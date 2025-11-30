@@ -58,6 +58,12 @@ export interface SearchOptions {
   search_parameters?: SearchParameters;
 }
 
+export interface ChatOptions {
+  model?: string;
+  temperature?: number;
+  searchOptions?: SearchOptions;
+}
+
 export interface GrokResponse {
   choices: Array<{
     message: {
@@ -67,6 +73,11 @@ export interface GrokResponse {
     };
     finish_reason: string;
   }>;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
 }
 
 export class GrokClient {
@@ -118,22 +129,28 @@ export class GrokClient {
   async chat(
     messages: GrokMessage[],
     tools?: GrokTool[],
-    model?: string,
+    options?: string | ChatOptions,
     searchOptions?: SearchOptions
   ): Promise<GrokResponse> {
     try {
+      // Support both old signature (model as string) and new signature (options object)
+      const opts: ChatOptions = typeof options === "string"
+        ? { model: options, searchOptions }
+        : options || {};
+
       const requestPayload: ChatRequestPayload = {
-        model: model || this.currentModel,
+        model: opts.model || this.currentModel,
         messages,
         tools: tools || [],
         tool_choice: tools && tools.length > 0 ? "auto" : undefined,
-        temperature: 0.7,
+        temperature: opts.temperature ?? 0.7,
         max_tokens: this.defaultMaxTokens,
       };
 
       // Add search parameters if specified
-      if (searchOptions?.search_parameters) {
-        requestPayload.search_parameters = searchOptions.search_parameters;
+      const searchOpts = opts.searchOptions || searchOptions;
+      if (searchOpts?.search_parameters) {
+        requestPayload.search_parameters = searchOpts.search_parameters;
       }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -149,23 +166,29 @@ export class GrokClient {
   async *chatStream(
     messages: GrokMessage[],
     tools?: GrokTool[],
-    model?: string,
+    options?: string | ChatOptions,
     searchOptions?: SearchOptions
   ): AsyncGenerator<ChatCompletionChunk, void, unknown> {
     try {
+      // Support both old signature (model as string) and new signature (options object)
+      const opts: ChatOptions = typeof options === "string"
+        ? { model: options, searchOptions }
+        : options || {};
+
       const requestPayload: ChatRequestPayload = {
-        model: model || this.currentModel,
+        model: opts.model || this.currentModel,
         messages,
         tools: tools || [],
         tool_choice: tools && tools.length > 0 ? "auto" : undefined,
-        temperature: 0.7,
+        temperature: opts.temperature ?? 0.7,
         max_tokens: this.defaultMaxTokens,
         stream: true,
       };
 
       // Add search parameters if specified
-      if (searchOptions?.search_parameters) {
-        requestPayload.search_parameters = searchOptions.search_parameters;
+      const searchOpts = opts.searchOptions || searchOptions;
+      if (searchOpts?.search_parameters) {
+        requestPayload.search_parameters = searchOpts.search_parameters;
       }
 
       const stream = await this.client.chat.completions.create({

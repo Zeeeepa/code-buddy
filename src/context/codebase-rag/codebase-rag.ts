@@ -277,16 +277,18 @@ export class CodebaseRAG extends EventEmitter {
     const queryEmbedding = await this.embedder.embed(query);
     const searchResults = await this.vectorStore.search(queryEmbedding, k, filter);
 
-    return searchResults.map(result => {
+    const results: ScoredChunk[] = [];
+    for (const result of searchResults) {
       const chunk = this.chunkStore.get(result.id);
-      if (!chunk) return null;
-
-      return {
-        chunk,
-        score: result.score,
-        matchType: "semantic" as const,
-      };
-    }).filter((r): r is ScoredChunk => r !== null);
+      if (chunk) {
+        results.push({
+          chunk,
+          score: result.score,
+          matchType: "semantic",
+        });
+      }
+    }
+    return results;
   }
 
   /**
