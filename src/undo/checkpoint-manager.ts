@@ -123,7 +123,7 @@ export class CheckpointManager extends EventEmitter {
   private currentIndex: number = -1;
   private workingDirectory: string;
   private autoCheckpointTimer: NodeJS.Timeout | null = null;
-  private dmp: diff_match_patch;
+  private dmp: InstanceType<typeof diff_match_patch>;
 
   constructor(workingDirectory: string, config: Partial<CheckpointConfig> = {}) {
     super();
