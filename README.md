@@ -144,6 +144,8 @@ Your CLI can query:
 - Grok
 - Claude
 - Gemini
+- **Ollama** (local models with tool support)
+- **LM Studio** (local models)
 - And more...
 
 And choose:
@@ -154,7 +156,82 @@ And choose:
 
 We wanted models to collaborate instead of fighting.
 
-### 🗺️ 7. Semantic Code Map — A GPS for Your Project
+### 🏠 7. Local AI Support — Your Local AI Army
+
+Run AI locally with **LM Studio**, **Ollama**, or any OpenAI-compatible server:
+
+- **Auto-detection** of function calling support based on model name
+- Works with Hermes, Llama 3.1/3.2, Qwen 2.5, Mistral, Mixtral, Functionary, Gorilla...
+- **Dynamic probing** to test model capabilities at startup
+- No cloud dependency for basic tasks
+- Full compatibility with the OpenAI API specification
+
+#### Ollama Setup
+
+```bash
+# Install Ollama (https://ollama.ai)
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Pull a model
+ollama pull llama3.2
+
+# Point grok-cli to Ollama
+export GROK_BASE_URL=http://localhost:11434/v1
+export GROK_API_KEY=ollama  # Any non-empty value works
+
+# Start with tool support (auto-enabled for Ollama!)
+grok --model "llama3.2"
+```
+
+#### LM Studio Setup
+
+```bash
+# Point to your LM Studio server
+export GROK_BASE_URL=http://localhost:1234/v1
+export GROK_API_KEY=lm-studio  # Any non-empty value works
+
+# Start with auto-detected tools
+grok --model "hermes-4-14b"  # Tools auto-enabled!
+```
+
+**CLI Options for Local Models:**
+```bash
+# Force enable tools (for models that support function calling)
+grok --force-tools --model "my-custom-model"
+
+# Probe model capabilities at startup
+grok --probe-tools --model "unknown-model"
+
+# Combine both for maximum compatibility
+grok --probe-tools --force-tools
+```
+
+**Environment Variables:**
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `GROK_BASE_URL` | API endpoint | `http://localhost:11434/v1` (Ollama) or `http://localhost:1234/v1` (LM Studio) |
+| `GROK_API_KEY` | API key (any value for local) | `ollama` or `lm-studio` |
+| `GROK_FORCE_TOOLS` | Force enable tools | `true` |
+| `GROK_MAX_TOKENS` | Max response tokens | `4096` |
+
+**Supported Local Providers:**
+| Provider | Default Port | Tool Support | Notes |
+|----------|--------------|--------------|-------|
+| **Ollama** | 11434 | Auto-enabled | Native OpenAI compatibility |
+| **LM Studio** | 1234 | Auto-detect | Depends on model |
+
+**Models with Auto-Detected Tool Support:**
+- Hermes 2 Pro, Hermes 3, Hermes 4
+- Llama 3.1, Llama 3.2 (native tool support)
+- Qwen 2.5, Qwen 2.5 Coder
+- Mistral, Mixtral
+- Functionary v2/v3
+- Gorilla OpenFunctions
+- DeepSeek Coder v2
+- Command-R
+- NexusRaven, FireFunction
+
+### 🗺️ 8. Semantic Code Map — A GPS for Your Project
 
 grok-cli analyzes:
 
@@ -171,7 +248,7 @@ You say "if I change this, what breaks?" → it explains.
 It's a GPS, but for devs.
 No subscription required.
 
-### 🤝 8. Real-Time Collaboration — Code Together, Even Remotely
+### 🤝 9. Real-Time Collaboration — Code Together, Even Remotely
 
 With WebSockets:
 
@@ -186,7 +263,7 @@ With WebSockets:
 Like Google Docs... but for coding.
 And more serious.
 
-### 📊 9. Analytics Dashboard — Because a Great Project Deserves Great Graphs
+### 📊 10. Analytics Dashboard — Because a Great Project Deserves Great Graphs
 
 Do you know how many tokens you consume?
 Which model costs the most?
@@ -197,7 +274,7 @@ Now you do.
 
 And you can export everything to JSON / CSV / Markdown.
 
-### 🧩 10. Plugin Marketplace — Open Your Door to Creativity
+### 🧩 11. Plugin Marketplace — Open Your Door to Creativity
 
 Plugins with:
 
@@ -210,7 +287,7 @@ Plugins with:
 
 Grok-cli can become whatever you choose to make of it.
 
-### 📡 11. Offline Mode — Even Without Internet, You're Not Alone
+### 📡 12. Offline Mode — Even Without Internet, You're Not Alone
 
 - intelligent cache
 - local execution via Ollama / llama.cpp
@@ -222,7 +299,7 @@ Even on a plane.
 Even in an elevator.
 Even at your parents' house.
 
-### 💾 12. Checkpoint & Undo System — Because Everyone Makes Mistakes
+### 💾 13. Checkpoint & Undo System — Because Everyone Makes Mistakes
 
 Before dangerous operations:
 👉 grok-cli creates a snapshot.
@@ -235,7 +312,7 @@ Want to go back?
 
 Like Git, but... cuddly.
 
-### 🎭 13. Personas — Your Personalized Assistants
+### 🎭 14. Personas — Your Personalized Assistants
 
 7 built-in personas:
 
@@ -251,7 +328,7 @@ You can create others.
 Your CLI becomes you.
 (The well-rested version.)
 
-### 🧠❤️ 14. Enhanced Memory — A Companion That Learns With You
+### 🧠❤️ 15. Enhanced Memory — A Companion That Learns With You
 
 - summaries
 - preferences

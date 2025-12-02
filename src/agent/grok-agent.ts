@@ -31,6 +31,7 @@ import { getMCPClient, MCPClient } from "../mcp/mcp-client.js";
 import { getSettingsManager } from "../utils/settings-manager.js";
 import { getSystemPromptForMode } from "../prompts/index.js";
 import { getCostTracker, CostTracker } from "../utils/cost-tracker.js";
+import { ContextManagerV2, createContextManager } from "../context/context-manager-v2.js";
 
 /**
  * Represents a single entry in the chat history
@@ -120,6 +121,7 @@ export class GrokAgent extends EventEmitter {
   private sessionCostLimit: number;
   private sessionCost: number = 0;
   private costTracker: CostTracker;
+  private contextManager: ContextManagerV2;
 
   /**
    * Create a new GrokAgent instance
@@ -164,6 +166,15 @@ export class GrokAgent extends EventEmitter {
     this.webSearch = new WebSearchTool();
     this.imageTool = new ImageTool();
     this.tokenCounter = createTokenCounter(modelToUse);
+
+    // Initialize context manager with model-specific limits
+    // Detect max tokens from environment or use model default
+    const envMaxContext = Number(process.env.GROK_MAX_CONTEXT);
+    const maxContextTokens = Number.isFinite(envMaxContext) && envMaxContext > 0
+      ? envMaxContext
+      : undefined;
+    this.contextManager = createContextManager(modelToUse, maxContextTokens);
+
     this.checkpointManager = getCheckpointManager();
     this.sessionStore = getSessionStore();
     this.modeManager = getAgentModeManager();
@@ -190,9 +201,14 @@ export class GrokAgent extends EventEmitter {
     });
   }
 
-  private async initializeMCP(): Promise<void> {
+  /**
+   * Initialize MCP servers in the background
+   * Properly handles errors and doesn't create unhandled promise rejections
+   */
+  private initializeMCP(): void {
     // Initialize MCP in the background without blocking
-    Promise.resolve().then(async () => {
+    // Using IIFE with .catch() to properly handle any errors
+    (async () => {
       try {
         const config = loadMCPConfig();
         if (config.servers.length > 0) {
@@ -201,6 +217,9 @@ export class GrokAgent extends EventEmitter {
       } catch (error) {
         console.warn("MCP initialization failed:", error);
       }
+    })().catch((error) => {
+      // This catch handles any uncaught errors from the IIFE
+      console.warn("Uncaught error in MCP initialization:", error);
     });
   }
 
@@ -397,11 +416,25 @@ export class GrokAgent extends EventEmitter {
     const maxToolRounds = this.maxToolRounds; // Prevent infinite loops
     let toolRounds = 0;
 
+    // Track token usage for cost calculation
+    const inputTokens = this.tokenCounter.countMessageTokens(this.messages as any);
+    let totalOutputTokens = 0;
+
     try {
       // Use RAG-based tool selection for initial query
       const { tools } = await this.getToolsForQuery(message);
+
+      // Apply context management - compress messages if approaching token limits
+      const preparedMessages = this.contextManager.prepareMessages(this.messages);
+
+      // Check for context warnings
+      const contextWarning = this.contextManager.shouldWarn(preparedMessages);
+      if (contextWarning.warn) {
+        console.warn(contextWarning.message);
+      }
+
       let currentResponse = await this.grokClient.chat(
-        this.messages,
+        preparedMessages,
         tools,
         undefined,
         this.isGrokModel() && this.shouldUseSearchFor(message)
@@ -415,6 +448,14 @@ export class GrokAgent extends EventEmitter {
 
         if (!assistantMessage) {
           throw new Error("No response from Grok");
+        }
+
+        // Track output tokens from response
+        if (currentResponse.usage) {
+          totalOutputTokens += currentResponse.usage.completion_tokens || 0;
+        } else if (assistantMessage.content) {
+          // Estimate if usage not provided
+          totalOutputTokens += this.tokenCounter.countTokens(assistantMessage.content);
         }
 
         // Handle tool calls
@@ -496,8 +537,10 @@ export class GrokAgent extends EventEmitter {
           }
 
           // Get next response - this might contain more tool calls
+          // Apply context management again for long tool chains
+          const nextPreparedMessages = this.contextManager.prepareMessages(this.messages);
           currentResponse = await this.grokClient.chat(
-            this.messages,
+            nextPreparedMessages,
             tools,
             undefined,
             this.isGrokModel() && this.shouldUseSearchFor(message)
@@ -531,7 +574,21 @@ export class GrokAgent extends EventEmitter {
           timestamp: new Date(),
         };
         this.chatHistory.push(warningEntry);
+        this.messages.push({ role: "assistant", content: warningEntry.content });
         newEntries.push(warningEntry);
+      }
+
+      // Record session cost and check limit
+      this.recordSessionCost(inputTokens, totalOutputTokens);
+      if (this.isSessionCostLimitReached()) {
+        const costEntry: ChatEntry = {
+          type: "assistant",
+          content: `💸 Session cost limit reached ($${this.sessionCost.toFixed(2)} / $${this.sessionCostLimit.toFixed(2)}). Please start a new session.`,
+          timestamp: new Date(),
+        };
+        this.chatHistory.push(costEntry);
+        this.messages.push({ role: "assistant", content: costEntry.content });
+        newEntries.push(costEntry);
       }
 
       return newEntries;
@@ -668,8 +725,21 @@ export class GrokAgent extends EventEmitter {
           // Use cached tools from first round instead of ALL tools
           tools = this.cachedSelectedTools || await getAllGrokTools();
         }
+
+        // Apply context management - compress messages if approaching token limits
+        const preparedMessages = this.contextManager.prepareMessages(this.messages);
+
+        // Check for context warnings and emit to user
+        const contextWarning = this.contextManager.shouldWarn(preparedMessages);
+        if (contextWarning.warn) {
+          yield {
+            type: "content",
+            content: `\n${contextWarning.message}\n`,
+          };
+        }
+
         const stream = this.grokClient.chatStream(
-          this.messages,
+          preparedMessages,
           tools,
           undefined,
           this.isGrokModel() && this.shouldUseSearchFor(message)
@@ -1033,6 +1103,8 @@ export class GrokAgent extends EventEmitter {
     // Update token counter for new model
     this.tokenCounter.dispose();
     this.tokenCounter = createTokenCounter(model);
+    // Update context manager for new model limits
+    this.contextManager.updateConfig({ model });
   }
 
   /**
@@ -1422,6 +1494,39 @@ export class GrokAgent extends EventEmitter {
     return `${modeStr} | Session: $${this.sessionCost.toFixed(4)} / ${limitStr} | Rounds: ${this.maxToolRounds} max`;
   }
 
+  // Context Management methods
+
+  /**
+   * Get current context statistics
+   */
+  getContextStats() {
+    return this.contextManager.getStats(this.messages);
+  }
+
+  /**
+   * Format context stats as a readable string
+   */
+  formatContextStats(): string {
+    const stats = this.contextManager.getStats(this.messages);
+    const status = stats.isCritical ? '🔴 Critical' :
+                   stats.isNearLimit ? '🟡 Warning' : '🟢 Normal';
+    return `Context: ${stats.totalTokens}/${stats.maxTokens} tokens (${stats.usagePercent.toFixed(1)}%) ${status} | Messages: ${stats.messageCount} | Summaries: ${stats.summarizedSessions}`;
+  }
+
+  /**
+   * Update context manager configuration
+   * @param config - Partial configuration to update
+   */
+  updateContextConfig(config: {
+    maxContextTokens?: number;
+    responseReserveTokens?: number;
+    recentMessagesCount?: number;
+    enableSummarization?: boolean;
+    compressionRatio?: number;
+  }): void {
+    this.contextManager.updateConfig(config);
+  }
+
   /**
    * Clean up all resources
    * Should be called when the agent is no longer needed
@@ -1430,6 +1535,11 @@ export class GrokAgent extends EventEmitter {
     // Clean up token counter
     if (this.tokenCounter) {
       this.tokenCounter.dispose();
+    }
+
+    // Clean up context manager
+    if (this.contextManager) {
+      this.contextManager.dispose();
     }
 
     // Abort any ongoing operations

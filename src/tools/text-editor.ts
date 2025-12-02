@@ -7,13 +7,45 @@ import { ConfirmationService } from "../utils/confirmation-service.js";
 export class TextEditorTool {
   private editHistory: EditorCommand[] = [];
   private confirmationService = ConfirmationService.getInstance();
+  private baseDirectory: string = process.cwd();
+
+  /**
+   * Validate path is within allowed directory (prevent path traversal)
+   */
+  private validatePath(filePath: string): { valid: boolean; resolved: string; error?: string } {
+    const resolved = path.resolve(filePath);
+    const normalizedBase = path.normalize(this.baseDirectory);
+    const normalizedResolved = path.normalize(resolved);
+
+    // Allow paths within the base directory
+    if (!normalizedResolved.startsWith(normalizedBase)) {
+      return {
+        valid: false,
+        resolved,
+        error: `Path traversal not allowed: ${filePath} resolves outside project directory`
+      };
+    }
+
+    return { valid: true, resolved };
+  }
+
+  /**
+   * Set the base directory for path validation
+   */
+  setBaseDirectory(dir: string): void {
+    this.baseDirectory = path.resolve(dir);
+  }
 
   async view(
     filePath: string,
     viewRange?: [number, number]
   ): Promise<ToolResult> {
     try {
-      const resolvedPath = path.resolve(filePath);
+      const pathValidation = this.validatePath(filePath);
+      if (!pathValidation.valid) {
+        return { success: false, error: pathValidation.error };
+      }
+      const resolvedPath = pathValidation.resolved;
 
       if (await fs.pathExists(resolvedPath)) {
         const stats = await fs.stat(resolvedPath);
@@ -75,7 +107,11 @@ export class TextEditorTool {
     replaceAll: boolean = false
   ): Promise<ToolResult> {
     try {
-      const resolvedPath = path.resolve(filePath);
+      const pathValidation = this.validatePath(filePath);
+      if (!pathValidation.valid) {
+        return { success: false, error: pathValidation.error };
+      }
+      const resolvedPath = pathValidation.resolved;
 
       if (!(await fs.pathExists(resolvedPath))) {
         return {
@@ -165,7 +201,11 @@ export class TextEditorTool {
 
   async create(filePath: string, content: string): Promise<ToolResult> {
     try {
-      const resolvedPath = path.resolve(filePath);
+      const pathValidation = this.validatePath(filePath);
+      if (!pathValidation.valid) {
+        return { success: false, error: pathValidation.error };
+      }
+      const resolvedPath = pathValidation.resolved;
 
       // Check if file already exists - prevent accidental overwrite
       if (await fs.pathExists(resolvedPath)) {
@@ -245,7 +285,11 @@ export class TextEditorTool {
     newContent: string
   ): Promise<ToolResult> {
     try {
-      const resolvedPath = path.resolve(filePath);
+      const pathValidation = this.validatePath(filePath);
+      if (!pathValidation.valid) {
+        return { success: false, error: pathValidation.error };
+      }
+      const resolvedPath = pathValidation.resolved;
 
       if (!(await fs.pathExists(resolvedPath))) {
         return {
@@ -332,7 +376,11 @@ export class TextEditorTool {
     content: string
   ): Promise<ToolResult> {
     try {
-      const resolvedPath = path.resolve(filePath);
+      const pathValidation = this.validatePath(filePath);
+      if (!pathValidation.valid) {
+        return { success: false, error: pathValidation.error };
+      }
+      const resolvedPath = pathValidation.resolved;
 
       if (!(await fs.pathExists(resolvedPath))) {
         return {
@@ -343,6 +391,40 @@ export class TextEditorTool {
 
       const fileContent = await fs.readFile(resolvedPath, "utf-8");
       const lines = fileContent.split("\n");
+
+      // Validate insert line
+      if (insertLine < 1 || insertLine > lines.length + 1) {
+        return {
+          success: false,
+          error: `Invalid insert line: ${insertLine}. Must be between 1 and ${lines.length + 1}.`,
+        };
+      }
+
+      // Request confirmation for insert operation
+      const sessionFlags = this.confirmationService.getSessionFlags();
+      if (!sessionFlags.fileOperations && !sessionFlags.allOperations) {
+        const previewLines = [...lines];
+        previewLines.splice(insertLine - 1, 0, content);
+        const diffContent = this.generateDiff(lines, previewLines, filePath);
+
+        const confirmationResult =
+          await this.confirmationService.requestConfirmation(
+            {
+              operation: `Insert at line ${insertLine}`,
+              filename: filePath,
+              showVSCodeOpen: false,
+              content: diffContent,
+            },
+            "file"
+          );
+
+        if (!confirmationResult.confirmed) {
+          return {
+            success: false,
+            error: confirmationResult.feedback || "Insert operation cancelled by user",
+          };
+        }
+      }
 
       lines.splice(insertLine - 1, 0, content);
       const newContent = lines.join("\n");
@@ -383,10 +465,8 @@ export class TextEditorTool {
         case "str_replace":
           if (lastEdit.path && lastEdit.old_str && lastEdit.new_str) {
             const content = await fs.readFile(lastEdit.path, "utf-8");
-            const revertedContent = content.replace(
-              lastEdit.new_str,
-              lastEdit.old_str
-            );
+            // Use split/join to replace ALL occurrences (replaceAll equivalent)
+            const revertedContent = content.split(lastEdit.new_str).join(lastEdit.old_str);
             await writeFilePromise(lastEdit.path, revertedContent, "utf-8");
           }
           break;

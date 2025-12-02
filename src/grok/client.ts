@@ -87,6 +87,7 @@ export class GrokClient {
   private baseURL: string;
   private toolSupportProbed: boolean = false;
   private toolSupportDetected: boolean | null = null;
+  private probePromise: Promise<boolean> | null = null;
 
   constructor(apiKey: string, model?: string, baseURL?: string) {
     this.baseURL = baseURL || process.env.GROK_BASE_URL || "https://api.x.ai/v1";
@@ -115,6 +116,7 @@ export class GrokClient {
   /**
    * Probe the model to check if it supports function calling
    * Makes a quick test request with a simple tool
+   * Uses promise-based locking to prevent concurrent probes
    */
   async probeToolSupport(): Promise<boolean> {
     // Skip if already probed
@@ -122,9 +124,14 @@ export class GrokClient {
       return this.toolSupportDetected;
     }
 
+    // Return existing probe if already in progress (prevent race condition)
+    if (this.probePromise) {
+      return this.probePromise;
+    }
+
     // Skip probe for known providers that support tools
     const modelInfo = getModelInfo(this.currentModel);
-    if (['xai', 'anthropic', 'google'].includes(modelInfo.provider)) {
+    if (['xai', 'anthropic', 'google', 'ollama'].includes(modelInfo.provider)) {
       this.toolSupportProbed = true;
       this.toolSupportDetected = true;
       return true;
@@ -144,7 +151,15 @@ export class GrokClient {
       return true;
     }
 
-    // Probe with a simple tool call
+    // Create and cache the probe promise to prevent concurrent probes
+    this.probePromise = this.performToolProbe();
+    return this.probePromise;
+  }
+
+  /**
+   * Perform the actual tool support probe
+   */
+  private async performToolProbe(): Promise<boolean> {
     try {
       const testTool: GrokTool = {
         type: "function",
@@ -168,12 +183,22 @@ export class GrokClient {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any);
 
+      // Check if response has valid choices
+      if (!response.choices || response.choices.length === 0) {
+        console.warn("Tool support probe returned empty choices array");
+        this.toolSupportProbed = true;
+        this.toolSupportDetected = false;
+        this.probePromise = null;
+        return false;
+      }
+
       // Check if the model attempted to use the tool
-      const message = response.choices[0]?.message;
+      const message = response.choices[0].message;
       const hasToolCall = !!(message?.tool_calls && message.tool_calls.length > 0);
 
       this.toolSupportProbed = true;
       this.toolSupportDetected = hasToolCall;
+      this.probePromise = null;
 
       if (hasToolCall) {
         console.log("🔧 Tool support: DETECTED (model supports function calling)");
@@ -184,6 +209,7 @@ export class GrokClient {
       // If the request fails (e.g., tools not supported), assume no tool support
       this.toolSupportProbed = true;
       this.toolSupportDetected = false;
+      this.probePromise = null;
       return false;
     }
   }
@@ -242,6 +268,10 @@ export class GrokClient {
     }
 
     const modelInfo = getModelInfo(this.currentModel);
+    // Ollama supports tools via OpenAI-compatible API - always enable
+    if (modelInfo.provider === 'ollama') return false;
+    if (this.baseURL.includes('localhost:11434')) return false;
+    if (this.baseURL.includes('127.0.0.1:11434')) return false;
     // Check if provider is lmstudio or if baseURL points to common local servers
     if (modelInfo.provider === 'lmstudio') return true;
     if (this.baseURL.includes('localhost:1234')) return true;

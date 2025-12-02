@@ -308,15 +308,28 @@ export class BashTool {
     return this.currentDirectory;
   }
 
+  /**
+   * Escape shell argument to prevent command injection
+   */
+  private escapeShellArg(arg: string): string {
+    // Use single quotes and escape any single quotes in the string
+    return `'${arg.replace(/'/g, "'\\''")}'`;
+  }
+
   async listFiles(directory: string = '.'): Promise<ToolResult> {
-    return this.execute(`ls -la ${directory}`);
+    const safeDir = this.escapeShellArg(directory);
+    return this.execute(`ls -la ${safeDir}`);
   }
 
   async findFiles(pattern: string, directory: string = '.'): Promise<ToolResult> {
-    return this.execute(`find ${directory} -name "${pattern}" -type f`);
+    const safeDir = this.escapeShellArg(directory);
+    const safePattern = this.escapeShellArg(pattern);
+    return this.execute(`find ${safeDir} -name ${safePattern} -type f`);
   }
 
   async grep(pattern: string, files: string = '.'): Promise<ToolResult> {
-    return this.execute(`grep -r "${pattern}" ${files}`);
+    const safePattern = this.escapeShellArg(pattern);
+    const safeFiles = this.escapeShellArg(files);
+    return this.execute(`grep -r ${safePattern} ${safeFiles}`);
   }
 }

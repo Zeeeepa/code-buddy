@@ -6,7 +6,7 @@ import { SUPPORTED_MODELS } from '../config/constants.js';
 import { ValidationError } from './errors.js';
 
 export type ModelName = keyof typeof SUPPORTED_MODELS;
-export type ModelProvider = 'xai' | 'anthropic' | 'google' | 'lmstudio' | 'unknown';
+export type ModelProvider = 'xai' | 'anthropic' | 'google' | 'lmstudio' | 'ollama' | 'unknown';
 
 export interface ModelInfo {
   maxTokens: number;
@@ -73,6 +73,8 @@ export function getDefaultModel(provider: ModelProvider = 'xai'): string {
       return 'gemini-2.5-pro';
     case 'lmstudio':
       return 'local-model';
+    case 'ollama':
+      return 'llama3.2';
     default:
       return 'grok-beta';
   }

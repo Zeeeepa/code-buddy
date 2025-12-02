@@ -140,6 +140,63 @@ export class ConfigurationError extends GrokError {
 }
 
 /**
+ * Error thrown when MCP server communication fails
+ */
+export class MCPError extends GrokError {
+  constructor(
+    message: string,
+    public serverName?: string,
+    public operation?: string
+  ) {
+    super(message, 'MCP_ERROR', { serverName, operation });
+  }
+}
+
+/**
+ * Error thrown when search operation fails
+ */
+export class SearchError extends GrokError {
+  constructor(
+    message: string,
+    public query?: string,
+    public searchType?: 'ripgrep' | 'web' | 'symbol'
+  ) {
+    super(message, 'SEARCH_ERROR', { query, searchType });
+  }
+}
+
+/**
+ * Error thrown when code parsing fails
+ */
+export class ParserError extends GrokError {
+  constructor(
+    message: string,
+    public filePath?: string,
+    public language?: string
+  ) {
+    super(message, 'PARSER_ERROR', { filePath, language });
+  }
+}
+
+/**
+ * Error thrown when path traversal is attempted
+ */
+export class PathTraversalError extends GrokError {
+  constructor(message: string, public attemptedPath: string, public basePath?: string) {
+    super(message, 'PATH_TRAVERSAL_ERROR', { attemptedPath, basePath });
+  }
+}
+
+/**
+ * Error thrown when JSON parsing fails
+ */
+export class JSONParseError extends GrokError {
+  constructor(message: string, public input?: string) {
+    super(message, 'JSON_PARSE_ERROR', { input: input?.substring(0, 200) });
+  }
+}
+
+/**
  * Checks if an error is a GrokError or subclass
  */
 export function isGrokError(error: unknown): error is GrokError {

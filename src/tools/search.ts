@@ -234,6 +234,14 @@ export class SearchTool {
       const rg = spawn("rg", args);
       let output = "";
       let errorOutput = "";
+      let timedOut = false;
+
+      // Add timeout to prevent hanging on slow filesystems
+      const SEARCH_TIMEOUT = 30000; // 30 seconds
+      const timeout = setTimeout(() => {
+        timedOut = true;
+        rg.kill("SIGKILL");
+      }, SEARCH_TIMEOUT);
 
       rg.stdout.on("data", (data) => {
         output += data.toString();
@@ -244,7 +252,10 @@ export class SearchTool {
       });
 
       rg.on("close", (code) => {
-        if (code === 0 || code === 1) {
+        clearTimeout(timeout);
+        if (timedOut) {
+          reject(new Error(`Search timed out after ${SEARCH_TIMEOUT / 1000} seconds`));
+        } else if (code === 0 || code === 1) {
           // 0 = found, 1 = not found
           const results = this.parseRipgrepOutput(output);
           resolve(results);
@@ -254,6 +265,7 @@ export class SearchTool {
       });
 
       rg.on("error", (error) => {
+        clearTimeout(timeout);
         reject(error);
       });
     });

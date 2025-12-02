@@ -81,6 +81,8 @@ export const API_CONFIG = {
   RETRY_DELAY: 1000,
   /** LM Studio default base URL */
   LMSTUDIO_BASE_URL: 'http://localhost:1234/v1',
+  /** Ollama default base URL */
+  OLLAMA_BASE_URL: 'http://localhost:11434/v1',
 } as const;
 
 export const PATHS = {
@@ -121,6 +123,23 @@ export const SUPPORTED_MODELS = {
   'deepseek-coder': { maxTokens: 16384, provider: 'lmstudio' },
   'qwen2.5-coder': { maxTokens: 32768, provider: 'lmstudio' },
   'phi-3': { maxTokens: 4096, provider: 'lmstudio' },
+  // Ollama models (local inference via OpenAI-compatible API)
+  'ollama': { maxTokens: 8192, provider: 'ollama' },
+  'llama3.2': { maxTokens: 131072, provider: 'ollama' },
+  'llama3.2:1b': { maxTokens: 131072, provider: 'ollama' },
+  'llama3.2:3b': { maxTokens: 131072, provider: 'ollama' },
+  'llama3.1': { maxTokens: 131072, provider: 'ollama' },
+  'llama3.1:8b': { maxTokens: 131072, provider: 'ollama' },
+  'llama3.1:70b': { maxTokens: 131072, provider: 'ollama' },
+  'mistral': { maxTokens: 32768, provider: 'ollama' },
+  'mixtral': { maxTokens: 32768, provider: 'ollama' },
+  'codellama': { maxTokens: 16384, provider: 'ollama' },
+  'deepseek-coder-v2': { maxTokens: 131072, provider: 'ollama' },
+  'qwen2.5': { maxTokens: 32768, provider: 'ollama' },
+  'qwen2.5-coder:7b': { maxTokens: 32768, provider: 'ollama' },
+  'phi3': { maxTokens: 4096, provider: 'ollama' },
+  'gemma2': { maxTokens: 8192, provider: 'ollama' },
+  'command-r': { maxTokens: 131072, provider: 'ollama' },
 } as const;
 
 export const TOKEN_LIMITS = {
