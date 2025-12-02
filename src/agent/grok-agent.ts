@@ -1035,6 +1035,14 @@ export class GrokAgent extends EventEmitter {
     this.tokenCounter = createTokenCounter(model);
   }
 
+  /**
+   * Probe the model to check if it supports function calling
+   * Makes a quick test request with a simple tool
+   */
+  async probeToolSupport(): Promise<boolean> {
+    return this.grokClient.probeToolSupport();
+  }
+
   abortCurrentOperation(): void {
     if (this.abortController) {
       this.abortController.abort();

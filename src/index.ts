@@ -383,6 +383,10 @@ program
     "--force-tools",
     "enable tools/function calling for local models (LM Studio)"
   )
+  .option(
+    "--probe-tools",
+    "auto-detect tool support by testing the model at startup"
+  )
   .action(async (message, options) => {
     // Handle --init flag
     if (options.init) {
@@ -443,6 +447,15 @@ program
 
       // Interactive mode: launch UI
       const agent = new GrokAgent(apiKey, baseURL, model, maxToolRounds);
+
+      // Probe for tool support if requested
+      if (options.probeTools) {
+        console.log("🔍 Probing model for tool support...");
+        const hasToolSupport = await agent.probeToolSupport();
+        if (!hasToolSupport) {
+          console.log("ℹ️ Tool support: NOT DETECTED (using chat-only mode)");
+        }
+      }
 
       // Configure security mode if specified
       if (options.securityMode) {

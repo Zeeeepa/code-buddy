@@ -85,6 +85,8 @@ export class GrokClient {
   private currentModel: string = "grok-code-fast-1";
   private defaultMaxTokens: number;
   private baseURL: string;
+  private toolSupportProbed: boolean = false;
+  private toolSupportDetected: boolean | null = null;
 
   constructor(apiKey: string, model?: string, baseURL?: string) {
     this.baseURL = baseURL || process.env.GROK_BASE_URL || "https://api.x.ai/v1";
@@ -107,6 +109,82 @@ export class GrokClient {
           `Warning: Model '${model}' is not officially supported. Using default token limits.`
         );
       }
+    }
+  }
+
+  /**
+   * Probe the model to check if it supports function calling
+   * Makes a quick test request with a simple tool
+   */
+  async probeToolSupport(): Promise<boolean> {
+    // Skip if already probed
+    if (this.toolSupportProbed && this.toolSupportDetected !== null) {
+      return this.toolSupportDetected;
+    }
+
+    // Skip probe for known providers that support tools
+    const modelInfo = getModelInfo(this.currentModel);
+    if (['xai', 'anthropic', 'google'].includes(modelInfo.provider)) {
+      this.toolSupportProbed = true;
+      this.toolSupportDetected = true;
+      return true;
+    }
+
+    // Skip probe if force tools is enabled
+    if (process.env.GROK_FORCE_TOOLS === 'true') {
+      this.toolSupportProbed = true;
+      this.toolSupportDetected = true;
+      return true;
+    }
+
+    // Check static list first (fast path)
+    if (this.modelSupportsFunctionCalling()) {
+      this.toolSupportProbed = true;
+      this.toolSupportDetected = true;
+      return true;
+    }
+
+    // Probe with a simple tool call
+    try {
+      const testTool: GrokTool = {
+        type: "function",
+        function: {
+          name: "get_current_time",
+          description: "Get the current time",
+          parameters: {
+            type: "object",
+            properties: {},
+            required: [],
+          },
+        },
+      };
+
+      const response = await this.client.chat.completions.create({
+        model: this.currentModel,
+        messages: [{ role: "user", content: "What time is it? Use the get_current_time tool." }],
+        tools: [testTool],
+        tool_choice: "auto",
+        max_tokens: 50,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
+
+      // Check if the model attempted to use the tool
+      const message = response.choices[0]?.message;
+      const hasToolCall = !!(message?.tool_calls && message.tool_calls.length > 0);
+
+      this.toolSupportProbed = true;
+      this.toolSupportDetected = hasToolCall;
+
+      if (hasToolCall) {
+        console.log("🔧 Tool support: DETECTED (model supports function calling)");
+      }
+
+      return hasToolCall;
+    } catch (error) {
+      // If the request fails (e.g., tools not supported), assume no tool support
+      this.toolSupportProbed = true;
+      this.toolSupportDetected = false;
+      return false;
     }
   }
 
@@ -151,6 +229,11 @@ export class GrokClient {
     // Allow forcing tools for local models that support function calling
     if (process.env.GROK_FORCE_TOOLS === 'true') {
       return false;
+    }
+
+    // Use probed result if available
+    if (this.toolSupportProbed && this.toolSupportDetected === true) {
+      return false; // Enable tools - probe detected support
     }
 
     // Auto-detect function calling support based on model name
