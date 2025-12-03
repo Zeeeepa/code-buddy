@@ -13,7 +13,6 @@
 import { EventEmitter } from 'events';
 import { spawn } from 'child_process';
 import * as path from 'path';
-import * as fs from 'fs-extra';
 import * as os from 'os';
 
 export interface ParallelAgentConfig {
@@ -223,7 +222,7 @@ export class AdvancedParallelExecutor extends EventEmitter {
    */
   private async runAgentTask(
     task: ParallelAgentConfig,
-    workdir: string
+    _workdir: string
   ): Promise<{
     success: boolean;
     output: string;

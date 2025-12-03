@@ -10,7 +10,7 @@
  */
 
 import { EventEmitter } from "events";
-import { GrokClient, GrokMessage, GrokTool } from "../../grok/client.js";
+import { GrokClient, GrokMessage } from "../../grok/client.js";
 import { ToolResult } from "../../types/index.js";
 import {
   ThoughtNode,
@@ -24,7 +24,7 @@ import {
   CoTResult,
   CoTStep,
 } from "./types.js";
-import { MCTS, createMCTS } from "./mcts.js";
+import { createMCTS } from "./mcts.js";
 
 /**
  * Configuration for the ToT reasoner

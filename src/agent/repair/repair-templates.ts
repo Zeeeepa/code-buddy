@@ -11,9 +11,7 @@
 
 import {
   RepairTemplate,
-  FaultType,
   Fault,
-  PatchChange,
   RepairPatch,
   RepairStrategy,
 } from "./types.js";
@@ -395,7 +393,7 @@ export class TemplateRepairEngine {
       };
 
       return patch;
-    } catch (error) {
+    } catch {
       return null;
     }
   }

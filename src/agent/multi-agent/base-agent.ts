@@ -6,8 +6,7 @@
  */
 
 import { EventEmitter } from "events";
-import { GrokClient, GrokMessage, GrokToolCall, GrokTool } from "../../grok/client.js";
-import { ToolResult } from "../../types/index.js";
+import { GrokClient, GrokMessage, GrokTool } from "../../grok/client.js";
 import {
   AgentRole,
   AgentConfig,
@@ -18,7 +17,6 @@ import {
   TaskArtifact,
   SharedContext,
   ToolExecutor,
-  CodeLocation,
 } from "./types.js";
 
 /**

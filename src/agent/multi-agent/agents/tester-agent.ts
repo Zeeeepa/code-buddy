@@ -17,7 +17,6 @@ import {
   SharedContext,
   AgentExecutionResult,
   ToolExecutor,
-  TaskArtifact,
 } from "../types.js";
 import { GrokTool } from "../../../grok/client.js";
 
@@ -440,8 +439,8 @@ STEPS:
    * Detect test framework from project
    */
   async detectTestFramework(
-    tools: GrokTool[],
-    executeTool: ToolExecutor
+    _tools: GrokTool[],
+    _executeTool: ToolExecutor
   ): Promise<string | null> {
     // This would analyze package.json and config files
     // For now, return null to let the agent detect it

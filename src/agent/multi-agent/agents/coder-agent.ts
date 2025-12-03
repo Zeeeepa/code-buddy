@@ -14,7 +14,6 @@ import { BaseAgent, createId } from "../base-agent.js";
 import {
   AgentConfig,
   AgentTask,
-  TaskArtifact,
   SharedContext,
   AgentExecutionResult,
   ToolExecutor,
@@ -288,8 +287,8 @@ TEST REQUIREMENTS:
    */
   async learnCodeStyle(
     filePath: string,
-    tools: GrokTool[],
-    executeTool: ToolExecutor
+    _tools: GrokTool[],
+    _executeTool: ToolExecutor
   ): Promise<void> {
     // This would analyze the file and extract style patterns
     // For now, just store the file path

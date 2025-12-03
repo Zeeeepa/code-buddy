@@ -18,7 +18,6 @@ import {
   AgentRole,
   AgentTask,
   ExecutionPlan,
-  PlanPhase,
   SharedContext,
   AgentExecutionResult,
   WorkflowResult,
@@ -26,7 +25,6 @@ import {
   WorkflowOptions,
   AgentMessage,
   TaskArtifact,
-  CollaborationStrategy,
   CodebaseInfo,
   Decision,
   ToolExecutor,
@@ -34,8 +32,8 @@ import {
 import { BaseAgent, createId } from "./base-agent.js";
 import { OrchestratorAgent, createOrchestratorAgent } from "./agents/orchestrator-agent.js";
 import { CoderAgent, createCoderAgent } from "./agents/coder-agent.js";
-import { ReviewerAgent, createReviewerAgent, ReviewResult } from "./agents/reviewer-agent.js";
-import { TesterAgent, createTesterAgent, TestResult } from "./agents/tester-agent.js";
+import { ReviewerAgent, createReviewerAgent } from "./agents/reviewer-agent.js";
+import { TesterAgent, createTesterAgent } from "./agents/tester-agent.js";
 
 /**
  * Default workflow options

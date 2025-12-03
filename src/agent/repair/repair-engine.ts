@@ -16,12 +16,10 @@ import { EventEmitter } from "events";
 import { GrokClient, GrokMessage } from "../../grok/client.js";
 import {
   Fault,
-  FaultType,
   RepairConfig,
   RepairResult,
   RepairPatch,
   PatchChange,
-  RepairStrategy,
   TestValidationResult,
   RepairSession,
   RepairStats,
@@ -372,7 +370,7 @@ export class RepairEngine extends EventEmitter {
           patches.push(patch);
         }
       }
-    } catch (error) {
+    } catch {
       // LLM generation failed, return empty
     }
 
@@ -494,7 +492,7 @@ Please provide an improved fix that addresses the issues with the previous attem
    */
   private async validatePatch(
     patch: RepairPatch,
-    fault: Fault
+    _fault: Fault
   ): Promise<TestValidationResult> {
     const defaultResult: TestValidationResult = {
       success: true,
