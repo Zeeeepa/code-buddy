@@ -102,6 +102,23 @@ export type {
   VoiceInputState
 } from '../input/voice-input-enhanced.js';
 
+// Text-to-Speech (Edge TTS)
+import {
+  TextToSpeechManager as _TextToSpeechManager,
+  getTTSManager as _getTTSManager,
+  resetTTSManager as _resetTTSManager,
+} from '../input/text-to-speech.js';
+
+export {
+  _TextToSpeechManager as TextToSpeechManager,
+  _getTTSManager as getTTSManager,
+  _resetTTSManager as resetTTSManager,
+};
+export type {
+  TTSConfig,
+  TTSState
+} from '../input/text-to-speech.js';
+
 // Background Tasks (inspired by Codex CLI Cloud)
 import {
   BackgroundTaskManager as _BackgroundTaskManager,
@@ -211,6 +228,12 @@ export function getFeatureStatusSummary(): string {
   output += '🎤 Voice Input\n';
   output += `   • Status: ${voiceInput.isEnabled() ? '✅ Enabled' : '❌ Disabled'}\n`;
   output += `   • Provider: ${voiceInput.getConfig().provider}\n\n`;
+
+  const tts = _getTTSManager();
+  output += '🔊 Text-to-Speech\n';
+  output += `   • Status: ${tts.getConfig().enabled ? '✅ Enabled' : '❌ Disabled'}\n`;
+  output += `   • Provider: ${tts.getConfig().provider}\n`;
+  output += `   • Auto-speak: ${tts.getConfig().autoSpeak ? 'Yes' : 'No'}\n\n`;
 
   output += '📋 Background Tasks\n';
   output += `   • Total: ${taskStats.total} | Running: ${taskStats.running} | Pending: ${taskStats.pending}\n`;

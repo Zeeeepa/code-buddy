@@ -13,6 +13,7 @@ import { getSelfHealingEngine } from "../utils/self-healing.js";
 import { ConfirmationService } from "../utils/confirmation-service.js";
 import { getThemeManager } from "../themes/theme-manager.js";
 import { getVoiceInputManager } from "../input/voice-input-enhanced.js";
+import { getTTSManager } from "../input/text-to-speech.js";
 
 /**
  * Enhanced Command Handler - Processes special command tokens
@@ -118,6 +119,12 @@ export class EnhancedCommandHandler {
 
       case "__VOICE__":
         return this.handleVoice(args);
+
+      case "__SPEAK__":
+        return this.handleSpeak(args);
+
+      case "__TTS__":
+        return this.handleTTS(args);
 
       default:
         return { handled: false };
@@ -1434,6 +1441,127 @@ Configuration file: ~/.grok/voice-config.json`;
       case "status":
       default:
         content = voiceManager.formatStatus();
+        break;
+    }
+
+    return {
+      handled: true,
+      entry: {
+        type: "assistant",
+        content,
+        timestamp: new Date(),
+      },
+    };
+  }
+
+  /**
+   * Speak - Text-to-speech
+   */
+  private async handleSpeak(args: string[]): Promise<CommandHandlerResult> {
+    const ttsManager = getTTSManager();
+    const text = args.join(" ");
+
+    if (!text || text.toLowerCase() === "stop") {
+      ttsManager.stop();
+      return {
+        handled: true,
+        entry: {
+          type: "assistant",
+          content: `🔇 Speech stopped.`,
+          timestamp: new Date(),
+        },
+      };
+    }
+
+    const availability = await ttsManager.isAvailable();
+    if (!availability.available) {
+      return {
+        handled: true,
+        entry: {
+          type: "assistant",
+          content: `❌ TTS not available: ${availability.reason}
+
+Install with: pip3 install edge-tts`,
+          timestamp: new Date(),
+        },
+      };
+    }
+
+    // Start speaking in background
+    ttsManager.speak(text, 'fr');
+
+    return {
+      handled: true,
+      entry: {
+        type: "assistant",
+        content: `🔊 Speaking: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`,
+        timestamp: new Date(),
+      },
+    };
+  }
+
+  /**
+   * TTS - Text-to-speech settings
+   */
+  private async handleTTS(args: string[]): Promise<CommandHandlerResult> {
+    const ttsManager = getTTSManager();
+    const action = args[0]?.toLowerCase();
+
+    let content: string;
+
+    switch (action) {
+      case "on":
+        ttsManager.enable();
+        content = `🔊 Text-to-Speech: ENABLED
+
+Provider: ${ttsManager.getConfig().provider}
+Use /speak <text> to speak text.`;
+        break;
+
+      case "off":
+        ttsManager.disable();
+        content = `🔇 Text-to-Speech: DISABLED`;
+        break;
+
+      case "auto":
+        const currentAuto = ttsManager.getConfig().autoSpeak;
+        ttsManager.setAutoSpeak(!currentAuto);
+        content = !currentAuto
+          ? `🔊 Auto-speak: ENABLED
+
+AI responses will now be spoken aloud automatically.`
+          : `🔇 Auto-speak: DISABLED
+
+AI responses will no longer be spoken automatically.`;
+        break;
+
+      case "voices":
+        const voices = await ttsManager.listVoices();
+        const frVoices = voices.filter(v => v.includes('fr-'));
+        content = `🎤 Available French Voices (${frVoices.length})
+
+${frVoices.slice(0, 10).map(v => `  • ${v}`).join('\n')}
+${frVoices.length > 10 ? `  ... and ${frVoices.length - 10} more` : ''}
+
+Set voice: /tts voice <name>
+Example: /tts voice fr-FR-HenriNeural`;
+        break;
+
+      case "voice":
+        if (args[1]) {
+          ttsManager.updateConfig({ voice: args[1] });
+          content = `✅ Voice set to: ${args[1]}`;
+        } else {
+          content = `Usage: /tts voice <voice-name>
+
+Example: /tts voice fr-FR-HenriNeural
+Use /tts voices to list available voices.`;
+        }
+        break;
+
+      case "status":
+      default:
+        content = ttsManager.formatStatus();
         break;
     }
 

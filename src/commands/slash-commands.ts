@@ -538,6 +538,26 @@ Be systematic and thorough in your analysis.`,
         arguments: [
           { name: 'action', description: 'on, off, toggle, status, or config', required: false }
         ]
+      },
+      {
+        name: 'speak',
+        description: 'Speak text aloud using text-to-speech',
+        prompt: '__SPEAK__',
+        filePath: '',
+        isBuiltin: true,
+        arguments: [
+          { name: 'text', description: 'Text to speak (or "stop" to stop speaking)', required: false }
+        ]
+      },
+      {
+        name: 'tts',
+        description: 'Control text-to-speech settings',
+        prompt: '__TTS__',
+        filePath: '',
+        isBuiltin: true,
+        arguments: [
+          { name: 'action', description: 'on, off, auto, status, voices, or voice <name>', required: false }
+        ]
       }
     ];
 
