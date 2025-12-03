@@ -1017,6 +1017,27 @@ export class GrokAgent extends EventEmitter {
             includeHidden: args.include_hidden,
           });
 
+        case "find_symbols":
+          return await this.search.findSymbols(args.name, {
+            types: args.types,
+            exportedOnly: args.exported_only,
+          });
+
+        case "find_references":
+          return await this.search.findReferences(
+            args.symbol_name,
+            args.context_lines ?? 2
+          );
+
+        case "find_definition":
+          return await this.search.findDefinition(args.symbol_name);
+
+        case "search_multi":
+          return await this.search.searchMultiple(
+            args.patterns,
+            args.operator ?? "OR"
+          );
+
         case "web_search":
           return await this.webSearch.search(args.query, {
             maxResults: args.max_results,
