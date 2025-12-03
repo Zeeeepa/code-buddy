@@ -525,6 +525,19 @@ Be systematic and thorough in your analysis.`,
         arguments: [
           { name: 'preset', description: 'Avatar preset (default, emoji, minimal, fun, hacker, space, animal) or "list" to see all', required: false }
         ]
+      },
+      // ==========================================
+      // Voice Input Commands
+      // ==========================================
+      {
+        name: 'voice',
+        description: 'Control voice input (speech-to-text)',
+        prompt: '__VOICE__',
+        filePath: '',
+        isBuiltin: true,
+        arguments: [
+          { name: 'action', description: 'on, off, toggle, status, or config', required: false }
+        ]
       }
     ];
 

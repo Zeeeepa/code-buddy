@@ -12,6 +12,7 @@ import { getConversationExporter } from "../utils/conversation-export.js";
 import { getSelfHealingEngine } from "../utils/self-healing.js";
 import { ConfirmationService } from "../utils/confirmation-service.js";
 import { getThemeManager } from "../themes/theme-manager.js";
+import { getVoiceInputManager } from "../input/voice-input-enhanced.js";
 
 /**
  * Enhanced Command Handler - Processes special command tokens
@@ -114,6 +115,9 @@ export class EnhancedCommandHandler {
 
       case "__AVATAR__":
         return this.handleAvatar(args);
+
+      case "__VOICE__":
+        return this.handleVoice(args);
 
       default:
         return { handled: false };
@@ -1335,6 +1339,95 @@ Or use --dry-run flag when starting the CLI.`;
         content += presets.map(p => `  • ${p.id}`).join("\n");
         content += `\n\nOr use: /avatar custom <type> <value>`;
       }
+    }
+
+    return {
+      handled: true,
+      entry: {
+        type: "assistant",
+        content,
+        timestamp: new Date(),
+      },
+    };
+  }
+
+  /**
+   * Voice - Control voice input
+   */
+  private async handleVoice(args: string[]): Promise<CommandHandlerResult> {
+    const voiceManager = getVoiceInputManager();
+    const action = args[0]?.toLowerCase();
+
+    let content: string;
+
+    switch (action) {
+      case "on":
+        voiceManager.enable();
+        const availability = await voiceManager.isAvailable();
+        if (availability.available) {
+          content = `🎤 Voice Input: ENABLED
+
+Provider: ${voiceManager.getConfig().provider}
+Language: ${voiceManager.getConfig().language}
+Hotkey: ${voiceManager.getConfig().hotkey}
+
+Use /voice toggle to start/stop recording.`;
+        } else {
+          content = `🎤 Voice Input: ENABLED (but not available)
+
+⚠️ ${availability.reason}
+
+Please install the required dependencies and try again.`;
+        }
+        break;
+
+      case "off":
+        voiceManager.disable();
+        content = `🎤 Voice Input: DISABLED
+
+Voice recording has been turned off.`;
+        break;
+
+      case "toggle":
+        const state = voiceManager.getState();
+        if (state.isRecording) {
+          voiceManager.stopRecording();
+          content = `🎤 Recording stopped.
+
+Processing audio...`;
+        } else {
+          const avail = await voiceManager.isAvailable();
+          if (avail.available) {
+            await voiceManager.startRecording();
+            content = `🔴 Recording started...
+
+Speak now. Recording will stop automatically after silence.
+Or use /voice toggle to stop manually.`;
+          } else {
+            content = `❌ Cannot start recording: ${avail.reason}`;
+          }
+        }
+        break;
+
+      case "config":
+        const config = voiceManager.getConfig();
+        content = `🎤 Voice Configuration
+
+Provider: ${config.provider}
+Language: ${config.language || 'auto'}
+Model: ${config.model || 'base'}
+Hotkey: ${config.hotkey}
+Auto-send: ${config.autoSend ? 'Yes' : 'No'}
+Silence Threshold: ${config.silenceThreshold}
+Silence Duration: ${config.silenceDuration}ms
+
+Configuration file: ~/.grok/voice-config.json`;
+        break;
+
+      case "status":
+      default:
+        content = voiceManager.formatStatus();
+        break;
     }
 
     return {
