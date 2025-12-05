@@ -19,6 +19,7 @@ import { getThemeManager } from "../themes/theme-manager.js";
 import { getVoiceInputManager } from "../input/voice-input-enhanced.js";
 import { getTTSManager } from "../input/text-to-speech.js";
 import { getPerformanceManager } from "../performance/index.js";
+import { getSecurityManager, ApprovalMode } from "../security/index.js";
 
 /**
  * Enhanced Command Handler - Processes special command tokens
@@ -66,6 +67,9 @@ export class EnhancedCommandHandler {
 
       case "__STATS__":
         return this.handleStats(args);
+
+      case "__SECURITY__":
+        return this.handleSecurity(args);
 
       case "__FORK__":
         return this.handleFork(args);
@@ -580,6 +584,65 @@ Current Concurrency: ${stats.currentConcurrency}`;
   Operations: ${summary.overall.totalOperations}
   Cache Hit Rate: ${(summary.overall.cacheHitRate * 100).toFixed(1)}%
   Time Saved: ${(summary.overall.estimatedTimeSaved / 1000).toFixed(1)}s`;
+        break;
+    }
+
+    return {
+      handled: true,
+      entry: {
+        type: "assistant",
+        content,
+        timestamp: new Date(),
+      },
+    };
+  }
+
+  /**
+   * Security - Show security dashboard
+   */
+  private handleSecurity(args: string[]): CommandHandlerResult {
+    const securityManager = getSecurityManager();
+    const action = args[0]?.toLowerCase();
+
+    let content: string;
+
+    switch (action) {
+      case "mode":
+        const mode = args[1]?.toLowerCase() as ApprovalMode;
+        if (mode && ['read-only', 'auto', 'full-access'].includes(mode)) {
+          securityManager.updateConfig({ approvalMode: mode });
+          content = `🛡️ Security mode set to: ${mode.toUpperCase()}`;
+        } else {
+          content = `Usage: /security mode <read-only|auto|full-access>
+
+Modes:
+  read-only   - Only read operations, no writes or commands
+  auto        - Auto-approve safe operations, confirm dangerous ones
+  full-access - All operations auto-approved (trusted environments)`;
+        }
+        break;
+
+      case "reset":
+        securityManager.resetStats();
+        content = `🔄 Security statistics reset`;
+        break;
+
+      case "events":
+        const events = securityManager.getEvents(10);
+        if (events.length === 0) {
+          content = `📜 No security events recorded`;
+        } else {
+          const eventLines = events.map(e => {
+            const time = new Date(e.timestamp).toLocaleTimeString();
+            return `[${time}] ${e.type}: ${e.action} → ${e.result}`;
+          });
+          content = `📜 Recent Security Events\n\n${eventLines.join('\n')}`;
+        }
+        break;
+
+      case "status":
+      default:
+        content = securityManager.formatDashboard();
         break;
     }
 

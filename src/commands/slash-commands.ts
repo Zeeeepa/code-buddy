@@ -329,6 +329,16 @@ Be systematic and thorough in your analysis.`,
         ]
       },
       {
+        name: 'security',
+        description: 'Show security dashboard and settings',
+        prompt: '__SECURITY__',
+        filePath: '',
+        isBuiltin: true,
+        arguments: [
+          { name: 'action', description: 'status, mode <mode>, reset', required: false }
+        ]
+      },
+      {
         name: 'fork',
         description: 'Fork conversation into a new branch',
         prompt: '__FORK__',
