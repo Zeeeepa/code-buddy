@@ -1,11 +1,21 @@
 /**
  * Structured Logger for Grok CLI
  * Provides consistent logging across the application with levels and context
+ *
+ * Environment Variables:
+ * - DEBUG=true or DEBUG=1: Enable debug mode (sets log level to 'debug')
+ * - LOG_LEVEL=debug|info|warn|error: Set specific log level
+ * - LOG_FORMAT=json|text: Output format (default: text)
+ * - LOG_FILE=path: Write logs to file (in addition to console)
+ * - NO_COLOR=1: Disable colored output
  */
 
 import chalk from 'chalk';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+export type LogFormat = 'text' | 'json';
 
 export interface LogContext {
   [key: string]: unknown;
@@ -21,10 +31,12 @@ export interface LogEntry {
 
 export interface LoggerOptions {
   level: LogLevel;
+  format: LogFormat;
   enableColors: boolean;
   enableTimestamps: boolean;
   source?: string;
   silent?: boolean;
+  logFile?: string;
 }
 
 const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
@@ -49,21 +61,66 @@ const LOG_LEVEL_ICONS: Record<LogLevel, string> = {
 };
 
 /**
+ * Check if debug mode is enabled via environment
+ */
+function isDebugEnabled(): boolean {
+  const debug = process.env.DEBUG;
+  return debug === 'true' || debug === '1' || debug === 'grok';
+}
+
+/**
+ * Get log level from environment
+ */
+function getLogLevelFromEnv(): LogLevel {
+  if (isDebugEnabled()) {
+    return 'debug';
+  }
+  const level = process.env.LOG_LEVEL?.toLowerCase();
+  if (level && ['debug', 'info', 'warn', 'error'].includes(level)) {
+    return level as LogLevel;
+  }
+  return 'info';
+}
+
+/**
  * Structured Logger class
  */
 export class Logger {
   private options: LoggerOptions;
   private logHistory: LogEntry[] = [];
   private maxHistorySize = 1000;
+  private fileStream?: fs.WriteStream;
 
   constructor(options: Partial<LoggerOptions> = {}) {
     this.options = {
-      level: (process.env.LOG_LEVEL as LogLevel) || 'info',
-      enableColors: process.stdout.isTTY ?? true,
+      level: getLogLevelFromEnv(),
+      format: (process.env.LOG_FORMAT as LogFormat) || 'text',
+      enableColors: !process.env.NO_COLOR && (process.stdout.isTTY ?? true),
       enableTimestamps: true,
       silent: process.env.NODE_ENV === 'test',
+      logFile: process.env.LOG_FILE,
       ...options,
     };
+
+    // Initialize file stream if configured
+    if (this.options.logFile) {
+      this.initializeFileLogging(this.options.logFile);
+    }
+  }
+
+  /**
+   * Initialize file logging
+   */
+  private initializeFileLogging(logFile: string): void {
+    try {
+      const logDir = path.dirname(logFile);
+      if (!fs.existsSync(logDir)) {
+        fs.mkdirSync(logDir, { recursive: true });
+      }
+      this.fileStream = fs.createWriteStream(logFile, { flags: 'a' });
+    } catch (err) {
+      console.error(`Failed to initialize log file: ${logFile}`, err);
+    }
   }
 
   /**
@@ -115,9 +172,21 @@ export class Logger {
    * Format log entry for output
    */
   private formatEntry(entry: LogEntry): string {
+    // JSON format
+    if (this.options.format === 'json') {
+      return JSON.stringify({
+        timestamp: entry.timestamp,
+        level: entry.level,
+        source: entry.source,
+        message: entry.message,
+        ...entry.context,
+      });
+    }
+
+    // Text format
     const parts: string[] = [];
     const color = this.options.enableColors ? LOG_LEVEL_COLORS[entry.level] : (s: string) => s;
-    const icon = LOG_LEVEL_ICONS[entry.level];
+    const icon = this.options.enableColors ? LOG_LEVEL_ICONS[entry.level] : '';
 
     // Timestamp
     if (this.options.enableTimestamps) {
@@ -166,7 +235,7 @@ export class Logger {
       this.logHistory.shift();
     }
 
-    // Output
+    // Output to console
     if (!this.options.silent) {
       const formatted = this.formatEntry(entry);
       if (level === 'error') {
@@ -176,6 +245,35 @@ export class Logger {
       } else {
         console.log(formatted);
       }
+    }
+
+    // Output to file (always JSON for easy parsing)
+    if (this.fileStream) {
+      const jsonEntry = JSON.stringify({
+        timestamp: entry.timestamp,
+        level: entry.level,
+        source: entry.source,
+        message: entry.message,
+        ...entry.context,
+      });
+      this.fileStream.write(jsonEntry + '\n');
+    }
+  }
+
+  /**
+   * Check if debug logging is enabled
+   */
+  isDebugEnabled(): boolean {
+    return this.options.level === 'debug';
+  }
+
+  /**
+   * Close file stream
+   */
+  close(): void {
+    if (this.fileStream) {
+      this.fileStream.end();
+      this.fileStream = undefined;
     }
   }
 
@@ -296,4 +394,22 @@ export const logger = {
       getLogger().error(message, errorOrContext);
     }
   },
+  isDebugEnabled: () => getLogger().isDebugEnabled(),
+  time: (label: string) => getLogger().time(label),
+  child: (source: string) => getLogger().child(source),
 };
+
+/**
+ * Check if debug mode is enabled (for use outside logger)
+ */
+export { isDebugEnabled };
+
+/**
+ * Debug utility - only logs if DEBUG is enabled
+ * Usage: debug('message') or debug('message', { context })
+ */
+export function debug(message: string, context?: LogContext): void {
+  if (isDebugEnabled()) {
+    getLogger().debug(message, context);
+  }
+}
