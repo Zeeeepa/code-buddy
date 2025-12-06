@@ -1,5 +1,5 @@
-# Construire des Agents Cognitifs
-## Architecture, Reasoning, RAG et Autonomie Outillée avec LLMs
+# Construire un Agent LLM Moderne
+## De la Théorie à Grok-CLI
 
 **Auteur** : Patrice Huetz
 **Basé sur** : Grok-CLI — Agent IA Open Source
@@ -7,11 +7,67 @@
 
 ---
 
+> **Tagline**
+> *De "simple chatbot" à agent autonome : comment penser, architecturer et optimiser un agent moderne, de Transformer à MCP, en passant par RAG, ToT, MCTS et Grok-CLI.*
+
+---
+
+## Résumé
+
+Ce livre montre, de bout en bout, comment passer d'un **LLM brut** (un modèle de texte qui prédit des tokens) à un **agent complet** : capable de raisonner, de se souvenir, d'utiliser des outils, d'apprendre de ses erreurs et de s'intégrer proprement dans un écosystème produit.
+
+On part des bases (transformers, attention, limites structurelles des LLMs) pour construire pièce par pièce :
+- **Reasoning** (ToT, MCTS, loops de réflexion)
+- **Mémoire** (RAG moderne, dependency-aware RAG, compression de contexte)
+- **Action** (tool-calling, plugins, MCP, sandbox)
+- **Optimisation** (FrugalGPT, LLMCompiler, caching)
+- **Apprentissage persistant**
+
+Le tout est illustré par une étude de cas complète : **Grok-CLI**, un agent open-source en ligne de commande pour développeurs.
+
+---
+
+## Public Cible
+
+| Profil | Ce qu'il trouvera |
+|--------|-------------------|
+| **Développeurs & Leads techniques** | Aller au-delà du "ChatGPT dans un textarea" |
+| **Founders / PM / Architectes** | Penser un produit agentique robuste |
+| **Builders no-code/low-code** | Comprendre les bons blocs de design |
+
+---
+
+## Promesse au Lecteur
+
+À la fin du livre, tu sauras :
+
+1. **Modéliser** un agent en termes de reasoning, mémoire, action, sécurité, observabilité
+2. **Comprendre** pourquoi des approches comme ToT, MCTS, FrugalGPT ou LLMCompiler sont utiles — et quand ne pas les utiliser
+3. **Concevoir** une architecture d'agent moderne inspirée de Grok-CLI : modules, flux, limites, évolutions possibles
+4. **Cloner ou étendre** un agent comme Grok-CLI pour ton propre contexte (IDE, navigateur, back-office, etc.)
+
+---
+
+## Thèmes & Ambiance
+
+| Aspect | Description |
+|--------|-------------|
+| **Ton** | Professionnel, concret, orienté pratique, avec des mini-scènes et dialogues pour garder un côté "page-turner" |
+| **Style** | Pédagogique, structuré, peu de blabla marketing, beaucoup de schémas mentaux, pseudo-code et checklists |
+
+### Fils Rouges Narratifs
+
+🧑‍💻 **Lina** — Une développeuse qui évolue d'un "prompt ChatGPT bricolé" vers un agent robuste. On la suit tout au long du livre, de ses premiers échecs à son architecture finale.
+
+🛠️ **Grok-CLI** — Exemple récurrent d'architecture et de choix techniques. Chaque concept est illustré par son implémentation dans le projet.
+
+---
+
 ## Informations Éditoriales
 
 | Élément | Détail |
 |---------|--------|
-| **Public cible** | Développeurs IA, architectes logiciels, chercheurs appliqués |
+| **Public cible** | Développeurs IA, architectes logiciels, product builders |
 | **Niveau** | Intermédiaire à avancé |
 | **Prérequis** | Python/TypeScript, notions LLM, API OpenAI/Anthropic |
 | **Format estimé** | ~400 pages, 15 chapitres, 7 parties |
@@ -23,6 +79,18 @@
 
 ## Chapitre 1 — Comprendre les LLMs Aujourd'hui
 *Pages estimées : 25-30*
+
+> **🎬 Scène d'ouverture**
+>
+> *Lina fixe son écran. Son chatbot "intelligent" vient encore de s'emmêler les pinceaux.*
+>
+> « Peux-tu modifier le fichier `config.ts` pour ajouter le nouveau paramètre ? »
+>
+> *Le modèle répond avec assurance... en inventant un fichier qui n'existe pas.*
+>
+> *Elle soupire. C'est le troisième hallucination de la journée. Il doit y avoir un meilleur moyen.*
+
+---
 
 ### 1.1 Fonctionnement Interne
 - Architecture Transformer (attention mechanism)

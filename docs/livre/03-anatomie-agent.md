@@ -1,53 +1,66 @@
-# Chapitre 3 — Anatomie d'un Agent Autonome
+# 🏗️ Chapitre 3 : Anatomie d'un Agent Autonome
 
 ---
 
-> **Scène**
->
-> *Lina a couvert le tableau blanc de diagrammes. Des flèches partent dans tous les sens.*
->
-> *"Ok, récapitulons," dit-elle en pointant le centre du tableau. "Un agent a besoin de..."*
->
-> *Elle écrit en gros :*
->
-> **REASONING — MEMORY — ACTION — LEARNING — SECURITY**
->
-> *"Ces cinq piliers. Si l'un manque, ce n'est pas vraiment un agent."*
->
-> *Marc observe le schéma. "Ça ressemble à un cerveau humain, en fait."*
->
-> *"Exactement. On essaie de reproduire ce que fait un développeur quand il résout un problème. Réfléchir, se souvenir, agir, apprendre, et... ne pas tout casser."*
+## 🎬 Scène d'ouverture : Les Six Piliers
+
+*Le tableau blanc de Lina ressemblait à une toile d'araignée de concepts. Des flèches partaient dans tous les sens, reliant des boxes multicolores.*
+
+Marc observait le chaos organisé, essayant de comprendre la logique.
+
+— "OK, récapitulons," dit Lina en pointant le centre du tableau où elle avait écrit en grosses lettres :
+
+**ORCHESTRATEUR — REASONING — MEMORY — ACTION — LEARNING — SECURITY**
+
+— "Ces six composants. Si l'un manque, ce n'est pas vraiment un agent. C'est juste un chatbot amélioré."
+
+Marc s'approcha.
+
+— "Ça ressemble à... un cerveau humain, en fait."
+
+Lina sourit.
+
+— "Exactement. On essaie de reproduire ce que fait un développeur quand il résout un problème. Il réfléchit, se souvient, agit, apprend de ses erreurs, et — c'est important — il ne fait pas n'importe quoi. Il a du bon sens."
+
+Sophie, la PM, intervint :
+
+— "Et l'orchestrateur, c'est quoi ? La conscience ?"
+
+— "En quelque sorte. C'est ce qui coordonne tout. Ce qui décide quand réfléchir, quand agir, quand s'arrêter. Sans lui, les autres composants seraient des pièces détachées."
+
+Elle prit un marqueur et commença à dessiner les connexions.
+
+— "Laissez-moi vous montrer comment tout ça s'assemble..."
 
 ---
 
-## Introduction
+## 🔬 3.1 Vue d'Ensemble : Les Six Composants
 
-Un agent n'est pas juste un LLM avec des outils. C'est une architecture complexe où plusieurs systèmes collaborent pour produire un comportement intelligent. Ce chapitre dissèque chaque composant d'un agent moderne et montre comment ils interagissent.
+Un agent n'est pas simplement un LLM avec des outils. C'est une **architecture cognitive** où plusieurs systèmes spécialisés collaborent pour produire un comportement intelligent. Chaque composant a un rôle précis, et c'est leur interaction qui fait la magie.
 
----
-
-## 3.1 Vue d'Ensemble : Les Six Composants
+### 3.1.1 🏛️ Architecture Globale
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        AGENT COGNITIF                                │
+│                    🏗️ ARCHITECTURE AGENT COGNITIF                   │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  ┌─────────────────────────────────────────────────────────────┐    │
-│  │                    INTERFACE UTILISATEUR                     │    │
-│  │  (CLI, TUI, API, Voice)                                     │    │
+│  │              🖥️ INTERFACE UTILISATEUR                        │    │
+│  │  (CLI, TUI, API, Voice, IDE Plugin)                         │    │
 │  └────────────────────────────┬────────────────────────────────┘    │
 │                               │                                      │
 │                               ▼                                      │
 │  ┌─────────────────────────────────────────────────────────────┐    │
-│  │                       ORCHESTRATEUR                          │    │
-│  │  (Boucle agentique, gestion du flow)                        │    │
+│  │                    🎯 ORCHESTRATEUR                          │    │
+│  │  (Boucle agentique, gestion du flow, coordination)          │    │
 │  └────────────────────────────┬────────────────────────────────┘    │
 │                               │                                      │
 │         ┌─────────┬───────────┼───────────┬─────────┐               │
 │         │         │           │           │         │               │
 │         ▼         ▼           ▼           ▼         ▼               │
 │  ┌──────────┐┌──────────┐┌──────────┐┌──────────┐┌──────────┐      │
+│  │ 🧠       ││ 💾       ││ 🔧       ││ 📚       ││ 🛡️       │      │
 │  │ REASONING││  MEMORY  ││  ACTION  ││ LEARNING ││ SECURITY │      │
 │  │          ││          ││          ││          ││          │      │
 │  │ • ToT    ││ • Short  ││ • Tools  ││ • Patterns││ • Sandbox│      │
@@ -59,103 +72,111 @@ Un agent n'est pas juste un LLM avec des outils. C'est une architecture complexe
 │                               │                                      │
 │                               ▼                                      │
 │  ┌─────────────────────────────────────────────────────────────┐    │
-│  │                     PERSISTANCE                              │    │
-│  │  (SQLite, Embeddings, Cache)                                │    │
+│  │                    💿 PERSISTANCE                            │    │
+│  │  (SQLite, Embeddings, Cache, Logs)                          │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-Chaque composant a un rôle précis :
+### 3.1.2 📊 Rôle de Chaque Composant
 
-| Composant | Rôle | Analogie humaine |
-|-----------|------|------------------|
-| **Orchestrateur** | Coordonne le flux | Conscience |
-| **Reasoning** | Résout les problèmes | Réflexion |
-| **Memory** | Stocke et retrouve | Mémoire |
-| **Action** | Interagit avec le monde | Corps/mains |
-| **Learning** | S'améliore | Expérience |
-| **Security** | Protège | Prudence |
+| 🔧 Composant | 🎯 Rôle Principal | 🧠 Analogie Humaine | 📁 Implémentation Grok-CLI |
+|:-------------|:------------------|:--------------------|:---------------------------|
+| **Orchestrateur** | Coordonne le flux, gère la boucle | Conscience, attention | `src/agent/grok-agent.ts` |
+| **Reasoning** | Résout les problèmes complexes | Réflexion, analyse | `src/agent/reasoning/` |
+| **Memory** | Stocke et retrouve l'information | Mémoire court/long terme | `src/context/`, `src/database/` |
+| **Action** | Interagit avec le monde externe | Corps, mains | `src/tools/` |
+| **Learning** | S'améliore avec l'expérience | Apprentissage | `src/learning/` |
+| **Security** | Protège contre les erreurs/abus | Prudence, bon sens | `src/security/` |
+
+> 💡 **Analogie du développeur** : Quand vous résolvez un bug, vous utilisez tous ces composants : vous *réfléchissez* au problème, vous *vous souvenez* de bugs similaires, vous *agissez* (éditez le code), vous *apprenez* pour la prochaine fois, et vous faites *attention* à ne pas introduire de nouvelles erreurs.
 
 ---
 
-## 3.2 L'Orchestrateur : Le Chef d'Orchestre
+## 🎯 3.2 L'Orchestrateur : Le Chef d'Orchestre
 
-### 3.2.1 La boucle agentique
+L'orchestrateur est le cœur de l'agent. C'est lui qui décide quand appeler le LLM, quand exécuter un outil, quand s'arrêter. Sans lui, les autres composants seraient comme des musiciens talentueux mais sans chef — capables individuellement, mais incapables de produire une symphonie.
 
-L'orchestrateur implémente la boucle fondamentale de tout agent :
+### 3.2.1 🔄 La Boucle Agentique (ReAct)
+
+Le pattern fondamental de tout agent est la boucle **ReAct** (Reasoning + Acting) :
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                      BOUCLE AGENTIQUE                                │
+│                    🔄 BOUCLE AGENTIQUE REACT                        │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
-│   START                                                             │
+│   START (message utilisateur)                                       │
 │     │                                                                │
 │     ▼                                                                │
 │   ┌─────────────┐                                                   │
-│   │  PERCEIVE   │ ◄── Recevoir input utilisateur                    │
-│   └──────┬──────┘     ou résultat d'outil                           │
-│          │                                                           │
-│          ▼                                                           │
-│   ┌─────────────┐                                                   │
-│   │   THINK     │ ◄── Appeler le LLM avec contexte                  │
+│   │ 👁️ PERCEIVE │ ◄── Recevoir input (user message ou tool result) │
 │   └──────┬──────┘                                                   │
 │          │                                                           │
 │          ▼                                                           │
 │   ┌─────────────┐                                                   │
-│   │   DECIDE    │ ◄── Interpréter la réponse                        │
+│   │  🧠 THINK   │ ◄── Appeler le LLM avec contexte complet          │
+│   └──────┬──────┘                                                   │
+│          │                                                           │
+│          ▼                                                           │
+│   ┌─────────────┐                                                   │
+│   │  🎯 DECIDE  │ ◄── Interpréter la réponse du LLM                 │
 │   └──────┬──────┘                                                   │
 │          │                                                           │
 │    ┌─────┴─────┐                                                    │
 │    │           │                                                     │
 │    ▼           ▼                                                     │
 │  ┌─────┐   ┌─────┐                                                  │
+│  │ 🔧  │   │ 💬  │                                                  │
 │  │TOOL │   │TEXT │                                                  │
 │  │CALL │   │ONLY │                                                  │
 │  └──┬──┘   └──┬──┘                                                  │
 │     │         │                                                      │
 │     ▼         │                                                      │
 │  ┌─────────┐  │                                                     │
-│  │ EXECUTE │  │                                                     │
+│  │ ⚡ ACT  │  │ ◄── Exécuter l'outil demandé                        │
 │  └────┬────┘  │                                                     │
 │       │       │                                                      │
 │       ▼       │                                                      │
 │  ┌─────────┐  │                                                     │
-│  │ OBSERVE │  │                                                     │
+│  │ 👁️ OBS  │  │ ◄── Observer le résultat                            │
 │  └────┬────┘  │                                                     │
 │       │       │                                                      │
 │       └───────┴───────┐                                             │
 │                       │                                              │
 │               ┌───────▼───────┐                                     │
-│               │   COMPLETE?   │                                     │
+│               │  ✅ COMPLETE? │                                     │
 │               └───────┬───────┘                                     │
 │                       │                                              │
 │               Non ────┴──── Oui                                     │
 │                │            │                                        │
 │                │            ▼                                        │
 │                │         ┌──────┐                                   │
-│                │         │ END  │                                   │
+│                │         │ 🏁 END│                                   │
 │                │         └──────┘                                   │
 │                │                                                     │
-│                └───────────────────────► (retour à PERCEIVE)        │
+│                └──────────────────────► (retour à PERCEIVE)         │
 │                                                                      │
-│   Limite : max 30-400 rounds selon configuration                    │
+│   ⚠️ Limites : max 30-400 rounds selon configuration                │
+│                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### 3.2.2 Implémentation Grok-CLI
+### 3.2.2 💻 Implémentation Simplifiée
 
 ```typescript
-// src/agent/grok-agent.ts (simplifié)
+// src/agent/grok-agent.ts (structure simplifiée)
 export class GrokAgent {
-  private maxRounds: number = 30;
+  private maxRounds: number = 30;        // Limite anti-boucle infinie
   private currentRound: number = 0;
+  private messages: Message[] = [];      // Historique de conversation
 
   async run(userMessage: string): Promise<void> {
-    // Ajouter le message à l'historique
+    // Ajouter le message utilisateur à l'historique
     this.addMessage({ role: 'user', content: userMessage });
 
+    // Boucle principale
     while (this.currentRound < this.maxRounds) {
       this.currentRound++;
 
@@ -167,108 +188,119 @@ export class GrokAgent {
 
       // 2. DECIDE - Analyser la réponse
       if (response.tool_calls && response.tool_calls.length > 0) {
-        // Tool call demandé
+        // Le LLM veut utiliser des outils
         for (const toolCall of response.tool_calls) {
-          // 3. EXECUTE
+          // 3. ACT - Exécuter l'outil
           const result = await this.executeTool(toolCall);
 
           // 4. OBSERVE - Ajouter le résultat au contexte
           this.addToolResult(toolCall.id, result);
         }
-        // Continuer la boucle
+        // Continuer la boucle pour que le LLM traite les résultats
       } else {
-        // Réponse textuelle finale
+        // Réponse textuelle = tâche terminée
         this.emit('response', response.content);
-        break; // Fin de la boucle
+        break;
       }
     }
   }
 }
 ```
 
-### 3.2.3 Gestion des limites
+### 3.2.3 🚧 Gestion des Limites
 
-L'orchestrateur doit gérer plusieurs limites :
+L'orchestrateur doit protéger contre plusieurs risques :
 
-| Limite | Valeur typique | Raison |
-|--------|----------------|--------|
-| **Max rounds** | 30-400 | Éviter les boucles infinies |
-| **Max tokens** | 128K | Limite du modèle |
-| **Max coût** | $10/session | Budget |
-| **Timeout** | 5min/tool | Performance |
+| ⚠️ Risque | 🛡️ Protection | 📊 Valeur Typique |
+|:----------|:--------------|:------------------|
+| **Boucle infinie** | Limite de rounds | 30-400 rounds |
+| **Dépassement contexte** | Compression automatique | 128K tokens max |
+| **Coût excessif** | Budget par session | $10/session |
+| **Outil bloqué** | Timeout par outil | 5min/outil |
+| **Répétition** | Détection de patterns | Hash des 5 derniers messages |
 
 ```typescript
-// Détection de boucle infinie
+// Détection de boucle par répétition
 if (this.detectLoop()) {
   this.emit('warning', 'Possible boucle détectée');
-  // Stratégies : reset context, changer d'approche, demander à l'utilisateur
+  // Stratégies possibles :
+  // 1. Demander clarification à l'utilisateur
+  // 2. Changer d'approche (élever le niveau de reasoning)
+  // 3. Résumer et repartir à zéro
 }
 ```
 
 ---
 
-## 3.3 Reasoning : Le Moteur de Réflexion
+## 🧠 3.3 Reasoning : Le Moteur de Réflexion
 
-### 3.3.1 Les niveaux de raisonnement
+Le composant Reasoning détermine *comment* l'agent réfléchit à un problème. Tous les problèmes ne nécessitent pas la même profondeur de réflexion — demander l'heure est différent de debugger une race condition.
 
-Grok-CLI implémente plusieurs niveaux de raisonnement selon la complexité :
+### 3.3.1 📊 Les Quatre Niveaux de Raisonnement
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                   NIVEAUX DE REASONING                               │
+│                    🧠 NIVEAUX DE REASONING                          │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
-│  NIVEAU 0 : DIRECT                                                  │
+│  🟢 NIVEAU 0 : DIRECT                                               │
 │  ┌─────────────────────────────────────────────────────────────┐    │
 │  │  Question simple → Réponse directe                          │    │
 │  │  "Quelle heure est-il ?" → Appel tool datetime              │    │
-│  │  Tokens thinking : 0                                        │    │
+│  │  🎯 Tokens thinking : 0                                     │    │
+│  │  ⏱️ Latence : ~1s                                           │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │                                                                      │
-│  NIVEAU 1 : CHAIN-OF-THOUGHT (think)                               │
+│  🟡 NIVEAU 1 : CHAIN-OF-THOUGHT (mot-clé: "think")                  │
 │  ┌─────────────────────────────────────────────────────────────┐    │
-│  │  Problème modéré → Raisonnement linéaire                    │    │
+│  │  Problème modéré → Raisonnement linéaire étape par étape    │    │
 │  │  "Refactor cette fonction" → Analyse → Plan → Exécution     │    │
-│  │  Tokens thinking : ~4,000                                   │    │
+│  │  🎯 Tokens thinking : ~4,000                                │    │
+│  │  ⏱️ Latence : ~5-10s                                        │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │                                                                      │
-│  NIVEAU 2 : TREE-OF-THOUGHT (megathink)                            │
+│  🟠 NIVEAU 2 : TREE-OF-THOUGHT (mot-clé: "megathink")               │
 │  ┌─────────────────────────────────────────────────────────────┐    │
 │  │  Problème complexe → Exploration multi-chemins              │    │
 │  │  "Debug ce crash aléatoire" → Hypothèses → Tests → Solution │    │
-│  │  Tokens thinking : ~10,000                                  │    │
+│  │  🎯 Tokens thinking : ~10,000                               │    │
+│  │  ⏱️ Latence : ~20-30s                                       │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │                                                                      │
-│  NIVEAU 3 : MCTS (ultrathink)                                      │
+│  🔴 NIVEAU 3 : MCTS (mot-clé: "ultrathink")                         │
 │  ┌─────────────────────────────────────────────────────────────┐    │
 │  │  Problème critique → Simulation et optimisation             │    │
-│  │  "Redesign l'architecture" → Variantes → Évaluation → Best  │    │
-│  │  Tokens thinking : ~32,000                                  │    │
+│  │  "Redesign l'architecture" → Variantes → Éval → Meilleur    │    │
+│  │  🎯 Tokens thinking : ~32,000                               │    │
+│  │  ⏱️ Latence : ~60-120s                                      │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### 3.3.2 Détection du niveau requis
+### 3.3.2 🎯 Détection Automatique du Niveau
 
 ```typescript
-// src/agent/thinking-keywords.ts (simplifié)
+// src/agent/thinking-keywords.ts (logique de détection)
 export class ThinkingKeywordsManager {
   detectLevel(message: string): ThinkingLevel {
     const lowerMessage = message.toLowerCase();
 
+    // Mots-clés explicites
     if (lowerMessage.includes('ultrathink') ||
         lowerMessage.includes('deep analysis')) {
       return ThinkingLevel.MCTS;
     }
-
     if (lowerMessage.includes('megathink') ||
         lowerMessage.includes('think hard')) {
       return ThinkingLevel.TREE_OF_THOUGHT;
     }
+    if (lowerMessage.includes('think')) {
+      return ThinkingLevel.CHAIN_OF_THOUGHT;
+    }
 
-    if (lowerMessage.includes('think') ||
-        this.isComplexTask(message)) {
+    // Détection automatique basée sur la complexité
+    if (this.isComplexTask(message)) {
       return ThinkingLevel.CHAIN_OF_THOUGHT;
     }
 
@@ -278,7 +310,8 @@ export class ThinkingKeywordsManager {
   private isComplexTask(message: string): boolean {
     const complexIndicators = [
       'debug', 'refactor', 'optimize', 'architect',
-      'investigate', 'analyze', 'design'
+      'investigate', 'analyze', 'design', 'why does',
+      'race condition', 'memory leak', 'performance'
     ];
     return complexIndicators.some(ind =>
       message.toLowerCase().includes(ind)
@@ -287,79 +320,82 @@ export class ThinkingKeywordsManager {
 }
 ```
 
-### 3.3.3 Architecture du module Reasoning
+### 3.3.3 📊 Comparaison des Niveaux
 
-```
-src/agent/reasoning/
-├── index.ts              # Point d'entrée, routing
-├── tree-of-thought.ts    # Exploration multi-chemins
-├── mcts.ts               # Monte-Carlo Tree Search
-├── evaluator.ts          # Évaluation des solutions
-└── pruning.ts            # Élagage des branches inutiles
-```
+| 🎚️ Niveau | 🎯 Cas d'usage | ⏱️ Latence | 💰 Coût relatif | 📈 Qualité |
+|:----------|:---------------|:-----------|:----------------|:-----------|
+| Direct | Commandes simples | ~1s | 1x | Suffisante |
+| CoT | Refactoring, bugs simples | ~5-10s | 3x | Bonne |
+| ToT | Bugs complexes, design | ~20-30s | 8x | Très bonne |
+| MCTS | Architecture, problèmes critiques | ~60-120s | 20x | Optimale |
+
+> 💡 **Principe** : Utiliser le minimum de reasoning nécessaire. Overkill = gaspillage de temps et d'argent.
 
 ---
 
-## 3.4 Memory : La Mémoire Multi-Niveaux
+## 💾 3.4 Memory : La Mémoire Multi-Niveaux
 
-### 3.4.1 Les trois horizons de mémoire
+La mémoire est ce qui distingue un agent d'un chatbot sans état. Sans mémoire, chaque interaction repart de zéro. Avec mémoire, l'agent peut apprendre, se souvenir du contexte, et s'améliorer.
+
+### 3.4.1 🏗️ Les Trois Horizons de Mémoire
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    ARCHITECTURE MÉMOIRE                              │
+│                    💾 ARCHITECTURE MÉMOIRE                          │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  ┌─────────────────────────────────────────────────────────────┐    │
-│  │              MÉMOIRE COURT TERME                             │    │
+│  │           🧠 MÉMOIRE COURT TERME (Working Memory)           │    │
 │  │  ┌─────────────────────────────────────────────────────┐    │    │
-│  │  │  Conversation courante                               │    │    │
-│  │  │  • Messages user/assistant                           │    │    │
-│  │  │  • Tool calls et résultats                          │    │    │
-│  │  │  • Durée : session active                           │    │    │
-│  │  │  • Stockage : RAM                                   │    │    │
+│  │  │  📝 Conversation courante                           │    │    │
+│  │  │     • Messages user/assistant                       │    │    │
+│  │  │     • Tool calls et résultats                      │    │    │
+│  │  │     • Fichiers récemment lus                       │    │    │
+│  │  │  ⏱️ Durée : session active (~minutes/heures)       │    │    │
+│  │  │  💿 Stockage : RAM                                 │    │    │
 │  │  └─────────────────────────────────────────────────────┘    │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │                              │                                       │
 │                              ▼                                       │
 │  ┌─────────────────────────────────────────────────────────────┐    │
-│  │              MÉMOIRE MOYEN TERME                             │    │
+│  │           📋 MÉMOIRE MOYEN TERME (Session Memory)           │    │
 │  │  ┌─────────────────────────────────────────────────────┐    │    │
-│  │  │  Contexte de session                                 │    │    │
-│  │  │  • Fichiers lus/modifiés                            │    │    │
-│  │  │  • Décisions prises                                 │    │    │
-│  │  │  • Durée : session (heures)                         │    │    │
-│  │  │  • Stockage : SQLite (sessions table)               │    │    │
+│  │  │  📊 Contexte de session                             │    │    │
+│  │  │     • Résumé des conversations précédentes         │    │    │
+│  │  │     • Fichiers modifiés dans la session            │    │    │
+│  │  │     • Décisions et choix effectués                 │    │    │
+│  │  │  ⏱️ Durée : session (heures/jours)                 │    │    │
+│  │  │  💿 Stockage : SQLite (table sessions)             │    │    │
 │  │  └─────────────────────────────────────────────────────┘    │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │                              │                                       │
 │                              ▼                                       │
 │  ┌─────────────────────────────────────────────────────────────┐    │
-│  │              MÉMOIRE LONG TERME                              │    │
+│  │           🏛️ MÉMOIRE LONG TERME (Persistent Memory)         │    │
 │  │  ┌─────────────────────────────────────────────────────┐    │    │
-│  │  │  Connaissances persistantes                          │    │    │
-│  │  │  • Embeddings du codebase                           │    │    │
-│  │  │  • Patterns de réparation appris                    │    │    │
-│  │  │  • Conventions du projet                            │    │    │
-│  │  │  • Durée : permanente                               │    │    │
-│  │  │  • Stockage : SQLite + fichiers embeddings          │    │    │
+│  │  │  📚 Connaissances persistantes                      │    │    │
+│  │  │     • Embeddings du codebase (RAG)                 │    │    │
+│  │  │     • Patterns de réparation appris                │    │    │
+│  │  │     • Conventions et style du projet               │    │    │
+│  │  │     • Préférences utilisateur                      │    │    │
+│  │  │  ⏱️ Durée : permanente                             │    │    │
+│  │  │  💿 Stockage : SQLite + fichiers embeddings        │    │    │
 │  │  └─────────────────────────────────────────────────────┘    │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### 3.4.2 Schéma de la base de données
+### 3.4.2 🗄️ Schéma de Base de Données
 
 ```sql
--- src/database/schema.sql (simplifié)
-
 -- Mémoire long terme avec embeddings
 CREATE TABLE memories (
   id TEXT PRIMARY KEY,
   content TEXT NOT NULL,
-  type TEXT NOT NULL,  -- 'fact', 'preference', 'convention'
-  embedding BLOB,      -- Vecteur 384/1536 dimensions
-  importance REAL DEFAULT 0.5,
+  type TEXT NOT NULL,           -- 'fact', 'preference', 'convention'
+  embedding BLOB,               -- Vecteur 384/1536 dimensions
+  importance REAL DEFAULT 0.5,  -- Score 0-1
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   accessed_at DATETIME,
   access_count INTEGER DEFAULT 0
@@ -370,18 +406,8 @@ CREATE TABLE sessions (
   id TEXT PRIMARY KEY,
   started_at DATETIME,
   ended_at DATETIME,
-  summary TEXT,
-  metadata JSON
-);
-
--- Messages de conversation
-CREATE TABLE messages (
-  id TEXT PRIMARY KEY,
-  session_id TEXT REFERENCES sessions(id),
-  role TEXT NOT NULL,  -- 'user', 'assistant', 'tool'
-  content TEXT,
-  tool_calls JSON,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  summary TEXT,                 -- Résumé auto-généré
+  metadata JSON                 -- Fichiers modifiés, stats, etc.
 );
 
 -- Patterns de réparation appris
@@ -391,298 +417,210 @@ CREATE TABLE repair_learning (
   solution_pattern TEXT NOT NULL,
   success_count INTEGER DEFAULT 0,
   failure_count INTEGER DEFAULT 0,
+  -- Confidence calculée automatiquement
   confidence REAL GENERATED ALWAYS AS (
     success_count * 1.0 / (success_count + failure_count + 1)
   )
 );
 ```
 
-### 3.4.3 RAG : Retrieval-Augmented Generation
+### 3.4.3 🔍 RAG : Retrieval-Augmented Generation
 
 Le RAG permet de retrouver les informations pertinentes dans la mémoire long terme :
 
-```typescript
-// src/context/codebase-rag/retriever.ts (simplifié)
-export class CodebaseRetriever {
-  async retrieve(query: string, limit: number = 5): Promise<RetrievedDoc[]> {
-    // 1. Générer l'embedding de la query
-    const queryEmbedding = await this.embedder.embed(query);
-
-    // 2. Recherche par similarité cosine
-    const candidates = await this.db.query(`
-      SELECT id, content, embedding,
-             cosine_similarity(embedding, ?) as score
-      FROM code_embeddings
-      ORDER BY score DESC
-      LIMIT ?
-    `, [queryEmbedding, limit * 2]);
-
-    // 3. Reranking avec les dépendances
-    const reranked = await this.dependencyAwareRerank(candidates, query);
-
-    return reranked.slice(0, limit);
-  }
-}
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    🔍 PIPELINE RAG                                  │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  Query : "Comment fonctionne GrokAgent ?"                           │
+│                     │                                                │
+│                     ▼                                                │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │  1️⃣ EMBED : Convertir la query en vecteur                   │    │
+│  │     query → [0.23, -0.45, 0.12, ...]  (384 dimensions)      │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│                     │                                                │
+│                     ▼                                                │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │  2️⃣ SEARCH : Recherche par similarité cosine               │    │
+│  │     SELECT * FROM embeddings                                │    │
+│  │     ORDER BY cosine_similarity(embedding, query_vec) DESC   │    │
+│  │     LIMIT 10                                                │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│                     │                                                │
+│                     ▼                                                │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │  3️⃣ EXPAND : Ajouter les dépendances (CodeRAG)             │    │
+│  │     grok-agent.ts → + types.ts + tools.ts + client.ts       │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│                     │                                                │
+│                     ▼                                                │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │  4️⃣ RERANK : Prioriser par pertinence                      │    │
+│  │     Cross-encoder ou heuristiques                           │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│                     │                                                │
+│                     ▼                                                │
+│  Résultat : [grok-agent.ts, types.ts, tools.ts, client.ts]         │
+│             Contexte enrichi pour le LLM                            │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-### 3.4.4 Compression de contexte
+### 3.4.4 📦 Compression de Contexte
 
-Quand le contexte devient trop grand :
+Quand le contexte dépasse la limite du modèle :
 
-```typescript
-// src/context/context-compressor.ts (simplifié)
-export class ContextCompressor {
-  compress(context: Context, maxTokens: number): Context {
-    const prioritized = this.prioritize(context);
-
-    let tokens = 0;
-    const result: Context = { messages: [] };
-
-    for (const item of prioritized) {
-      const itemTokens = this.countTokens(item);
-
-      if (tokens + itemTokens > maxTokens) {
-        // Tenter de résumer au lieu de supprimer
-        const summary = this.summarize(item);
-        if (tokens + this.countTokens(summary) <= maxTokens) {
-          result.messages.push(summary);
-          tokens += this.countTokens(summary);
-        }
-        // Sinon, skip
-      } else {
-        result.messages.push(item);
-        tokens += itemTokens;
-      }
-    }
-
-    return result;
-  }
-
-  private prioritize(context: Context): Message[] {
-    // Ordre de priorité :
-    // 1. System prompt (toujours)
-    // 2. Derniers messages user/assistant
-    // 3. Tool results récents
-    // 4. Contexte code actif
-    // 5. Historique ancien (résumé)
-    return context.messages.sort((a, b) =>
-      this.getPriority(b) - this.getPriority(a)
-    );
-  }
-}
-```
+| 🎯 Priorité | 📝 Contenu | 🔧 Action |
+|:------------|:-----------|:----------|
+| 🔴 **Haute** | System prompt, message actuel, code en cours d'édition | Garder intégralement |
+| 🟡 **Moyenne** | Historique récent, imports, documentation | Résumer |
+| 🟢 **Basse** | Historique ancien, fichiers non liés | Supprimer |
 
 ---
 
-## 3.5 Action : Les Outils de l'Agent
+## 🔧 3.5 Action : Les Outils de l'Agent
 
-### 3.5.1 Anatomie d'un outil
+Le composant Action est ce qui distingue un agent d'un simple chatbot. C'est la capacité d'**agir** sur le monde — lire des fichiers, exécuter du code, modifier du texte.
+
+### 3.5.1 📐 Anatomie d'un Outil
 
 Chaque outil suit une interface standard :
 
 ```typescript
-// src/tools/types.ts
 export interface Tool {
-  name: string;
-  description: string;
-  inputSchema: JSONSchema;
-  requiresConfirmation?: boolean;
-  timeout?: number;
+  name: string;                      // Identifiant unique
+  description: string;               // Description pour le LLM
+  inputSchema: JSONSchema;           // Paramètres acceptés
+  requiresConfirmation?: boolean;    // Demande approbation ?
+  timeout?: number;                  // Limite de temps
 
   execute(args: Record<string, unknown>): Promise<ToolResult>;
 }
 
 export interface ToolResult {
   success: boolean;
-  output?: string;
-  error?: string;
-  metadata?: Record<string, unknown>;
+  output?: string;                   // Résultat pour le LLM
+  error?: string;                    // Message d'erreur si échec
+  metadata?: Record<string, unknown>; // Infos supplémentaires
 }
 ```
 
-### 3.5.2 Les 41 outils de Grok-CLI
+### 3.5.2 🧰 Les 41 Outils de Grok-CLI
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                       CATALOGUE D'OUTILS                             │
+│                    🧰 CATALOGUE D'OUTILS (41)                       │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
-│  FICHIERS (12 outils)                                               │
-│  ├── read_file          Lire un fichier                             │
-│  ├── write_file         Écrire un fichier                           │
-│  ├── edit_file          Éditer une partie de fichier                │
-│  ├── multi_edit         Éditions multiples atomiques                │
-│  ├── list_directory     Lister un répertoire                        │
-│  ├── create_directory   Créer un répertoire                         │
-│  ├── delete_file        Supprimer un fichier                        │
-│  ├── move_file          Déplacer/renommer                           │
-│  ├── copy_file          Copier un fichier                           │
-│  ├── file_info          Métadonnées d'un fichier                    │
-│  ├── find_files         Recherche par pattern glob                  │
-│  └── search_content     Recherche dans le contenu                   │
+│  📁 FICHIERS (12 outils)                                            │
+│  ├── read_file         📖 Lire un fichier                           │
+│  ├── write_file        ✏️ Écrire un fichier                         │
+│  ├── edit_file         🔧 Éditer une partie de fichier              │
+│  ├── multi_edit        ⚡ Éditions multiples atomiques              │
+│  ├── list_directory    📂 Lister un répertoire                      │
+│  ├── create_directory  📁 Créer un répertoire                       │
+│  ├── delete_file       🗑️ Supprimer un fichier                      │
+│  ├── move_file         🔄 Déplacer/renommer                         │
+│  ├── copy_file         📋 Copier un fichier                         │
+│  ├── file_info         ℹ️ Métadonnées d'un fichier                  │
+│  ├── find_files        🔍 Recherche par pattern glob                │
+│  └── search_content    🔎 Recherche dans le contenu                 │
 │                                                                      │
-│  SHELL (4 outils)                                                   │
-│  ├── bash               Exécuter une commande                       │
-│  ├── interactive_bash   Session shell interactive                   │
-│  ├── background_task    Tâche en arrière-plan                       │
-│  └── kill_process       Terminer un processus                       │
+│  💻 SHELL (4 outils)                                                │
+│  ├── bash              ⚡ Exécuter une commande                     │
+│  ├── interactive_bash  🖥️ Session shell interactive                 │
+│  ├── background_task   🔄 Tâche en arrière-plan                     │
+│  └── kill_process      ❌ Terminer un processus                     │
 │                                                                      │
-│  GIT (5 outils)                                                     │
-│  ├── git_status         État du repo                                │
-│  ├── git_diff           Différences                                 │
-│  ├── git_commit         Créer un commit                             │
-│  ├── git_log            Historique                                  │
-│  └── git_branch         Gestion branches                            │
+│  📊 GIT (5 outils)                                                  │
+│  ├── git_status        📋 État du repo                              │
+│  ├── git_diff          📝 Différences                               │
+│  ├── git_commit        💾 Créer un commit                           │
+│  ├── git_log           📜 Historique                                │
+│  └── git_branch        🌿 Gestion branches                          │
 │                                                                      │
-│  RECHERCHE (4 outils)                                               │
-│  ├── search_code        Recherche sémantique                        │
-│  ├── find_symbol        Trouver définition                          │
-│  ├── find_references    Trouver utilisations                        │
-│  └── search_web         Recherche web                               │
+│  🔍 RECHERCHE (4 outils)                                            │
+│  ├── search_code       🎯 Recherche sémantique                      │
+│  ├── find_symbol       📍 Trouver définition                        │
+│  ├── find_references   🔗 Trouver utilisations                      │
+│  └── search_web        🌐 Recherche web                             │
 │                                                                      │
-│  MÉDIAS (5 outils)                                                  │
-│  ├── screenshot         Capture d'écran                             │
-│  ├── audio_transcribe   Transcrire audio                            │
-│  ├── video_extract      Extraire frames                             │
-│  ├── image_analyze      Analyser image                              │
-│  └── qr_code            Générer/lire QR                             │
+│  🎨 MÉDIAS (5 outils)                                               │
+│  ├── screenshot        📸 Capture d'écran                           │
+│  ├── audio_transcribe  🎙️ Transcrire audio                          │
+│  ├── video_extract     🎬 Extraire frames                           │
+│  ├── image_analyze     🖼️ Analyser image                            │
+│  └── qr_code           📱 Générer/lire QR                           │
 │                                                                      │
-│  DOCUMENTS (5 outils)                                               │
-│  ├── pdf_extract        Extraire texte PDF                          │
-│  ├── excel_read         Lire Excel/CSV                              │
-│  ├── excel_write        Écrire Excel                                │
-│  ├── archive_extract    Extraire archives                           │
-│  └── archive_create     Créer archives                              │
+│  📄 DOCUMENTS (5 outils)                                            │
+│  ├── pdf_extract       📑 Extraire texte PDF                        │
+│  ├── excel_read        📊 Lire Excel/CSV                            │
+│  ├── excel_write       📈 Écrire Excel                              │
+│  ├── archive_extract   📦 Extraire archives                         │
+│  └── archive_create    🗜️ Créer archives                            │
 │                                                                      │
-│  SYSTÈME (6 outils)                                                 │
-│  ├── memory_store       Stocker en mémoire                          │
-│  ├── memory_recall      Rappeler de mémoire                         │
-│  ├── spawn_agent        Lancer sous-agent                           │
-│  ├── http_request       Requête HTTP                                │
-│  ├── database_query     Query SQL                                   │
-│  └── thinking           Réflexion approfondie                       │
+│  ⚙️ SYSTÈME (6 outils)                                              │
+│  ├── memory_store      💾 Stocker en mémoire                        │
+│  ├── memory_recall     🧠 Rappeler de mémoire                       │
+│  ├── spawn_agent       🤖 Lancer sous-agent                         │
+│  ├── http_request      🌐 Requête HTTP                              │
+│  ├── database_query    🗄️ Query SQL                                 │
+│  └── thinking          💭 Réflexion approfondie                     │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### 3.5.3 Exemple d'implémentation d'outil
-
-```typescript
-// src/tools/text-editor.ts (simplifié)
-export class ReadFileTool implements Tool {
-  name = 'read_file';
-  description = 'Read the contents of a file at the specified path';
-
-  inputSchema = {
-    type: 'object',
-    properties: {
-      path: {
-        type: 'string',
-        description: 'The path to the file to read'
-      },
-      encoding: {
-        type: 'string',
-        enum: ['utf-8', 'base64'],
-        default: 'utf-8'
-      }
-    },
-    required: ['path']
-  };
-
-  requiresConfirmation = false; // Lecture = safe
-
-  async execute(args: { path: string; encoding?: string }): Promise<ToolResult> {
-    try {
-      // Validation du chemin
-      const safePath = this.validatePath(args.path);
-
-      // Lecture
-      const content = await fs.readFile(safePath, {
-        encoding: args.encoding ?? 'utf-8'
-      });
-
-      // Troncature si trop long
-      const truncated = this.truncateIfNeeded(content, 50000);
-
-      return {
-        success: true,
-        output: truncated.content,
-        metadata: {
-          path: safePath,
-          size: content.length,
-          truncated: truncated.wasTruncated
-        }
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: `Failed to read file: ${error.message}`
-      };
-    }
-  }
-
-  private validatePath(path: string): string {
-    // Empêcher path traversal
-    const resolved = path.resolve(path);
-    const cwd = process.cwd();
-
-    if (!resolved.startsWith(cwd)) {
-      throw new Error('Path outside working directory');
-    }
-
-    return resolved;
-  }
-}
-```
-
-### 3.5.4 Flux d'exécution d'un outil
+### 3.5.3 🔄 Flux d'Exécution d'un Outil
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                  FLUX D'EXÉCUTION OUTIL                              │
+│                    🔄 FLUX D'EXÉCUTION OUTIL                        │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │   LLM demande : { tool: "bash", args: { command: "rm -rf /" } }    │
 │                              │                                       │
 │                              ▼                                       │
 │   ┌──────────────────────────────────────────────────────────┐      │
-│   │                    VALIDATION                             │      │
-│   │  1. Schema JSON valide ?                                 │      │
-│   │  2. Paramètres requis présents ?                         │      │
-│   │  3. Types corrects ?                                     │      │
+│   │  1️⃣ VALIDATION                                           │      │
+│   │     • Schema JSON valide ?                               │      │
+│   │     • Paramètres requis présents ?                       │      │
+│   │     • Types corrects ?                                   │      │
+│   └──────────────────────────────────────────────────────────┘      │
+│                              │ ✓                                    │
+│                              ▼                                       │
+│   ┌──────────────────────────────────────────────────────────┐      │
+│   │  2️⃣ SÉCURITÉ                                             │      │
+│   │     • Commande blacklistée ? ❌ rm -rf / = BLOQUÉ        │      │
+│   │     • Path dans working dir ?                            │      │
+│   │     • Permissions suffisantes ?                          │      │
+│   └──────────────────────────────────────────────────────────┘      │
+│                              │ ❌ BLOQUÉ !                          │
+│                              │                                       │
+│   Si passé :                 │                                       │
+│                              ▼                                       │
+│   ┌──────────────────────────────────────────────────────────┐      │
+│   │  3️⃣ CONFIRMATION (si requiresConfirmation = true)        │      │
+│   │     • Afficher à l'utilisateur                           │      │
+│   │     • Attendre approbation                               │      │
+│   │     • Si refusé : annuler                                │      │
+│   └──────────────────────────────────────────────────────────┘      │
+│                              │ ✓ Approuvé                           │
+│                              ▼                                       │
+│   ┌──────────────────────────────────────────────────────────┐      │
+│   │  4️⃣ EXÉCUTION                                            │      │
+│   │     • Sandbox si nécessaire (firejail)                   │      │
+│   │     • Timeout                                            │      │
+│   │     • Capture stdout/stderr                              │      │
 │   └──────────────────────────────────────────────────────────┘      │
 │                              │                                       │
 │                              ▼                                       │
 │   ┌──────────────────────────────────────────────────────────┐      │
-│   │                    SÉCURITÉ                               │      │
-│   │  1. Commande blacklistée ? (rm -rf /, format C:)         │      │
-│   │  2. Path dans working dir ?                              │      │
-│   │  3. Permissions suffisantes ?                            │      │
-│   └──────────────────────────────────────────────────────────┘      │
-│                              │                                       │
-│                              ▼                                       │
-│   ┌──────────────────────────────────────────────────────────┐      │
-│   │                  CONFIRMATION                             │      │
-│   │  Si requiresConfirmation = true :                        │      │
-│   │  → Afficher à l'utilisateur                              │      │
-│   │  → Attendre approbation                                  │      │
-│   │  → Si refusé : annuler                                   │      │
-│   └──────────────────────────────────────────────────────────┘      │
-│                              │                                       │
-│                              ▼                                       │
-│   ┌──────────────────────────────────────────────────────────┐      │
-│   │                    EXÉCUTION                              │      │
-│   │  1. Sandbox si nécessaire (firejail)                     │      │
-│   │  2. Timeout                                              │      │
-│   │  3. Capture stdout/stderr                                │      │
-│   └──────────────────────────────────────────────────────────┘      │
-│                              │                                       │
-│                              ▼                                       │
-│   ┌──────────────────────────────────────────────────────────┐      │
-│   │                  POST-TRAITEMENT                          │      │
-│   │  1. Redaction de secrets (API keys, passwords)           │      │
-│   │  2. Troncature si output trop long                       │      │
-│   │  3. Logging pour audit                                   │      │
+│   │  5️⃣ POST-TRAITEMENT                                      │      │
+│   │     • Redaction de secrets (API keys, passwords)         │      │
+│   │     • Troncature si output trop long                     │      │
+│   │     • Logging pour audit                                 │      │
 │   └──────────────────────────────────────────────────────────┘      │
 │                              │                                       │
 │                              ▼                                       │
@@ -693,430 +631,354 @@ export class ReadFileTool implements Tool {
 
 ---
 
-## 3.6 Learning : L'Apprentissage Continu
+## 📚 3.6 Learning : L'Apprentissage Continu
 
-### 3.6.1 Ce que l'agent apprend
+Un agent qui n'apprend pas répète les mêmes erreurs. Le composant Learning permet à l'agent de s'améliorer avec l'expérience.
+
+### 3.6.1 📖 Ce que l'Agent Apprend
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    APPRENTISSAGE AGENT                               │
+│                    📚 TYPES D'APPRENTISSAGE                         │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
-│  PATTERNS DE RÉPARATION                                             │
+│  🔧 PATTERNS DE RÉPARATION                                          │
 │  ┌─────────────────────────────────────────────────────────────┐    │
-│  │  Erreur observée → Solution appliquée → Résultat            │    │
+│  │  Erreur observée → Solution appliquée → Résultat             │    │
 │  │                                                              │    │
 │  │  Exemple :                                                   │    │
-│  │  "Cannot find module 'X'" → npm install X → ✓ résolu        │    │
-│  │  → Mémorisé avec confidence 0.95                            │    │
+│  │  "Cannot find module 'X'" → npm install X → ✓ résolu         │    │
+│  │  → Mémorisé avec confidence 0.95                             │    │
+│  │                                                              │    │
+│  │  Prochaine fois : suggère automatiquement "npm install X"    │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │                                                                      │
-│  CONVENTIONS DE CODE                                                │
+│  📝 CONVENTIONS DE CODE                                             │
 │  ┌─────────────────────────────────────────────────────────────┐    │
-│  │  Style observé dans le projet                               │    │
+│  │  Style observé dans le projet :                              │    │
+│  │     • Indentation : 2 spaces                                 │    │
+│  │     • Quotes : single                                        │    │
+│  │     • Semicolons : yes                                       │    │
+│  │     • Naming : camelCase                                     │    │
 │  │                                                              │    │
-│  │  • Indentation : 2 spaces                                   │    │
-│  │  • Quotes : single                                          │    │
-│  │  • Semicolons : yes                                         │    │
-│  │  • Naming : camelCase                                       │    │
-│  │  → Appliqué automatiquement au code généré                  │    │
+│  │  → Appliqué automatiquement au code généré                   │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │                                                                      │
-│  STATISTIQUES D'OUTILS                                              │
+│  📊 STATISTIQUES D'OUTILS                                           │
 │  ┌─────────────────────────────────────────────────────────────┐    │
-│  │  Outil → Temps moyen → Taux succès → Fréquence              │    │
+│  │  Outil       │ Temps moyen │ Taux succès │ Fréquence         │    │
+│  │  ─────────────────────────────────────────────────────────   │    │
+│  │  bash        │    1.2s     │    85%      │    45%            │    │
+│  │  read_file   │    0.1s     │    99%      │    30%            │    │
+│  │  edit_file   │    0.3s     │    92%      │    20%            │    │
 │  │                                                              │    │
-│  │  bash      : 1.2s, 85%, 45%                                 │    │
-│  │  read_file : 0.1s, 99%, 30%                                 │    │
-│  │  edit_file : 0.3s, 92%, 20%                                 │    │
-│  │  → Utilisé pour prédiction et optimisation                  │    │
+│  │  → Utilisé pour prédiction de temps et optimisation          │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │                                                                      │
-│  PRÉFÉRENCES UTILISATEUR                                            │
+│  👤 PRÉFÉRENCES UTILISATEUR                                         │
 │  ┌─────────────────────────────────────────────────────────────┐    │
-│  │  Comportements observés                                     │    │
+│  │  Comportements observés :                                    │    │
+│  │     • Préfère explications détaillées                        │    │
+│  │     • Demande confirmation avant git push                    │    │
+│  │     • Utilise TypeScript strict                              │    │
 │  │                                                              │    │
-│  │  • Préfère explications détaillées                          │    │
-│  │  • Demande confirmation avant git push                      │    │
-│  │  • Utilise TypeScript strict                                │    │
-│  │  → Personnalise les réponses futures                        │    │
+│  │  → Personnalise les réponses futures                         │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### 3.6.2 Boucle d'apprentissage
+### 3.6.2 🔄 Boucle d'Apprentissage
 
-```typescript
-// src/learning/persistent-learning.ts (simplifié)
-export class PersistentLearning {
-  async learnFromRepair(
-    error: string,
-    solution: string,
-    success: boolean
-  ): Promise<void> {
-    // Extraire le pattern d'erreur
-    const errorPattern = this.extractPattern(error);
-
-    // Chercher si on connaît déjà ce pattern
-    const existing = await this.db.query(`
-      SELECT * FROM repair_learning
-      WHERE error_pattern = ?
-    `, [errorPattern]);
-
-    if (existing) {
-      // Mettre à jour les stats
-      await this.db.run(`
-        UPDATE repair_learning
-        SET ${success ? 'success_count' : 'failure_count'} =
-            ${success ? 'success_count' : 'failure_count'} + 1
-        WHERE id = ?
-      `, [existing.id]);
-    } else {
-      // Nouveau pattern
-      await this.db.run(`
-        INSERT INTO repair_learning (error_pattern, solution_pattern, success_count)
-        VALUES (?, ?, ?)
-      `, [errorPattern, solution, success ? 1 : 0]);
-    }
-  }
-
-  async suggestSolution(error: string): Promise<string | null> {
-    const errorPattern = this.extractPattern(error);
-
-    // Chercher les solutions avec haute confiance
-    const solutions = await this.db.query(`
-      SELECT solution_pattern, confidence
-      FROM repair_learning
-      WHERE error_pattern LIKE ?
-      AND confidence > 0.7
-      ORDER BY confidence DESC
-      LIMIT 1
-    `, [`%${errorPattern}%`]);
-
-    return solutions[0]?.solution_pattern ?? null;
-  }
-}
-```
+| Étape | Action | Exemple |
+|:------|:-------|:--------|
+| 1️⃣ **Observer** | Capturer erreur + tentative de solution | "TypeError: undefined" + "ajout de null check" |
+| 2️⃣ **Exécuter** | Tester la solution | Relancer les tests |
+| 3️⃣ **Évaluer** | Succès ou échec ? | Tests passent ✓ |
+| 4️⃣ **Mémoriser** | Stocker le pattern avec son score | Pattern + confidence 0.85 |
+| 5️⃣ **Réutiliser** | Suggérer pour erreurs similaires | Même erreur → même solution |
 
 ---
 
-## 3.7 Security : La Protection Multi-Couches
+## 🛡️ 3.7 Security : La Protection Multi-Couches
 
-### 3.7.1 Les trois modes d'approbation
+Un agent qui peut modifier des fichiers et exécuter des commandes est puissant — et dangereux. Le composant Security est le garde-fou qui empêche les catastrophes.
+
+### 3.7.1 🎚️ Les Trois Modes d'Approbation
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    MODES D'APPROBATION                               │
+│                    🎚️ MODES D'APPROBATION                           │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
-│  MODE 1 : READ-ONLY (Minimal trust)                                 │
+│  🟢 MODE 1 : READ-ONLY (Confiance minimale)                         │
 │  ┌─────────────────────────────────────────────────────────────┐    │
-│  │  ✓ Autorisé : read_file, list_dir, git_status, search       │    │
-│  │  ✗ Bloqué  : write, edit, bash, delete, git_commit          │    │
-│  │  Usage    : Exploration, audit, review                       │    │
+│  │  ✅ Autorisé : read_file, list_dir, git_status, search      │    │
+│  │  ❌ Bloqué  : write, edit, bash, delete, git_commit         │    │
+│  │  📋 Usage   : Exploration, audit, review de code            │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │                                                                      │
-│  MODE 2 : AUTO-APPROVE (Default)                                    │
+│  🟡 MODE 2 : AUTO-APPROVE (Par défaut)                              │
 │  ┌─────────────────────────────────────────────────────────────┐    │
-│  │  ✓ Auto   : read, write dans working dir, git add/commit    │    │
-│  │  ? Confirm: bash dangereux, delete, git push                │    │
-│  │  ✗ Bloqué : rm -rf, format, credentials                     │    │
-│  │  Usage    : Développement quotidien                          │    │
+│  │  ✅ Auto   : read, write dans working dir, git add/commit   │    │
+│  │  ⚠️ Confirm: bash "dangereux", delete, git push             │    │
+│  │  ❌ Bloqué : rm -rf, format, credentials en clair           │    │
+│  │  📋 Usage  : Développement quotidien                        │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │                                                                      │
-│  MODE 3 : FULL-ACCESS (YOLO mode)                                   │
+│  🔴 MODE 3 : FULL-ACCESS (YOLO mode)                                │
 │  ┌─────────────────────────────────────────────────────────────┐    │
-│  │  ✓ Auto   : Tout sauf blacklist absolue                     │    │
-│  │  ✗ Bloqué : rm -rf /, format, credentials en clair          │    │
-│  │  Usage    : Scripts automatisés, CI/CD                       │    │
-│  │  ⚠️ DANGER : À utiliser avec précaution                       │    │
+│  │  ✅ Auto   : Tout sauf blacklist absolue                    │    │
+│  │  ❌ Bloqué : rm -rf /, format, credentials en clair         │    │
+│  │  📋 Usage  : Scripts automatisés, CI/CD                     │    │
+│  │  ⚠️ DANGER : À utiliser avec grande précaution              │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### 3.7.2 Architecture de sécurité
+### 3.7.2 🔒 Mesures de Sécurité
+
+| 🛡️ Protection | 📝 Description | 🎯 Contre quoi ? |
+|:--------------|:---------------|:-----------------|
+| **Blacklist** | Commandes interdites (rm -rf /, format) | Destruction système |
+| **Path validation** | Chemins restreints au working dir | Accès fichiers sensibles |
+| **Sandbox** | Firejail pour commandes à risque | Effets de bord |
+| **Redaction** | Masquage auto des secrets | Fuite de credentials |
+| **Audit log** | Journal de toutes les actions | Traçabilité |
+| **Timeout** | Limite de temps par outil | Blocage/boucle |
+
+### 3.7.3 🔐 Redaction Automatique
 
 ```typescript
-// src/security/index.ts (simplifié)
-export class SecurityManager {
-  private approvalMode: ApprovalMode;
-  private sandbox: SandboxManager;
-  private redactor: DataRedactor;
-  private auditor: SecurityAuditor;
+// Patterns détectés et masqués automatiquement
+const REDACTION_PATTERNS = [
+  // API Keys
+  { regex: /api[_-]?key[=:]\s*["']?([a-zA-Z0-9_-]{20,})/gi,
+    replace: 'api_key=[REDACTED]' },
 
-  async checkPermission(tool: Tool, args: unknown): Promise<PermissionResult> {
-    // 1. Vérifier la blacklist absolue
-    if (this.isAbsolutelyForbidden(tool, args)) {
-      return { allowed: false, reason: 'Operation forbidden' };
-    }
+  // Passwords
+  { regex: /password[=:]\s*["']?([^"'\s]+)/gi,
+    replace: 'password=[REDACTED]' },
 
-    // 2. Vérifier selon le mode
-    const modeResult = this.approvalMode.check(tool, args);
-    if (!modeResult.allowed) {
-      return modeResult;
-    }
+  // AWS Keys
+  { regex: /AKIA[0-9A-Z]{16}/g,
+    replace: '[AWS_KEY_REDACTED]' },
 
-    // 3. Vérifier les permissions spécifiques
-    const permResult = await this.checkSpecificPermissions(tool, args);
-
-    return permResult;
-  }
-
-  async executeSecurely(tool: Tool, args: unknown): Promise<ToolResult> {
-    // 1. Sandbox si nécessaire
-    const executor = this.shouldSandbox(tool)
-      ? this.sandbox.wrap(tool.execute)
-      : tool.execute;
-
-    // 2. Exécuter avec timeout
-    const result = await withTimeout(
-      executor(args),
-      tool.timeout ?? 30000
-    );
-
-    // 3. Redacter les secrets dans l'output
-    const redactedResult = this.redactor.redact(result);
-
-    // 4. Logger pour audit
-    await this.auditor.log({
-      tool: tool.name,
-      args: this.redactor.redact(args),
-      result: redactedResult,
-      timestamp: new Date()
-    });
-
-    return redactedResult;
-  }
-}
-```
-
-### 3.7.3 Redaction automatique
-
-```typescript
-// src/security/data-redaction.ts (simplifié)
-export class DataRedactor {
-  private patterns = [
-    // API Keys
-    { regex: /(?:api[_-]?key|apikey)[=:]\s*["']?([a-zA-Z0-9_-]{20,})["']?/gi,
-      replace: '$1=[REDACTED]' },
-
-    // Passwords
-    { regex: /(?:password|passwd|pwd)[=:]\s*["']?([^"'\s]+)["']?/gi,
-      replace: '$1=[REDACTED]' },
-
-    // Tokens
-    { regex: /(?:token|bearer)\s+([a-zA-Z0-9._-]{20,})/gi,
-      replace: 'token [REDACTED]' },
-
-    // AWS Keys
-    { regex: /AKIA[0-9A-Z]{16}/g,
-      replace: '[AWS_KEY_REDACTED]' },
-
-    // Private keys
-    { regex: /-----BEGIN (?:RSA |EC )?PRIVATE KEY-----[\s\S]*?-----END/g,
-      replace: '[PRIVATE_KEY_REDACTED]' }
-  ];
-
-  redact(data: unknown): unknown {
-    if (typeof data === 'string') {
-      return this.redactString(data);
-    }
-    if (typeof data === 'object' && data !== null) {
-      return this.redactObject(data);
-    }
-    return data;
-  }
-
-  private redactString(str: string): string {
-    let result = str;
-    for (const pattern of this.patterns) {
-      result = result.replace(pattern.regex, pattern.replace);
-    }
-    return result;
-  }
-}
+  // Private keys
+  { regex: /-----BEGIN (?:RSA )?PRIVATE KEY-----/,
+    replace: '[PRIVATE_KEY_REDACTED]' }
+];
 ```
 
 ---
 
-## 3.8 Persistance : La Fondation Stable
+## 💿 3.8 Persistance : La Fondation Stable
 
-### 3.8.1 Architecture de stockage
+Tous les composants reposent sur une couche de persistance qui stocke données, cache, et configuration.
+
+### 3.8.1 📁 Architecture de Stockage
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    ARCHITECTURE PERSISTANCE                          │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  ~/.grok/                                                           │
-│  ├── grok.db                    SQLite principal                    │
-│  │   ├── memories               Mémoire long terme                  │
-│  │   ├── sessions               Historique sessions                 │
-│  │   ├── messages               Messages conversation               │
-│  │   ├── repair_learning        Patterns de réparation              │
-│  │   ├── conventions            Conventions code                    │
-│  │   ├── tool_stats             Stats d'utilisation                 │
-│  │   └── analytics              Métriques                           │
-│  │                                                                   │
-│  ├── cache/                                                         │
-│  │   ├── semantic-cache.json    Cache réponses API                  │
-│  │   ├── tool-cache.json        Cache résultats outils              │
-│  │   └── embeddings/            Embeddings calculés                 │
-│  │                                                                   │
-│  ├── settings.json              Configuration utilisateur           │
-│  └── logs/                      Logs structurés                     │
-│                                                                      │
-│  .grok/ (dans le projet)                                            │
-│  ├── project-settings.json      Config projet                       │
-│  ├── mcp.json                   Serveurs MCP                        │
-│  ├── hooks.json                 Hooks personnalisés                 │
-│  └── approval-mode.json         Mode d'approbation                  │
-│                                                                      │
-└─────────────────────────────────────────────────────────────────────┘
-```
+~/.grok/                              📁 Répertoire utilisateur
+├── grok.db                           🗄️ SQLite principal
+│   ├── memories                      💾 Mémoire long terme
+│   ├── sessions                      📋 Historique sessions
+│   ├── messages                      💬 Messages conversation
+│   ├── repair_learning               🔧 Patterns de réparation
+│   └── tool_stats                    📊 Stats d'utilisation
+│
+├── cache/                            ⚡ Caches
+│   ├── semantic-cache.json           🧠 Cache réponses API
+│   ├── tool-cache.json               🔧 Cache résultats outils
+│   └── embeddings/                   🔢 Embeddings calculés
+│
+├── settings.json                     ⚙️ Configuration utilisateur
+└── logs/                             📜 Logs structurés
 
-### 3.8.2 Caching multi-niveaux
-
-```typescript
-// src/performance/cache-manager.ts (simplifié)
-export class CacheManager {
-  private semanticCache: SemanticCache;
-  private toolCache: ToolCache;
-  private memoryCache: Map<string, unknown>;
-
-  async get<T>(key: string, type: CacheType): Promise<T | null> {
-    // 1. Cache mémoire (plus rapide)
-    if (this.memoryCache.has(key)) {
-      return this.memoryCache.get(key) as T;
-    }
-
-    // 2. Cache approprié selon le type
-    let value: T | null = null;
-
-    switch (type) {
-      case 'semantic':
-        value = await this.semanticCache.find(key);
-        break;
-      case 'tool':
-        value = await this.toolCache.get(key);
-        break;
-    }
-
-    // 3. Mettre en cache mémoire si trouvé
-    if (value !== null) {
-      this.memoryCache.set(key, value);
-    }
-
-    return value;
-  }
-}
+.grok/ (dans chaque projet)           📁 Configuration projet
+├── project-settings.json             ⚙️ Settings du projet
+├── mcp.json                          🔌 Serveurs MCP
+├── hooks.json                        🪝 Hooks personnalisés
+└── approval-mode.json                🎚️ Mode d'approbation
 ```
 
 ---
 
-## 3.9 Le Flux Complet : Un Exemple
+## 🎬 3.9 Le Flux Complet : Un Exemple
 
-> *Lina tape une commande :*
->
-> `"Trouve et corrige le bug dans la fonction calculateTotal"`
+Voyons comment tous ces composants interagissent pour une vraie tâche.
 
-Voici ce qui se passe dans l'agent :
+> 👩‍💻 *Lina tape :* `"Trouve et corrige le bug dans la fonction calculateTotal"`
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│            FLUX COMPLET : "Corrige le bug dans calculateTotal"       │
+│       🎬 FLUX COMPLET : "Corrige le bug dans calculateTotal"        │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
-│  1. ORCHESTRATEUR reçoit le message                                 │
+│  1️⃣ ORCHESTRATEUR reçoit le message                                │
 │     └─► Ajoute à l'historique de conversation                       │
 │                                                                      │
-│  2. MEMORY rappelle le contexte                                     │
+│  2️⃣ MEMORY rappelle le contexte                                    │
 │     └─► RAG trouve : calculateTotal dans src/utils/math.ts          │
 │     └─► Charge les dépendances : types.ts, constants.ts             │
 │                                                                      │
-│  3. REASONING évalue la complexité                                  │
-│     └─► "debug" détecté → Chain-of-thought activé                   │
+│  3️⃣ REASONING évalue la complexité                                 │
+│     └─► "bug" + "debug" détectés → Chain-of-Thought activé          │
 │                                                                      │
-│  4. LLM appelé avec contexte enrichi                                │
-│     └─► Prompt : message + fichiers + instructions de debug         │
+│  4️⃣ LLM appelé avec contexte enrichi                               │
+│     └─► Prompt : message + fichiers trouvés + instructions debug    │
 │                                                                      │
-│  5. LLM répond : tool_call(search_content, {pattern: "error"})      │
+│  5️⃣ LLM répond : tool_call(search_content, {pattern: "divide"})    │
 │                                                                      │
-│  6. SECURITY vérifie                                                │
-│     └─► search_content = lecture seule = auto-approved              │
+│  6️⃣ SECURITY vérifie                                               │
+│     └─► search_content = lecture seule = ✅ auto-approved           │
 │                                                                      │
-│  7. ACTION exécute                                                  │
+│  7️⃣ ACTION exécute                                                 │
 │     └─► Recherche dans math.ts                                      │
-│     └─► Trouve : ligne 45, division potentielle par 0               │
+│     └─► Trouve : ligne 45, division potentielle par 0 !             │
 │                                                                      │
-│  8. ORCHESTRATEUR continue la boucle                                │
+│  8️⃣ ORCHESTRATEUR continue la boucle                               │
 │                                                                      │
-│  9. LLM analyse et propose : tool_call(edit_file, {...})            │
+│  9️⃣ LLM analyse et propose : tool_call(edit_file, {...fix...})     │
 │                                                                      │
-│ 10. SECURITY vérifie                                                │
-│     └─► edit_file dans working dir = auto-approved                  │
+│ 1️⃣0️⃣ SECURITY vérifie                                              │
+│     └─► edit_file dans working dir = ✅ auto-approved               │
 │                                                                      │
-│ 11. ACTION exécute                                                  │
-│     └─► Ajoute garde : if (divisor === 0) throw new Error(...)      │
+│ 1️⃣1️⃣ ACTION exécute                                                │
+│     └─► Ajoute : if (divisor === 0) throw new Error(...)            │
 │                                                                      │
-│ 12. LLM propose : tool_call(bash, {command: "npm test"})            │
+│ 1️⃣2️⃣ LLM propose : tool_call(bash, {command: "npm test"})         │
 │                                                                      │
-│ 13. ACTION exécute les tests                                        │
-│     └─► Tests passent ✓                                             │
+│ 1️⃣3️⃣ ACTION exécute les tests                                      │
+│     └─► Tests passent ✅                                             │
 │                                                                      │
-│ 14. LEARNING mémorise                                               │
+│ 1️⃣4️⃣ LEARNING mémorise                                             │
 │     └─► Pattern : "division by zero" → "add guard check"            │
-│     └─► Confidence +1                                               │
+│     └─► Confidence +1                                                │
 │                                                                      │
-│ 15. LLM répond : "Bug corrigé ! Ajouté vérification division..."    │
+│ 1️⃣5️⃣ LLM répond : "Bug corrigé ! J'ai ajouté une vérification..."  │
 │                                                                      │
-│ 16. ORCHESTRATEUR termine                                           │
+│ 1️⃣6️⃣ ORCHESTRATEUR termine                                         │
 │     └─► Affiche la réponse à l'utilisateur                          │
+│                                                                      │
+│  📊 Résultat : 5 rounds, 3 tool calls, ~15 secondes                 │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Résumé
+## 📝 3.10 Points Clés à Retenir
 
-Dans ce chapitre, nous avons disséqué les six composants d'un agent :
+### 🏗️ Sur l'Architecture
 
-| Composant | Rôle | Fichiers clés Grok-CLI |
-|-----------|------|------------------------|
-| **Orchestrateur** | Coordonne la boucle | `grok-agent.ts` |
-| **Reasoning** | Résout les problèmes | `reasoning/*.ts` |
-| **Memory** | Stocke et retrouve | `database/`, `context/` |
-| **Action** | Exécute les outils | `tools/*.ts` |
-| **Learning** | S'améliore | `learning/*.ts` |
-| **Security** | Protège | `security/*.ts` |
+| Concept | Point clé |
+|:--------|:----------|
+| **6 composants** | Orchestrateur, Reasoning, Memory, Action, Learning, Security |
+| **Interdépendance** | Chaque composant dépend des autres |
+| **Boucle ReAct** | Think → Act → Observe → Repeat |
+
+### 🧠 Sur le Reasoning
+
+| Concept | Point clé |
+|:--------|:----------|
+| **4 niveaux** | Direct → CoT → ToT → MCTS |
+| **Principe** | Minimum nécessaire pour la tâche |
+| **Mots-clés** | think, megathink, ultrathink |
+
+### 💾 Sur la Memory
+
+| Concept | Point clé |
+|:--------|:----------|
+| **3 horizons** | Court terme (session) → Moyen → Long terme (permanent) |
+| **RAG** | Retrouver l'info pertinente par embeddings |
+| **Compression** | Résumer/supprimer quand le contexte déborde |
+
+### 🛡️ Sur la Security
+
+| Concept | Point clé |
+|:--------|:----------|
+| **3 modes** | Read-only → Auto-approve → Full-access |
+| **Défense en profondeur** | Validation → Sécurité → Confirmation → Exécution |
+| **Redaction** | Masquage automatique des secrets |
 
 ---
 
-## Exercices
+## 🏋️ 3.11 Exercices
 
-1. **Diagramme** : Dessinez le flux pour la commande "Crée un fichier test.txt avec Hello World".
+### Exercice 1 : Dessiner un Flux (20 min)
 
-2. **Implémentation** : Implémentez un outil simple (ex: `word_count`) en suivant l'interface `Tool`.
+Dessinez le flux complet pour la commande :
+> "Crée un fichier test.txt avec 'Hello World' dedans"
 
-3. **Sécurité** : Listez 5 commandes bash qui devraient être bloquées et pourquoi.
+Identifiez chaque composant impliqué et les étapes.
 
-4. **Mémoire** : Concevez le schéma SQL pour stocker les préférences utilisateur.
+### Exercice 2 : Implémenter un Outil (30 min)
+
+Implémentez un outil `word_count` qui compte les mots d'un fichier :
+```typescript
+// Signature
+word_count(path: string) → { words: number, lines: number, chars: number }
+```
+
+### Exercice 3 : Sécurité (15 min)
+
+Listez 10 commandes bash qui devraient être **bloquées** et expliquez pourquoi :
+1. `rm -rf /` — Destruction système
+2. `:(){ :|:& };:` — Fork bomb
+3. ... (8 autres)
+
+### Exercice 4 : Schema SQL (20 min)
+
+Concevez un schéma SQL pour stocker les préférences utilisateur avec :
+- Type de préférence (style, comportement, confirmation)
+- Valeur
+- Date de dernière modification
+- Fréquence d'utilisation
 
 ---
 
-## Pour aller plus loin
+## 📚 3.12 Pour Aller Plus Loin
 
-- Grok-CLI Source : `src/agent/grok-agent.ts`
-- Tool Implementations : `src/tools/`
-- Security Layer : `src/security/`
+### Code Source Grok-CLI
+
+- Orchestrateur : `src/agent/grok-agent.ts`
+- Reasoning : `src/agent/reasoning/`
+- Memory : `src/context/`, `src/database/`
+- Action : `src/tools/`
+- Learning : `src/learning/`
+- Security : `src/security/`
+
+### Références
+
+- ReAct: Synergizing Reasoning and Acting (Yao et al., 2022)
+- Cognitive Architectures for Language Agents (Sumers et al., 2023)
+
+---
+
+## 🌅 Épilogue : La Vision Complète
+
+Marc recula pour observer le tableau blanc maintenant couvert de diagrammes.
+
+— "Je comprends mieux maintenant. Ce n'est pas juste 'un LLM avec des outils'. C'est une vraie architecture avec des composants spécialisés qui collaborent."
+
+Lina acquiesça.
+
+— "Exactement. Et le plus beau, c'est que chaque composant peut être amélioré indépendamment. Tu veux un meilleur reasoning ? Implémente MCTS. Tu veux une meilleure mémoire ? Améliore le RAG. Tu veux plus de sécurité ? Ajoute des règles."
+
+Sophie nota quelque chose.
+
+— "Et dans les prochains chapitres, on va voir chaque composant en détail ?"
+
+— "Oui. On commence par le Reasoning — Tree-of-Thought et MCTS. C'est là que la magie opère vraiment."
 
 ---
 
 *Fin de la Partie I — Fondations*
 
-*Prochainement : Partie II — Reasoning & Planification*
-*Chapitre 4 — Tree-of-Thought (ToT)*
+---
 
+| ⬅️ Précédent | 📖 Sommaire | ➡️ Suivant |
+|:-------------|:-----------:|:-----------|
+| [Le Rôle des Agents](02-role-des-agents.md) | [Index](README.md) | [Tree-of-Thought](04-tree-of-thought.md) |

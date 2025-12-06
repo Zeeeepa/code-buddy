@@ -1,527 +1,792 @@
-# Chapitre 2 — Le Rôle des Agents dans l'Écosystème IA
+# 🤖 Chapitre 2 : Le Rôle des Agents dans l'Écosystème IA
 
 ---
 
-> **Scène**
->
-> *Lina présente son prototype à son équipe. Un chatbot amélioré qui peut lire des fichiers.*
->
-> *"C'est cool," dit Marc, le lead tech, "mais AutoGPT fait déjà ça, non ? Et Claude Code, et Cursor, et Copilot..."*
->
-> *Lina hésite. Elle sait que son prototype est différent, mais comment l'expliquer ?*
->
-> *"La différence," commence-t-elle, "c'est qu'un chatbot te donne une réponse. Un assistant te donne de l'aide. Mais un agent... un agent résout le problème."*
+## 🎬 Scène d'ouverture : La Confusion du Buzzword
+
+*Salle de réunion, le lendemain matin...*
+
+Lina présentait son prototype à l'équipe. Sur l'écran, un terminal noir avec une interface minimaliste — son chatbot amélioré qui pouvait lire des fichiers et exécuter du code.
+
+Marc, le lead technique, croisa les bras.
+
+— "C'est cool, mais AutoGPT fait déjà ça, non ? Et Claude Code, et Cursor, et Copilot... Tout le monde prétend avoir un 'agent IA' maintenant."
+
+Lina hésita. Elle *savait* que son prototype était différent, mais comment l'expliquer clairement ?
+
+— "La différence," commença-t-elle prudemment, "c'est dans ce qu'ils font réellement. Un chatbot te donne une réponse. Un assistant te donne de l'aide. Mais un **agent**..."
+
+Elle fit une pause dramatique.
+
+— "Un agent **résout** le problème. Tout seul. De bout en bout."
+
+Sophie, la PM, fronça les sourcils.
+
+— "Mais Copilot m'aide à écrire du code. Ce n'est pas un agent ?"
+
+— "Non. Copilot te suggère du code. Tu dois valider, corriger, intégrer. Lui ne peut pas lancer les tests, voir qu'ils échouent, comprendre pourquoi, et corriger jusqu'à ce que ça marche. Un vrai agent, si."
+
+Le silence dans la salle indiqua qu'elle avait touché une corde sensible.
+
+— "Laissez-moi vous montrer la différence..."
 
 ---
 
-## Introduction
+## 📚 2.1 Une Taxonomie Claire des Systèmes IA
 
-Le terme "agent IA" est devenu un buzzword en 2024. Tout le monde prétend en avoir un. Mais qu'est-ce qu'un agent, vraiment ? Ce chapitre établit une taxonomie claire des systèmes IA, retrace l'évolution qui nous a menés aux agents modernes, et présente les travaux de recherche fondamentaux qui ont façonné le domaine.
+Le terme "agent IA" est devenu l'un des buzzwords les plus galvaudés de 2024. Startups, entreprises établies, et projets open-source — tous revendiquent avoir un "agent". Mais cette confusion terminologique masque des différences fondamentales en termes de capacités et d'architecture.
 
----
+Pour construire quelque chose de vraiment utile, il faut d'abord comprendre ce qui existe, et où notre système se situe dans le paysage.
 
-## 2.1 Taxonomie des Systèmes IA
+### 2.1.1 📊 Les Quatre Niveaux d'Intelligence Artificielle Appliquée
 
-### 2.1.1 Les quatre niveaux d'intelligence artificielle appliquée
-
-Tous les systèmes basés sur des LLMs ne sont pas égaux. Voici une classification pragmatique :
+Au fil des années, une hiérarchie naturelle a émergé :
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    NIVEAUX D'IA APPLIQUÉE                            │
+│                    📊 PYRAMIDE DE L'IA APPLIQUÉE                    │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
-│  NIVEAU 4 : MULTI-AGENTS                                            │
+│  🏆 NIVEAU 4 : MULTI-AGENTS                                         │
 │  ┌─────────────────────────────────────────────────────────────┐    │
-│  │  Plusieurs agents collaborent                                │    │
-│  │  • MetaGPT, CrewAI, AutoGen                                 │    │
-│  │  • Spécialisation des rôles                                 │    │
-│  │  • Coordination complexe                                     │    │
+│  │  🤝 Plusieurs agents qui collaborent                        │    │
+│  │     • Spécialisation des rôles (dev, testeur, reviewer)     │    │
+│  │     • Coordination et communication inter-agents            │    │
+│  │     • Exemples : MetaGPT, CrewAI, AutoGen                   │    │
 │  └─────────────────────────────────────────────────────────────┘    │
-│                          ▲                                           │
-│  NIVEAU 3 : AGENT AUTONOME                                          │
+│                              ▲                                       │
+│  🚀 NIVEAU 3 : AGENT AUTONOME                                        │
 │  ┌─────────────────────────────────────────────────────────────┐    │
-│  │  Reasoning + Action + Mémoire + Apprentissage               │    │
-│  │  • AutoGPT, Grok-CLI, Devin                                 │    │
-│  │  • Boucle autonome                                          │    │
-│  │  • Résolution de bout en bout                               │    │
+│  │  🔄 Reasoning + Action + Mémoire + Auto-correction          │    │
+│  │     • Boucle autonome sans intervention humaine             │    │
+│  │     • Résolution de problèmes de bout en bout               │    │
+│  │     • Exemples : Grok-CLI, Claude Code, Devin               │    │
 │  └─────────────────────────────────────────────────────────────┘    │
-│                          ▲                                           │
-│  NIVEAU 2 : ASSISTANT AUGMENTÉ                                      │
+│                              ▲                                       │
+│  ⚡ NIVEAU 2 : ASSISTANT AUGMENTÉ                                    │
 │  ┌─────────────────────────────────────────────────────────────┐    │
-│  │  LLM + Contexte + Quelques outils                           │    │
-│  │  • Claude (avec code interpreter), ChatGPT Plus             │    │
-│  │  • GitHub Copilot, Cursor                                   │    │
-│  │  • Aide mais ne résout pas seul                             │    │
+│  │  🔧 LLM + Contexte + Quelques outils                        │    │
+│  │     • Aide l'humain mais ne résout pas seul                 │    │
+│  │     • Requiert validation et guidance continue              │    │
+│  │     • Exemples : Copilot, Cursor, ChatGPT Plus              │    │
 │  └─────────────────────────────────────────────────────────────┘    │
-│                          ▲                                           │
-│  NIVEAU 1 : CHATBOT                                                 │
+│                              ▲                                       │
+│  💬 NIVEAU 1 : CHATBOT                                               │
 │  ┌─────────────────────────────────────────────────────────────┐    │
-│  │  LLM brut avec prompt                                       │    │
-│  │  • ChatGPT vanilla, chatbots de support                     │    │
-│  │  • Conversation simple                                      │    │
-│  │  • Pas d'action réelle                                      │    │
+│  │  📝 LLM brut avec prompt                                    │    │
+│  │     • Conversation simple, pas d'action réelle              │    │
+│  │     • Connaissances limitées au training                    │    │
+│  │     • Exemples : ChatGPT vanilla, bots de support           │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### 2.1.2 Tableau comparatif détaillé
+Cette pyramide n'est pas qu'une taxonomie académique — elle a des implications pratiques directes sur ce que chaque système peut accomplir.
 
-| Aspect | Chatbot | Assistant | Agent | Multi-Agent |
-|--------|---------|-----------|-------|-------------|
-| **Mémoire** | Session | Session + docs | Persistante | Partagée |
-| **Outils** | 0 | 1-5 | 10-50+ | Spécialisés |
-| **Autonomie** | Aucune | Guidée | Boucle autonome | Coordination |
+### 2.1.2 📋 Tableau Comparatif Détaillé
+
+| Aspect | 💬 Chatbot | ⚡ Assistant | 🚀 Agent | 🤝 Multi-Agent |
+|:-------|:-----------|:-------------|:---------|:---------------|
+| **Mémoire** | Session uniquement | Session + documents | Persistante | Partagée entre agents |
+| **Outils** | 0 | 1-5 | 10-50+ | Spécialisés par rôle |
+| **Autonomie** | Aucune | Guidée par l'humain | Boucle autonome | Coordination autonome |
 | **Reasoning** | Linéaire | Chain-of-thought | ToT, MCTS | Distribué |
-| **Feedback** | Aucun | Utilisateur | Auto-évaluation | Inter-agents |
-| **Exemple** | FAQ bot | Copilot | Grok-CLI | MetaGPT |
+| **Feedback** | Aucun | De l'utilisateur | Auto-évaluation | Inter-agents |
+| **Qui décide ?** | L'humain, toujours | L'humain, souvent | L'agent, supervisé | Les agents, négocié |
+| **Exemple** | FAQ bot | GitHub Copilot | Grok-CLI | MetaGPT |
 
-### 2.1.3 Le spectre de l'autonomie
+### 2.1.3 🎚️ Le Spectre de l'Autonomie
+
+La différence fondamentale entre ces niveaux n'est pas technologique — c'est le **degré d'autonomie** accordé au système.
 
 ```
-Aucune autonomie ◄────────────────────────────────────────► Autonomie totale
+┌─────────────────────────────────────────────────────────────────────┐
+│                    🎚️ SPECTRE DE L'AUTONOMIE                        │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  Aucune autonomie ◄─────────────────────────────► Autonomie totale  │
+│                                                                      │
+│       │              │              │              │                 │
+│       ▼              ▼              ▼              ▼                 │
+│  ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐             │
+│  │ 💬      │   │ ⚡      │   │ 🚀      │   │ 🌟      │             │
+│  │ Chatbot │   │Assistant│   │  Agent  │   │  AGI?   │             │
+│  │         │   │         │   │         │   │         │             │
+│  │ Répond  │   │  Aide   │   │ Résout  │   │ Décide  │             │
+│  └─────────┘   └─────────┘   └─────────┘   └─────────┘             │
+│       │              │              │              │                 │
+│       ▼              ▼              ▼              ▼                 │
+│   L'humain       L'humain       L'humain       L'humain             │
+│   décide         guide le       supervise      ...fait quoi ?       │
+│   tout           processus      le résultat                         │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
-     │                    │                    │                    │
-     ▼                    ▼                    ▼                    ▼
-┌─────────┐         ┌─────────┐         ┌─────────┐         ┌─────────┐
-│ Chatbot │         │Assistant│         │  Agent  │         │  AGI    │
-│         │         │         │         │         │         │  (?)    │
-│ Répond  │         │ Aide    │         │ Résout  │         │ Décide  │
-└─────────┘         └─────────┘         └─────────┘         └─────────┘
+> 💡 **Point crucial** : Plus l'autonomie augmente, plus la **confiance** et la **sécurité** deviennent critiques. Un agent qui peut modifier du code et exécuter des commandes a le pouvoir de faire des dégâts considérables s'il n'est pas correctement encadré.
 
-Humain décide       Humain guide        Humain supervise    Humain... ?
-tout                les étapes          le résultat
+Cette réalité explique pourquoi les agents modernes (Claude Code, Grok-CLI) intègrent des systèmes de permission, de confirmation, et de sandbox. L'autonomie sans garde-fous serait irresponsable.
+
+---
+
+## 🕰️ 2.2 L'Évolution vers les Agents (2020-2025)
+
+Pour comprendre où nous en sommes, il faut retracer le chemin parcouru. L'émergence des agents n'était pas un accident — c'est le résultat de plusieurs percées technologiques qui se sont alignées.
+
+### 2.2.1 📅 Chronologie des Innovations Clés
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    📅 CHRONOLOGIE 2020-2025                         │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  2020-2022 : L'ÈRE DES FONDATIONS                                   │
+│  ════════════════════════════════                                   │
+│                                                                      │
+│  2020 │ GPT-3 : 175B paramètres, completion only                   │
+│       │ → Premier modèle capable de tâches diverses                 │
+│       │                                                             │
+│  2022 │ InstructGPT : RLHF pour suivre des instructions            │
+│  Mar  │ → Le modèle commence à "obéir"                             │
+│       │                                                             │
+│  2022 │ ChatGPT : Interface conversationnelle                       │
+│  Nov  │ → L'IA devient accessible au grand public                  │
+│                                                                      │
+│  2023 : L'ANNÉE DU DÉCOLLAGE                                        │
+│  ═══════════════════════════                                        │
+│                                                                      │
+│  2023 │ GPT-4 : Multimodal + Function Calling                      │
+│  Mar  │ → Le modèle peut demander l'exécution d'outils             │
+│       │                                                             │
+│  2023 │ AutoGPT : Premier agent viral                               │
+│  Avr  │ → L'idée d'autonomie captive l'imagination                 │
+│       │                                                             │
+│  2023 │ Claude 2 : Fenêtre de 100K tokens                          │
+│  Juil │ → On peut enfin voir des fichiers entiers                  │
+│                                                                      │
+│  2024-2025 : L'ÈRE DES AGENTS                                       │
+│  ════════════════════════════                                       │
+│                                                                      │
+│  2024 │ Claude 3 : 200K contexte + capacités avancées              │
+│  Mar  │                                                             │
+│       │ Devin : "Premier AI Software Engineer"                     │
+│       │ → L'agent devient produit commercial                       │
+│       │                                                             │
+│  2024 │ Claude Code : Agent de développement mainstream            │
+│       │                                                             │
+│       │ MCP Protocol : Standard pour les outils                    │
+│  Nov  │ → Interopérabilité entre agents et outils                  │
+│       │                                                             │
+│  2025 │ Grok-CLI : Agent open-source complet                       │
+│       │ → Les techniques deviennent accessibles à tous             │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 2.2.2 🔑 Les Quatre Catalyseurs Technologiques
+
+Ce ne sont pas les LLMs seuls qui ont rendu les agents possibles. Quatre innovations spécifiques ont été déterminantes :
+
+#### 1️⃣ Function Calling (2023)
+
+Avant le function calling, les LLMs ne pouvaient que générer du texte. Demander l'exécution d'un outil nécessitait du parsing complexe et peu fiable.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    🔧 AVANT vs APRÈS FUNCTION CALLING               │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  AVANT (parsing manuel) :                                           │
+│  ─────────────────────────                                          │
+│  LLM : "Je vais maintenant lire le fichier config.ts"              │
+│        "```bash"                                                    │
+│        "cat config.ts"                                              │
+│        "```"                                                        │
+│                                                                      │
+│  → Il faut parser le texte, extraire la commande, espérer          │
+│    que le format soit cohérent... fragile !                        │
+│                                                                      │
+│  APRÈS (function calling natif) :                                   │
+│  ─────────────────────────────────                                  │
+│  LLM retourne un JSON structuré :                                   │
+│  {                                                                   │
+│    "function_call": {                                               │
+│      "name": "read_file",                                           │
+│      "arguments": "{\"path\": \"config.ts\"}"                       │
+│    }                                                                 │
+│  }                                                                   │
+│                                                                      │
+│  → Structure garantie, facile à traiter, fiable !                  │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### 2️⃣ Fenêtres de Contexte Étendues (2023-2024)
+
+Un agent doit voir suffisamment de code pour comprendre ce qu'il fait. Les fenêtres de 4K tokens de GPT-3.5 étaient insuffisantes.
+
+| 🤖 Modèle | 📏 Contexte | 📝 Équivalent pratique |
+|:----------|:-----------:|:-----------------------|
+| GPT-3.5 | 4K tokens | Une seule fonction |
+| GPT-4 (initial) | 8K → 32K | Un fichier moyen |
+| GPT-4 Turbo | 128K | Un petit projet |
+| Claude 3 | 200K | Un projet complet |
+| Grok-2 | 128K | Codebase avec RAG |
+
+> 💡 **Implication** : Avec 200K tokens, un agent peut voir ~100 fichiers simultanément. C'est ce qui rend possible la compréhension contextuelle de codebases entières.
+
+#### 3️⃣ Benchmarks Standardisés (2023-2024)
+
+Sans mesure, pas d'amélioration. L'émergence de benchmarks spécifiques aux agents a permis de quantifier les progrès :
+
+| 📊 Benchmark | Focus | Meilleur score 2024 | Signification |
+|:-------------|:------|:-------------------:|:--------------|
+| **SWE-bench** | Correction de vrais bugs GitHub | ~30% | 1 bug sur 3 résolu automatiquement |
+| **WebArena** | Navigation web autonome | ~35% | Tâches web de difficulté moyenne |
+| **GAIA** | Raisonnement général multi-étapes | ~55% | Questions nécessitant recherche |
+| **HumanEval** | Génération de code | ~95% | Fonctions simples et isolées |
+
+> ⚠️ **Nuance importante** : Ces chiffres montrent à la fois le potentiel (95% sur HumanEval) et les limites actuelles (30% sur SWE-bench). Les tâches réelles, avec leur complexité et leur ambiguïté, restent difficiles.
+
+#### 4️⃣ MCP Protocol (2024)
+
+Anthropic a standardisé comment les agents découvrent et utilisent les outils. Avant MCP, chaque agent avait sa propre façon de définir les outils — incompatibilité garantie.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    🔌 MODEL CONTEXT PROTOCOL (MCP)                  │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  AVANT MCP : Chaque outil défini différemment                       │
+│  ─────────────────────────────────────────────                      │
+│  Agent A : { name: "readFile", params: ["path"] }                  │
+│  Agent B : { tool: "file_read", input: { filepath: "..." } }       │
+│  Agent C : function read(file: string): string                     │
+│                                                                      │
+│  → Pas d'interopérabilité, duplication d'efforts                   │
+│                                                                      │
+│  AVEC MCP : Standard universel                                      │
+│  ────────────────────────────                                       │
+│  {                                                                   │
+│    "name": "read_file",                                             │
+│    "description": "Read contents of a file",                        │
+│    "inputSchema": {                                                 │
+│      "type": "object",                                              │
+│      "properties": {                                                │
+│        "path": {                                                    │
+│          "type": "string",                                          │
+│          "description": "Path to the file"                         │
+│        }                                                            │
+│      },                                                             │
+│      "required": ["path"]                                           │
+│    }                                                                │
+│  }                                                                   │
+│                                                                      │
+│  → Un outil MCP fonctionne avec tous les agents MCP-compatibles    │
+│                                                                      │
+│  Transports supportés :                                             │
+│  • stdio : Communication via stdin/stdout                          │
+│  • HTTP : API REST standard                                         │
+│  • SSE : Server-Sent Events pour streaming                         │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2.2 L'Évolution vers les Agents (2020-2025)
+## 📖 2.3 Les Travaux de Recherche Fondamentaux
 
-### 2.2.1 Chronologie des innovations
+Grok-CLI n'est pas une invention ex nihilo — il s'appuie sur des années de recherche académique et industrielle. Comprendre ces travaux, c'est comprendre **pourquoi** l'agent est conçu comme il l'est.
+
+### 2.3.1 🌳 Tree-of-Thought (Yao et al., 2023)
+
+**Le problème** : Le raisonnement linéaire (un chemin unique) échoue sur les problèmes qui nécessitent exploration et backtracking.
+
+**L'idée** : Au lieu de suivre une seule chaîne de pensée, explorer plusieurs chemins en parallèle, évaluer lesquels sont prometteurs, et abandonner les impasses.
 
 ```
-2020 ──────────────────────────────────────────────────────────────────►
-
-     │ GPT-3          │ InstructGPT    │ ChatGPT       │ GPT-4
-     │ Completion     │ RLHF           │ Dialogue      │ Multimodal
-     │ only           │                │               │ + Function calls
-     ▼                ▼                ▼               ▼
-   ┌───┐            ┌───┐           ┌───┐           ┌───┐
-   │   │            │   │           │   │           │   │
-   └───┘            └───┘           └───┘           └───┘
-   2020             2022            Nov 2022        Mars 2023
-
-
-2023 ──────────────────────────────────────────────────────────────────►
-
-     │ AutoGPT        │ Claude 2      │ Claude 3      │ Grok-2
-     │ Premier agent  │ 100K context  │ 200K context  │ Reasoning
-     │ viral          │               │               │ amélioré
-     ▼                ▼               ▼               ▼
-   ┌───┐            ┌───┐           ┌───┐           ┌───┐
-   │   │            │   │           │   │           │   │
-   └───┘            └───┘           └───┘           └───┘
-   Avril 2023       Juillet 2023   Mars 2024        2024
-
-
-2024-2025 ─────────────────────────────────────────────────────────────►
-
-     │ Claude Code    │ MCP Protocol  │ Devin         │ Grok-CLI
-     │ Agent dev      │ Standard      │ AI Engineer   │ Agent complet
-     │ mainstream     │ outils        │               │ open-source
-     ▼                ▼               ▼               ▼
-   ┌───┐            ┌───┐           ┌───┐           ┌───┐
-   │   │            │   │           │   │           │   │
-   └───┘            └───┘           └───┘           └───┘
-   2024             Nov 2024        Mars 2024       2025
+┌─────────────────────────────────────────────────────────────────────┐
+│                    🌳 TREE-OF-THOUGHT EN ACTION                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  Problème : "Game of 24 : Utiliser 4, 5, 6, 10 pour obtenir 24"    │
+│                                                                      │
+│  Raisonnement linéaire (Chain-of-Thought) :                         │
+│  ──────────────────────────────────────────                         │
+│  4 + 5 = 9... 9 + 6 = 15... 15 + 10 = 25 ✗                         │
+│  → Un seul chemin, échec, pas de récupération possible             │
+│                                                                      │
+│  Tree-of-Thought :                                                  │
+│  ─────────────────                                                  │
+│                        [Problème]                                   │
+│                            │                                        │
+│            ┌───────────────┼───────────────┐                        │
+│            │               │               │                        │
+│            ▼               ▼               ▼                        │
+│       [4 + 5 = 9]    [4 × 5 = 20]    [10 - 4 = 6]                  │
+│            │               │               │                        │
+│       ✗ impasse      [20 + 6 = 26]   [6 × 5 = 30]                  │
+│                           ✗               ✗                         │
+│                                            │                        │
+│                                   Backtrack...                      │
+│                                            │                        │
+│                                   [4 × 6 = 24] ✓                    │
+│                                                                      │
+│  → Exploration systématique, trouve la solution !                  │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-### 2.2.2 Les catalyseurs clés
+| 📊 Métrique | Chain-of-Thought | Tree-of-Thought |
+|:------------|:----------------:|:---------------:|
+| Game of 24 | 4% | **74%** |
+| Creative Writing | baseline | +15% qualité |
+| Mini-Crosswords | 16% | **60%** |
 
-**1. Function Calling (2023)**
+**Dans Grok-CLI** : `src/agent/reasoning/tree-of-thought.ts`
 
-L'introduction du function calling dans GPT-4 a été révolutionnaire. Pour la première fois, le modèle pouvait demander explicitement l'exécution d'outils :
+### 2.3.2 🎲 RethinkMCTS (Zhang et al., 2024)
 
-```json
-{
-  "function_call": {
-    "name": "read_file",
-    "arguments": "{\"path\": \"src/config.ts\"}"
-  }
-}
+**Le problème** : Tree-of-Thought explore trop de mauvais chemins. Comment prioriser intelligemment ?
+
+**L'idée** : Adapter Monte-Carlo Tree Search (l'algorithme derrière AlphaGo) à la génération de code.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    🎲 MCTS POUR LA GÉNÉRATION DE CODE               │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  Les 4 phases de MCTS :                                             │
+│                                                                      │
+│  1️⃣ SELECT : Choisir le nœud le plus prometteur                    │
+│     └─ Utilise UCB1 : exploitation + exploration                    │
+│                                                                      │
+│  2️⃣ EXPAND : Générer des variations de code                        │
+│     └─ Le LLM propose plusieurs approches                          │
+│                                                                      │
+│  3️⃣ SIMULATE : Exécuter les tests                                  │
+│     └─ Feedback objectif sur la qualité                            │
+│                                                                      │
+│  4️⃣ BACKPROPAGATE : Mettre à jour les scores                       │
+│     └─ Les bons chemins deviennent plus attractifs                 │
+│                                                                      │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                                                             │   │
+│  │      [Racine]                                               │   │
+│  │      score: 0.5                                             │   │
+│  │          │                                                  │   │
+│  │    ┌─────┴─────┐                                            │   │
+│  │    │           │                                            │   │
+│  │    ▼           ▼                                            │   │
+│  │ [Approche A] [Approche B]                                   │   │
+│  │  score: 0.3   score: 0.7 ◄── Plus prometteur               │   │
+│  │                   │                                         │   │
+│  │             ┌─────┴─────┐                                   │   │
+│  │             │           │                                   │   │
+│  │             ▼           ▼                                   │   │
+│  │          [B.1]       [B.2]                                  │   │
+│  │         score: 0.8   score: 0.4                             │   │
+│  │          ✓ !                                                │   │
+│  │                                                             │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                      │
+│  Résultat : Converge vers la solution optimale avec moins          │
+│             d'explorations que ToT naïf                             │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-**2. Fenêtres de contexte étendues (2023-2024)**
+| 📊 Amélioration | Benchmark |
+|:----------------|:---------:|
+| HumanEval | +15% vs ToT |
+| MBPP | +12% vs ToT |
+| Exploration | -40% de nœuds visités |
 
-| Modèle | Contexte | Impact |
-|--------|----------|--------|
-| GPT-3.5 | 4K tokens | Une fonction |
-| GPT-4 | 8K → 128K | Fichiers entiers |
-| Claude 3 | 200K | Projets complets |
-| Grok-3 | 128K | Codebase RAG |
+**Dans Grok-CLI** : `src/agent/reasoning/mcts.ts`
 
-**3. Benchmarks agents (2023-2024)**
+### 2.3.3 💰 FrugalGPT (Chen et al., Stanford, 2023)
 
-Des benchmarks standardisés ont permis de mesurer les progrès :
+**Le problème** : Les meilleurs modèles coûtent cher. Utiliser GPT-4 pour tout est du gaspillage.
 
-| Benchmark | Focus | Meilleur 2024 |
-|-----------|-------|---------------|
-| SWE-bench | Bug fixing réel | ~30% résolu |
-| WebArena | Navigation web | ~35% succès |
-| GAIA | Raisonnement général | ~55% succès |
-| HumanEval | Code generation | ~95% pass |
+**L'idée** : Un "routeur" intelligent qui envoie chaque requête au modèle approprié selon sa complexité.
 
-**4. MCP Protocol (2024)**
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    💰 FRUGALGPT MODEL ROUTING                       │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│                      Requête entrante                               │
+│                            │                                        │
+│                            ▼                                        │
+│                   ┌────────────────┐                                │
+│                   │  🧠 Classifier │                                │
+│                   │  (complexité)  │                                │
+│                   └───────┬────────┘                                │
+│                           │                                         │
+│         ┌─────────────────┼─────────────────┐                       │
+│         │                 │                 │                       │
+│         ▼                 ▼                 ▼                       │
+│    ┌─────────┐      ┌─────────┐      ┌─────────┐                   │
+│    │ 💚 Tier │      │ 💛 Tier │      │ ❤️ Tier │                   │
+│    │   1     │      │    2    │      │    3    │                   │
+│    │  ($)    │      │  ($$)   │      │ ($$$)   │                   │
+│    ├─────────┤      ├─────────┤      ├─────────┤                   │
+│    │ Grok-2  │      │ Grok-2  │      │ Grok-3  │                   │
+│    │  mini   │      │ standard│      │  + ToT  │                   │
+│    └─────────┘      └─────────┘      └─────────┘                   │
+│         │                 │                 │                       │
+│         ▼                 ▼                 ▼                       │
+│    "ls -la"        "refactor      "debug cette                     │
+│    "git status"     cette          race condition                  │
+│    Simple!          fonction"      complexe"                       │
+│                     Modéré         Difficile!                      │
+│                                                                      │
+│  📊 Économies mesurées : 30-70% des coûts API                      │
+│  📈 Sans perte de qualité sur les tâches simples                   │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
-Anthropic a standardisé comment les agents communiquent avec les outils :
+| 🎯 Type de tâche | Modèle utilisé | Coût relatif |
+|:-----------------|:---------------|:------------:|
+| Commandes simples | Tier 1 (mini) | 1x |
+| Refactoring standard | Tier 2 (standard) | 5x |
+| Debugging complexe | Tier 3 (avancé) | 20x |
+| Architecture | Tier 3 + ToT | 30x |
 
-```typescript
-// Standard MCP pour exposer un outil
-{
-  name: "read_file",
-  description: "Read contents of a file",
-  inputSchema: {
-    type: "object",
-    properties: {
-      path: { type: "string" }
-    },
-    required: ["path"]
-  }
-}
+**Dans Grok-CLI** : `src/optimization/model-routing.ts`
+
+### 2.3.4 ⚡ LLMCompiler (Kim et al., Berkeley, 2023)
+
+**Le problème** : Les appels d'outils séquentiels sont lents. Si trois fichiers sont indépendants, pourquoi les lire un par un ?
+
+**L'idée** : Analyser les dépendances entre appels d'outils et exécuter en parallèle quand possible.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    ⚡ LLMCOMPILER PARALLÉLISATION                   │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  Tâche : "Lis config.ts, types.ts, et utils.ts puis analyse-les"   │
+│                                                                      │
+│  EXÉCUTION SÉQUENTIELLE (avant) :                                   │
+│  ─────────────────────────────────                                  │
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐       │
+│  │read config │→│read types  │→│read utils  │→│  analyze   │       │
+│  │   500ms    │ │   500ms    │ │   500ms    │ │   1000ms   │       │
+│  └────────────┘ └────────────┘ └────────────┘ └────────────┘       │
+│                                                                      │
+│  Total : 2500ms                                                     │
+│                                                                      │
+│  EXÉCUTION LLMCOMPILER (après) :                                    │
+│  ─────────────────────────────────                                  │
+│  ┌────────────┐                                                     │
+│  │read config │─┐                                                   │
+│  │   500ms    │ │                                                   │
+│  └────────────┘ │                                                   │
+│  ┌────────────┐ ├──→ ┌────────────┐                                │
+│  │read types  │─┤    │  analyze   │                                │
+│  │   500ms    │ │    │   1000ms   │                                │
+│  └────────────┘ │    └────────────┘                                │
+│  ┌────────────┐ │                                                   │
+│  │read utils  │─┘                                                   │
+│  │   500ms    │                                                     │
+│  └────────────┘                                                     │
+│                                                                      │
+│  Total : 1500ms (⚡ 1.7x plus rapide !)                             │
+│                                                                      │
+│  Sur des tâches plus complexes : 2.5-4.6x speedup                   │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Dans Grok-CLI** : `src/optimization/parallel-executor.ts`
+
+### 2.3.5 🔧 ChatRepair (Xia et al., ISSTA 2024)
+
+**Le problème** : Les LLMs échouent souvent au premier essai de correction de bug. Une seule tentative ne suffit pas.
+
+**L'idée** : Créer une boucle itérative où l'agent essaie, observe le résultat des tests, et réessaie avec le feedback.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    🔧 CHATREPAIR : BOUCLE ITÉRATIVE                 │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│                        Bug signalé                                  │
+│                            │                                        │
+│                            ▼                                        │
+│                   ┌────────────────┐                                │
+│                   │ 🔍 LOCALISER   │ ◄── Ochiai, DStar, Tarantula  │
+│                   │   la faute     │     (spectral fault loc.)     │
+│                   └───────┬────────┘                                │
+│                           │                                         │
+│                           ▼                                         │
+│                   ┌────────────────┐                                │
+│                   │ 🔧 GÉNÉRER     │ ◄── LLM avec contexte         │
+│                   │   un patch     │     + historique d'erreurs    │
+│                   └───────┬────────┘                                │
+│                           │                                         │
+│                           ▼                                         │
+│                   ┌────────────────┐                                │
+│                   │ 🧪 EXÉCUTER    │                                │
+│                   │   les tests    │                                │
+│                   └───────┬────────┘                                │
+│                           │                                         │
+│                      ┌────┴────┐                                    │
+│                      │ Succès? │                                    │
+│                      └────┬────┘                                    │
+│                     Non   │   Oui                                   │
+│                      │    │    │                                    │
+│                      ▼    │    ▼                                    │
+│              ┌──────────┐ │  ✅ Terminé !                           │
+│              │ 📝 FEEDBACK│ │                                       │
+│              │  d'erreur │ │                                       │
+│              └─────┬────┘ │                                        │
+│                    │      │                                        │
+│                    └──────┘ (retour à GÉNÉRER, max 5 itérations)   │
+│                                                                      │
+│  📊 Amélioration : +40% bugs résolus vs single-shot                │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+| 📊 Métrique | Single-shot | ChatRepair (5 iter) |
+|:------------|:-----------:|:-------------------:|
+| Bugs résolus (Defects4J) | 19% | **27%** (+42%) |
+| Bugs résolus (QuixBugs) | 31% | **44%** (+42%) |
+| Temps moyen par bug | 30s | 90s |
+
+**Dans Grok-CLI** : `src/agent/repair/iterative-repair.ts`
+
+### 2.3.6 📦 Context Compression (JetBrains Research, 2024)
+
+**Le problème** : Le contexte long coûte cher et dilue l'attention du modèle. Plus on donne d'information, moins elle est utilisée efficacement.
+
+**L'idée** : Compresser intelligemment en gardant ce qui est essentiel et en résumant ou supprimant le reste.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    📦 COMPRESSION INTELLIGENTE                      │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  Contexte original : 50,000 tokens                                  │
+│                                                                      │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │ 🔴 PRIORITÉ HAUTE — Garder intégralement                    │   │
+│  │                                                             │   │
+│  │  • Code modifié récemment                                   │   │
+│  │  • Fonctions référencées dans la question                  │   │
+│  │  • Types et interfaces utilisés                            │   │
+│  │  • Erreurs et stack traces                                  │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                      │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │ 🟡 PRIORITÉ MOYENNE — Résumer                               │   │
+│  │                                                             │   │
+│  │  • Imports et dépendances → liste des noms                 │   │
+│  │  • Documentation → points clés uniquement                  │   │
+│  │  • Tests existants → signatures seulement                  │   │
+│  │  • Historique de conversation → résumé                     │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                      │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │ 🟢 PRIORITÉ BASSE — Supprimer                               │   │
+│  │                                                             │   │
+│  │  • Code non lié à la tâche                                 │   │
+│  │  • Commentaires redondants                                  │   │
+│  │  • Messages anciens déjà traités                           │   │
+│  │  • Fichiers de configuration standard                      │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                      │
+│  Contexte compressé : 15,000 tokens (70% de réduction !)           │
+│                                                                      │
+│  📊 Résultat : -7% coûts, +2.6% taux de succès                     │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Dans Grok-CLI** : `src/context/context-compressor.ts`
+
+### 2.3.7 🕸️ CodeRAG (2024)
+
+**Le problème** : Le RAG classique trouve des fichiers par similarité textuelle, mais ignore les dépendances du code. Comprendre une classe nécessite souvent ses imports.
+
+**L'idée** : Construire un graphe de dépendances et inclure automatiquement les fichiers liés.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    🕸️ DEPENDENCY-AWARE RAG                         │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  Query : "Comment fonctionne GrokAgent ?"                           │
+│                                                                      │
+│  RAG CLASSIQUE :                                                    │
+│  ───────────────                                                    │
+│  → Recherche "GrokAgent" dans les embeddings                       │
+│  → Retourne : grok-agent.ts ✓                                      │
+│  → Manque : types.ts, tools.ts, client.ts (dépendances !)          │
+│                                                                      │
+│  CODERAG (Dependency-Aware) :                                       │
+│  ─────────────────────────────                                      │
+│  → Recherche "GrokAgent"                                           │
+│  → Analyse le graphe d'imports :                                   │
+│                                                                      │
+│         ┌─────────────────┐                                        │
+│         │  grok-agent.ts  │ ◄── Query match                        │
+│         │   (principal)   │                                        │
+│         └────────┬────────┘                                        │
+│                  │ imports                                          │
+│      ┌───────────┼───────────┐                                     │
+│      │           │           │                                      │
+│      ▼           ▼           ▼                                      │
+│  ┌───────┐  ┌────────┐  ┌────────┐                                │
+│  │types.ts│  │tools.ts│  │client.ts│                               │
+│  │(types)│  │(41 outils)│ │(API)  │                                │
+│  └───────┘  └────────┘  └────────┘                                │
+│                  │                                                  │
+│                  ▼                                                  │
+│            ┌──────────┐                                            │
+│            │ utils.ts │ ◄── Import transitif                       │
+│            └──────────┘                                            │
+│                                                                      │
+│  → Retourne : grok-agent.ts + types.ts + tools.ts + client.ts     │
+│  → Contexte complet pour vraiment comprendre !                     │
+│                                                                      │
+│  📊 Amélioration : +25% pertinence des réponses                    │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Dans Grok-CLI** : `src/context/dependency-aware-rag.ts`
+
+---
+
+## 📋 2.4 Tableau Récapitulatif des Recherches
+
+| 📖 Publication | 📅 Année | ⚠️ Problème | 💡 Solution | 📈 Amélioration | 📁 Fichier Grok-CLI |
+|:---------------|:--------:|:------------|:------------|:----------------|:--------------------|
+| Tree-of-Thought | 2023 | Reasoning linéaire | Exploration multi-chemins | +70% problèmes complexes | `tree-of-thought.ts` |
+| RethinkMCTS | 2024 | Exploration inefficace | MCTS guidé par UCB1 | +15% génération code | `mcts.ts` |
+| FrugalGPT | 2023 | Coûts API élevés | Model routing intelligent | -30-70% coûts | `model-routing.ts` |
+| LLMCompiler | 2023 | Latence des outils | Parallélisation auto | 2.5-4.6x speedup | `parallel-executor.ts` |
+| ChatRepair | 2024 | Réparation single-shot | Boucle itérative | +42% bugs résolus | `iterative-repair.ts` |
+| JetBrains | 2024 | Contexte coûteux | Compression intelligente | -7% coûts, +2.6% succès | `context-compressor.ts` |
+| CodeRAG | 2024 | RAG sans dépendances | Graphe d'imports | +25% pertinence | `dependency-aware-rag.ts` |
+
+---
+
+## 🌐 2.5 L'Écosystème des Agents en 2025
+
+### 2.5.1 🛠️ Agents de Développement
+
+Le marché des agents de développement s'est structuré en plusieurs catégories :
+
+| 🤖 Agent | 📊 Type | ✅ Forces | ⚠️ Faiblesses |
+|:---------|:--------|:----------|:--------------|
+| **GitHub Copilot** | Assistant | Intégration IDE fluide, vitesse | Pas autonome, suggestions locales |
+| **Cursor** | Assistant+ | Context-aware, multi-fichier | Limité à l'environnement IDE |
+| **Claude Code** | Agent | Autonome, sécurisé, bien intégré | Propriétaire, coût |
+| **Devin** | Agent | Full-stack, très autonome | Accès limité, coût élevé |
+| **Grok-CLI** | Agent | Open-source, complet, recherche | Plus récent, communauté plus petite |
+| **Aider** | Agent | Simple, efficace, léger | Moins de fonctionnalités avancées |
+
+### 2.5.2 🤝 Frameworks Multi-Agents
+
+Pour les tâches nécessitant plusieurs perspectives ou spécialisations :
+
+| 🔧 Framework | 🎯 Paradigme | 📋 Cas d'usage idéal |
+|:-------------|:-------------|:---------------------|
+| **LangChain** | Chaîne d'outils | Prototypage rapide, PoC |
+| **LangGraph** | Graphe d'états | Workflows complexes avec branches |
+| **AutoGen** | Multi-agent dialogique | Collaboration et débat entre agents |
+| **CrewAI** | Équipes spécialisées | Projets avec rôles définis |
+| **MetaGPT** | Simulation d'entreprise | Projets structurés type "startup" |
+
+### 2.5.3 📡 Standards Émergents
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    📡 STANDARDS AGENTS 2025                         │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  🔌 MCP (Model Context Protocol) — Anthropic                        │
+│  ─────────────────────────────────────────────                      │
+│  • Standard pour la communication agent ↔ outils                   │
+│  • Transports : stdio, HTTP, SSE                                   │
+│  • Découverte dynamique des capacités                              │
+│  • Adopté par Claude Code, en expansion                            │
+│                                                                      │
+│  🔧 OpenAI Function Calling                                         │
+│  ────────────────────────────                                       │
+│  • JSON Schema pour les paramètres                                 │
+│  • Parallel function calling supporté                              │
+│  • De facto standard pour la plupart des providers                 │
+│  • Compatible avec Grok API (via OpenAI SDK)                       │
+│                                                                      │
+│  🤝 A2A (Agent-to-Agent) — Émergent                                 │
+│  ────────────────────────────────────                               │
+│  • Communication entre agents différents                           │
+│  • Délégation de tâches inter-agents                               │
+│  • Pas encore standardisé, plusieurs propositions                  │
+│  • Enjeu majeur pour le multi-agent                                │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2.3 Les Travaux de Recherche Fondamentaux
+## 🎯 2.6 Pourquoi Construire son Propre Agent ?
 
-### 2.3.1 Tree-of-Thought (Yao et al., 2023)
+Sophie, la PM, interrompit la présentation de Lina :
 
-**Problème résolu** : Le raisonnement linéaire échoue sur les problèmes complexes.
+— "Mais si Claude Code existe déjà et qu'il est si bon, pourquoi réinventer la roue ?"
 
-**Innovation** : Explorer plusieurs chemins de pensée en parallèle.
+Marc acquiesça.
 
-```
-Problème : "Game of 24 : Utiliser 4, 5, 6, 10 pour obtenir 24"
+— "C'est la question que tout le monde se pose."
 
-Raisonnement linéaire :
-  4 + 5 = 9... 9 + 6 = 15... 15 + 10 = 25 ✗
-  (Un seul chemin, échec)
+Lina avait prévu cette objection.
 
-Tree-of-Thought :
-  ┌─ 4 + 5 = 9 ────── 9 + 6 = 15 ────── ✗
-  │
-  ├─ 4 × 5 = 20 ───── 20 + 6 = 26 ───── ✗
-  │
-  ├─ 6 - 4 = 2 ────── 2 × 10 = 20 ───── 20 + 5 = 25 ✗
-  │
-  └─ 10 - 4 = 6 ───── 6 × 5 = 30 ────── ✗
-      │
-      └─ (6 - 4) × 10 = 20 ───── 20 + 5 - 1 ?
-          │
-          └─ 4 × 6 = 24 ────── ✓ (trouvé !)
-```
+— "Trois raisons. La première : **le contrôle**. Claude Code est une boîte noire. Si demain Anthropic change son pricing, ses conditions, ou décide de ne plus supporter une feature dont on dépend, on n'a aucun recours."
 
-**Impact sur Grok-CLI** : Implémenté dans `src/agent/reasoning/tree-of-thought.ts`
+— "Fair enough. Et les deux autres ?"
 
-### 2.3.2 RethinkMCTS (Zhang et al., 2024)
+— "La deuxième : **la customisation**. Notre codebase a des spécificités. Des conventions, des outils internes, des patterns qu'aucun agent générique ne connaît. Un agent custom peut être parfaitement adapté."
 
-**Problème résolu** : ToT explore trop de mauvais chemins.
+— "Et la troisième ?"
 
-**Innovation** : Utiliser Monte-Carlo Tree Search pour guider l'exploration intelligemment.
+Lina sourit.
 
-```
-MCTS pour code :
+— "**L'apprentissage**. En construisant un agent, on comprend vraiment comment ça marche. Et cette compréhension, c'est ce qui nous permettra de l'utiliser efficacement — ou de diagnostiquer quand ça ne marche pas."
 
-1. SELECT : Choisir le nœud le plus prometteur (UCB1)
-2. EXPAND : Générer des variations de code
-3. SIMULATE : Exécuter les tests
-4. BACKPROPAGATE : Mettre à jour les scores
+### 2.6.1 📊 Comparaison Agent Commercial vs Custom
 
-Résultat : Converge vers la solution optimale
-           avec moins d'explorations que ToT
-```
+| 🎯 Aspect | 🏢 Agent Commercial | 🔧 Agent Custom |
+|:----------|:--------------------|:----------------|
+| **Contrôle** | Limité aux options exposées | Total, code source disponible |
+| **Coût** | Abonnement + usage | API uniquement |
+| **Customisation** | Plugins si disponibles | Tout est modifiable |
+| **Données** | Transitent par le provider | Restent locales si voulu |
+| **Évolution** | Dépend du vendor | Vous décidez du roadmap |
+| **Apprentissage** | Limité à l'usage | Profond, technique |
 
-**Amélioration** : +15% de succès sur les benchmarks de génération de code
+### 2.6.2 📋 Cas d'Usage pour un Agent Custom
 
-**Impact sur Grok-CLI** : Implémenté dans `src/agent/reasoning/mcts.ts`
-
-### 2.3.3 FrugalGPT (Chen et al., Stanford, 2023)
-
-**Problème résolu** : Les meilleurs modèles coûtent cher.
-
-**Innovation** : Router les requêtes vers le modèle approprié selon la complexité.
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                   FRUGALGPT ROUTING                      │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│   Requête entrante                                      │
-│         │                                                │
-│         ▼                                                │
-│   ┌───────────────┐                                     │
-│   │  Classifier   │                                     │
-│   │  (complexité) │                                     │
-│   └───────┬───────┘                                     │
-│           │                                              │
-│     ┌─────┼─────┬─────────┐                             │
-│     │     │     │         │                              │
-│     ▼     ▼     ▼         ▼                              │
-│   ┌───┐ ┌───┐ ┌───┐   ┌─────┐                          │
-│   │ $ │ │$$ │ │$$$│   │$$$$ │                          │
-│   │   │ │   │ │   │   │     │                          │
-│   │GPT│ │GPT│ │GPT│   │GPT-4│                          │
-│   │3.5│ │ 4 │ │4-T│   │+ToT │                          │
-│   └───┘ └───┘ └───┘   └─────┘                          │
-│                                                          │
-│   Simple  Standard  Complexe  Critique                  │
-│   "ls"    "refactor" "debug"   "architecture"           │
-│                                                          │
-│   Économie : 30-70% des coûts API                       │
-└─────────────────────────────────────────────────────────┘
-```
-
-**Impact sur Grok-CLI** : Implémenté dans `src/optimization/model-routing.ts`
-
-### 2.3.4 LLMCompiler (Kim et al., 2023)
-
-**Problème résolu** : Les appels d'outils séquentiels sont lents.
-
-**Innovation** : Analyser les dépendances et exécuter en parallèle.
-
-```
-Tâche : "Lis config.ts, types.ts, et utils.ts puis analyse-les"
-
-Exécution séquentielle :
-  read(config.ts) ──► read(types.ts) ──► read(utils.ts) ──► analyze
-  Total : 4 × latence
-
-Exécution LLMCompiler :
-  ┌─ read(config.ts) ─┐
-  │                   │
-  ├─ read(types.ts) ──┼──► analyze
-  │                   │
-  └─ read(utils.ts) ──┘
-
-  Total : 2 × latence (2.5x speedup)
-```
-
-**Amélioration mesurée** : 2.5-4.6x speedup selon les tâches
-
-**Impact sur Grok-CLI** : Implémenté dans `src/optimization/parallel-executor.ts`
-
-### 2.3.5 ChatRepair (Xia et al., ISSTA 2024)
-
-**Problème résolu** : Les LLMs échouent souvent au premier essai de correction de bug.
-
-**Innovation** : Boucle itérative avec feedback des tests.
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                   CHATREPAIR LOOP                        │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│   Bug signalé                                           │
-│        │                                                 │
-│        ▼                                                 │
-│   ┌─────────────┐                                       │
-│   │ Localiser   │ ◄── Ochiai, DStar, Tarantula         │
-│   │ la faute    │                                       │
-│   └──────┬──────┘                                       │
-│          │                                               │
-│          ▼                                               │
-│   ┌─────────────┐                                       │
-│   │ Générer     │ ◄── LLM avec contexte                │
-│   │ un patch    │                                       │
-│   └──────┬──────┘                                       │
-│          │                                               │
-│          ▼                                               │
-│   ┌─────────────┐                                       │
-│   │ Exécuter    │                                       │
-│   │ les tests   │                                       │
-│   └──────┬──────┘                                       │
-│          │                                               │
-│     ┌────┴────┐                                         │
-│     │ Succès? │                                         │
-│     └────┬────┘                                         │
-│      Non │  Oui                                         │
-│          │   │                                          │
-│          ▼   ▼                                          │
-│      ┌──────┐ Terminé                                   │
-│      │Feedback                                          │
-│      │erreur │                                          │
-│      └───┬──┘                                           │
-│          │                                               │
-│          └──────────► (retour à "Générer")              │
-│                                                          │
-│   Amélioration : +40% bugs résolus vs single-shot       │
-└─────────────────────────────────────────────────────────┘
-```
-
-**Impact sur Grok-CLI** : Implémenté dans `src/agent/repair/iterative-repair.ts`
-
-### 2.3.6 Context Compression (JetBrains Research, 2024)
-
-**Problème résolu** : Le contexte long coûte cher et dilue l'attention.
-
-**Innovation** : Compresser intelligemment en gardant l'essentiel.
-
-```
-Contexte original : 50,000 tokens
-
-Compression intelligente :
-┌────────────────────────────────────────────────────────┐
-│  Priorité haute (garder intégralement)                 │
-│  • Code modifié récemment                              │
-│  • Fonctions référencées dans la question              │
-│  • Types et interfaces utilisés                        │
-├────────────────────────────────────────────────────────┤
-│  Priorité moyenne (résumer)                            │
-│  • Imports et dépendances                              │
-│  • Documentation                                        │
-│  • Tests existants                                      │
-├────────────────────────────────────────────────────────┤
-│  Priorité basse (supprimer)                            │
-│  • Code non lié                                         │
-│  • Commentaires redondants                             │
-│  • Historique de conversation ancien                   │
-└────────────────────────────────────────────────────────┘
-
-Contexte compressé : 15,000 tokens
-
-Résultat : -7% coûts, +2.6% taux de succès
-```
-
-**Impact sur Grok-CLI** : Implémenté dans `src/context/context-compressor.ts`
-
-### 2.3.7 CodeRAG (2024)
-
-**Problème résolu** : Le RAG classique ignore les dépendances du code.
-
-**Innovation** : Construire un graphe de dépendances et retriever les fichiers liés.
-
-```
-Query : "Comment fonctionne GrokAgent ?"
-
-RAG classique :
-  → Recherche "GrokAgent" dans les embeddings
-  → Retourne : grok-agent.ts
-  → Manque : types.ts, tools.ts, client.ts (dépendances)
-
-CodeRAG (Dependency-Aware) :
-  → Recherche "GrokAgent"
-  → Analyse les imports de grok-agent.ts
-  → Retourne :
-    • grok-agent.ts (query match)
-    • types.ts (import direct)
-    • tools.ts (import direct)
-    • client.ts (import transitif)
-  → Contexte complet pour comprendre
-```
-
-**Impact sur Grok-CLI** : Implémenté dans `src/context/dependency-aware-rag.ts`
+| 🎯 Situation | 💡 Pourquoi Custom ? |
+|:-------------|:---------------------|
+| **Outils internes** | Intégration avec CI/CD propriétaire, bases de données internes |
+| **Sécurité stricte** | Données sensibles qui ne peuvent pas quitter l'entreprise |
+| **Volume élevé** | Contrôle fin du routing et des coûts à grande échelle |
+| **Recherche** | Expérimentation avec de nouvelles techniques |
+| **Formation** | Comprendre le fonctionnement pour mieux utiliser |
 
 ---
 
-## 2.4 Tableau Récapitulatif des Recherches
+## 🗺️ 2.7 Référence Grok-CLI : Où Trouver Quoi
 
-| Publication | Année | Problème | Solution | Amélioration | Fichier Grok-CLI |
-|-------------|-------|----------|----------|--------------|------------------|
-| Tree-of-Thought | 2023 | Reasoning linéaire | Multi-chemins | +30% problèmes complexes | `tree-of-thought.ts` |
-| RethinkMCTS | 2024 | Exploration inefficace | MCTS guidé | +15% génération code | `mcts.ts` |
-| FrugalGPT | 2023 | Coûts API | Model routing | -30-70% coûts | `model-routing.ts` |
-| LLMCompiler | 2023 | Latence tools | Parallélisation | 2.5-4.6x speedup | `parallel-executor.ts` |
-| ChatRepair | 2024 | Réparation single-shot | Boucle itérative | +40% bugs résolus | `iterative-repair.ts` |
-| JetBrains | 2024 | Contexte coûteux | Compression | -7% coûts, +2.6% succès | `context-compressor.ts` |
-| CodeRAG | 2024 | RAG sans dépendances | Graphe imports | +25% pertinence | `dependency-aware-rag.ts` |
-
----
-
-## 2.5 L'Écosystème des Agents en 2025
-
-### 2.5.1 Agents de développement
-
-| Agent | Type | Forces | Faiblesses |
-|-------|------|--------|------------|
-| **GitHub Copilot** | Assistant | Intégration IDE, vitesse | Pas autonome |
-| **Cursor** | Assistant+ | Context-aware, multi-fichier | Limité à l'IDE |
-| **Claude Code** | Agent | Autonome, sécurisé | Fermé |
-| **Devin** | Agent | Full-stack, autonome | Coût, accès limité |
-| **Grok-CLI** | Agent | Open-source, complet | Moins mature |
-| **Aider** | Agent | Simple, efficace | Moins de features |
-
-### 2.5.2 Frameworks multi-agents
-
-| Framework | Paradigme | Cas d'usage |
-|-----------|-----------|-------------|
-| **LangChain** | Chaîne d'outils | Prototypage rapide |
-| **LangGraph** | Graphe d'états | Workflows complexes |
-| **AutoGen** | Multi-agent | Collaboration agents |
-| **CrewAI** | Équipes spécialisées | Projets structurés |
-| **MetaGPT** | Rôles d'entreprise | Simulation orga |
-
-### 2.5.3 Standards émergents
-
-```
-┌─────────────────────────────────────────────────────────┐
-│               STANDARDS AGENTS 2025                      │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│   MCP (Model Context Protocol)                          │
-│   └─ Standard Anthropic pour les outils                 │
-│   └─ Transport : stdio, HTTP, SSE                       │
-│   └─ Découverte dynamique des capacités                 │
-│                                                          │
-│   OpenAI Function Calling                               │
-│   └─ JSON Schema pour les paramètres                    │
-│   └─ Parallel function calling                          │
-│   └─ Adopté par la plupart des providers                │
-│                                                          │
-│   A2A (Agent-to-Agent) - Émergent                       │
-│   └─ Communication inter-agents                         │
-│   └─ Délégation de tâches                               │
-│   └─ Pas encore standardisé                             │
-│                                                          │
-└─────────────────────────────────────────────────────────┘
-```
-
----
-
-## 2.6 Pourquoi Construire son Propre Agent ?
-
-> *"Pourquoi ne pas juste utiliser Claude Code ?" demande Marc.*
->
-> *Lina sourit. "Parce que Claude Code est une boîte noire. Je veux comprendre comment ça marche. Je veux pouvoir le modifier. Et surtout, je veux apprendre."*
->
-> *"Et si un jour Anthropic change son pricing ou ses conditions ?"*
->
-> *"Exactement."*
-
-### 2.6.1 Avantages d'un agent custom
-
-| Aspect | Agent commercial | Agent custom |
-|--------|------------------|--------------|
-| **Contrôle** | Limité | Total |
-| **Coût** | Abonnement | API uniquement |
-| **Customisation** | Plugins limités | Code source complet |
-| **Données** | Chez le provider | Local |
-| **Évolution** | Dépend du vendor | Vous décidez |
-| **Apprentissage** | Aucun | Immense |
-
-### 2.6.2 Cas d'usage pour un agent custom
-
-1. **Besoins spécifiques** : Intégration avec des systèmes internes, outils propriétaires
-2. **Sécurité** : Données sensibles qui ne peuvent pas quitter l'entreprise
-3. **Coûts** : Volume important où le contrôle du routing est critique
-4. **Recherche** : Expérimentation avec de nouvelles techniques
-5. **Formation** : Comprendre le fonctionnement des agents
-
----
-
-## 2.7 Référence Grok-CLI
-
-Grok-CLI implémente toutes les techniques de recherche mentionnées dans ce chapitre. Voici la correspondance :
+Chaque technique de recherche mentionnée dans ce chapitre est implémentée dans Grok-CLI :
 
 ```
 src/
@@ -531,7 +796,7 @@ src/
 │   │   └── mcts.ts               ◄── RethinkMCTS (Zhang 2024)
 │   └── repair/
 │       ├── iterative-repair.ts   ◄── ChatRepair (Xia 2024)
-│       └── fault-localization.ts ◄── Ochiai, DStar
+│       └── fault-localization.ts ◄── Ochiai, DStar (spectral)
 ├── context/
 │   ├── dependency-aware-rag.ts   ◄── CodeRAG (2024)
 │   ├── context-compressor.ts     ◄── JetBrains Research (2024)
@@ -546,40 +811,113 @@ src/
 
 ---
 
-## Résumé
+## 📝 2.8 Points Clés à Retenir
 
-Dans ce chapitre, nous avons vu :
+### 📊 Sur la Taxonomie
 
 | Concept | Point clé |
-|---------|-----------|
-| **Taxonomie** | Chatbot → Assistant → Agent → Multi-Agent |
-| **Évolution** | 2020-2025 : de GPT-3 aux agents autonomes |
+|:--------|:----------|
+| **4 niveaux** | Chatbot → Assistant → Agent → Multi-Agent |
+| **Différence clé** | Le degré d'autonomie et de capacité d'action |
+| **Agent vs Assistant** | L'agent résout, l'assistant aide |
+
+### 🕰️ Sur l'Évolution
+
+| Concept | Point clé |
+|:--------|:----------|
 | **Catalyseurs** | Function calling, contexte étendu, MCP |
-| **Recherche** | ToT, MCTS, FrugalGPT, LLMCompiler, ChatRepair |
-| **Écosystème** | Agents commerciaux vs custom |
+| **2023** | Année charnière (GPT-4, AutoGPT) |
+| **2024-2025** | Maturation et standardisation |
+
+### 📖 Sur la Recherche
+
+| Concept | Point clé |
+|:--------|:----------|
+| **ToT/MCTS** | Exploration multi-chemins > raisonnement linéaire |
+| **FrugalGPT** | Adapter le modèle à la complexité de la tâche |
+| **ChatRepair** | Itérer avec feedback > essai unique |
+| **CodeRAG** | Inclure les dépendances, pas juste le fichier |
+
+### 🎯 Sur la Décision Custom vs Commercial
+
+| Concept | Point clé |
+|:--------|:----------|
+| **Custom** | Contrôle, personnalisation, apprentissage |
+| **Commercial** | Rapidité, support, moins de maintenance |
+| **Hybride** | Souvent la meilleure approche en pratique |
 
 ---
 
-## Exercices
+## 🏋️ 2.9 Exercices
 
-1. **Classification** : Classez 5 produits IA que vous utilisez selon la taxonomie Chatbot/Assistant/Agent.
+### Exercice 1 : Classification (15 min)
 
-2. **Analyse** : Choisissez une publication du tableau et lisez l'abstract. Résumez en 3 phrases.
+Classez ces 5 produits selon la taxonomie Chatbot/Assistant/Agent :
+1. ChatGPT vanilla (sans plugins)
+2. GitHub Copilot
+3. Claude Code
+4. Siri
+5. Un script qui utilise GPT pour formater du JSON
 
-3. **Comparaison** : Installez Aider et Grok-CLI. Comparez-les sur une tâche simple de refactoring.
+### Exercice 2 : Analyse de Publication (30 min)
 
-4. **Réflexion** : Quels outils spécifiques à votre domaine un agent custom devrait-il avoir ?
+Choisissez une publication du tableau récapitulatif. Trouvez l'article sur arXiv et :
+1. Lisez l'abstract
+2. Identifiez le problème résolu
+3. Résumez la solution en 3 phrases
+
+### Exercice 3 : Comparaison Pratique (1h)
+
+Installez [Aider](https://github.com/paul-gauthier/aider) et comparez-le à votre intuition de ce que devrait faire un agent :
+1. Quelles tâches réussit-il bien ?
+2. Où sont ses limites ?
+3. Qu'est-ce qui le distingue d'un simple wrapper LLM ?
+
+### Exercice 4 : Réflexion Métier (20 min)
+
+Pour votre domaine ou projet actuel :
+1. Quels outils spécifiques un agent custom devrait-il avoir ?
+2. Quelles intégrations seraient impossibles avec un agent commercial ?
+3. Le coût de construction justifie-t-il les bénéfices ?
 
 ---
 
-## Pour aller plus loin
+## 📚 2.10 Pour Aller Plus Loin
+
+### Publications Fondamentales
 
 - Yao, S., et al. (2023). "Tree of Thoughts: Deliberate Problem Solving with Large Language Models." arXiv:2305.10601
 - Kim, S., et al. (2023). "LLMCompiler: An LLM Compiler for Parallel Function Calling." arXiv:2312.04511
 - Chen, L., et al. (2023). "FrugalGPT: How to Use Large Language Models While Reducing Cost and Improving Performance." arXiv:2305.05176
+- Xia, C., et al. (2024). "ChatRepair: Autonomous Repair of Programs via Large Language Models." ISSTA 2024
+
+### Spécifications et Documentation
+
 - Anthropic. (2024). "Model Context Protocol Specification." https://modelcontextprotocol.io
+- OpenAI. (2024). "Function Calling Guide." https://platform.openai.com/docs/guides/function-calling
 
 ---
 
-*Prochainement : Chapitre 3 — Anatomie d'un Agent Autonome*
+## 🌅 Épilogue : Le Choix de Lina
 
+La réunion touchait à sa fin. Marc résuma :
+
+— "Donc si je comprends bien, Copilot c'est niveau 2, et ce que tu veux construire c'est niveau 3 ?"
+
+— "Exactement," confirma Lina. "Un agent qui peut prendre un ticket, comprendre le contexte, explorer le code, proposer une solution, la tester, et itérer jusqu'à ce que ça marche. Sans que j'aie à valider chaque ligne."
+
+Sophie hocha la tête.
+
+— "Et tout ce que tu as montré — Tree-of-Thought, MCTS, ChatRepair — c'est ce qui rend ça possible ?"
+
+— "Ce sont les briques. Le chapitre suivant, on va voir comment les assembler. L'anatomie d'un agent — les 6 composants qui font qu'un agent est vraiment un agent."
+
+Marc sourit.
+
+— "OK. Tu as mon attention. Montre-nous l'architecture."
+
+---
+
+| ⬅️ Précédent | 📖 Sommaire | ➡️ Suivant |
+|:-------------|:-----------:|:-----------|
+| [Comprendre les LLMs](01-comprendre-les-llms.md) | [Index](README.md) | [Anatomie d'un Agent](03-anatomie-agent.md) |

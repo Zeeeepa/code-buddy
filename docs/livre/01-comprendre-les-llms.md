@@ -1,589 +1,795 @@
-# Chapitre 1 — Comprendre les LLMs Aujourd'hui
+# 🧠 Chapitre 1 : Comprendre les Large Language Models
 
 ---
 
-> **Scène d'ouverture**
+## 🎬 Scène d'ouverture : La Question Fondamentale
+
+*Un mardi soir, dans un café près du campus universitaire...*
+
+Lina fixait son écran, perplexe. Elle venait de passer trois heures à interagir avec ChatGPT, lui demandant d'expliquer du code, de générer des tests, de suggérer des refactorisations. Les résultats étaient tantôt brillants, tantôt absurdes.
+
+— "Comment ça peut être si intelligent et si stupide à la fois ?" murmura-t-elle.
+
+Son ami Marcus, doctorant en machine learning, s'assit à côté d'elle avec son café.
+
+— "Tu sais comment ça fonctionne, un LLM ?"
+
+Lina haussa les épaules.
+
+— "Vaguement. Des réseaux de neurones, beaucoup de données, quelque chose avec l'attention..."
+
+Marcus sourit.
+
+— "C'est un bon début. Mais si tu veux vraiment construire des outils qui utilisent ces modèles, tu dois comprendre ce qu'ils sont *vraiment*. Pas la version marketing. La vraie mécanique."
+
+Il sortit un carnet et commença à dessiner.
+
+— "Laisse-moi te raconter une histoire. Elle commence en 2017, dans les bureaux de Google..."
+
+---
+
+## 📜 1.1 Une Brève Histoire des Modèles de Langage
+
+### 1.1.1 Avant les Transformers : L'Ère des Approches Séquentielles
+
+Pour comprendre pourquoi les LLMs actuels sont si puissants, il faut d'abord comprendre ce qui existait avant — et pourquoi c'était insuffisant.
+
+Pendant des décennies, le traitement automatique du langage naturel (NLP) reposait sur des approches statistiques. Les modèles n-grammes, par exemple, prédisaient le mot suivant en comptant les fréquences d'apparition dans un corpus.
+
+> 💡 **Exemple** : Si le modèle avait vu "le chat dort sur le" mille fois suivi de "canapé" et seulement dix fois suivi de "toit", il prédirait "canapé".
+
+Cette approche avait un défaut fondamental : elle ne capturait que des **dépendances locales**. Un modèle 5-gramme ne pouvait "voir" que les quatre mots précédents. Or, le langage humain est plein de dépendances à longue distance :
+
+> "Le développeur qui avait passé trois ans à travailler sur ce projet, malgré les difficultés rencontrées avec l'équipe de management et les contraintes budgétaires imposées par la direction, **était** finalement satisfait du résultat."
+
+Le verbe "était" doit s'accorder avec "Le développeur" — un mot situé à plus de trente tokens de distance ! Aucun modèle n-gramme ne pouvait capturer cette relation.
+
+### 1.1.2 Les Réseaux Récurrents : Une Fausse Bonne Idée
+
+Dans les années 2010, les réseaux de neurones récurrents (RNN) et leurs variantes (LSTM, GRU) ont apporté une amélioration significative.
+
+| 📊 Comparaison | N-grammes | RNN/LSTM |
+|:--------------|:----------|:---------|
+| **Mémoire** | Fenêtre fixe (3-5 mots) | Théoriquement illimitée |
+| **Contexte** | Local uniquement | Peut propager l'information |
+| **Parallélisation** | ✅ Facile | ❌ Séquentiel obligatoire |
+| **Entraînement** | Rapide | Lent |
+
+L'idée des RNN était élégante : au lieu de regarder une fenêtre fixe de mots, le réseau maintenait un "état caché" qui se propageait d'un mot au suivant, théoriquement capable de "se souvenir" d'informations arbitrairement lointaines.
+
+En pratique, cette promesse n'était que partiellement tenue. Les RNN souffraient de deux problèmes majeurs :
+
+| ⚠️ Problème | Description | Conséquence |
+|:-----------|:------------|:------------|
+| **Gradient évanescent** | Le signal d'erreur diminue exponentiellement à travers la chaîne | Le réseau "oublie" les dépendances lointaines |
+| **Séquentialité** | Traitement mot par mot, dans l'ordre | Impossible de paralléliser sur GPU |
+
+### 1.1.3 ⚡ 2017 : "Attention Is All You Need"
+
+En juin 2017, une équipe de Google publia un article au titre provocateur : **"Attention Is All You Need"**. Les auteurs proposaient une architecture radicalement différente : le **Transformer**.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    🎯 L'IDÉE RÉVOLUTIONNAIRE                │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│   AVANT (RNN) :    mot₁ → mot₂ → mot₃ → mot₄ → mot₅        │
+│                    (séquentiel, lent)                       │
+│                                                             │
+│   APRÈS (Transformer) :                                     │
+│                                                             │
+│                    mot₁ ←──────→ mot₂                       │
+│                      ↕    ╲  ╱     ↕                        │
+│                    mot₃ ←──╳───→ mot₄                       │
+│                      ↕    ╱  ╲     ↕                        │
+│                    mot₅ ←──────→ mot₆                       │
+│                                                             │
+│                    (parallèle, tous connectés)              │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+L'idée centrale était audacieuse : et si on abandonnait complètement la récurrence ? Au lieu de traiter les mots séquentiellement, pourquoi ne pas les traiter **tous en parallèle**, en utilisant uniquement des mécanismes d'attention pour capturer les relations entre eux ?
+
+| 📈 Résultats | RNN (LSTM) | Transformer |
+|:------------|:-----------|:------------|
+| **Vitesse d'entraînement** | Baseline | **3-10x plus rapide** |
+| **Qualité (BLEU)** | 25.8 | **28.4** |
+| **Dépendances longues** | ⚠️ Difficile | ✅ Native |
+| **Parallélisation GPU** | ❌ Limitée | ✅ Massive |
+
+Un an plus tard, Google dévoilait **BERT**, et OpenAI présentait **GPT**. L'ère des LLMs venait de commencer.
+
+---
+
+## 🔬 1.2 L'Anatomie d'un Transformer
+
+Pour construire des agents efficaces, il ne suffit pas de savoir que les Transformers "fonctionnent bien". Il faut comprendre *comment* ils fonctionnent.
+
+### 1.2.1 ✂️ La Tokenisation : Découper le Langage
+
+Avant même d'entrer dans le réseau de neurones, le texte doit être converti en nombres. Cette étape, appelée **tokenisation**, est plus subtile qu'il n'y paraît.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                 🔤 PROCESSUS DE TOKENISATION                │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Texte : "Le développeur mass bien"                         │
+│                    │                                        │
+│                    ▼                                        │
+│  ┌─────────────────────────────────────┐                   │
+│  │       Tokenizer (BPE/WordPiece)     │                   │
+│  └─────────────────────────────────────┘                   │
+│                    │                                        │
+│                    ▼                                        │
+│  Tokens : ["Le", "dé", "velopp", "eur", "code", "bien"]    │
+│                    │                                        │
+│                    ▼                                        │
+│  IDs : [453, 8721, 34502, 2174, 1825, 3901]                │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+La solution moderne est le **Byte-Pair Encoding (BPE)**. L'idée est de découper le texte en "sous-mots" — des fragments qui peuvent être combinés pour former n'importe quel mot.
+
+| 🌍 Langue | Texte | Tokens | Ratio |
+|:---------|:------|:------:|:-----:|
+| 🇬🇧 Anglais | "The developer writes code" | 4 | 1.0x |
+| 🇫🇷 Français | "Le développeur écrit du code" | 7 | 1.4x |
+| 🇯🇵 Japonais | "開発者はコードを書く" | 9 | 2.25x |
+| 🇨🇳 Chinois | "开发人员编写代码" | 8 | 2.0x |
+
+> ⚠️ **Conséquence importante** : Les langues non-anglaises consomment plus de tokens, donc coûtent plus cher !
+
+**Implications pour les agents de développement :**
+
+| Impact | Description |
+|:-------|:------------|
+| 💰 **Coût** | Le code avec des noms longs (ex: `calculateTotalAmountWithTax`) coûte plus cher |
+| 🔢 **Comptage** | Les LLMs ne "voient" pas les caractères individuels — mauvais pour compter les lettres |
+| 📏 **Contexte** | Un fichier de 1000 lignes peut consommer 10K+ tokens |
+
+### 1.2.2 🎯 Les Embeddings : Donner du Sens aux Nombres
+
+Une fois tokenisé, chaque identifiant est converti en un **vecteur de nombres réels** — son embedding. Dans GPT-4, ces vecteurs ont plusieurs milliers de dimensions.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              🧭 ESPACE DES EMBEDDINGS                       │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│                        👑 roi                               │
+│                       ╱                                     │
+│                      ╱  (direction "royauté")               │
+│                     ╱                                       │
+│        👨 homme ──────────────────── 👩 femme               │
+│                     ╲                                       │
+│                      ╲  (direction "royauté")               │
+│                       ╲                                     │
+│                        👸 reine                             │
+│                                                             │
+│   Formule magique :                                         │
+│   embedding(roi) - embedding(homme) + embedding(femme)      │
+│                    ≈ embedding(reine)                       │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+Cette propriété n'est pas programmée explicitement — elle **émerge** de l'entraînement. Le modèle "découvre" que les mots apparaissant dans des contextes similaires devraient avoir des embeddings proches.
+
+Pour le code, c'est précieux :
+
+```
+embedding("array.push")    ≈  embedding("list.append")
+embedding("console.log")   ≈  embedding("print")
+embedding("async/await")   ≈  embedding("Promise")
+```
+
+C'est ce qui permet aux systèmes de **RAG** de trouver du code pertinent même quand les mots exacts diffèrent !
+
+### 1.2.3 👁️ L'Attention : Le Cœur du Transformer
+
+Le mécanisme d'attention est ce qui distingue fondamentalement les Transformers. Pour le comprendre, une analogie :
+
+> 📖 **Analogie du roman policier**
 >
-> *Lina fixe son écran, les sourcils froncés. Son chatbot "intelligent" vient encore de s'emmêler les pinceaux.*
+> Imaginez que vous lisez un polar. À la page 200, le détective révèle : "le majordome était le coupable". Pour comprendre, votre cerveau rappelle instantanément :
+> - Qui est le majordome (page 15)
+> - Les indices subtils (pages 45, 78, 123)
+> - Le contexte de l'enquête
 >
-> « Peux-tu modifier le fichier `config.ts` pour ajouter le nouveau paramètre ? »
->
-> *Le modèle répond avec assurance :*
->
-> « Bien sûr ! J'ai modifié le fichier `src/config.ts` pour ajouter le paramètre `maxRetries`. Voici les changements... »
->
-> *Lina vérifie. Le fichier s'appelle `configuration.ts`, pas `config.ts`. Et il n'y a aucun paramètre `maxRetries` dedans. Le modèle a tout inventé.*
->
-> *Elle soupire. C'est la troisième hallucination de la journée. Il doit y avoir un meilleur moyen.*
+> Vous ne relisez pas tout — votre cerveau *sait* quelles informations sont pertinentes.
+
+L'attention fonctionne de manière similaire. Pour chaque token, le modèle calcule un score de "pertinence" avec tous les autres tokens :
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                 🎯 MÉCANISME D'ATTENTION                    │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Pour chaque token, on calcule 3 vecteurs :                 │
+│                                                             │
+│  ┌─────────┐                                                │
+│  │ Query Q │  "Quelle information je cherche ?"             │
+│  └─────────┘                                                │
+│  ┌─────────┐                                                │
+│  │  Key K  │  "Quelle information je peux fournir ?"        │
+│  └─────────┘                                                │
+│  ┌─────────┐                                                │
+│  │ Value V │  "Voici l'information proprement dite"         │
+│  └─────────┘                                                │
+│                                                             │
+│  Score d'attention = softmax(Q · K^T / √d) × V              │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Exemple concret avec du code :**
+
+```python
+def calculate_total(items):
+    total = 0
+    for item in items:
+        total += item.price  # ← Quand on traite ce token...
+    return total
+```
+
+| Token traité | Regarde vers... | Pourquoi ? |
+|:-------------|:----------------|:-----------|
+| `item.price` | `item` (ligne 3) | Comprendre le type |
+| `item.price` | `items` (signature) | Structure de données |
+| `item.price` | `total +=` | Contexte d'utilisation |
+| `item.price` | `calculate_total` | Intention de la fonction |
+
+Sans attention, le modèle ne verrait que `item.price` isolément, sans contexte !
+
+### 1.2.4 🎭 L'Attention Multi-Têtes : Plusieurs Perspectives
+
+Un raffinement crucial : au lieu d'un seul mécanisme d'attention, le modèle en a **plusieurs** (32 à 128) fonctionnant en parallèle.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              🎭 ATTENTION MULTI-TÊTES                       │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Phrase : "Le programme Python que Marie a écrit hier       │
+│            fonctionne parfaitement."                        │
+│                                                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │ 🔷 Tête 1    │  │ 🔶 Tête 2    │  │ 🔷 Tête 3    │      │
+│  │  Syntaxique  │  │  Sémantique  │  │  Temporelle  │      │
+│  ├──────────────┤  ├──────────────┤  ├──────────────┤      │
+│  │ programme ↔  │  │ Python ↔     │  │ hier ↔       │      │
+│  │ fonctionne   │  │ programme    │  │ a écrit      │      │
+│  │ (sujet-verbe)│  │ (langage)    │  │ (temps)      │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│                                                             │
+│  ┌──────────────┐  ┌──────────────┐                        │
+│  │ 🔶 Tête 4    │  │ 🔷 Tête 5    │  ...jusqu'à 128        │
+│  │ Attribution  │  │ Coréférence  │                        │
+│  ├──────────────┤  ├──────────────┤                        │
+│  │ Marie ↔      │  │ que ↔        │                        │
+│  │ a écrit      │  │ programme    │                        │
+│  │ (qui fait)   │  │ (réfère à)   │                        │
+│  └──────────────┘  └──────────────┘                        │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+Chaque tête se spécialise dans un type de relation, et leurs sorties sont combinées pour former une représentation riche.
+
+### 1.2.5 📚 Les Couches : Profondeur et Abstraction
+
+Un Transformer n'a pas qu'une seule couche d'attention — il en a des dizaines :
+
+| 🤖 Modèle | Couches | Paramètres |
+|:---------|:-------:|:----------:|
+| GPT-2 | 12-48 | 117M - 1.5B |
+| GPT-3 | 96 | 175B |
+| GPT-4 | ~120 (estimé) | ~1.7T (estimé) |
+| Claude 3 | ? | ? |
+| Grok-2 | ? | ? |
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              📊 HIÉRARCHIE DES COUCHES                      │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Couches hautes (80-120)                                    │
+│  └─ 🎯 Concepts abstraits, intentions, raisonnement         │
+│                                                             │
+│  Couches moyennes (30-80)                                   │
+│  └─ 🔗 Relations sémantiques, coréférences                  │
+│                                                             │
+│  Couches basses (1-30)                                      │
+│  └─ 📝 Syntaxe, grammaire, patterns locaux                  │
+│                                                             │
+│  Entrée                                                     │
+│  └─ 🔤 Tokens bruts                                         │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Implication pratique** : Quand un LLM "ne comprend pas", le problème peut être à différents niveaux :
+
+| Niveau | Symptôme | Solution |
+|:-------|:---------|:---------|
+| 🔤 Bas | Ne reconnaît pas la syntaxe | Reformuler, utiliser un format standard |
+| 🔗 Moyen | Perd les références | Ajouter du contexte, répéter les éléments clés |
+| 🎯 Haut | Ne saisit pas l'intention | Décomposer la tâche, Chain-of-Thought |
 
 ---
 
-## Introduction
+## ⚙️ 1.3 Comment un LLM Génère du Texte
 
-Avant de construire un agent, il faut comprendre son cerveau : le Large Language Model (LLM). Ce chapitre démystifie le fonctionnement interne des LLMs, explique pourquoi ils hallucinent, et pose les bases de ce qui différencie un simple chatbot d'un agent véritable.
+### 1.3.1 🎲 La Prédiction du Token Suivant
+
+Au cœur de tout LLM génératif se trouve une tâche d'une simplicité trompeuse : **prédire le token suivant**.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              🎯 PRÉDICTION NEXT-TOKEN                       │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Entrée : "Le développeur a corrigé le"                     │
+│                                                             │
+│  Sortie (distribution de probabilité) :                     │
+│                                                             │
+│  bug ████████████████████████░░░░░░░░░░  23%               │
+│  problème ██████████████████░░░░░░░░░░░░  18%               │
+│  code ████████████░░░░░░░░░░░░░░░░░░░░░  12%               │
+│  fichier ████████░░░░░░░░░░░░░░░░░░░░░░░   8%               │
+│  test █████░░░░░░░░░░░░░░░░░░░░░░░░░░░░   5%               │
+│  ...                                                        │
+│  éléphant ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  0.001%            │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+> ⚠️ **Distinction cruciale** : Le modèle ne "sait" pas ce qui vient ensuite — il calcule ce qui serait *probable* étant donné son entraînement. Il reproduit ce qui est **probable**, pas nécessairement ce qui est **correct**.
+
+### 1.3.2 🌡️ L'Échantillonnage : Choisir Parmi les Possibles
+
+Une fois la distribution calculée, il faut choisir un token. Plusieurs stratégies :
+
+| 🎛️ Stratégie | Description | Usage |
+|:-------------|:------------|:------|
+| **Greedy** | Toujours le plus probable | ⚠️ Répétitif, ennuyeux |
+| **Random** | Tirage selon probabilités | ⚠️ Parfois incohérent |
+| **Temperature** | Aplatit/accentue la distribution | ✅ Contrôle créativité |
+| **Top-p** | Garde les tokens jusqu'à p% cumulé | ✅ Équilibre variété/cohérence |
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                 🌡️ EFFET DE LA TEMPÉRATURE                 │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Temperature = 0.1 (conservateur)                           │
+│  bug ████████████████████████████████░░  95%               │
+│  problème ███░░░░░░░░░░░░░░░░░░░░░░░░░░   4%               │
+│  autres █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   1%               │
+│                                                             │
+│  Temperature = 0.7 (équilibré)                              │
+│  bug ██████████████████░░░░░░░░░░░░░░░  45%                │
+│  problème █████████████░░░░░░░░░░░░░░░░  30%                │
+│  code ██████░░░░░░░░░░░░░░░░░░░░░░░░░░  15%                │
+│  autres ████░░░░░░░░░░░░░░░░░░░░░░░░░░  10%                │
+│                                                             │
+│  Temperature = 1.2 (créatif)                                │
+│  bug ██████████░░░░░░░░░░░░░░░░░░░░░░░  25%                │
+│  problème ████████░░░░░░░░░░░░░░░░░░░░░  20%                │
+│  code ██████░░░░░░░░░░░░░░░░░░░░░░░░░░  15%                │
+│  fichier ████░░░░░░░░░░░░░░░░░░░░░░░░░░  10%                │
+│  autres ████████████░░░░░░░░░░░░░░░░░░░  30%                │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Recommandations pour les agents :**
+
+| 🎯 Tâche | Température | Pourquoi |
+|:---------|:-----------:|:---------|
+| Génération de code | 0.2 - 0.4 | Précision syntaxique |
+| Refactoring | 0.3 - 0.5 | Cohérence avec l'existant |
+| Documentation | 0.5 - 0.7 | Style naturel |
+| Brainstorming | 0.7 - 0.9 | Créativité |
+| Noms de variables | 0.6 - 0.8 | Variété mais pertinence |
+
+### 1.3.3 🔄 L'Autoregression : Un Token à la Fois
+
+Les LLMs génératifs sont **autorégressifs** : ils génèrent un token, l'ajoutent au contexte, puis génèrent le suivant.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              🔄 GÉNÉRATION AUTORÉGRESSIVE                   │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Étape 1: "function add(a, b) {"                            │
+│           → prédit: "return"                                │
+│                                                             │
+│  Étape 2: "function add(a, b) { return"                     │
+│           → prédit: "a"                                     │
+│                                                             │
+│  Étape 3: "function add(a, b) { return a"                   │
+│           → prédit: "+"                                     │
+│                                                             │
+│  Étape 4: "function add(a, b) { return a +"                 │
+│           → prédit: "b"                                     │
+│                                                             │
+│  Étape 5: "function add(a, b) { return a + b"               │
+│           → prédit: ";"                                     │
+│                                                             │
+│  Étape 6: "function add(a, b) { return a + b;"              │
+│           → prédit: "}"                                     │
+│                                                             │
+│  ✅ Terminé !                                                │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+> ⚠️ **Conséquence importante** : Le modèle ne peut pas "revenir en arrière". Une erreur au début influence tout le reste. C'est pourquoi les techniques comme **Chain-of-Thought** sont si efficaces — elles permettent de poser les bases d'un raisonnement avant la réponse finale.
 
 ---
 
-## 1.1 L'Architecture Transformer
+## ⚠️ 1.4 Les Limites Fondamentales des LLMs
 
-### 1.1.1 Une révolution née en 2017
+Comprendre les limites n'est pas du pessimisme — c'est une **nécessité** pour construire des agents robustes.
 
-Tout a commencé avec un article de Google intitulé "Attention Is All You Need". Les auteurs — Vaswani et ses collègues — ont proposé une architecture radicalement différente des réseaux de neurones récurrents (RNN) qui dominaient alors le traitement du langage.
+### 1.4.1 👻 Les Hallucinations : Quand le Probable N'est Pas le Vrai
 
-L'idée centrale ? **L'attention**.
-
-Plutôt que de traiter les mots un par un de manière séquentielle, le Transformer peut regarder tous les mots d'une phrase simultanément et décider lesquels sont importants pour comprendre chaque mot.
+Le terme "hallucination" désigne les cas où un LLM génère des informations **fausses avec confiance**.
 
 ```
-Phrase : "Le chat qui dort sur le canapé est noir"
-
-Pour comprendre "noir" :
-- "chat" → très important (c'est lui qui est noir)
-- "dort" → peu important
-- "canapé" → peu important
-- "est" → important (lien syntaxique)
+┌─────────────────────────────────────────────────────────────┐
+│              👻 ANATOMIE D'UNE HALLUCINATION                │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Vous : "Quelle est la fonction lodash.deepMergeRecursive?"│
+│                                                             │
+│  LLM : "La fonction lodash.deepMergeRecursive permet de     │
+│         fusionner récursivement des objets imbriqués.       │
+│         Elle prend deux arguments : l'objet cible et        │
+│         l'objet source..."                                  │
+│                                                             │
+│  ❌ CETTE FONCTION N'EXISTE PAS !                           │
+│                                                             │
+│  Mais la réponse est plausible car :                        │
+│  ✓ lodash existe                                            │
+│  ✓ Elle a des fonctions de merge                            │
+│  ✓ "deepMergeRecursive" semble logique                      │
+│  ✓ L'explication suit le pattern de vraie documentation    │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### 1.1.2 Le mécanisme d'attention
+**Types d'hallucinations dans le code :**
 
-Techniquement, l'attention fonctionne avec trois vecteurs pour chaque token :
+| 👻 Type | Exemple | Danger |
+|:--------|:--------|:------:|
+| **APIs inventées** | `array.deepClone()` au lieu de `structuredClone()` | 🔴 Élevé |
+| **Imports fantômes** | `import { useQuery } from 'react-query'` (ancien nom) | 🟡 Moyen |
+| **Paramètres faux** | `fs.readFile(path, 'utf-8', { recursive: true })` | 🔴 Élevé |
+| **Comportements inventés** | "Cette fonction retourne null si..." (faux) | 🔴 Élevé |
 
-| Vecteur | Rôle | Analogie |
-|---------|------|----------|
-| **Query (Q)** | "Que cherche ce token ?" | Une question |
-| **Key (K)** | "Que contient ce token ?" | Une étiquette |
-| **Value (V)** | "Quelle information transmettre ?" | La réponse |
+> 💡 **Solution** : Ne pas espérer éliminer les hallucinations — concevoir des systèmes qui les **détectent et corrigent**. C'est l'une des raisons d'être des agents !
 
-La formule magique :
+### 1.4.2 📏 La Fenêtre de Contexte : Une Mémoire Limitée
 
-```
-Attention(Q, K, V) = softmax(QK^T / √d_k) × V
-```
+Un LLM ne voit que sa **fenêtre de contexte** :
 
-En français : pour chaque token, on calcule à quel point il "matche" avec tous les autres tokens (Q × K), on normalise ces scores (softmax), puis on utilise ces scores pour pondérer les informations (× V).
-
-### 1.1.3 Multi-Head Attention
-
-Un seul mécanisme d'attention ne suffit pas. Les Transformers utilisent plusieurs "têtes" d'attention en parallèle, chacune spécialisée dans un type de relation :
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                  MULTI-HEAD ATTENTION                    │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│   ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐       │
-│   │ Head 1 │  │ Head 2 │  │ Head 3 │  │ Head 4 │ ...   │
-│   │Syntaxe │  │Sémantiq│  │Position│  │Coréfér.│       │
-│   └────┬───┘  └────┬───┘  └────┬───┘  └────┬───┘       │
-│        │           │           │           │            │
-│        └───────────┴───────────┴───────────┘            │
-│                         │                               │
-│                   ┌─────▼─────┐                         │
-│                   │  Concat   │                         │
-│                   │ + Linear  │                         │
-│                   └───────────┘                         │
-└─────────────────────────────────────────────────────────┘
-```
-
-GPT-4, par exemple, utilise probablement 96 têtes d'attention sur 96 couches — des milliers de perspectives différentes sur chaque token.
-
-### 1.1.4 L'architecture complète
-
-Un Transformer moderne (comme GPT-4 ou Claude) empile des dizaines de blocs identiques :
+| 🤖 Modèle | Fenêtre | ≈ Pages de texte |
+|:---------|:-------:|:----------------:|
+| GPT-3.5 | 4K - 16K | 3 - 12 pages |
+| GPT-4 | 8K - 128K | 6 - 100 pages |
+| Claude 3 | 200K | ~150 pages |
+| Grok-2 | 128K | ~100 pages |
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    TRANSFORMER BLOCK                     │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│   Input ──▶ ┌──────────────────────┐                    │
-│             │  Layer Normalization │                     │
-│             └──────────┬───────────┘                    │
-│                        ▼                                 │
-│             ┌──────────────────────┐                    │
-│             │  Multi-Head Attention │                    │
-│             └──────────┬───────────┘                    │
-│                        │                                 │
-│             ┌──────────▼───────────┐                    │
-│             │  + Residual Connection│                    │
-│             └──────────┬───────────┘                    │
-│                        ▼                                 │
-│             ┌──────────────────────┐                    │
-│             │  Layer Normalization │                     │
-│             └──────────┬───────────┘                    │
-│                        ▼                                 │
-│             ┌──────────────────────┐                    │
-│             │    Feed Forward NN   │                     │
-│             └──────────┬───────────┘                    │
-│                        │                                 │
-│             ┌──────────▼───────────┐                    │
-│             │  + Residual Connection│                    │
-│             └──────────┬───────────┘                    │
-│                        ▼                                 │
-│                     Output                               │
-│                                                          │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│              📏 LA FENÊTRE DE CONTEXTE                      │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │  │
+│  │      INVISIBLE (au-delà de la fenêtre)              │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                         │                                   │
+│                         ▼                                   │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │ ████████████████████████████████████████████████████ │  │
+│  │      VISIBLE (dans la fenêtre de contexte)          │  │
+│  │                                                      │  │
+│  │  - System prompt                                     │  │
+│  │  - Historique récent                                 │  │
+│  │  - Fichiers injectés                                 │  │
+│  │  - Message actuel                                    │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                                                             │
+│  ⚠️ Plus le contexte est long, plus l'inférence coûte !    │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
 
-         × N couches (N = 32 à 96+)
+**Solutions des agents modernes :**
+
+| 🛠️ Technique | Description | Chapitre |
+|:-------------|:------------|:--------:|
+| **RAG** | Récupérer dynamiquement l'info pertinente | Ch. 7-8 |
+| **Compression** | Résumer les informations moins importantes | Ch. 9 |
+| **Mémoire externe** | Stocker dans une DB consultable | Ch. 14 |
+
+### 1.4.3 🧠 Le Raisonnement : Apparence vs. Réalité
+
+Les LLMs *semblent* raisonner. Mais ce "raisonnement" est-il comparable au raisonnement humain ?
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              🧠 RAISONNEMENT : MYTHE VS RÉALITÉ             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  CE QU'ON CROIT :                                           │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ Problème → Analyse → Logique → Déduction → Réponse  │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  CE QUI SE PASSE VRAIMENT :                                 │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ Problème → Pattern matching → Génération plausible  │   │
+│  │            (ressemble à X     (vu pendant           │   │
+│  │             dans training)     l'entraînement)      │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Preuves de cette distinction :**
+
+| Test | Résultat | Implication |
+|:-----|:---------|:------------|
+| Problème classique, formulation standard | ✅ Réussit | Pattern reconnu |
+| Même problème, formulation inhabituelle | ❌ Échoue souvent | Pattern non reconnu |
+| Problème simple mais inédit | ❌ Peut échouer | Pas de pattern |
+| Problème complexe mais "classique" | ✅ Peut réussir | Pattern mémorisé |
+
+> 💡 C'est pourquoi le **prompt engineering** fonctionne : il reformule le problème sous une forme que le modèle reconnaît !
+
+### 1.4.4 ⏰ La Connaissance : Figée dans le Temps
+
+Un LLM est entraîné sur un corpus avec une **date de coupure**. Tout ce qui vient après lui est inconnu.
+
+| 🤖 Modèle | Date de coupure | Ne connaît pas... |
+|:---------|:----------------|:------------------|
+| GPT-4 (original) | Sept 2021 | GPT-4 lui-même ! |
+| GPT-4 Turbo | Avril 2023 | Claude 3, Grok-2 |
+| Claude 3 | Début 2024 | Actualités récentes |
+| Grok-2 | ? | ? |
+
+**Problèmes pour le développement :**
+
+| ⚠️ Risque | Exemple |
+|:----------|:--------|
+| APIs obsolètes | Suggère `componentWillMount` (déprécié React 16.3) |
+| Packages renommés | `react-query` → `@tanstack/react-query` |
+| Failles non connues | Suggère une version vulnérable |
+| Nouvelles features | Ignore les dernières additions au langage |
+
+> 💡 **Solution** : Augmenter le LLM avec des sources actuelles — documentation récente, recherche web, exemples à jour. C'est le rôle de l'agent !
+
+---
+
+## 🤖 1.5 Du LLM à l'Agent : Pourquoi l'Enrobage Compte
+
+### 1.5.1 Le LLM Nu : Puissant mais Incomplet
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              🔒 LIMITATIONS DU LLM SEUL                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ❌ Ne peut pas exécuter de code                            │
+│  ❌ Ne peut pas accéder à Internet                          │
+│  ❌ Ne peut pas lire/écrire des fichiers                    │
+│  ❌ Ne peut pas vérifier ses affirmations                   │
+│  ❌ Ne peut pas apprendre de ses erreurs                    │
+│  ❌ Ne peut pas interagir avec des APIs                     │
+│                                                             │
+│  🎭 Analogie : Un expert brillant enfermé dans une pièce   │
+│     sans fenêtre, sans téléphone, sans ordinateur.          │
+│     Il peut répondre... mais pas AGIR.                      │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 1.5.2 ⚡ L'Agent : Le LLM Augmenté
+
+Un agent transforme le LLM en acteur capable d'agir :
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              🔄 LA BOUCLE REACT                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  LLM NU :                                                   │
+│  Question ──────────────────────────────────► Réponse       │
+│                                                (peut-être    │
+│                                                 fausse)      │
+│                                                             │
+│  AGENT :                                                    │
+│                                                             │
+│  Question                                                   │
+│     │                                                       │
+│     ▼                                                       │
+│  ┌──────────┐    ┌──────────┐    ┌──────────┐              │
+│  │ 🧠 Think │───►│ 🔧 Act   │───►│ 👁️ Observe│             │
+│  │ Réfléchir│    │ Utiliser │    │ Voir le  │              │
+│  │          │◄───│ un outil │◄───│ résultat │              │
+│  └──────────┘    └──────────┘    └──────────┘              │
+│       │              │                │                     │
+│       └──────────────┴────────────────┘                     │
+│                      │                                      │
+│                      ▼                                      │
+│                  Réponse                                    │
+│               (vérifiée !)                                  │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Ce que l'agent peut faire :**
+
+| 🔧 Capacité | Outil | Bénéfice |
+|:------------|:------|:---------|
+| Lire des fichiers | `Read` | Comprendre le contexte réel |
+| Exécuter du code | `Bash` | Vérifier que ça marche |
+| Rechercher | `Grep`, `Glob` | Trouver l'information pertinente |
+| Modifier | `Edit`, `Write` | Accomplir des tâches |
+| Tester | `npm test` | Valider les changements |
+
+### 1.5.3 🚀 La Synergie : Plus que la Somme des Parties
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              🚀 SYNERGIE LLM + OUTILS                       │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────────────┐    ┌─────────────────────┐        │
+│  │      🧠 LLM          │    │      🔧 OUTILS       │        │
+│  ├─────────────────────┤    ├─────────────────────┤        │
+│  │ ✓ Comprend langage  │    │ ✓ Exécute vraiment  │        │
+│  │ ✓ Connaissance      │    │ ✓ Info actuelle     │        │
+│  │ ✓ Planification     │    │ ✓ Actions réelles   │        │
+│  │ ✓ Adaptabilité      │    │ ✓ Précision 100%    │        │
+│  ├─────────────────────┤    ├─────────────────────┤        │
+│  │ ✗ Peut halluciner   │    │ ✗ Pas de jugement   │        │
+│  │ ✗ Connaissance figée│    │ ✗ Pas de créativité │        │
+│  │ ✗ Ne peut pas agir  │    │ ✗ Pas de contexte   │        │
+│  └─────────────────────┘    └─────────────────────┘        │
+│             │                          │                    │
+│             └──────────┬───────────────┘                    │
+│                        ▼                                    │
+│            ┌─────────────────────┐                         │
+│            │      🤖 AGENT        │                         │
+│            ├─────────────────────┤                         │
+│            │ ✓ Comprend ET agit  │                         │
+│            │ ✓ Vérifie ses idées │                         │
+│            │ ✓ Info à jour       │                         │
+│            │ ✓ Créatif ET précis │                         │
+│            └─────────────────────┘                         │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 1.2 Tokenization et Embeddings
+## 📝 1.6 Exercices de Compréhension
 
-### 1.2.1 Le problème des mots
+Ces exercices ne sont pas des quiz — ce sont des **explorations** pour approfondir votre compréhension.
 
-Les ordinateurs ne comprennent pas les mots. Ils comprennent les nombres. Comment passer de "Bonjour, comment allez-vous ?" à quelque chose qu'un réseau de neurones peut traiter ?
+### 🔬 Exercice 1 : Tokenisation et Ses Conséquences
 
-La première étape est la **tokenization** : découper le texte en unités manipulables.
+Prenez un extrait de code de votre projet (environ 50 lignes). Utilisez [tiktoken](https://github.com/openai/tiktoken) ou le [playground OpenAI](https://platform.openai.com/tokenizer) pour voir comment il est tokenisé.
 
-### 1.2.2 BPE : Byte Pair Encoding
+| Question | Exploration |
+|:---------|:------------|
+| 1️⃣ | Combien de tokens ? Compare au nombre de mots |
+| 2️⃣ | Les noms de variables longs coûtent-ils plus ? |
+| 3️⃣ | Commentaires FR vs EN — différence de coût ? |
+| 4️⃣ | Implications pour votre budget API ? |
 
-Les LLMs modernes utilisent BPE (ou ses variantes comme SentencePiece). L'idée est de trouver les paires de caractères les plus fréquentes et de les fusionner itérativement.
+### 🎯 Exercice 2 : Provoquer une Hallucination
 
-```
-Vocabulaire initial : a, b, c, d, e, f, ...
-
-Texte : "aaaaabbbbb"
-
-Étape 1 : "aa" fréquent → nouveau token "X"
-          "XXXXXbbbbb" → "XXabbbbb"
-
-Étape 2 : "bb" fréquent → nouveau token "Y"
-          "XXaYYYb" → "XXaYYb"
-
-Etc.
-```
-
-Résultat : un vocabulaire de 30 000 à 100 000 tokens qui capture :
-- Les mots courants entiers ("the", "est", "function")
-- Les sous-mots ("un", "##able", "##tion")
-- Les caractères individuels pour les cas rares
-
-### 1.2.3 Exemple concret
+Essayez **délibérément** de faire halluciner un LLM :
 
 ```
-Texte : "Développement d'applications"
-
-Tokens GPT-4 : ["Dé", "velopp", "ement", " d", "'", "applications"]
-
-Token IDs : [5765, 19927, 1671, 294, 6, 31783]
+1. Demandez une fonction d'une bibliothèque inventée
+2. Demandez de documenter un comportement faux
+3. Demandez un exemple avec une API "future"
 ```
 
-Chaque token devient ensuite un **embedding** : un vecteur de haute dimension (typiquement 4096 à 12288 dimensions) qui capture son sens.
+| Question | Exploration |
+|:---------|:------------|
+| 1️⃣ | Le modèle admet-il son incertitude ? |
+| 2️⃣ | L'hallucination est-elle détectable par un non-expert ? |
+| 3️⃣ | Comment un agent pourrait-il vérifier ? |
 
-### 1.2.4 Embeddings positionnels
+### 🧠 Exercice 3 : Les Limites du Raisonnement
 
-Un problème : l'attention traite tous les tokens simultanément, sans notion d'ordre. Comment savoir que "Le chat mange la souris" est différent de "La souris mange le chat" ?
-
-Solution : ajouter des **embeddings positionnels** qui encodent la position de chaque token.
+Posez un problème de logique **simple mais formulé bizarrement** :
 
 ```
-Embedding final = Embedding du token + Embedding de position
+Au lieu de : "Si tous les A sont B, et X est un A, alors X est-il un B ?"
 
-Position 1 : [0.1, -0.2, 0.5, ...]
-Position 2 : [0.2, -0.1, 0.4, ...]
-Position 3 : [0.3, 0.0, 0.3, ...]
+Essayez : "Si tous les zorblax sont des plimfos, et Grixel est un zorblax,
+           Grixel est-il un plimfo ?"
 ```
 
-Les modèles récents utilisent des embeddings positionnels rotatifs (RoPE) qui permettent de généraliser à des séquences plus longues que celles vues à l'entraînement.
+| Question | Exploration |
+|:---------|:------------|
+| 1️⃣ | La reformulation affecte-t-elle la performance ? |
+| 2️⃣ | Le modèle montre-t-il ses étapes de raisonnement ? |
+| 3️⃣ | Ces étapes sont-elles vraiment nécessaires ? |
 
 ---
 
-## 1.3 Génération Autorégressive
+## 🎯 1.7 Points Clés à Retenir
 
-### 1.3.1 Prédire le prochain token
-
-Les LLMs sont fondamentalement des **machines à prédire le prochain token**. Ils ne "comprennent" pas au sens humain — ils calculent des probabilités.
-
-```
-Input  : "Le ciel est"
-Output : P("bleu") = 0.35
-         P("gris") = 0.20
-         P("nuageux") = 0.15
-         P("beau") = 0.10
-         ...
-```
-
-Le modèle sélectionne ensuite un token (souvent par échantillonnage pondéré par les probabilités), l'ajoute à l'input, et recommence.
-
-### 1.3.2 Température et échantillonnage
-
-La **température** contrôle la "créativité" du modèle :
-
-| Température | Comportement | Usage |
-|-------------|--------------|-------|
-| 0.0 | Déterministe (toujours le token le plus probable) | Code, maths |
-| 0.7 | Équilibré | Conversation |
-| 1.0+ | Créatif/aléatoire | Fiction, brainstorming |
-
-```typescript
-// Grok-CLI utilise température 0.7 par défaut
-const response = await client.chat.completions.create({
-  model: 'grok-3',
-  messages: [...],
-  temperature: 0.7,
-  top_p: 0.95
-});
-```
-
-### 1.3.3 Top-p (nucleus sampling)
-
-Plutôt que de considérer tous les tokens possibles, **top-p** ne garde que les tokens dont les probabilités cumulées atteignent p (typiquement 0.9 ou 0.95).
-
-```
-Probabilités : bleu(0.35), gris(0.20), nuageux(0.15),
-               beau(0.10), sombre(0.08), ...
-
-Top-p = 0.9 → Garde : bleu, gris, nuageux, beau, sombre
-               Ignore : les centaines d'autres tokens improbables
-```
-
----
-
-## 1.4 Scaling Laws et Émergence
-
-### 1.4.1 Plus gros = plus intelligent ?
-
-Une découverte surprenante : les performances des LLMs suivent des **lois de puissance** prévisibles par rapport à trois facteurs :
-
-1. **Taille du modèle** (nombre de paramètres)
-2. **Taille du dataset** (tokens d'entraînement)
-3. **Compute** (FLOPs d'entraînement)
-
-```
-Performance ∝ (Paramètres)^α × (Données)^β × (Compute)^γ
-
-Avec α ≈ 0.076, β ≈ 0.095, γ ≈ 0.050
-```
-
-### 1.4.2 Capacités émergentes
-
-Certaines capacités apparaissent **soudainement** quand le modèle atteint une certaine taille :
-
-| Capacité | Seuil approximatif |
-|----------|-------------------|
-| Arithmetic à 3 chiffres | ~1B paramètres |
-| Chain-of-thought | ~10B paramètres |
-| Raisonnement multi-étapes | ~50B paramètres |
-| In-context learning complexe | ~100B+ paramètres |
-
-Ces "sauts" qualitatifs expliquent pourquoi GPT-4 semble si différent de GPT-3 : ce n'est pas juste "un peu meilleur", certaines capacités sont apparues.
-
-### 1.4.3 Les limites du scaling
-
-Mais le scaling a ses limites :
-- **Coût** : GPT-4 a coûté ~$100M à entraîner
-- **Données** : On épuise le texte de qualité disponible
-- **Énergie** : Empreinte carbone croissante
-- **Rendements décroissants** : Chaque doublement de taille donne moins de gains
-
-D'où l'importance des techniques que nous verrons : comment obtenir plus avec moins.
-
----
-
-## 1.5 Les Limites Fondamentales des LLMs
-
-> *Lina a passé une heure à débugger un problème. Le LLM lui a suggéré une solution élégante... qui utilisait une fonction inexistante dans la bibliothèque.*
->
-> *"Comment peut-il être si confiant sur quelque chose de complètement faux ?" se demande-t-elle.*
-
-### 1.5.1 Hallucinations
-
-Les LLMs **inventent**. Pas par malveillance, mais parce qu'ils optimisent pour produire du texte plausible, pas du texte vrai.
-
-**Causes des hallucinations :**
-
-1. **Données d'entraînement contradictoires** : Le modèle a vu des informations conflictuelles et "moyenne"
-
-2. **Pression de complétion** : Le modèle préfère répondre (même faux) plutôt que dire "je ne sais pas"
-
-3. **Patterns statistiques** : Si "Python 3.12 ajoute" est suivi de diverses features dans les données, le modèle peut inventer une feature plausible
-
-4. **Absence de grounding** : Le modèle n'a pas accès à la réalité pour vérifier ses affirmations
-
-**Types d'hallucinations :**
-
-| Type | Exemple | Dangerosité |
-|------|---------|-------------|
-| **Factuelle** | "La Tour Eiffel mesure 450m" | Modérée |
-| **Référentielle** | "Selon l'article de Smith (2023)..." (n'existe pas) | Haute |
-| **Code** | "Utilisez `array.flatten()` en JavaScript" (n'existe pas) | Haute |
-| **Confabulation** | Inventer des détails sur un fichier non lu | Très haute |
-
-### 1.5.2 Fenêtre de contexte
-
-Les LLMs ont une **mémoire limitée** : la fenêtre de contexte.
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                  CONTEXT WINDOW                          │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │ System prompt │ Historique │ User message │ ...  │   │
-│  └──────────────────────────────────────────────────┘   │
-│                                                          │
-│  GPT-3.5  : 4K tokens   (~3 000 mots)                   │
-│  GPT-4    : 8K-128K tokens                              │
-│  Claude 3 : 200K tokens (~150 000 mots)                 │
-│  Grok-3   : 128K tokens                                 │
-│                                                          │
-│  ⚠️ Au-delà de la fenêtre : le modèle OUBLIE            │
-└─────────────────────────────────────────────────────────┘
-```
-
-**Implications :**
-- Une conversation longue "pousse" les anciens messages hors de la fenêtre
-- Les fichiers volumineux ne peuvent pas être traités en une fois
-- Le modèle peut se contredire s'il a oublié ce qu'il a dit
-
-### 1.5.3 Absence de mémoire persistante
-
-Un LLM vanilla n'a **aucune mémoire entre les sessions**. Chaque requête est indépendante.
-
-```
-Session 1 : "Je m'appelle Lina, je travaille sur Grok-CLI"
-Session 2 : "Comment je m'appelle ?" → "Je ne sais pas"
-```
-
-C'est pourquoi les agents ont besoin de systèmes de mémoire externes (bases de données, embeddings).
-
-### 1.5.4 Incapacité d'action directe
-
-Un LLM **ne peut rien faire** par lui-même. Il ne peut que générer du texte.
-
-```
-User : "Crée un fichier test.txt"
-LLM  : "Voici comment créer un fichier : ..."  (mais ne le fait pas)
-```
-
-Pour agir, le LLM doit être augmenté avec des **outils** — exactement ce que fait un agent.
-
-### 1.5.5 Biais et limitations
-
-Les LLMs héritent des biais de leurs données d'entraînement :
-- Biais culturels (surreprésentation de l'anglais et de la culture occidentale)
-- Biais temporels (connaissances figées à la date de cutoff)
-- Biais de fréquence (solutions populaires favorisées même si pas optimales)
-
----
-
-## 1.6 Pourquoi un Agent > un Simple Modèle
-
-> *Lina réfléchit. Le problème n'est pas que le LLM est "bête" — il est incroyablement capable. Le problème est qu'il est isolé : pas d'accès au code réel, pas de mémoire, pas de feedback.*
->
-> *"Et si je lui donnais des yeux et des mains ?" pense-t-elle.*
-
-### 1.6.1 Le paradigme ReAct
-
-En 2022, des chercheurs de Princeton et Google ont formalisé le paradigme **ReAct** (Reasoning + Acting) :
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    REACT LOOP                            │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│   ┌─────────┐     ┌─────────┐     ┌─────────┐          │
-│   │ THOUGHT │────▶│ ACTION  │────▶│OBSERVAT.│          │
-│   │(Reason) │     │  (Act)  │     │(Perceive)│          │
-│   └─────────┘     └─────────┘     └────┬────┘          │
-│        ▲                               │                │
-│        └───────────────────────────────┘                │
-│                   (loop)                                │
-└─────────────────────────────────────────────────────────┘
-```
-
-1. **Thought** : Le modèle raisonne sur ce qu'il doit faire
-2. **Action** : Il exécute une action (outil)
-3. **Observation** : Il observe le résultat
-4. **Répéter** jusqu'à résolution
-
-### 1.6.2 Augmentation par outils
-
-Un LLM augmenté d'outils peut :
-
-| Sans outils | Avec outils |
-|-------------|-------------|
-| "Le fichier contient probablement..." | Lire le fichier réel |
-| "La commande devrait retourner..." | Exécuter la commande |
-| "L'API répond généralement..." | Appeler l'API |
-| "Le test devrait passer..." | Lancer le test |
-
-C'est la différence entre **supposer** et **savoir**.
-
-### 1.6.3 Boucle de feedback
-
-Les outils permettent un **feedback loop** crucial :
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                   FEEDBACK LOOP                          │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│   Génère du code                                        │
-│        │                                                 │
-│        ▼                                                 │
-│   Exécute le code (outil)                               │
-│        │                                                 │
-│        ▼                                                 │
-│   Observe le résultat                                   │
-│        │                                                 │
-│   ┌────┴────┐                                           │
-│   │ Erreur? │                                           │
-│   └────┬────┘                                           │
-│    Oui │    Non                                         │
-│        │     │                                          │
-│        ▼     ▼                                          │
-│   Corrige  Terminé                                      │
-│        │                                                 │
-│        └──────▶ (répète)                                │
-└─────────────────────────────────────────────────────────┘
-```
-
-Sans feedback, un LLM génère du code et espère qu'il fonctionne. Avec feedback, il peut itérer jusqu'à ce que ça marche.
-
-### 1.6.4 Autonomie contrôlée
-
-Un agent bien conçu est **autonome mais contrôlé** :
-
-| Aspect | Autonomie | Contrôle |
-|--------|-----------|----------|
-| Décisions | Choisit les outils à utiliser | Outils limités et validés |
-| Exécution | Lance les commandes | Sandbox, confirmations |
-| Itération | Boucle jusqu'à succès | Limite de rounds |
-| Apprentissage | Mémorise les patterns | Données filtrées |
-
----
-
-## 1.7 Le Pont vers les Agents
-
-> *Lina esquisse une architecture sur son carnet :*
->
-> ```
-> LLM brut + Outils + Mémoire + Reasoning = Agent
-> ```
->
-> *"C'est simple en théorie," pense-t-elle. "Voyons si ça l'est en pratique."*
-
-### 1.7.1 Ce qu'un agent ajoute au LLM
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    LLM vs AGENT                          │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│   LLM BRUT                    AGENT                      │
-│   ────────                    ─────                      │
-│   • Génère du texte           • Génère + Agit            │
-│   • Stateless                 • Mémoire persistante      │
-│   • Monologue                 • Dialogue avec le monde   │
-│   • Confiant mais faillible   • Vérifie ses actions      │
-│   • Isolé                     • Connecté (outils)        │
-│   • Linéaire                  • Raisonnement complexe    │
-│                                                          │
-└─────────────────────────────────────────────────────────┘
-```
-
-### 1.7.2 Les composants que nous allons construire
-
-Dans les prochains chapitres, nous verrons :
-
-1. **Reasoning** (Parties II)
-   - Tree-of-Thought pour l'exploration
-   - MCTS pour l'optimisation
-   - Réparation automatique
-
-2. **Mémoire** (Partie III)
-   - RAG moderne
-   - Compression de contexte
-   - Dependency-aware retrieval
-
-3. **Action** (Partie IV)
-   - 41 outils spécialisés
-   - Plugins et MCP
-   - Sandbox et sécurité
-
-4. **Optimisation** (Partie V)
-   - Model routing
-   - Exécution parallèle
-   - Caching sémantique
-
-5. **Apprentissage** (Partie VI)
-   - Patterns de réparation
-   - Conventions apprises
-   - Amélioration continue
-
----
-
-## 1.8 Référence Grok-CLI
-
-Le wrapper client de Grok-CLI illustre comment interfacer proprement avec l'API :
-
-```typescript
-// src/grok/client.ts (simplifié)
-import OpenAI from 'openai';
-
-export class GrokClient {
-  private client: OpenAI;
-
-  constructor(apiKey: string) {
-    this.client = new OpenAI({
-      apiKey,
-      baseURL: 'https://api.x.ai/v1'
-    });
-  }
-
-  async chat(messages: Message[], options?: ChatOptions) {
-    const response = await this.client.chat.completions.create({
-      model: options?.model ?? 'grok-3',
-      messages,
-      temperature: options?.temperature ?? 0.7,
-      tools: options?.tools,
-      stream: true
-    });
-
-    return response;
-  }
-}
-```
-
-Ce wrapper abstrait les détails de l'API et fournit une interface propre que l'agent utilise.
-
----
-
-## Résumé
-
-Dans ce chapitre, nous avons vu :
+### 📐 Sur l'Architecture
 
 | Concept | Point clé |
-|---------|-----------|
-| **Transformers** | Architecture basée sur l'attention multi-tête |
-| **Tokenization** | BPE convertit le texte en IDs numériques |
-| **Génération** | Autorégressive, contrôlée par température |
-| **Scaling** | Plus gros = plus capable, mais rendements décroissants |
-| **Limitations** | Hallucinations, contexte limité, pas de mémoire |
-| **Agents** | LLM + Outils + Mémoire + Reasoning |
+|:--------|:----------|
+| **Transformers** | Ont remplacé la récurrence par l'attention parallèle |
+| **Attention** | Chaque token "regarde" tous les autres tokens |
+| **Multi-têtes** | Capturent différents types de relations simultanément |
+| **Profondeur** | Permet l'abstraction progressive (syntaxe → sémantique → intention) |
+
+### ⚙️ Sur la Génération
+
+| Concept | Point clé |
+|:--------|:----------|
+| **Next-token** | Les LLMs prédisent le probable, pas le vrai |
+| **Température** | Contrôle le compromis précision/créativité |
+| **Autoregression** | Pas de retour en arrière — les erreurs se propagent |
+
+### ⚠️ Sur les Limites
+
+| Limite | Réalité |
+|:-------|:--------|
+| **Hallucinations** | Intrinsèques, pas un bug — il faut les détecter |
+| **Contexte** | Fenêtre limitée — il faut gérer la mémoire |
+| **Raisonnement** | Pattern matching, pas logique formelle |
+| **Connaissance** | Figée à la date d'entraînement |
+
+### 🤖 Sur les Agents
+
+| Concept | Point clé |
+|:--------|:----------|
+| **LLM seul** | Puissant mais ne peut pas agir |
+| **Agent** | LLM + outils = capacité d'action |
+| **ReAct** | Boucle Think → Act → Observe |
+| **Synergie** | L'ensemble > somme des parties |
 
 ---
 
-## Exercices
+## 🌅 Épilogue : La Fondation Est Posée
 
-1. **Tokenization** : Utilisez le tokenizer de tiktoken pour compter les tokens d'un fichier de votre projet. Combien de tokens pour 1000 lignes de code ?
+Marcus reposa son café, maintenant froid.
 
-2. **Hallucinations** : Demandez à un LLM de décrire une fonction inexistante de votre langage préféré. Analysez comment il confabule.
+— "Tu vois," dit-il, "un LLM n'est pas magique. C'est un système statistique extraordinairement sophistiqué. Brillant pour reconnaître des patterns. Mais il n'est pas omniscient, pas infaillible, et surtout — il ne peut rien faire par lui-même."
 
-3. **Contexte** : Calculez combien de fichiers de votre projet tiendraient dans une fenêtre de 128K tokens.
+Lina hocha la tête, les pièces du puzzle s'assemblant.
+
+— "Donc quand je veux construire un outil vraiment utile..."
+
+— "Tu dois envelopper le LLM dans un système qui compense ses faiblesses. Des outils pour vérifier. De la mémoire pour dépasser le contexte. Des boucles de rétroaction pour corriger les erreurs. C'est ça, un **agent**."
+
+Elle sourit, ouvrant un nouveau fichier dans son éditeur.
+
+— "Par où je commence ?"
+
+— "Par comprendre ce qu'est vraiment un agent. Leurs types, leurs composants, leurs patterns. C'est le sujet du prochain chapitre."
 
 ---
 
-## Pour aller plus loin
-
-- Vaswani et al. (2017). "Attention Is All You Need"
-- Kaplan et al. (2020). "Scaling Laws for Neural Language Models"
-- Yao et al. (2022). "ReAct: Synergizing Reasoning and Acting in Language Models"
-
----
-
-*Prochainement : Chapitre 2 — Le Rôle des Agents dans l'Écosystème IA*
-
+| ⬅️ Précédent | 📖 Sommaire | ➡️ Suivant |
+|:-------------|:-----------:|:-----------|
+| [Avant-propos](00-avant-propos.md) | [Index](README.md) | [Le Rôle des Agents](02-role-des-agents.md) |

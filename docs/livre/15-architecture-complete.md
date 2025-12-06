@@ -1,8 +1,8 @@
-# Chapitre 15 : Architecture Complète — Grok-CLI de A à Z
+# 🏗️ Chapitre 15 : Architecture Complète — Grok-CLI de A à Z
 
 ---
 
-## Scène d'ouverture : La Vue d'Ensemble
+## 🎬 Scène d'ouverture : La Vue d'Ensemble
 
 *Un an après le premier commit...*
 
@@ -10,114 +10,168 @@ Lina se tenait devant l'écran de la salle de conférence. Derrière elle, le sc
 
 — "Et voilà où nous en sommes," dit-elle à l'équipe réunie. "Ce qui a commencé comme un simple wrapper autour de l'API Grok est devenu... ça."
 
-Elle désigna le diagramme. Les nouveaux développeurs écarquillèrent les yeux devant la complexité apparente.
+Elle désigna le diagramme. Les nouveaux développeurs écarquillèrent les yeux.
 
-— "Ne vous inquiétez pas," ajouta-t-elle avec un sourire. "Chaque pièce a une raison d'être. Et aujourd'hui, je vais vous expliquer comment tout s'assemble."
+— "Ne vous inquiétez pas," ajouta-t-elle avec un sourire. "Chaque pièce a une raison d'être. Aujourd'hui, je vais vous montrer comment tout s'assemble."
 
-Elle cliqua sur la première diapositive.
+Marcus, l'un des nouveaux, leva la main.
 
-— "Commençons par la question fondamentale : qu'est-ce qu'un agent LLM moderne ?"
+— "Par où on commence ?"
+
+— "Par le haut," répondit Lina. "Six couches. Une à la fois."
 
 ---
 
-## 15.1 Vue Aérienne de l'Architecture
+## 📋 Table des Matières
+
+| Section | Titre | Description |
+|---------|-------|-------------|
+| 15.1 | 🌍 Vue Aérienne | Les 6 couches et le flux de données |
+| 15.2 | 🖥️ Couche Interface | React/Ink, streaming, composants UI |
+| 15.3 | 🎯 Couche Orchestration | GrokAgent, boucle agentique, multi-agent |
+| 15.4 | 🧠 Couche Raisonnement | ToT, MCTS, Repair, stratégies hybrides |
+| 15.5 | 💾 Couche Contexte & Mémoire | RAG, compression, mémoire unifiée |
+| 15.6 | ⚡ Couche Actions | 41 outils, registre, MCP |
+| 15.7 | 🔒 Couche Sécurité | Permissions, sandbox, audit |
+| 15.8 | 📊 Intégration Complète | Diagramme global, configuration |
+| 15.9 | 📈 Métriques & Monitoring | Dashboard, statistiques |
+| 15.10 | 📝 Points Clés | Synthèse du chapitre |
+
+---
+
+## 15.1 🌍 Vue Aérienne de l'Architecture
 
 ### 15.1.1 Les Six Couches
 
+L'architecture de Grok-CLI suit le principe de **séparation des responsabilités**. Chaque couche a un rôle précis et communique uniquement avec ses voisines immédiates.
+
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    ARCHITECTURE GROK-CLI                    │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │                    INTERFACE (UI)                    │   │
-│  │   React/Ink • Streaming • Rendu Markdown • Thèmes   │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                           │                                 │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │                   ORCHESTRATION                      │   │
-│  │   GrokAgent • Boucle Agentique • Coordination       │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                           │                                 │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │                    RAISONNEMENT                      │   │
-│  │   ToT • MCTS • Repair • Réflexion • Planning        │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                           │                                 │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │                  CONTEXTE & MÉMOIRE                  │   │
-│  │   RAG • Compression • Embedding • Persistance       │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                           │                                 │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │                      ACTIONS                         │   │
-│  │   Tools • MCP • Plugins • Exécution Parallèle       │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                           │                                 │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │                     SÉCURITÉ                         │   │
-│  │   Permissions • Sandbox • Redaction • Audit         │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                  🏗️ ARCHITECTURE GROK-CLI                       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │  🖥️ INTERFACE (UI)                                       │   │
+│   │     React/Ink • Streaming • Rendu Markdown • Thèmes     │   │
+│   └─────────────────────────────────────────────────────────┘   │
+│                              │                                   │
+│                              ▼                                   │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │  🎯 ORCHESTRATION                                        │   │
+│   │     GrokAgent • Boucle Agentique • Coordination         │   │
+│   └─────────────────────────────────────────────────────────┘   │
+│                              │                                   │
+│                              ▼                                   │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │  🧠 RAISONNEMENT                                         │   │
+│   │     ToT • MCTS • Repair • Réflexion • Planning          │   │
+│   └─────────────────────────────────────────────────────────┘   │
+│                              │                                   │
+│                              ▼                                   │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │  💾 CONTEXTE & MÉMOIRE                                   │   │
+│   │     RAG • Compression • Embedding • Persistance         │   │
+│   └─────────────────────────────────────────────────────────┘   │
+│                              │                                   │
+│                              ▼                                   │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │  ⚡ ACTIONS                                               │   │
+│   │     Tools • MCP • Plugins • Exécution Parallèle         │   │
+│   └─────────────────────────────────────────────────────────┘   │
+│                              │                                   │
+│                              ▼                                   │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │  🔒 SÉCURITÉ                                              │   │
+│   │     Permissions • Sandbox • Redaction • Audit           │   │
+│   └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
+
+| Couche | Responsabilité | Composants Clés |
+|--------|----------------|-----------------|
+| 🖥️ Interface | Interaction utilisateur | ChatInterface, StreamingText, ToolProgress |
+| 🎯 Orchestration | Coordination globale | GrokAgent, MultiAgentCoordinator |
+| 🧠 Raisonnement | Stratégies de résolution | ToT, MCTS, IterativeRepair |
+| 💾 Contexte | Gestion de l'information | RAGPipeline, ContextCompressor, UnifiedMemory |
+| ⚡ Actions | Exécution des tâches | ToolRegistry, ParallelExecutor, MCPClient |
+| 🔒 Sécurité | Protection système | ApprovalModes, Sandbox, DataRedaction |
 
 ### 15.1.2 Flux de Données Principal
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    FLUX DE DONNÉES                          │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  User Input                                                 │
-│      │                                                      │
-│      ▼                                                      │
-│  ┌────────────┐     ┌────────────┐     ┌────────────┐      │
-│  │   Parser   │────▶│  Security  │────▶│  Context   │      │
-│  │  & Hooks   │     │   Check    │     │  Enrichment│      │
-│  └────────────┘     └────────────┘     └────────────┘      │
-│                                               │              │
-│                                               ▼              │
-│  ┌────────────┐     ┌────────────┐     ┌────────────┐      │
-│  │   Tool     │◀────│   Agent    │◀────│   Model    │      │
-│  │ Execution  │     │   Loop     │     │  Routing   │      │
-│  └────────────┘     └────────────┘     └────────────┘      │
-│       │                   │                                 │
-│       ▼                   ▼                                 │
-│  ┌────────────┐     ┌────────────┐                         │
-│  │  Results   │────▶│  Memory    │                         │
-│  │  Render    │     │  Update    │                         │
-│  └────────────┘     └────────────┘                         │
-│       │                                                     │
-│       ▼                                                     │
-│  User Output (Streaming)                                    │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                    📊 FLUX DE DONNÉES                            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   User Input                                                    │
+│       │                                                         │
+│       ▼                                                         │
+│   ┌──────────┐     ┌──────────┐     ┌──────────┐               │
+│   │ 📝 Parse │────▶│ 🔒 Check │────▶│ 📚 Enrich│               │
+│   │ & Hooks  │     │ Security │     │ Context  │               │
+│   └──────────┘     └──────────┘     └──────────┘               │
+│                                           │                     │
+│                                           ▼                     │
+│   ┌──────────┐     ┌──────────┐     ┌──────────┐               │
+│   │ ⚙️ Tools │◀────│ 🔄 Agent │◀────│ 🎛️ Route │               │
+│   │ Execute  │     │   Loop   │     │  Model   │               │
+│   └──────────┘     └──────────┘     └──────────┘               │
+│       │                 │                                       │
+│       ▼                 ▼                                       │
+│   ┌──────────┐     ┌──────────┐                                │
+│   │ 📤 Render│────▶│ 💾 Memory│                                │
+│   │ Results  │     │  Update  │                                │
+│   └──────────┘     └──────────┘                                │
+│       │                                                         │
+│       ▼                                                         │
+│   User Output (Streaming)                                       │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
+
+**Étapes du flux :**
+
+1. **Parse & Hooks** — L'entrée utilisateur est analysée et les hooks pré-exécution sont déclenchés
+2. **Security Check** — Vérification des permissions et détection de patterns dangereux
+3. **Context Enrichment** — RAG, mémoires, et profil utilisateur sont ajoutés au contexte
+4. **Model Routing** — Sélection du modèle optimal (FrugalGPT)
+5. **Agent Loop** — Boucle agentique avec max 30 itérations
+6. **Tool Execution** — Exécution parallèle des outils demandés
+7. **Render Results** — Formatage et streaming vers l'utilisateur
+8. **Memory Update** — Apprentissage et mise à jour des mémoires
 
 ---
 
-## 15.2 Couche Interface (UI)
+## 15.2 🖥️ Couche Interface (UI)
 
 ### 15.2.1 Stack Technologique
+
+La couche UI utilise **React 18** avec **Ink 4** pour créer une interface terminal riche et réactive.
+
+| Technologie | Rôle | Avantage |
+|-------------|------|----------|
+| React 18 | Framework UI | Composants réutilisables, hooks |
+| Ink 4 | Rendu terminal | Flexbox pour terminal, composants natifs |
+| Streaming | Affichage progressif | Feedback immédiat, UX fluide |
+| Error Boundaries | Résilience | Crash gracieux, récupération |
 
 ```typescript
 // src/ui/chat-interface.tsx
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 import { ErrorBoundary } from './components/error-boundary.js';
 import { StreamingText } from './components/streaming-text.js';
-import { ToolProgress } from './components/tool-progress.js';
-import { StatusBar } from './components/status-bar.js';
 
 /**
- * Interface principale du chat
+ * 🖥️ Interface principale du chat
  *
- * Stack : React 18 + Ink 4
- * - Rendu terminal avec composants React
- * - Gestion du state avec hooks
- * - Streaming natif
+ * Responsabilités :
+ * - Gestion des entrées clavier
+ * - Affichage des messages (user/assistant)
+ * - Streaming des réponses
+ * - Progression des outils
  */
 export function ChatInterface({ agent, config }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -126,14 +180,10 @@ export function ChatInterface({ agent, config }: ChatInterfaceProps) {
   const [streamingContent, setStreamingContent] = useState('');
   const { exit } = useApp();
 
-  // Gestion des entrées clavier
+  // ⌨️ Gestion des entrées clavier
   useInput((inputChar, key) => {
-    if (key.escape) {
-      exit();
-    }
-    if (key.return && !isProcessing) {
-      handleSubmit();
-    }
+    if (key.escape) exit();
+    if (key.return && !isProcessing) handleSubmit();
   });
 
   const handleSubmit = useCallback(async () => {
@@ -147,16 +197,14 @@ export function ChatInterface({ agent, config }: ChatInterfaceProps) {
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
 
     try {
-      // Streaming de la réponse
+      // 📡 Streaming de la réponse
       for await (const chunk of agent.processStream(userMessage)) {
         if (chunk.type === 'text') {
           setStreamingContent(prev => prev + chunk.content);
-        } else if (chunk.type === 'tool_start') {
-          // Affichage de la progression de l'outil
         }
       }
 
-      // Finalisation
+      // ✅ Finalisation
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: streamingContent
@@ -171,38 +219,33 @@ export function ChatInterface({ agent, config }: ChatInterfaceProps) {
     } finally {
       setIsProcessing(false);
     }
-  }, [input, agent]);
+  }, [input, agent, streamingContent]);
 
   return (
     <ErrorBoundary fallback={<ErrorFallback />}>
       <Box flexDirection="column" height="100%">
-        {/* En-tête */}
+        {/* 📊 En-tête avec status */}
         <StatusBar
           model={config.model}
           mode={config.mode}
           memorySize={agent.memorySize}
         />
 
-        {/* Zone des messages */}
-        <Box flexDirection="column" flexGrow={1} overflowY="scroll">
+        {/* 💬 Zone des messages */}
+        <Box flexDirection="column" flexGrow={1}>
           {messages.map((msg, i) => (
             <MessageBubble key={i} message={msg} />
           ))}
 
-          {/* Contenu en streaming */}
           {streamingContent && (
             <StreamingText content={streamingContent} />
           )}
         </Box>
 
-        {/* Zone de saisie */}
+        {/* ⌨️ Zone de saisie */}
         <Box borderStyle="single" paddingX={1}>
           <Text color="cyan">{'>'} </Text>
-          <TextInput
-            value={input}
-            onChange={setInput}
-            placeholder="Type your message..."
-          />
+          <TextInput value={input} onChange={setInput} />
         </Box>
       </Box>
     </ErrorBoundary>
@@ -213,37 +256,23 @@ export function ChatInterface({ agent, config }: ChatInterfaceProps) {
 ### 15.2.2 Composants Spécialisés
 
 ```typescript
-// src/ui/components/streaming-text.tsx
-
-/**
- * Affichage du texte en streaming avec rendu Markdown
- */
-export function StreamingText({ content }: { content: string }) {
-  return (
-    <Box flexDirection="column">
-      <Markdown>{content}</Markdown>
-      <BlinkingCursor />
-    </Box>
-  );
-}
-
 // src/ui/components/tool-progress.tsx
 
 /**
- * Affichage de la progression des outils
+ * ⚙️ Affichage de la progression des outils
  */
 export function ToolProgress({ tool, status, duration }: ToolProgressProps) {
-  const icon = status === 'running' ? '⟳' :
-               status === 'success' ? '✓' :
-               status === 'error' ? '✗' : '○';
-
-  const color = status === 'running' ? 'yellow' :
-                status === 'success' ? 'green' :
-                status === 'error' ? 'red' : 'gray';
+  // 🎨 Icônes et couleurs selon le status
+  const config = {
+    running: { icon: '⟳', color: 'yellow' },
+    success: { icon: '✓', color: 'green' },
+    error:   { icon: '✗', color: 'red' },
+    pending: { icon: '○', color: 'gray' }
+  }[status];
 
   return (
     <Box>
-      <Text color={color}>{icon} </Text>
+      <Text color={config.color}>{config.icon} </Text>
       <Text>{tool}</Text>
       {duration && <Text dimColor> ({duration}ms)</Text>}
     </Box>
@@ -253,12 +282,9 @@ export function ToolProgress({ tool, status, duration }: ToolProgressProps) {
 // src/ui/components/error-boundary.tsx
 
 /**
- * Capture des erreurs React pour éviter les crashs
+ * 🛡️ Capture des erreurs React pour éviter les crashs
  */
-export class ErrorBoundary extends React.Component<
-  { children: React.ReactNode; fallback: React.ReactNode },
-  { hasError: boolean; error?: Error }
-> {
+export class ErrorBoundary extends React.Component<Props, State> {
   state = { hasError: false, error: undefined };
 
   static getDerivedStateFromError(error: Error) {
@@ -280,29 +306,41 @@ export class ErrorBoundary extends React.Component<
 
 ---
 
-## 15.3 Couche Orchestration
+## 15.3 🎯 Couche Orchestration
 
 ### 15.3.1 L'Agent Central
+
+Le **GrokAgent** est le chef d'orchestre du système. Il coordonne toutes les autres couches et gère la boucle agentique principale.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    🎯 GROK AGENT                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │                    Boucle Agentique                      │   │
+│   │   ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐│   │
+│   │   │ Process │──▶│ Execute │──▶│ Stream  │──▶│ Memory  ││   │
+│   │   │ Message │   │  Tools  │   │ Response│   │ Update  ││   │
+│   │   └─────────┘   └─────────┘   └─────────┘   └─────────┘│   │
+│   │        │                                         │      │   │
+│   │        └─────────────────────────────────────────┘      │   │
+│   │                    (max 30 rounds)                      │   │
+│   └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│   Composants intégrés :                                         │
+│   • GrokClient (API)    • ModelRouter (FrugalGPT)              │
+│   • ToolRegistry (41)   • ParallelExecutor                     │
+│   • MemorySystem        • SecurityManager                      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ```typescript
 // src/agent/grok-agent.ts
 
-import { EventEmitter } from 'events';
-import { GrokClient } from '../grok/client.js';
-import { ToolRegistry } from '../tools/registry.js';
-import { ModelRouter } from '../optimization/model-routing.js';
-import { ParallelExecutor } from '../optimization/parallel-executor.js';
-import { MemorySystem } from '../memory/memory-system.js';
-import { SecurityManager } from '../security/index.js';
-
 /**
- * Agent principal - Orchestrateur central
- *
- * Responsabilités :
- * - Boucle agentique (max 30 rounds)
- * - Coordination des composants
- * - Gestion du contexte
- * - Streaming des réponses
+ * 🎯 Agent principal - Orchestrateur central
  */
 export class GrokAgent extends EventEmitter {
   private client: GrokClient;
@@ -311,54 +349,37 @@ export class GrokAgent extends EventEmitter {
   private executor: ParallelExecutor;
   private memory: MemorySystem;
   private security: SecurityManager;
-
-  private maxRounds: number;
-  private currentRound: number = 0;
-
-  constructor(config: AgentConfig) {
-    super();
-
-    this.maxRounds = config.maxRounds ?? 30;
-
-    // Initialisation des composants
-    this.client = new GrokClient(config.apiKey);
-    this.tools = new ToolRegistry();
-    this.router = new ModelRouter();
-    this.executor = new ParallelExecutor();
-    this.memory = new MemorySystem(config.memoryPath);
-    this.security = new SecurityManager(config.security);
-  }
+  private maxRounds = 30;
 
   /**
-   * Boucle agentique principale
+   * 🔄 Boucle agentique principale
    */
   async *processStream(input: string): AsyncGenerator<AgentChunk> {
-    this.currentRound = 0;
+    let currentRound = 0;
 
-    // 1. Pré-traitement
+    // 1️⃣ Vérification sécurité
     const securityCheck = await this.security.checkInput(input);
     if (!securityCheck.allowed) {
       yield { type: 'error', content: securityCheck.reason };
       return;
     }
 
-    // 2. Enrichissement du contexte
+    // 2️⃣ Enrichissement du contexte
     const context = await this.buildContext(input);
 
-    // 3. Sélection du modèle
+    // 3️⃣ Sélection du modèle (FrugalGPT)
     const routing = await this.router.selectTier({
       prompt: input,
       type: this.detectTaskType(input)
     });
+    yield { type: 'metadata', model: routing.tier };
 
-    yield { type: 'metadata', model: routing.tier, confidence: routing.confidence };
-
-    // 4. Boucle agentique
+    // 4️⃣ Boucle agentique
     let messages = this.buildInitialMessages(input, context);
     let continueLoop = true;
 
-    while (continueLoop && this.currentRound < this.maxRounds) {
-      this.currentRound++;
+    while (continueLoop && currentRound < this.maxRounds) {
+      currentRound++;
 
       // Appel au modèle
       const response = await this.client.chat({
@@ -378,12 +399,12 @@ export class GrokAgent extends EventEmitter {
       // Vérification des appels d'outils
       const toolCalls = response.toolCalls;
 
-      if (!toolCalls || toolCalls.length === 0) {
+      if (!toolCalls?.length) {
         continueLoop = false;
       } else {
-        // Exécution des outils
         yield { type: 'tools_start', count: toolCalls.length };
 
+        // Exécution parallèle
         const results = await this.executeTools(toolCalls);
 
         for (const result of results) {
@@ -395,411 +416,152 @@ export class GrokAgent extends EventEmitter {
           };
         }
 
-        // Ajout des résultats au contexte
         messages = this.appendToolResults(messages, toolCalls, results);
       }
     }
 
-    // 5. Post-traitement
+    // 5️⃣ Post-traitement et mémoire
     await this.memory.remember('episodic', {
       input,
-      rounds: this.currentRound,
+      rounds: currentRound,
       model: routing.tier
     });
 
-    yield { type: 'complete', rounds: this.currentRound };
-  }
-
-  /**
-   * Exécution des outils avec parallélisation
-   */
-  private async executeTools(toolCalls: ToolCall[]): Promise<ToolResult[]> {
-    // Vérification des permissions
-    for (const call of toolCalls) {
-      const permission = await this.security.checkTool(call);
-      if (!permission.allowed) {
-        throw new Error(`Tool ${call.name} not permitted: ${permission.reason}`);
-      }
-    }
-
-    // Exécution parallèle
-    return this.executor.executeTools(
-      toolCalls,
-      {
-        execute: async (call) => {
-          const tool = this.tools.get(call.name);
-          const startTime = Date.now();
-
-          try {
-            const result = await tool.execute(call.params);
-            return {
-              tool: call.name,
-              success: true,
-              value: result,
-              duration: Date.now() - startTime
-            };
-          } catch (error) {
-            return {
-              tool: call.name,
-              success: false,
-              error: String(error),
-              duration: Date.now() - startTime
-            };
-          }
-        }
-      }
-    );
-  }
-
-  /**
-   * Construction du contexte enrichi
-   */
-  private async buildContext(input: string): Promise<Context> {
-    const [
-      memories,
-      codebaseContext,
-      userProfile
-    ] = await Promise.all([
-      this.memory.search({ text: input, limit: 5 }),
-      this.buildCodebaseContext(input),
-      this.memory.getUserProfile()
-    ]);
-
-    return {
-      memories,
-      codebase: codebaseContext,
-      user: userProfile,
-      project: await this.detectProject()
-    };
-  }
-
-  /**
-   * Construction du contexte codebase
-   */
-  private async buildCodebaseContext(input: string): Promise<CodebaseContext> {
-    // RAG + Dependency-aware
-    const relevantFiles = await this.tools.get('search').execute({
-      query: input,
-      limit: 10
-    });
-
-    return {
-      files: relevantFiles,
-      structure: await this.getProjectStructure()
-    };
-  }
-
-  /**
-   * Messages initiaux avec contexte
-   */
-  private buildInitialMessages(
-    input: string,
-    context: Context
-  ): Message[] {
-    return [
-      {
-        role: 'system',
-        content: this.buildSystemPrompt(context)
-      },
-      {
-        role: 'user',
-        content: input
-      }
-    ];
-  }
-
-  /**
-   * Prompt système avec contexte
-   */
-  private buildSystemPrompt(context: Context): string {
-    const parts: string[] = [
-      'You are Grok-CLI, an AI-powered development assistant.',
-      '',
-      '## Current Project',
-      `Name: ${context.project.name}`,
-      `Language: ${context.project.language}`,
-      '',
-      '## User Preferences',
-      `Favorite tools: ${context.user.favoriteTools.join(', ')}`,
-      '',
-      '## Relevant Files',
-      context.codebase.files.map(f => `- ${f.path}`).join('\n')
-    ];
-
-    if (context.memories.length > 0) {
-      parts.push('', '## Recent Context');
-      parts.push(context.memories.map(m => `- ${m.summary}`).join('\n'));
-    }
-
-    return parts.join('\n');
+    yield { type: 'complete', rounds: currentRound };
   }
 }
 ```
 
 ### 15.3.2 Coordination Multi-Agent
 
-```typescript
-// src/agent/multi-agent/coordinator.ts
+Pour les tâches complexes, un **coordinateur multi-agent** décompose le travail en sous-tâches distribuées à des agents spécialisés.
 
-/**
- * Coordinateur pour les tâches complexes
- *
- * Décompose les tâches en sous-tâches
- * et les distribue à des agents spécialisés
- */
-export class MultiAgentCoordinator {
-  private agents: Map<string, SpecializedAgent> = new Map();
-  private taskQueue: TaskQueue;
-
-  constructor() {
-    this.registerDefaultAgents();
-    this.taskQueue = new TaskQueue();
-  }
-
-  /**
-   * Enregistrement des agents spécialisés
-   */
-  private registerDefaultAgents(): void {
-    this.agents.set('code', new CodeAgent());
-    this.agents.set('test', new TestAgent());
-    this.agents.set('review', new ReviewAgent());
-    this.agents.set('doc', new DocAgent());
-    this.agents.set('security', new SecurityAgent());
-  }
-
-  /**
-   * Traitement d'une tâche complexe
-   */
-  async process(task: ComplexTask): Promise<TaskResult> {
-    // 1. Décomposition
-    const subtasks = await this.decompose(task);
-
-    // 2. Ordonnancement
-    const schedule = this.buildSchedule(subtasks);
-
-    // 3. Exécution coordonnée
-    const results: Map<string, SubtaskResult> = new Map();
-
-    for (const level of schedule) {
-      // Exécution parallèle des tâches du même niveau
-      const levelResults = await Promise.all(
-        level.map(async (subtask) => {
-          const agent = this.agents.get(subtask.type);
-          if (!agent) {
-            throw new Error(`No agent for type: ${subtask.type}`);
-          }
-
-          // Injection des dépendances
-          const context = this.buildSubtaskContext(subtask, results);
-
-          return {
-            id: subtask.id,
-            result: await agent.execute(subtask, context)
-          };
-        })
-      );
-
-      for (const { id, result } of levelResults) {
-        results.set(id, result);
-      }
-    }
-
-    // 4. Agrégation
-    return this.aggregate(task, results);
-  }
-
-  /**
-   * Décomposition de la tâche
-   */
-  private async decompose(task: ComplexTask): Promise<Subtask[]> {
-    const subtasks: Subtask[] = [];
-
-    // Analyse de la tâche
-    if (task.requiresCode) {
-      subtasks.push({
-        id: 'code',
-        type: 'code',
-        description: 'Implement the requested functionality',
-        dependencies: []
-      });
-    }
-
-    if (task.requiresTests) {
-      subtasks.push({
-        id: 'test',
-        type: 'test',
-        description: 'Write tests for the implementation',
-        dependencies: ['code']
-      });
-    }
-
-    if (task.requiresReview) {
-      subtasks.push({
-        id: 'review',
-        type: 'review',
-        description: 'Review code quality and security',
-        dependencies: ['code']
-      });
-    }
-
-    if (task.requiresDocs) {
-      subtasks.push({
-        id: 'doc',
-        type: 'doc',
-        description: 'Document the changes',
-        dependencies: ['code', 'test']
-      });
-    }
-
-    return subtasks;
-  }
-
-  /**
-   * Construction du schedule (niveaux de dépendances)
-   */
-  private buildSchedule(subtasks: Subtask[]): Subtask[][] {
-    const levels: Subtask[][] = [];
-    const completed = new Set<string>();
-
-    while (completed.size < subtasks.length) {
-      const level: Subtask[] = [];
-
-      for (const subtask of subtasks) {
-        if (completed.has(subtask.id)) continue;
-
-        const depsCompleted = subtask.dependencies.every(
-          dep => completed.has(dep)
-        );
-
-        if (depsCompleted) {
-          level.push(subtask);
-        }
-      }
-
-      if (level.length === 0) {
-        throw new Error('Circular dependency detected');
-      }
-
-      for (const subtask of level) {
-        completed.add(subtask.id);
-      }
-
-      levels.push(level);
-    }
-
-    return levels;
-  }
-}
 ```
+┌─────────────────────────────────────────────────────────────────┐
+│              👥 MULTI-AGENT COORDINATOR                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   Tâche Complexe                                                │
+│        │                                                        │
+│        ▼                                                        │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │                   Décomposition                          │   │
+│   └─────────────────────────────────────────────────────────┘   │
+│        │                                                        │
+│        ▼                                                        │
+│   ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐           │
+│   │  Code   │  │  Test   │  │ Review  │  │   Doc   │           │
+│   │  Agent  │  │  Agent  │  │  Agent  │  │  Agent  │           │
+│   └────┬────┘  └────┬────┘  └────┬────┘  └────┬────┘           │
+│        │            │            │            │                 │
+│        └────────────┼────────────┼────────────┘                 │
+│                     ▼                                           │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │                   Agrégation                             │   │
+│   └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+| Agent | Spécialisation | Dépendances |
+|-------|----------------|-------------|
+| 💻 Code | Implémentation | - |
+| 🧪 Test | Tests unitaires/intégration | Code |
+| 🔍 Review | Qualité et sécurité | Code |
+| 📚 Doc | Documentation | Code, Test |
+| 🔒 Security | Audit sécurité | Code, Review |
 
 ---
 
-## 15.4 Couche Raisonnement
+## 15.4 🧠 Couche Raisonnement
 
-### 15.4.1 Intégration des Stratégies
+### 15.4.1 Moteur de Raisonnement Unifié
+
+Le moteur de raisonnement sélectionne automatiquement la stratégie optimale selon la complexité du problème.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│               🧠 REASONING ENGINE                                │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   Problème                                                      │
+│       │                                                         │
+│       ▼                                                         │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │              Évaluation de Complexité                    │   │
+│   │   • Score < 0.3 → Direct                                 │   │
+│   │   • Bug fix + Tests → Iterative Repair                   │   │
+│   │   • Branching > 5 → MCTS                                 │   │
+│   │   • Exploration → Tree-of-Thought                        │   │
+│   └─────────────────────────────────────────────────────────┘   │
+│       │                                                         │
+│       ▼                                                         │
+│   ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐           │
+│   │ Direct  │  │   ToT   │  │  MCTS   │  │ Repair  │           │
+│   │         │  │  (Ch.4) │  │  (Ch.5) │  │  (Ch.6) │           │
+│   └─────────┘  └─────────┘  └─────────┘  └─────────┘           │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+| Stratégie | Cas d'Usage | Chapitre |
+|-----------|-------------|----------|
+| Direct | Tâches simples (score < 0.3) | - |
+| Tree-of-Thought | Exploration, "best solution" | Ch. 4 |
+| MCTS | Grand espace de solutions | Ch. 5 |
+| Iterative Repair | Bug fix avec tests | Ch. 6 |
+| Hybrid | Complexité maximale | Combinaison |
 
 ```typescript
 // src/agent/reasoning/reasoning-engine.ts
 
-import { TreeOfThought } from './tree-of-thought.js';
-import { MCTSReasoner } from './mcts.js';
-import { IterativeRepairEngine } from '../repair/iterative-repair.js';
-
 /**
- * Moteur de raisonnement unifié
- *
- * Sélectionne et combine les stratégies selon la tâche
+ * 🧠 Moteur de raisonnement unifié
  */
 export class ReasoningEngine {
   private tot: TreeOfThought;
   private mcts: MCTSReasoner;
   private repair: IterativeRepairEngine;
 
-  constructor(config: ReasoningConfig) {
-    this.tot = new TreeOfThought(config.tot);
-    this.mcts = new MCTSReasoner(config.mcts);
-    this.repair = new IterativeRepairEngine(config.repair);
-  }
-
   /**
-   * Raisonnement adaptatif
+   * 🎯 Raisonnement adaptatif
    */
-  async reason(
-    problem: Problem,
-    strategy?: ReasoningStrategy
-  ): Promise<Solution> {
-    // Sélection automatique si non spécifié
-    const selectedStrategy = strategy ?? this.selectStrategy(problem);
+  async reason(problem: Problem, strategy?: ReasoningStrategy): Promise<Solution> {
+    const selected = strategy ?? this.selectStrategy(problem);
 
-    switch (selectedStrategy) {
+    switch (selected) {
       case 'direct':
         return this.directReasoning(problem);
-
       case 'tree-of-thought':
         return this.tot.solve(problem);
-
       case 'mcts':
         return this.mcts.search(problem);
-
       case 'iterative-repair':
         return this.repair.repair(problem);
-
       case 'hybrid':
         return this.hybridReasoning(problem);
-
-      default:
-        throw new Error(`Unknown strategy: ${selectedStrategy}`);
     }
   }
 
   /**
-   * Sélection de la stratégie
+   * 📊 Sélection automatique de stratégie
    */
   private selectStrategy(problem: Problem): ReasoningStrategy {
-    // Analyse de la complexité
     const complexity = this.assessComplexity(problem);
 
-    if (complexity.score < 0.3) {
-      return 'direct';
-    }
-
-    if (problem.hasTests && problem.type === 'bug_fix') {
-      return 'iterative-repair';
-    }
-
-    if (complexity.branchingFactor > 5) {
-      return 'mcts';
-    }
-
-    if (complexity.requiresExploration) {
-      return 'tree-of-thought';
-    }
+    if (complexity.score < 0.3) return 'direct';
+    if (problem.hasTests && problem.type === 'bug_fix') return 'iterative-repair';
+    if (complexity.branchingFactor > 5) return 'mcts';
+    if (complexity.requiresExploration) return 'tree-of-thought';
 
     return 'direct';
   }
 
   /**
-   * Raisonnement direct (baseline)
-   */
-  private async directReasoning(problem: Problem): Promise<Solution> {
-    // Génération directe sans exploration
-    const response = await this.llm.generate({
-      prompt: problem.description,
-      maxTokens: problem.maxTokens
-    });
-
-    return {
-      content: response,
-      confidence: 0.7,
-      reasoning: ['direct generation']
-    };
-  }
-
-  /**
-   * Raisonnement hybride
+   * 🔀 Raisonnement hybride (ToT + MCTS + Repair)
    */
   private async hybridReasoning(problem: Problem): Promise<Solution> {
-    // 1. Exploration initiale avec ToT
+    // 1. Exploration avec ToT
     const candidates = await this.tot.explore(problem, { maxCandidates: 3 });
 
     // 2. Sélection avec MCTS
@@ -812,327 +574,159 @@ export class ReasoningEngine {
 
     return best;
   }
-
-  /**
-   * Évaluation de la complexité
-   */
-  private assessComplexity(problem: Problem): ComplexityAssessment {
-    let score = 0;
-    let branchingFactor = 1;
-    let requiresExploration = false;
-
-    // Indicateurs de complexité
-    if (problem.description.length > 500) score += 0.2;
-    if (problem.description.includes('architecture')) score += 0.3;
-    if (problem.description.includes('multiple')) score += 0.2;
-    if (problem.filesInvolved > 3) score += 0.2;
-
-    // Facteur de branchement
-    if (problem.type === 'design') branchingFactor = 5;
-    if (problem.type === 'refactoring') branchingFactor = 3;
-
-    // Besoin d'exploration
-    if (problem.type === 'optimization') requiresExploration = true;
-    if (problem.description.includes('best')) requiresExploration = true;
-
-    return {
-      score: Math.min(1, score),
-      branchingFactor,
-      requiresExploration
-    };
-  }
 }
-
-type ReasoningStrategy =
-  | 'direct'
-  | 'tree-of-thought'
-  | 'mcts'
-  | 'iterative-repair'
-  | 'hybrid';
 ```
 
 ---
 
-## 15.5 Couche Contexte et Mémoire
+## 15.5 💾 Couche Contexte & Mémoire
 
 ### 15.5.1 Pipeline RAG Complet
 
-```typescript
-// src/context/rag-pipeline.ts
+Le pipeline RAG intègre la récupération avec dépendances (Ch. 8), la compression (Ch. 9), et le cache sémantique (Ch. 12).
 
-import { DependencyAwareRAG } from './dependency-aware-rag.js';
-import { ContextCompressor } from './context-compressor.js';
-import { SemanticCache } from '../utils/semantic-cache.js';
-
-/**
- * Pipeline RAG complet
- *
- * 1. Récupération (Retrieval)
- * 2. Augmentation (Augmentation)
- * 3. Génération (Generation)
- */
-export class RAGPipeline {
-  private retriever: DependencyAwareRAG;
-  private compressor: ContextCompressor;
-  private cache: SemanticCache;
-
-  constructor(config: RAGConfig) {
-    this.retriever = new DependencyAwareRAG(config);
-    this.compressor = new ContextCompressor(config.compression);
-    this.cache = new SemanticCache(config.cachePath);
-  }
-
-  /**
-   * Récupération du contexte pour une requête
-   */
-  async getContext(query: string): Promise<RetrievedContext> {
-    // 1. Vérification du cache
-    const cached = await this.cache.get(query);
-    if (cached) {
-      return cached;
-    }
-
-    // 2. Récupération avec dépendances
-    const rawContext = await this.retriever.retrieve(query, {
-      maxFiles: 20,
-      includeImports: true,
-      includeCallers: true
-    });
-
-    // 3. Compression
-    const compressed = await this.compressor.compress(rawContext, {
-      targetTokens: 4000,
-      preservePriority: ['definitions', 'relevant_code']
-    });
-
-    // 4. Mise en cache
-    await this.cache.set(query, compressed);
-
-    return compressed;
-  }
-
-  /**
-   * Recherche de fichiers avec embedding
-   */
-  async searchFiles(
-    query: string,
-    options: SearchOptions
-  ): Promise<FileMatch[]> {
-    // Embedding de la requête
-    const queryEmbedding = await this.embedQuery(query);
-
-    // Recherche dans l'index
-    const matches = await this.retriever.searchByEmbedding(
-      queryEmbedding,
-      options.limit
-    );
-
-    // Expansion par dépendances
-    const expanded = await this.expandWithDependencies(matches);
-
-    return expanded;
-  }
-
-  /**
-   * Expansion par dépendances
-   */
-  private async expandWithDependencies(
-    matches: FileMatch[]
-  ): Promise<FileMatch[]> {
-    const expanded: FileMatch[] = [...matches];
-    const seen = new Set(matches.map(m => m.path));
-
-    for (const match of matches) {
-      // Récupération des dépendances
-      const deps = await this.retriever.getDependencies(match.path);
-
-      for (const dep of deps) {
-        if (!seen.has(dep.path)) {
-          seen.add(dep.path);
-          expanded.push({
-            ...dep,
-            score: match.score * 0.7  // Score réduit pour les dépendances
-          });
-        }
-      }
-    }
-
-    return expanded.sort((a, b) => b.score - a.score);
-  }
-}
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    📚 RAG PIPELINE                               │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   Query                                                         │
+│     │                                                           │
+│     ▼                                                           │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │  🔍 Cache Check (Semantic)                               │   │
+│   │     cosine similarity > 0.92 → cache hit                 │   │
+│   └─────────────────────────────────────────────────────────┘   │
+│     │ miss                                                      │
+│     ▼                                                           │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │  📖 Retrieval (Dependency-Aware)                         │   │
+│   │     • Embedding search                                   │   │
+│   │     • Import expansion                                   │   │
+│   │     • Caller context                                     │   │
+│   └─────────────────────────────────────────────────────────┘   │
+│     │                                                           │
+│     ▼                                                           │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │  🗜️ Compression                                          │   │
+│   │     • Priority-based retention                           │   │
+│   │     • Target: 4000 tokens                                │   │
+│   └─────────────────────────────────────────────────────────┘   │
+│     │                                                           │
+│     ▼                                                           │
+│   Context Enrichi                                               │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### 15.5.2 Gestionnaire de Mémoire Unifié
+### 15.5.2 Mémoire Unifiée
+
+La mémoire unifie les 4 types (Ch. 14) : épisodique, sémantique, procédurale, prospective.
 
 ```typescript
 // src/memory/unified-memory.ts
 
-import { MemorySystem } from './memory-system.js';
-import { EpisodicMemory } from './episodic-memory.js';
-import { SemanticMemory } from './semantic-memory.js';
-import { ProceduralMemory } from './procedural-memory.js';
-
 /**
- * Gestionnaire de mémoire unifié
- *
- * Point d'entrée unique pour toutes les opérations mémoire
+ * 💾 Gestionnaire de mémoire unifié
  */
 export class UnifiedMemory {
-  private system: MemorySystem;
-  private episodic: EpisodicMemory;
-  private semantic: SemanticMemory;
-  private procedural: ProceduralMemory;
-
-  constructor(storagePath: string) {
-    this.system = new MemorySystem(storagePath);
-    this.episodic = new EpisodicMemory(this.system);
-    this.semantic = new SemanticMemory(this.system);
-    this.procedural = new ProceduralMemory(this.system);
-  }
+  private episodic: EpisodicMemory;   // Conversations, erreurs
+  private semantic: SemanticMemory;   // Faits, préférences
+  private procedural: ProceduralMemory; // Workflows
+  private prospective: ProspectiveMemory; // Rappels
 
   /**
-   * Rappel contextuel unifié
+   * 🔍 Rappel contextuel unifié
    */
   async recall(context: string): Promise<UnifiedRecall> {
-    const [episodes, facts, procedures] = await Promise.all([
-      this.episodic.recallSimilarEpisodes(context, 3),
+    const [episodes, facts, procedure] = await Promise.all([
+      this.episodic.recallSimilar(context, 3),
       this.semantic.getFactsAbout(context),
-      this.procedural.findApplicableProcedure(context)
+      this.procedural.findApplicable(context)
     ]);
 
     return {
       episodes,
       facts,
-      suggestedProcedure: procedures,
-      summary: this.summarize(episodes, facts, procedures)
+      suggestedProcedure: procedure,
+      summary: this.summarize(episodes, facts, procedure)
     };
   }
 
   /**
-   * Apprentissage unifié
+   * 📝 Apprentissage unifié
    */
   async learn(event: LearningEvent): Promise<void> {
     // Enregistrement épisodique
-    await this.episodic.recordEpisode(event);
+    await this.episodic.record(event);
 
     // Extraction de faits
-    await this.semantic.learnFromEpisodes([event]);
+    await this.semantic.learnFromEpisode(event);
 
     // Apprentissage procédural si applicable
     if (event.toolSequence && event.success) {
-      await this.procedural.learnFromToolSequence(
+      await this.procedural.learnFromSequence(
         event.toolSequence,
-        event.context,
-        event.success
+        event.context
       );
     }
-  }
-
-  /**
-   * Génération de résumé
-   */
-  private summarize(
-    episodes: Episode[],
-    facts: Fact[],
-    procedure: Procedure | null
-  ): string {
-    const parts: string[] = [];
-
-    if (episodes.length > 0) {
-      parts.push(`Recent: ${episodes[0].summary}`);
-    }
-
-    if (facts.length > 0) {
-      const topFact = facts[0];
-      parts.push(`Known: ${topFact.subject} ${topFact.predicate} ${topFact.object}`);
-    }
-
-    if (procedure) {
-      parts.push(`Suggested: ${procedure.name}`);
-    }
-
-    return parts.join(' | ') || 'No relevant context';
   }
 }
 ```
 
 ---
 
-## 15.6 Couche Actions (Outils)
+## 15.6 ⚡ Couche Actions (Outils)
 
 ### 15.6.1 Registre d'Outils
+
+Le registre centralise les **41 outils** intégrés avec validation, métriques, et définitions API.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                  ⚡ TOOL REGISTRY (41 outils)                    │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   📁 Fichiers           🔍 Recherche          ⚙️ Exécution       │
+│   ├─ Read               ├─ Glob               ├─ Bash           │
+│   ├─ Write              ├─ Grep               ├─ TestRunner     │
+│   ├─ Edit               ├─ SymbolSearch       └─ ...            │
+│   ├─ MultiEdit          └─ ...                                  │
+│   └─ ...                                                        │
+│                                                                 │
+│   📊 Analyse            🔌 Intégration        🛠️ Refactoring     │
+│   ├─ DependencyAnalyzer ├─ MCPClient          ├─ RenameSymbol   │
+│   ├─ ASTParser          ├─ PluginLoader       ├─ ExtractMethod  │
+│   └─ ...                └─ ...                └─ ...            │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+| Catégorie | Outils | Exemples |
+|-----------|--------|----------|
+| 📁 Fichiers | 8 | Read, Write, Edit, MultiEdit, Delete, Move, Copy, Mkdir |
+| 🔍 Recherche | 6 | Glob, Grep, SymbolSearch, FindReferences, FindDefinition |
+| ⚙️ Exécution | 4 | Bash, TestRunner, Npm, Git |
+| 📊 Analyse | 5 | DependencyAnalyzer, ASTParser, TypeChecker, Linter |
+| 🛠️ Refactoring | 6 | RenameSymbol, ExtractMethod, InlineVariable, MoveFile |
+| 🔌 Intégration | 12+ | MCP servers, plugins dynamiques |
 
 ```typescript
 // src/tools/registry.ts
 
 /**
- * Registre centralisé des outils
- *
- * - Enregistrement dynamique
- * - Définitions pour l'API
- * - Validation des paramètres
- * - Métriques d'utilisation
+ * ⚡ Registre centralisé des outils
  */
 export class ToolRegistry {
   private tools: Map<string, Tool> = new Map();
   private metrics: Map<string, ToolMetrics> = new Map();
 
   constructor() {
-    this.registerBuiltinTools();
+    this.registerBuiltinTools();  // 41 outils
   }
 
   /**
-   * Enregistrement des outils intégrés
-   */
-  private registerBuiltinTools(): void {
-    // Outils de fichiers
-    this.register(new ReadTool());
-    this.register(new WriteTool());
-    this.register(new EditTool());
-    this.register(new MultiEditTool());
-
-    // Outils de recherche
-    this.register(new GlobTool());
-    this.register(new GrepTool());
-    this.register(new SymbolSearchTool());
-
-    // Outils d'exécution
-    this.register(new BashTool());
-    this.register(new TestRunnerTool());
-
-    // Outils d'analyse
-    this.register(new DependencyAnalyzerTool());
-    this.register(new RefactoringTool());
-
-    // Total : 41 outils intégrés
-  }
-
-  /**
-   * Enregistrement d'un outil
-   */
-  register(tool: Tool): void {
-    this.tools.set(tool.name, tool);
-    this.metrics.set(tool.name, {
-      calls: 0,
-      successes: 0,
-      totalDuration: 0,
-      lastUsed: 0
-    });
-  }
-
-  /**
-   * Récupération d'un outil
-   */
-  get(name: string): Tool {
-    const tool = this.tools.get(name);
-    if (!tool) {
-      throw new Error(`Tool not found: ${name}`);
-    }
-    return tool;
-  }
-
-  /**
-   * Définitions pour l'API (format OpenAI/Grok)
+   * 📋 Définitions pour l'API (format OpenAI/Grok)
    */
   getDefinitions(): ToolDefinition[] {
     return Array.from(this.tools.values()).map(tool => ({
@@ -1146,7 +740,7 @@ export class ToolRegistry {
   }
 
   /**
-   * Exécution avec métriques
+   * 🚀 Exécution avec métriques
    */
   async execute(name: string, params: unknown): Promise<ToolResult> {
     const tool = this.get(name);
@@ -1154,25 +748,17 @@ export class ToolRegistry {
     const startTime = Date.now();
 
     try {
-      // Validation des paramètres
       const validated = tool.validate(params);
-
-      // Exécution
       const result = await tool.execute(validated);
 
-      // Mise à jour des métriques
       metrics.calls++;
       metrics.successes++;
       metrics.totalDuration += Date.now() - startTime;
-      metrics.lastUsed = Date.now();
 
       return { success: true, value: result };
 
     } catch (error) {
       metrics.calls++;
-      metrics.totalDuration += Date.now() - startTime;
-      metrics.lastUsed = Date.now();
-
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error)
@@ -1181,132 +767,73 @@ export class ToolRegistry {
   }
 
   /**
-   * Statistiques globales
+   * 📊 Statistiques globales
    */
   getStats(): ToolStats {
-    const stats: ToolStats = {
-      totalTools: this.tools.size,
-      totalCalls: 0,
-      successRate: 0,
-      averageDuration: 0,
-      topTools: []
-    };
+    const topTools = [...this.metrics.entries()]
+      .sort((a, b) => b[1].calls - a[1].calls)
+      .slice(0, 10)
+      .map(([name, m]) => ({
+        name,
+        calls: m.calls,
+        successRate: m.calls > 0 ? m.successes / m.calls : 0,
+        avgDuration: m.calls > 0 ? m.totalDuration / m.calls : 0
+      }));
 
-    const toolMetrics: Array<[string, ToolMetrics]> = [];
-
-    for (const [name, metrics] of this.metrics) {
-      stats.totalCalls += metrics.calls;
-      toolMetrics.push([name, metrics]);
-    }
-
-    // Tri par utilisation
-    toolMetrics.sort((a, b) => b[1].calls - a[1].calls);
-
-    stats.topTools = toolMetrics.slice(0, 10).map(([name, m]) => ({
-      name,
-      calls: m.calls,
-      successRate: m.calls > 0 ? m.successes / m.calls : 0,
-      avgDuration: m.calls > 0 ? m.totalDuration / m.calls : 0
-    }));
-
-    // Calculs globaux
-    const totalSuccesses = toolMetrics.reduce((sum, [, m]) => sum + m.successes, 0);
-    const totalDuration = toolMetrics.reduce((sum, [, m]) => sum + m.totalDuration, 0);
-
-    stats.successRate = stats.totalCalls > 0 ? totalSuccesses / stats.totalCalls : 0;
-    stats.averageDuration = stats.totalCalls > 0 ? totalDuration / stats.totalCalls : 0;
-
-    return stats;
-  }
-}
-```
-
-### 15.6.2 Interface d'Outil Standard
-
-```typescript
-// src/tools/base-tool.ts
-
-/**
- * Interface de base pour tous les outils
- */
-export abstract class BaseTool implements Tool {
-  abstract name: string;
-  abstract description: string;
-  abstract schema: JSONSchema;
-
-  /**
-   * Validation des paramètres
-   */
-  validate(params: unknown): Record<string, unknown> {
-    const errors = validateSchema(this.schema, params);
-
-    if (errors.length > 0) {
-      throw new Error(`Validation failed: ${errors.join(', ')}`);
-    }
-
-    return params as Record<string, unknown>;
-  }
-
-  /**
-   * Exécution de l'outil
-   */
-  abstract execute(params: Record<string, unknown>): Promise<unknown>;
-
-  /**
-   * Description pour le prompt
-   */
-  getPromptDescription(): string {
-    return `${this.name}: ${this.description}`;
-  }
-}
-
-// Exemple d'implémentation
-export class ReadTool extends BaseTool {
-  name = 'Read';
-  description = 'Read the contents of a file';
-
-  schema = {
-    type: 'object',
-    properties: {
-      path: { type: 'string', description: 'File path to read' },
-      lines: { type: 'number', description: 'Max lines to read' }
-    },
-    required: ['path']
-  };
-
-  async execute(params: { path: string; lines?: number }): Promise<string> {
-    const content = await fs.readFile(params.path, 'utf-8');
-
-    if (params.lines) {
-      return content.split('\n').slice(0, params.lines).join('\n');
-    }
-
-    return content;
+    return { totalTools: this.tools.size, topTools };
   }
 }
 ```
 
 ---
 
-## 15.7 Couche Sécurité
+## 15.7 🔒 Couche Sécurité
 
 ### 15.7.1 Gestionnaire de Sécurité Unifié
+
+La sécurité est intégrée à chaque niveau avec 4 composants principaux.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    🔒 SECURITY MANAGER                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │
+│   │  Approval   │  │   Sandbox   │  │    Data     │            │
+│   │   Modes     │  │   Manager   │  │  Redaction  │            │
+│   └──────┬──────┘  └──────┬──────┘  └──────┬──────┘            │
+│          │                │                │                    │
+│          ▼                ▼                ▼                    │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │                   Audit Logger                           │   │
+│   │   • Toutes les actions sont journalisées                 │   │
+│   │   • Rétention configurable                               │   │
+│   │   • Export pour analyse                                  │   │
+│   └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+| Composant | Responsabilité | Configuration |
+|-----------|----------------|---------------|
+| 🚦 Approval Modes | 3 niveaux de permission | `.grok/approval-mode.json` |
+| 📦 Sandbox | Isolation des commandes | Conteneur/chroot |
+| 🔐 Data Redaction | Masquage données sensibles | Patterns regex |
+| 📋 Audit Logger | Journalisation complète | `.grok/audit.log` |
+
+**Les 3 modes d'approbation :**
+
+| Mode | Outils Lecture | Outils Écriture | Bash |
+|------|----------------|-----------------|------|
+| 🔴 read-only | ✅ Auto | ❌ Bloqué | ❌ Bloqué |
+| 🟡 auto | ✅ Auto | ⚠️ Règles | ⚠️ Règles |
+| 🟢 full-access | ✅ Auto | ✅ Auto | ✅ Auto |
 
 ```typescript
 // src/security/index.ts
 
-import { ApprovalModeManager } from './approval-modes.js';
-import { SandboxManager } from './sandbox.js';
-import { DataRedactor } from './data-redaction.js';
-import { AuditLogger } from './audit.js';
-
 /**
- * Gestionnaire de sécurité centralisé
- *
- * - Modes d'approbation (read-only, auto, full-access)
- * - Sandbox pour les commandes dangereuses
- * - Redaction des données sensibles
- * - Journalisation d'audit
+ * 🔒 Gestionnaire de sécurité centralisé
  */
 export class SecurityManager {
   private approval: ApprovalModeManager;
@@ -1314,74 +841,38 @@ export class SecurityManager {
   private redactor: DataRedactor;
   private audit: AuditLogger;
 
-  constructor(config: SecurityConfig) {
-    this.approval = new ApprovalModeManager(config.approvalMode);
-    this.sandbox = new SandboxManager(config.sandbox);
-    this.redactor = new DataRedactor(config.redaction);
-    this.audit = new AuditLogger(config.auditPath);
-  }
-
   /**
-   * Vérification d'une entrée utilisateur
-   */
-  async checkInput(input: string): Promise<SecurityCheck> {
-    // Redaction préventive
-    const redacted = this.redactor.redact(input);
-
-    // Détection de patterns dangereux
-    const dangerousPatterns = this.detectDangerousPatterns(input);
-
-    if (dangerousPatterns.length > 0) {
-      await this.audit.log('dangerous_input', { patterns: dangerousPatterns });
-
-      return {
-        allowed: false,
-        reason: `Dangerous patterns detected: ${dangerousPatterns.join(', ')}`
-      };
-    }
-
-    return { allowed: true };
-  }
-
-  /**
-   * Vérification d'un appel d'outil
+   * 🔍 Vérification d'un appel d'outil
    */
   async checkTool(toolCall: ToolCall): Promise<SecurityCheck> {
     const mode = this.approval.getCurrentMode();
 
-    // Mode read-only : bloquer les outils d'écriture
+    // 🔴 Mode read-only : bloquer les écritures
     if (mode === 'read-only' && this.isWriteTool(toolCall.name)) {
       return {
         allowed: false,
-        reason: `Tool ${toolCall.name} not allowed in read-only mode`,
+        reason: `Tool ${toolCall.name} blocked in read-only mode`,
         requiresApproval: true
       };
     }
 
-    // Mode auto : vérifier les règles
+    // 🟡 Mode auto : vérifier les règles
     if (mode === 'auto') {
-      const autoAllowed = this.approval.checkAutoRules(toolCall);
-      if (!autoAllowed.allowed) {
-        return {
-          allowed: false,
-          reason: autoAllowed.reason,
-          requiresApproval: true
-        };
+      const autoCheck = this.approval.checkAutoRules(toolCall);
+      if (!autoCheck.allowed) {
+        return { ...autoCheck, requiresApproval: true };
       }
     }
 
-    // Vérification du sandbox pour Bash
+    // 📦 Sandbox pour Bash
     if (toolCall.name === 'Bash') {
       const sandboxCheck = await this.sandbox.check(toolCall.params.command);
       if (!sandboxCheck.allowed) {
-        return {
-          allowed: false,
-          reason: sandboxCheck.reason
-        };
+        return sandboxCheck;
       }
     }
 
-    // Journalisation
+    // 📋 Journalisation
     await this.audit.log('tool_check', {
       tool: toolCall.name,
       allowed: true
@@ -1391,28 +882,12 @@ export class SecurityManager {
   }
 
   /**
-   * Redaction des résultats
-   */
-  redactOutput(output: string): string {
-    return this.redactor.redact(output);
-  }
-
-  /**
-   * Changement de mode
-   */
-  async setMode(mode: ApprovalMode): Promise<void> {
-    await this.approval.setMode(mode);
-    await this.audit.log('mode_change', { mode });
-  }
-
-  /**
-   * Détection des patterns dangereux
+   * ⚠️ Détection des patterns dangereux
    */
   private detectDangerousPatterns(input: string): string[] {
     const patterns = [
       { regex: /rm\s+-rf\s+\//, name: 'recursive delete root' },
       { regex: /:\(\)\{\s*:\|:\s*&\s*\}/, name: 'fork bomb' },
-      { regex: />\s*\/dev\/sda/, name: 'disk overwrite' },
       { regex: /curl.*\|\s*bash/, name: 'remote script execution' }
     ];
 
@@ -1420,158 +895,125 @@ export class SecurityManager {
       .filter(p => p.regex.test(input))
       .map(p => p.name);
   }
-
-  /**
-   * Vérification si outil d'écriture
-   */
-  private isWriteTool(name: string): boolean {
-    const writeTools = ['Write', 'Edit', 'MultiEdit', 'Bash', 'Delete', 'Move'];
-    return writeTools.includes(name);
-  }
-
-  /**
-   * Statistiques de sécurité
-   */
-  async getStats(): Promise<SecurityStats> {
-    const auditStats = await this.audit.getStats();
-
-    return {
-      currentMode: this.approval.getCurrentMode(),
-      ...auditStats
-    };
-  }
-}
-
-type ApprovalMode = 'read-only' | 'auto' | 'full-access';
-
-interface SecurityCheck {
-  allowed: boolean;
-  reason?: string;
-  requiresApproval?: boolean;
 }
 ```
 
 ---
 
-## 15.8 Diagramme d'Intégration Complet
+## 15.8 📊 Diagramme d'Intégration Complet
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        GROK-CLI ARCHITECTURE COMPLETE                       │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │                            USER INTERFACE                              │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │  │
-│  │  │ ChatInterface│  │ StatusBar   │  │ ToolProgress│  │ ErrorBoundary│   │  │
-│  │  └──────┬──────┘  └─────────────┘  └─────────────┘  └─────────────┘   │  │
-│  └─────────│─────────────────────────────────────────────────────────────┘  │
-│            │                                                                 │
-│            ▼                                                                 │
-│  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │                           ORCHESTRATION                                │  │
-│  │                                                                        │  │
-│  │    ┌──────────────────────────────────────────────────────────┐       │  │
-│  │    │                      GrokAgent                            │       │  │
-│  │    │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐     │       │  │
-│  │    │  │ Process │  │ Execute │  │ Stream  │  │ Memory  │     │       │  │
-│  │    │  │ Message │─▶│  Tools  │─▶│ Response│─▶│ Update  │     │       │  │
-│  │    │  └─────────┘  └─────────┘  └─────────┘  └─────────┘     │       │  │
-│  │    └──────────────────────────────────────────────────────────┘       │  │
-│  │                              │                                         │  │
-│  │    ┌─────────────────────────┼─────────────────────────┐              │  │
-│  │    │    MultiAgentCoordinator│                         │              │  │
-│  │    │  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐       │              │  │
-│  │    │  │Code │ │Test │ │Review│ │Doc  │ │Sec  │       │              │  │
-│  │    │  │Agent│ │Agent│ │Agent│ │Agent│ │Agent│       │              │  │
-│  │    │  └─────┘ └─────┘ └─────┘ └─────┘ └─────┘       │              │  │
-│  │    └─────────────────────────────────────────────────┘              │  │
-│  └───────────────────────────────────────────────────────────────────────┘  │
-│            │                                                                 │
-│            ▼                                                                 │
-│  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │                            REASONING                                   │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │  │
-│  │  │ Tree-of-    │  │    MCTS     │  │  Iterative  │  │   Hybrid    │   │  │
-│  │  │  Thought    │  │  Reasoner   │  │   Repair    │  │  Reasoning  │   │  │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘   │  │
-│  └───────────────────────────────────────────────────────────────────────┘  │
-│            │                                                                 │
-│            ▼                                                                 │
-│  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │                        CONTEXT & MEMORY                                │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │  │
-│  │  │ Dependency  │  │   Context   │  │   Semantic  │  │   Unified   │   │  │
-│  │  │  Aware RAG  │  │ Compressor  │  │    Cache    │  │   Memory    │   │  │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘   │  │
-│  │                                                                        │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                    │  │
-│  │  │  Episodic   │  │  Semantic   │  │ Procedural  │                    │  │
-│  │  │   Memory    │  │   Memory    │  │   Memory    │                    │  │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘                    │  │
-│  └───────────────────────────────────────────────────────────────────────┘  │
-│            │                                                                 │
-│            ▼                                                                 │
-│  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │                            ACTIONS                                     │  │
-│  │  ┌───────────────────────────────────────────────────────────────┐    │  │
-│  │  │                      Tool Registry (41 tools)                  │    │  │
-│  │  │  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐    │    │  │
-│  │  │  │Read │ │Write│ │Edit │ │Bash │ │Glob │ │Grep │ │Symbol│    │    │  │
-│  │  │  └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘    │    │  │
-│  │  └───────────────────────────────────────────────────────────────┘    │  │
-│  │                                                                        │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                    │  │
-│  │  │   Parallel  │  │     MCP     │  │   Plugin    │                    │  │
-│  │  │  Executor   │  │   Client    │  │   Loader    │                    │  │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘                    │  │
-│  └───────────────────────────────────────────────────────────────────────┘  │
-│            │                                                                 │
-│            ▼                                                                 │
-│  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │                            SECURITY                                    │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │  │
-│  │  │  Approval   │  │   Sandbox   │  │    Data     │  │    Audit    │   │  │
-│  │  │   Modes     │  │   Manager   │  │  Redaction  │  │   Logger    │   │  │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘   │  │
-│  └───────────────────────────────────────────────────────────────────────┘  │
-│            │                                                                 │
-│            ▼                                                                 │
-│  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │                          OPTIMIZATION                                  │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │  │
-│  │  │   Model     │  │    Lazy     │  │   Latency   │  │   Request   │   │  │
-│  │  │   Routing   │  │   Loading   │  │  Optimizer  │  │  Batching   │   │  │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘   │  │
-│  └───────────────────────────────────────────────────────────────────────┘  │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     🏗️ GROK-CLI ARCHITECTURE COMPLETE                    │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│   ┌─────────────────────────────────────────────────────────────────┐   │
+│   │  🖥️ USER INTERFACE                                               │   │
+│   │   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │   │
+│   │   │ Chat     │  │ Status   │  │ Tool     │  │ Error    │        │   │
+│   │   │ Interface│  │ Bar      │  │ Progress │  │ Boundary │        │   │
+│   │   └────┬─────┘  └──────────┘  └──────────┘  └──────────┘        │   │
+│   └────────│────────────────────────────────────────────────────────┘   │
+│            │                                                             │
+│            ▼                                                             │
+│   ┌─────────────────────────────────────────────────────────────────┐   │
+│   │  🎯 ORCHESTRATION                                                │   │
+│   │   ┌─────────────────────────────────────────────────────────┐   │   │
+│   │   │                    GrokAgent                             │   │   │
+│   │   │  ┌───────┐  ┌───────┐  ┌───────┐  ┌───────┐            │   │   │
+│   │   │  │Process│─▶│Execute│─▶│Stream │─▶│Memory │            │   │   │
+│   │   │  └───────┘  └───────┘  └───────┘  └───────┘            │   │   │
+│   │   └─────────────────────────────────────────────────────────┘   │   │
+│   │                                                                  │   │
+│   │   ┌─────────────────────────────────────────────────────────┐   │   │
+│   │   │            MultiAgent Coordinator                        │   │   │
+│   │   │  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐               │   │   │
+│   │   │  │Code │ │Test │ │Review│ │Doc │ │Sec  │               │   │   │
+│   │   │  └─────┘ └─────┘ └─────┘ └─────┘ └─────┘               │   │   │
+│   │   └─────────────────────────────────────────────────────────┘   │   │
+│   └─────────────────────────────────────────────────────────────────┘   │
+│            │                                                             │
+│            ▼                                                             │
+│   ┌─────────────────────────────────────────────────────────────────┐   │
+│   │  🧠 REASONING                                                    │   │
+│   │   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │   │
+│   │   │Tree-of-  │  │   MCTS   │  │ Iterative│  │  Hybrid  │        │   │
+│   │   │ Thought  │  │ Reasoner │  │  Repair  │  │ Reasoning│        │   │
+│   │   └──────────┘  └──────────┘  └──────────┘  └──────────┘        │   │
+│   └─────────────────────────────────────────────────────────────────┘   │
+│            │                                                             │
+│            ▼                                                             │
+│   ┌─────────────────────────────────────────────────────────────────┐   │
+│   │  💾 CONTEXT & MEMORY                                             │   │
+│   │   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │   │
+│   │   │Dependency│  │ Context  │  │ Semantic │  │ Unified  │        │   │
+│   │   │Aware RAG │  │Compressor│  │  Cache   │  │ Memory   │        │   │
+│   │   └──────────┘  └──────────┘  └──────────┘  └──────────┘        │   │
+│   │   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │   │
+│   │   │ Episodic │  │ Semantic │  │Procedural│  │Prospective│       │   │
+│   │   │  Memory  │  │  Memory  │  │  Memory  │  │  Memory  │        │   │
+│   │   └──────────┘  └──────────┘  └──────────┘  └──────────┘        │   │
+│   └─────────────────────────────────────────────────────────────────┘   │
+│            │                                                             │
+│            ▼                                                             │
+│   ┌─────────────────────────────────────────────────────────────────┐   │
+│   │  ⚡ ACTIONS                                                      │   │
+│   │   ┌─────────────────────────────────────────────────────────┐   │   │
+│   │   │              Tool Registry (41 tools)                    │   │   │
+│   │   │  ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐      │   │   │
+│   │   │  │Read│ │Write│ │Edit│ │Bash│ │Glob│ │Grep│ │Sym │      │   │   │
+│   │   │  └────┘ └────┘ └────┘ └────┘ └────┘ └────┘ └────┘      │   │   │
+│   │   └─────────────────────────────────────────────────────────┘   │   │
+│   │   ┌──────────┐  ┌──────────┐  ┌──────────┐                      │   │
+│   │   │ Parallel │  │   MCP    │  │  Plugin  │                      │   │
+│   │   │ Executor │  │  Client  │  │  Loader  │                      │   │
+│   │   └──────────┘  └──────────┘  └──────────┘                      │   │
+│   └─────────────────────────────────────────────────────────────────┘   │
+│            │                                                             │
+│            ▼                                                             │
+│   ┌─────────────────────────────────────────────────────────────────┐   │
+│   │  🔒 SECURITY                                                     │   │
+│   │   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │   │
+│   │   │ Approval │  │ Sandbox  │  │   Data   │  │  Audit   │        │   │
+│   │   │  Modes   │  │ Manager  │  │ Redaction│  │  Logger  │        │   │
+│   │   └──────────┘  └──────────┘  └──────────┘  └──────────┘        │   │
+│   └─────────────────────────────────────────────────────────────────┘   │
+│            │                                                             │
+│            ▼                                                             │
+│   ┌─────────────────────────────────────────────────────────────────┐   │
+│   │  🚀 OPTIMIZATION                                                 │   │
+│   │   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │   │
+│   │   │  Model   │  │   Lazy   │  │ Latency  │  │ Request  │        │   │
+│   │   │ Routing  │  │ Loading  │  │ Optimizer│  │ Batching │        │   │
+│   │   └──────────┘  └──────────┘  └──────────┘  └──────────┘        │   │
+│   └─────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 15.9 Configuration et Démarrage
+## 15.9 📈 Configuration et Démarrage
 
 ### 15.9.1 Fichiers de Configuration
 
-```typescript
-// Structure de configuration
+| Fichier | Portée | Contenu |
+|---------|--------|---------|
+| `.grok/settings.json` | Projet | Modèle, rounds, mémoire, outils |
+| `~/.grok/user-settings.json` | Utilisateur | Thème, éditeur, préférences |
+| `.grok/mcp.json` | Projet | Serveurs MCP |
+| `.grok/hooks.json` | Projet | Hooks d'événements |
+| `.grok/approval-mode.json` | Projet | Mode de sécurité actuel |
 
-// .grok/settings.json - Paramètres projet
+```json
+// .grok/settings.json
 {
   "model": "grok-3",
   "maxRounds": 30,
   "approvalMode": "auto",
   "memory": {
     "enabled": true,
-    "path": ".grok/memory.json",
     "consolidation": "daily"
-  },
-  "tools": {
-    "bash": {
-      "timeout": 30000,
-      "sandbox": true
-    }
   },
   "optimization": {
     "modelRouting": true,
@@ -1579,219 +1021,154 @@ interface SecurityCheck {
     "caching": true
   }
 }
-
-// ~/.grok/user-settings.json - Préférences utilisateur
-{
-  "theme": "dark",
-  "editor": "code",
-  "streaming": true,
-  "verbose": false
-}
-
-// .grok/mcp.json - Configuration MCP
-{
-  "servers": [
-    {
-      "name": "github",
-      "transport": "stdio",
-      "command": "node",
-      "args": ["./mcp-servers/github/index.js"]
-    }
-  ]
-}
-
-// .grok/hooks.json - Hooks d'événements
-{
-  "preToolUse": ["validate-paths"],
-  "postToolUse": ["log-to-file"],
-  "onError": ["notify-slack"]
-}
 ```
 
 ### 15.9.2 Séquence de Démarrage
 
-```typescript
-// src/index.ts
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    🚀 STARTUP SEQUENCE                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   Phase 1: Configuration ........................... ~5ms       │
+│   Phase 2: Security Manager ........................ ~10ms      │
+│   Phase 3: UI Minimal .............................. ~20ms      │
+│   Phase 4: Agent Init .............................. ~5ms       │
+│   ─────────────────────────────────────────────────────────     │
+│   Temps visible total .............................. ~40ms      │
+│                                                                 │
+│   Phase 5: Background Preload ...................... async      │
+│   • Heavy modules (RAG, MCTS, etc.)                             │
+│   • Semantic cache warmup                                       │
+│   • Memory load                                                 │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-import { moduleRegistry } from './performance/module-registry.js';
-import { SecurityManager } from './security/index.js';
+### 15.9.3 Dashboard de Métriques
 
-async function main() {
-  const startTime = Date.now();
-
-  console.log('Grok-CLI starting...');
-
-  // Phase 1 : Configuration (5ms)
-  const config = await loadConfig();
-
-  // Phase 2 : Sécurité (10ms)
-  const security = new SecurityManager(config.security);
-
-  // Phase 3 : Interface minimale (20ms)
-  const { ChatInterface } = await import('./ui/chat-interface.js');
-
-  // Phase 4 : Agent (5ms)
-  const { MemoryAwareAgent } = await import('./agent/memory-aware-agent.js');
-  const agent = new MemoryAwareAgent(config);
-  await agent.initialize();
-
-  // Temps visible : ~37ms
-  console.log(`Ready in ${Date.now() - startTime}ms`);
-
-  // Phase 5 : Préchargement arrière-plan
-  setImmediate(() => {
-    moduleRegistry.triggerPreload('session.start');
-  });
-
-  // Phase 6 : Boucle principale
-  const ui = new ChatInterface({ agent, config });
-  await ui.start();
-
-  // Arrêt propre
-  process.on('SIGINT', async () => {
-    await agent.shutdown();
-    process.exit(0);
-  });
-}
-
-main().catch(error => {
-  console.error('Fatal error:', error);
-  process.exit(1);
-});
+```
+┌────────────────────────────────────────────────────────────────┐
+│ 📊 GROK-CLI DASHBOARD                                          │
+├────────────────────────────────────────────────────────────────┤
+│ Session                                                        │
+│   Duration: 1h 23m 45s                                         │
+│   Requests: 47                                                 │
+│   Cost: $0.1234                                                │
+├────────────────────────────────────────────────────────────────┤
+│ Performance                                                    │
+│   Avg Latency: 245ms (P50)                                     │
+│   Cache Hit: 68.2%                                             │
+│   Cost Reduction: 42%                                          │
+├────────────────────────────────────────────────────────────────┤
+│ Tools                                                          │
+│   Total Calls: 156                                             │
+│   Success Rate: 98.7%                                          │
+│   Top: Read, Grep, Bash                                        │
+├────────────────────────────────────────────────────────────────┤
+│ Memory                                                         │
+│   Total: 234 memories                                          │
+│   User Confidence: 87%                                         │
+└────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 15.10 Métriques et Monitoring
+## 📝 15.10 Points Clés du Chapitre
 
-### 15.10.1 Tableau de Bord
+| Concept | Description | Impact |
+|---------|-------------|--------|
+| 🏗️ 6 Couches | Interface, Orchestration, Raisonnement, Contexte, Actions, Sécurité | Séparation des responsabilités |
+| 🎯 GrokAgent | Orchestrateur central avec boucle agentique | Max 30 rounds, streaming |
+| 👥 Multi-Agent | Décomposition en sous-tâches spécialisées | Parallélisme, expertise |
+| 🧠 Raisonnement | Sélection automatique ToT/MCTS/Repair | Adaptation à la complexité |
+| 💾 Mémoire Unifiée | 4 types : épisodique, sémantique, procédurale, prospective | Apprentissage continu |
+| ⚡ 41 Outils | Registre centralisé avec métriques | Extensibilité, monitoring |
+| 🔒 3 Modes | read-only, auto, full-access | Sécurité par défaut |
+| 🚀 Démarrage | 40ms visible, preload async | UX fluide |
 
-```typescript
-// src/commands/stats-command.ts
-
-export async function handleStatsCommand(
-  agent: MemoryAwareAgent,
-  args: string[]
-): Promise<string> {
-  const subcommand = args[0] || 'summary';
-
-  switch (subcommand) {
-    case 'summary':
-      return await formatSummary(agent);
-
-    case 'tools':
-      return await formatToolStats(agent);
-
-    case 'memory':
-      return await formatMemoryStats(agent);
-
-    case 'performance':
-      return await formatPerformanceStats(agent);
-
-    case 'security':
-      return await formatSecurityStats(agent);
-
-    default:
-      return 'Usage: /stats [summary|tools|memory|performance|security]';
-  }
-}
-
-async function formatSummary(agent: MemoryAwareAgent): Promise<string> {
-  const perf = agent.performanceManager.generateReport();
-  const mem = await agent.getMemoryStats();
-  const tools = agent.tools.getStats();
-
-  return `
-┌${'─'.repeat(60)}┐
-│ GROK-CLI DASHBOARD                                         │
-├${'─'.repeat(60)}┤
-│ Session                                                    │
-│   Duration: ${formatDuration(perf.summary.sessionDuration)}
-│   Requests: ${perf.summary.totalRequests}
-│   Cost: $${perf.summary.totalCost.toFixed(4)}
-├${'─'.repeat(60)}┤
-│ Performance                                                │
-│   Avg Latency: ${perf.latency.percentiles.p50}ms (P50)
-│   Cache Hit: ${(perf.summary.cacheHitRate * 100).toFixed(1)}%
-│   Cost Reduction: ${perf.optimization.costReduction.toFixed(0)}%
-├${'─'.repeat(60)}┤
-│ Tools                                                      │
-│   Total Calls: ${tools.totalCalls}
-│   Success Rate: ${(tools.successRate * 100).toFixed(1)}%
-│   Top: ${tools.topTools.slice(0, 3).map(t => t.name).join(', ')}
-├${'─'.repeat(60)}┤
-│ Memory                                                     │
-│   Total: ${mem.total} memories
-│   Confidence: ${(mem.userConfidence * 100).toFixed(0)}%
-└${'─'.repeat(60)}┘
-  `.trim();
-}
+```
+┌─────────────────────────────────────────────────────────────────┐
+│             📊 RÉCAPITULATIF ARCHITECTURE                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   1. PRINCIPES DE DESIGN                                        │
+│      ├─ Modularité (composants indépendants)                    │
+│      ├─ Extensibilité (plugins, MCP)                            │
+│      ├─ Observabilité (métriques, logs, audit)                  │
+│      ├─ Sécurité par défaut (3 modes)                           │
+│      └─ Performance (lazy loading, cache)                       │
+│                                                                 │
+│   2. FLUX DE DONNÉES                                            │
+│      Input → Security → Context → Model                         │
+│      Model → Tools → Parallel Execution                         │
+│      Results → Memory → Streaming Output                        │
+│                                                                 │
+│   3. OPTIMISATIONS MESURÉES                                     │
+│      ├─ Démarrage : 3s → 40ms (-98%)                            │
+│      ├─ Coûts API : -68% (routing + cache)                      │
+│      ├─ Latence : -64% (parallélisation)                        │
+│      └─ Mémoire : apprentissage continu                         │
+│                                                                 │
+│   4. EXTENSIBILITÉ                                              │
+│      ├─ Nouveaux outils via ToolRegistry                        │
+│      ├─ Serveurs MCP (stdio/HTTP)                               │
+│      ├─ Agents spécialisés (PDF, Excel, SQL)                    │
+│      └─ Hooks pour événements                                   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 15.11 Points Clés du Chapitre
+## 🏋️ Exercices
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│       RÉCAPITULATIF : ARCHITECTURE GROK-CLI                 │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  1. SIX COUCHES D'ARCHITECTURE                              │
-│     ├─ Interface (React/Ink)                                │
-│     ├─ Orchestration (GrokAgent)                            │
-│     ├─ Raisonnement (ToT/MCTS/Repair)                       │
-│     ├─ Contexte & Mémoire (RAG/Persistence)                 │
-│     ├─ Actions (41 outils + MCP)                            │
-│     └─ Sécurité (Permissions/Sandbox/Audit)                 │
-│                                                             │
-│  2. PRINCIPES DE DESIGN                                     │
-│     ├─ Modularité (composants indépendants)                 │
-│     ├─ Extensibilité (plugins, MCP)                         │
-│     ├─ Observabilité (métriques, logs)                      │
-│     ├─ Sécurité par défaut (3 modes)                        │
-│     └─ Performance (lazy loading, cache)                    │
-│                                                             │
-│  3. FLUX DE DONNÉES                                         │
-│     ├─ Input → Security → Context → Model                   │
-│     ├─ Model → Tools → Parallel Execution                   │
-│     ├─ Results → Memory → Streaming Output                  │
-│     └─ Boucle agentique (max 30 rounds)                     │
-│                                                             │
-│  4. OPTIMISATIONS                                           │
-│     ├─ Démarrage : 3s → 37ms                                │
-│     ├─ Coûts : -68% (routing + cache)                       │
-│     ├─ Latence : -64% (parallélisation)                     │
-│     └─ Mémoire : apprentissage continu                      │
-│                                                             │
-│  5. EXTENSIBILITÉ                                           │
-│     ├─ Nouveaux outils via ToolRegistry                     │
-│     ├─ Serveurs MCP (stdio/HTTP)                            │
-│     ├─ Agents spécialisés (PDF, Excel, SQL)                 │
-│     └─ Hooks pour événements                                │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
+### Exercice 1 : Ajouter un Nouvel Outil
+Créez un outil `JsonValidator` qui valide un fichier JSON contre un schéma.
+
+### Exercice 2 : Agent Spécialisé
+Implémentez un agent spécialisé pour l'analyse de performance (profiling).
+
+### Exercice 3 : Hook Personnalisé
+Créez un hook `postToolUse` qui mesure la durée des outils et alerte si > 5s.
+
+### Exercice 4 : Mode de Sécurité
+Ajoutez un mode `team` avec approbation multi-utilisateur.
+
+### Exercice 5 : Dashboard Étendu
+Étendez le dashboard avec des graphiques de tendance (latence, coûts).
 
 ---
 
-## Épilogue : Le Voyage Continue
+## 📚 Références
 
-Lina ferma la dernière diapositive. L'équipe restait silencieuse, absorbant l'immensité de ce qu'ils venaient de voir.
+| Source | Description |
+|--------|-------------|
+| React + Ink | [Ink Documentation](https://github.com/vadimdemedes/ink) |
+| OpenAI Tool Use | [Function Calling Guide](https://platform.openai.com/docs/guides/function-calling) |
+| MCP Protocol | [Model Context Protocol Spec](https://spec.modelcontextprotocol.io) |
+| AgentBench | Benchmark agents LLM (2024) |
+| Claude Code | Architecture de référence |
 
-— "C'est... beaucoup," admit Marcus, l'un des nouveaux développeurs.
+---
+
+## 🌅 Épilogue : Le Voyage Continue
+
+Lina ferma la dernière diapositive. L'équipe restait silencieuse.
+
+— "C'est... beaucoup," admit Marcus.
 
 Lina sourit.
 
-— "Ça l'est. Mais souviens-toi : tout a commencé par quelques lignes de code. Un appel API. Une boucle while. Ce n'est que l'accumulation de petites décisions, chaque jour, qui a créé cet ensemble."
+— "Ça l'est. Mais souviens-toi : tout a commencé par quelques lignes de code. Un appel API. Une boucle while. Ce n'est que l'accumulation de petites décisions qui a créé cet ensemble."
 
 Elle regarda par la fenêtre.
 
-— "Et ce n'est pas fini. Il y a encore tant à améliorer. De nouveaux modèles arrivent. De nouvelles techniques de raisonnement émergent. Les utilisateurs trouvent des cas d'usage auxquels nous n'avions jamais pensé."
+— "Et ce n'est pas fini. De nouveaux modèles arrivent. De nouvelles techniques émergent. Les utilisateurs trouvent des cas d'usage auxquels nous n'avions jamais pensé."
 
 Elle se tourna vers l'équipe.
 
-— "L'architecture que vous voyez n'est pas une destination. C'est un instantané d'un voyage en cours. Demain, nous ajouterons quelque chose de nouveau. Nous corrigerons un bug. Nous optimiserons une fonction. Et dans un an, le schéma sur ce mur sera différent."
+— "L'architecture que vous voyez n'est pas une destination. C'est un instantané d'un voyage en cours. Demain, nous ajouterons quelque chose de nouveau. Dans un an, le schéma sera différent."
 
 Elle fit une pause.
 
@@ -1799,23 +1176,21 @@ Elle fit une pause.
 
 ---
 
-## Conclusion du Livre
+## 🎓 Conclusion du Livre
 
-À travers ces quinze chapitres, nous avons parcouru le voyage complet de construction d'un agent LLM moderne. De la compréhension des fondamentaux des transformers jusqu'à l'architecture complète d'un système de production, chaque étape a construit sur la précédente.
+À travers ces quinze chapitres, nous avons parcouru le voyage complet de construction d'un agent LLM moderne.
 
-Les leçons clés :
+**Les 5 leçons clés :**
 
-1. **Les LLMs ne sont que le début** — La vraie valeur vient de l'architecture qui les entoure : outils, mémoire, raisonnement, sécurité.
+| # | Leçon | Application |
+|---|-------|-------------|
+| 1 | Les LLMs ne sont que le début | La valeur vient de l'architecture : outils, mémoire, raisonnement |
+| 2 | L'itération bat la perfection | Chaque fonctionnalité résout un problème réel |
+| 3 | La recherche informe la pratique | ToT, MCTS, ChatRepair, FrugalGPT = solutions concrètes |
+| 4 | La sécurité n'est pas optionnelle | Intégrée dès le début, pas en afterthought |
+| 5 | L'apprentissage est continu | Comme l'agent lui-même |
 
-2. **L'itération bat la perfection** — Grok-CLI n'est pas né complet. Chaque fonctionnalité a été ajoutée pour résoudre un problème réel.
-
-3. **La recherche informe la pratique** — Les publications scientifiques (ToT, MCTS, ChatRepair, FrugalGPT) ne sont pas que théoriques. Elles offrent des solutions concrètes aux problèmes réels.
-
-4. **La sécurité n'est pas optionnelle** — Un agent puissant sans garde-fous est un risque. La sécurité doit être intégrée dès le début.
-
-5. **L'apprentissage est continu** — Comme l'agent lui-même, les développeurs doivent continuer à apprendre, à s'adapter, à évoluer.
-
-Le code de Grok-CLI est open-source. Explorez-le. Modifiez-le. Construisez dessus. Et peut-être qu'un jour, vous ajouterez le prochain chapitre à cette histoire.
+Le code de Grok-CLI est open-source. Explorez-le. Modifiez-le. Construisez dessus.
 
 *Fin.*
 
@@ -1823,6 +1198,6 @@ Le code de Grok-CLI est open-source. Explorez-le. Modifiez-le. Construisez dessu
 
 *Merci d'avoir lu "Construire un Agent LLM Moderne — De la Théorie à Grok-CLI".*
 
-*Pour contribuer au projet : github.com/grok-cli*
-*Pour des questions : discussions sur le repository*
-*Pour signaler des erreurs : issues sur le repository*
+---
+
+[⬅️ Chapitre 14 : Apprentissage Persistant](14-apprentissage-persistant.md) | [📚 Table des Matières](README.md)
