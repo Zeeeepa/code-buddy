@@ -3,6 +3,7 @@ import * as path from "path";
 import axios from "axios";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { getErrorMessage } from "../types/index.js";
 
 const execAsync = promisify(exec);
 
@@ -59,12 +60,12 @@ export class ContextMentionParser {
             const placeholder = `[${type.toUpperCase()}: ${value}]`;
             expandedText = expandedText.replace(original, placeholder);
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           contexts.push({
             type: type as MentionContext["type"],
             original,
             resolved: value,
-            error: error.message,
+            error: getErrorMessage(error),
           });
         }
       }
@@ -161,8 +162,8 @@ export class ContextMentionParser {
         resolved: url,
         content: `URL ${url}:\n${content}`,
       };
-    } catch (error: any) {
-      throw new Error(`Failed to fetch URL: ${error.message}`);
+    } catch (error: unknown) {
+      throw new Error(`Failed to fetch URL: ${getErrorMessage(error)}`);
     }
   }
 
@@ -233,8 +234,8 @@ export class ContextMentionParser {
         resolved: command,
         content: `Git ${command}:\n\`\`\`\n${stdout || stderr || "(empty)"}\n\`\`\``,
       };
-    } catch (error: any) {
-      throw new Error(`Git command failed: ${error.message}`);
+    } catch (error: unknown) {
+      throw new Error(`Git command failed: ${getErrorMessage(error)}`);
     }
   }
 
@@ -265,8 +266,8 @@ export class ContextMentionParser {
         resolved: symbol,
         content: `Symbol ${symbol} (from ${firstFile}):\n\`\`\`\n${symbolContent}\n\`\`\`\nAlso found in: ${files.slice(1, 5).join(", ")}${files.length > 5 ? ` (+${files.length - 5} more)` : ""}`,
       };
-    } catch (error: any) {
-      throw new Error(`Symbol search failed: ${error.message}`);
+    } catch (error: unknown) {
+      throw new Error(`Symbol search failed: ${getErrorMessage(error)}`);
     }
   }
 
@@ -324,8 +325,8 @@ export class ContextMentionParser {
         resolved: query,
         content: `Search results for "${query}":\n\`\`\`\n${stdout || "(no matches)"}\n\`\`\``,
       };
-    } catch (error: any) {
-      throw new Error(`Search failed: ${error.message}`);
+    } catch (error: unknown) {
+      throw new Error(`Search failed: ${getErrorMessage(error)}`);
     }
   }
 

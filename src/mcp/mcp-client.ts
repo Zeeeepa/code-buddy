@@ -3,6 +3,7 @@ import { EventEmitter } from 'events';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { getErrorMessage } from '../types/index.js';
 
 /**
  * MCP (Model Context Protocol) Client
@@ -111,8 +112,8 @@ export class MCPClient extends EventEmitter {
       if (config.enabled !== false) {
         try {
           await this.connect(config);
-        } catch (error: any) {
-          console.error(`Failed to connect to MCP server ${config.name}:`, error.message);
+        } catch (error: unknown) {
+          console.error(`Failed to connect to MCP server ${config.name}:`, getErrorMessage(error));
         }
       }
     }

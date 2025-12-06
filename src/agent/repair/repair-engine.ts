@@ -13,6 +13,7 @@
  */
 
 import { EventEmitter } from "events";
+import { getErrorMessage } from "../../types/index.js";
 import { GrokClient, GrokMessage } from "../../grok/client.js";
 import {
   Fault,
@@ -199,8 +200,8 @@ export class RepairEngine extends EventEmitter {
 
       this.emit("repair:session:end", { session, results });
       return results;
-    } catch (error: any) {
-      this.emit("repair:error", { error: error.message });
+    } catch (error: unknown) {
+      this.emit("repair:error", { error: getErrorMessage(error) });
       throw error;
     }
   }
@@ -322,8 +323,8 @@ export class RepairEngine extends EventEmitter {
       this.emit("repair:failure", { result });
       result.duration = Date.now() - startTime;
       return result;
-    } catch (error: any) {
-      result.reason = error.message;
+    } catch (error: unknown) {
+      result.reason = getErrorMessage(error);
       result.duration = Date.now() - startTime;
       return result;
     }
@@ -526,7 +527,7 @@ Please provide an improved fix that addresses the issues with the previous attem
         await this.fileWriter(patch.changes[0].file, originalContent);
 
         return result;
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Restore on error
         if (originalContent && this.fileWriter) {
           await this.fileWriter(patch.changes[0].file, originalContent);
@@ -534,7 +535,7 @@ Please provide an improved fix that addresses the issues with the previous attem
         return {
           ...defaultResult,
           success: false,
-          failingTests: [error.message],
+          failingTests: [getErrorMessage(error)],
         };
       }
     }

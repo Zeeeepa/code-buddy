@@ -2,14 +2,39 @@ export interface ToolResult {
   success: boolean;
   output?: string;
   error?: string;
-  data?: any;
+  data?: unknown;
 }
 
 export interface Tool {
   name: string;
   description: string;
-  execute: (...args: any[]) => Promise<ToolResult>;
+  execute: (...args: unknown[]) => Promise<ToolResult>;
 }
+
+/**
+ * Type guard for error objects
+ */
+export function isError(value: unknown): value is Error {
+  return value instanceof Error;
+}
+
+/**
+ * Extract error message from unknown error
+ */
+export function getErrorMessage(error: unknown): string {
+  if (isError(error)) {
+    return error.message;
+  }
+  if (typeof error === 'string') {
+    return error;
+  }
+  return String(error);
+}
+
+/**
+ * Type for generic record with unknown values
+ */
+export type UnknownRecord = Record<string, unknown>;
 
 export interface EditorCommand {
   command: 'view' | 'str_replace' | 'create' | 'insert' | 'undo_edit';

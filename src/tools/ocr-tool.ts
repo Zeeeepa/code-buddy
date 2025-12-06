@@ -349,7 +349,7 @@ export class OCRTool {
     for (const filePath of filePaths) {
       const result = await this.extractText(filePath, options);
       if (result.success) {
-        results.push({ file: filePath, text: result.data?.text });
+        results.push({ file: filePath, text: (result.data as { text?: string })?.text });
       } else {
         results.push({ file: filePath, error: result.error });
       }

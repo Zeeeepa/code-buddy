@@ -354,7 +354,7 @@ end try`;
     try {
       const textResult = await this.readText();
 
-      if (textResult.success && textResult.data?.type === 'text') {
+      if (textResult.success && (textResult.data as { type?: string })?.type === 'text') {
         return {
           success: true,
           output: 'Clipboard contains: text',

@@ -1,7 +1,7 @@
 import * as fs from "fs-extra";
 import * as path from "path";
 import { writeFile as writeFilePromise } from "fs/promises";
-import { ToolResult, EditorCommand } from "../types/index.js";
+import { ToolResult, EditorCommand, getErrorMessage } from "../types/index.js";
 import { ConfirmationService } from "../utils/confirmation-service.js";
 
 export class TextEditorTool {
@@ -110,10 +110,10 @@ export class TextEditorTool {
           error: `File or directory not found: ${filePath}`,
         };
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: `Error viewing ${filePath}: ${error.message}`,
+        error: `Error viewing ${filePath}: ${getErrorMessage(error)}`,
       };
     }
   }
@@ -209,10 +209,10 @@ export class TextEditorTool {
         success: true,
         output: diff,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: `Error replacing text in ${filePath}: ${error.message}`,
+        error: `Error replacing text in ${filePath}: ${getErrorMessage(error)}`,
       };
     }
   }
@@ -288,10 +288,10 @@ export class TextEditorTool {
         success: true,
         output: diff,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: `Error creating ${filePath}: ${error.message}`,
+        error: `Error creating ${filePath}: ${getErrorMessage(error)}`,
       };
     }
   }
@@ -380,10 +380,10 @@ export class TextEditorTool {
         success: true,
         output: diff,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: `Error replacing lines in ${filePath}: ${error.message}`,
+        error: `Error replacing lines in ${filePath}: ${getErrorMessage(error)}`,
       };
     }
   }
@@ -460,10 +460,10 @@ export class TextEditorTool {
         success: true,
         output: `Successfully inserted content at line ${insertLine} in ${filePath}`,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: `Error inserting content in ${filePath}: ${error.message}`,
+        error: `Error inserting content in ${filePath}: ${getErrorMessage(error)}`,
       };
     }
   }
@@ -509,10 +509,10 @@ export class TextEditorTool {
         success: true,
         output: `Successfully undid ${lastEdit.command} operation`,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: `Error undoing edit: ${error.message}`,
+        error: `Error undoing edit: ${getErrorMessage(error)}`,
       };
     }
   }

@@ -1,6 +1,7 @@
 import * as fs from "fs-extra";
 import * as path from "path";
 import { spawn } from "child_process";
+import { getErrorMessage } from "../types/index.js";
 
 export type HookEvent =
   | "PreToolUse"
@@ -194,8 +195,8 @@ export class HookManager {
             ? `${combinedResult.output}\n${result.output}`
             : result.output;
         }
-      } catch (error: any) {
-        console.warn(`Hook execution error: ${error.message}`);
+      } catch (error: unknown) {
+        console.warn(`Hook execution error: ${getErrorMessage(error)}`);
         // Continue with other hooks even if one fails
       }
     }
