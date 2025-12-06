@@ -1,23 +1,27 @@
 #!/usr/bin/env node
-import React from "react";
-import { render } from "ink";
 import { program } from "commander";
 import * as dotenv from "dotenv";
-import { GrokAgent } from "./agent/grok-agent.js";
-import ChatInterface from "./ui/components/chat-interface.js";
 import { getSettingsManager } from "./utils/settings-manager.js";
-import { ConfirmationService } from "./utils/confirmation-service.js";
-import { createMCPCommand } from "./commands/mcp.js";
 import type { ChatCompletionMessageParam } from "openai/resources/chat";
 
-// Import enhanced features
-import { initGrokProject, formatInitResult } from "./utils/init-project.js";
-import { getSecurityModeManager, SecurityMode } from "./security/security-modes.js";
-import { getContextLoader, ContextLoader } from "./context/context-loader.js";
-import { initializeRenderers, configureRenderContext } from "./renderers/index.js";
-import { initializePerformanceManager, getPerformanceManager } from "./performance/index.js";
-// Headless output utilities available for future use
-// import { createHeadlessResult, formatOutput, OutputFormat } from "./utils/headless-output.js";
+// Types for dynamically imported modules
+import type { GrokAgent as GrokAgentType } from "./agent/grok-agent.js";
+import type { SecurityMode } from "./security/security-modes.js";
+
+// Lazy imports for heavy modules - only loaded when needed
+const lazyImport = {
+  React: () => import("react"),
+  ink: () => import("ink"),
+  GrokAgent: () => import("./agent/grok-agent.js").then(m => m.GrokAgent),
+  ChatInterface: () => import("./ui/components/chat-interface.js").then(m => m.default),
+  ConfirmationService: () => import("./utils/confirmation-service.js").then(m => m.ConfirmationService),
+  createMCPCommand: () => import("./commands/mcp.js").then(m => m.createMCPCommand),
+  initProject: () => import("./utils/init-project.js"),
+  securityModes: () => import("./security/security-modes.js"),
+  contextLoader: () => import("./context/context-loader.js"),
+  renderers: () => import("./renderers/index.js"),
+  performance: () => import("./performance/index.js"),
+};
 
 // Load environment variables
 dotenv.config();
@@ -123,9 +127,11 @@ async function handleCommitAndPushHeadless(
   maxToolRounds?: number
 ): Promise<void> {
   try {
+    const GrokAgent = await lazyImport.GrokAgent();
     const agent = new GrokAgent(apiKey, baseURL, model, maxToolRounds);
 
     // Configure confirmation service for headless mode (auto-approve all operations)
+    const { ConfirmationService } = await import("./utils/confirmation-service.js");
     const confirmationService = ConfirmationService.getInstance();
     confirmationService.setSessionFlag("allOperations", true);
 
@@ -247,6 +253,7 @@ async function processPromptHeadless(
   selfHealEnabled: boolean = true
 ): Promise<void> {
   try {
+    const GrokAgent = await lazyImport.GrokAgent();
     const agent = new GrokAgent(apiKey, baseURL, model, maxToolRounds);
 
     // Configure self-healing
@@ -255,6 +262,7 @@ async function processPromptHeadless(
     }
 
     // Configure confirmation service for headless mode (auto-approve all operations)
+    const { ConfirmationService } = await import("./utils/confirmation-service.js");
     const confirmationService = ConfirmationService.getInstance();
     confirmationService.setSessionFlag("allOperations", true);
 
@@ -404,6 +412,7 @@ program
   .action(async (message, options) => {
     // Handle --init flag
     if (options.init) {
+      const { initGrokProject, formatInitResult } = await lazyImport.initProject();
       const result = initGrokProject();
       console.log(formatInitResult(result));
       process.exit(result.success ? 0 : 1);
@@ -422,14 +431,6 @@ program
     }
 
     try {
-      // Initialize rendering system
-      initializeRenderers();
-      configureRenderContext({
-        plain: options.plain,
-        noColor: options.color === false,
-        noEmoji: options.emoji === false,
-      });
-
       // Get API key from options, environment, or user settings
       const apiKey = options.apiKey || loadApiKey();
       const baseURL = options.baseUrl || loadBaseURL();
@@ -467,7 +468,17 @@ program
         return;
       }
 
-      // Interactive mode: launch UI
+      // Initialize rendering system (lazy load)
+      const { initializeRenderers, configureRenderContext } = await lazyImport.renderers();
+      initializeRenderers();
+      configureRenderContext({
+        plain: options.plain,
+        noColor: options.color === false,
+        noEmoji: options.emoji === false,
+      });
+
+      // Interactive mode: launch UI (lazy load heavy modules)
+      const GrokAgent = await lazyImport.GrokAgent();
       const agent = new GrokAgent(apiKey, baseURL, model, maxToolRounds);
 
       // Probe for tool support if requested
@@ -483,6 +494,7 @@ program
       if (options.securityMode) {
         const validModes: SecurityMode[] = ["suggest", "auto-edit", "full-auto"];
         if (validModes.includes(options.securityMode)) {
+          const { getSecurityModeManager } = await lazyImport.securityModes();
           const securityManager = getSecurityModeManager();
           securityManager.setMode(options.securityMode);
           console.log(`🛡️ Security mode: ${options.securityMode.toUpperCase()}`);
@@ -493,6 +505,7 @@ program
 
       // Configure dry-run mode
       if (options.dryRun) {
+        const { ConfirmationService } = await import("./utils/confirmation-service.js");
         const confirmationService = ConfirmationService.getInstance();
         confirmationService.setDryRunMode(true);
         console.log("🔍 Dry-run mode: ENABLED (changes will be previewed, not applied)");
@@ -500,6 +513,7 @@ program
 
       // Load context files if specified
       if (options.context) {
+        const { ContextLoader, getContextLoader } = await lazyImport.contextLoader();
         const { include, exclude } = ContextLoader.parsePatternString(options.context);
         const contextLoader = getContextLoader(process.cwd(), {
           patterns: include,
@@ -516,9 +530,11 @@ program
       if (options.cache === false) {
         console.log("📦 Response cache: DISABLED");
         // Disable performance caching when cache is disabled
+        const { getPerformanceManager } = await lazyImport.performance();
         getPerformanceManager({ enabled: false });
       } else {
         // Initialize performance optimizations (lazy loading, tool caching, request optimization)
+        const { initializePerformanceManager } = await lazyImport.performance();
         await initializePerformanceManager();
       }
 
@@ -537,6 +553,10 @@ program
         ? message.join(" ")
         : message;
 
+      // Lazy load React and Ink for UI
+      const React = await lazyImport.React();
+      const { render } = await lazyImport.ink();
+      const ChatInterface = await lazyImport.ChatInterface();
       render(React.createElement(ChatInterface, { agent, initialMessage }));
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -609,7 +629,19 @@ gitCommand
     }
   });
 
-// MCP command
-program.addCommand(createMCPCommand());
+// MCP command - stub for help, lazy load actual implementation
+program
+  .command("mcp")
+  .description("Manage MCP (Model Context Protocol) servers")
+  .allowUnknownOption()
+  .action(async (_options, command) => {
+    // Lazy load the full MCP command implementation
+    const { createMCPCommand } = await import("./commands/mcp.js");
+    const mcpCmd = createMCPCommand();
+
+    // Replace stub with real command and re-run
+    const args = process.argv.slice(2);
+    mcpCmd.parse(args, { from: 'user' });
+  });
 
 program.parse();
