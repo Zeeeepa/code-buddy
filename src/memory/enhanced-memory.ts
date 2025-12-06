@@ -19,6 +19,7 @@ import * as os from 'os';
 import * as crypto from 'crypto';
 import { getMemoryRepository, MemoryRepository } from '../database/repositories/memory-repository.js';
 import type { Memory as DBMemory, MemoryType as DBMemoryType } from '../database/schema.js';
+import { getEmbeddingProvider, EmbeddingProvider } from '../embeddings/embedding-provider.js';
 
 export interface MemoryEntry {
   id: string;
@@ -143,7 +144,7 @@ const DEFAULT_CONFIG: MemoryConfig = {
   minImportance: 0.1,
   autoSummarize: true,
   summarizeThreshold: 20,
-  embeddingEnabled: false,
+  embeddingEnabled: true, // Enable local embeddings with @xenova/transformers
   useSQLite: true, // SQLite by default
 };
 
@@ -160,6 +161,7 @@ export class EnhancedMemory extends EventEmitter {
   private currentProjectId: string | null = null;
   private decayIntervalId: ReturnType<typeof setInterval> | null = null;
   private dbRepository: MemoryRepository | null = null;
+  private embeddingProvider: EmbeddingProvider | null = null;
 
   constructor(config: Partial<MemoryConfig> = {}) {
     super();
@@ -173,6 +175,20 @@ export class EnhancedMemory extends EventEmitter {
       } catch {
         // Fallback to JSON if SQLite fails
         this.config.useSQLite = false;
+      }
+    }
+
+    // Initialize embedding provider if embeddings are enabled
+    if (this.config.embeddingEnabled) {
+      try {
+        this.embeddingProvider = getEmbeddingProvider({
+          provider: 'local', // Use @xenova/transformers by default
+          modelName: this.config.embeddingModel || 'Xenova/all-MiniLM-L6-v2',
+        });
+      } catch {
+        // Disable embeddings if provider fails
+        console.warn('Failed to initialize embedding provider, disabling embeddings');
+        this.config.embeddingEnabled = false;
       }
     }
 
@@ -439,19 +455,32 @@ export class EnhancedMemory extends EventEmitter {
   }
 
   /**
-   * Generate embedding (placeholder - would use actual embedding model)
+   * Generate embedding using @xenova/transformers (local) or fallback to hash
    */
   private async generateEmbedding(text: string): Promise<number[]> {
-    // In a real implementation, this would call an embedding API
-    // For now, return a simple hash-based pseudo-embedding
+    // Use real embedding provider if available
+    if (this.embeddingProvider) {
+      try {
+        const result = await this.embeddingProvider.embed(text);
+        // Convert Float32Array to number[]
+        return Array.from(result.embedding);
+      } catch (error) {
+        console.warn('Embedding generation failed, using fallback:', error);
+        // Fall through to hash-based fallback
+      }
+    }
+
+    // Fallback: hash-based pseudo-embedding (for when @xenova/transformers is not available)
     const hash = crypto.createHash('sha256').update(text).digest();
     const embedding: number[] = [];
 
-    for (let i = 0; i < 128; i++) {
+    for (let i = 0; i < 384; i++) { // 384 dimensions to match all-MiniLM-L6-v2
       embedding.push((hash[i % hash.length] / 255) * 2 - 1);
     }
 
-    return embedding;
+    // Normalize
+    const norm = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
+    return embedding.map(val => val / norm);
   }
 
   /**
