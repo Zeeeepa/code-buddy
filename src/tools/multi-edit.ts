@@ -1,5 +1,4 @@
 import * as fs from "fs-extra";
-import * as path from "path";
 import { writeFile as writeFilePromise } from "fs/promises";
 import { ToolResult } from "../types/index.js";
 import { ConfirmationService } from "../utils/confirmation-service.js";

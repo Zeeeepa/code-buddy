@@ -133,19 +133,25 @@ export interface PluginAPI {
   };
 }
 
-export type CommandHandler = (args: string[], context: any) => Promise<string | void>;
-export type HookHandler = (data: any) => Promise<any>;
+export interface CommandContext {
+  cwd: string;
+  env?: Record<string, string>;
+  [key: string]: unknown;
+}
+
+export type CommandHandler = (args: string[], context: CommandContext) => Promise<string | void>;
+export type HookHandler = (data: unknown) => Promise<unknown>;
 
 export interface ToolDefinition {
   description: string;
-  parameters: Record<string, any>;
-  execute: (params: any) => Promise<any>;
+  parameters: Record<string, unknown>;
+  execute: (params: Record<string, unknown>) => Promise<unknown>;
 }
 
 export interface ProviderDefinition {
   type: 'llm' | 'embedding' | 'tts' | 'stt';
   models?: string[];
-  execute: (request: any) => Promise<any>;
+  execute: (request: Record<string, unknown>) => Promise<unknown>;
 }
 
 export interface MarketplaceConfig {
@@ -711,7 +717,7 @@ export class PluginMarketplace extends EventEmitter {
   /**
    * Execute a plugin command
    */
-  async executeCommand(name: string, args: string[], context: any): Promise<string | void> {
+  async executeCommand(name: string, args: string[], context: CommandContext): Promise<string | void> {
     const cmd = this.commands.get(name);
     if (!cmd) {
       throw new Error(`Command not found: ${name}`);
@@ -723,7 +729,7 @@ export class PluginMarketplace extends EventEmitter {
   /**
    * Execute a plugin tool
    */
-  async executeTool(name: string, params: any): Promise<any> {
+  async executeTool(name: string, params: Record<string, unknown>): Promise<unknown> {
     const tool = this.tools.get(name);
     if (!tool) {
       throw new Error(`Tool not found: ${name}`);
@@ -735,7 +741,7 @@ export class PluginMarketplace extends EventEmitter {
   /**
    * Execute hooks
    */
-  async executeHooks(event: string, data: any): Promise<any> {
+  async executeHooks(event: string, data: unknown): Promise<unknown> {
     const handlers = this.hooks.get(event) || [];
     let result = data;
 

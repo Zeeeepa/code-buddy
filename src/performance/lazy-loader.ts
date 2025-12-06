@@ -307,7 +307,6 @@ export function registerCommonModules(loader: LazyLoader): void {
 
   // SQL engines
   loader.register('better-sqlite3', async () => {
-    // @ts-expect-error - Optional dependency
     const module = await import('better-sqlite3');
     return module.default || module;
   });

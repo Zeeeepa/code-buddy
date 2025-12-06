@@ -113,7 +113,7 @@ export interface RoutingDecision {
 export function classifyTaskComplexity(
   message: string,
   conversationHistory?: string[],
-  currentFile?: string
+  _currentFile?: string
 ): TaskClassification {
   const lowerMessage = message.toLowerCase();
   const totalContext = [message, ...(conversationHistory || [])].join(" ");
@@ -463,7 +463,7 @@ export class ModelRouter {
     let actualCost = 0;
     let maxPossibleCost = 0;
 
-    for (const [modelId, stats] of this.usageStats) {
+    for (const [_modelId, stats] of this.usageStats) {
       actualCost += stats.cost;
       maxPossibleCost +=
         (stats.tokens / 1_000_000) * maxCostModel.costPerMillionTokens * 1.5;

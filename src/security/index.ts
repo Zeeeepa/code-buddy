@@ -33,7 +33,7 @@ import { EventEmitter } from 'events';
 import { getApprovalModeManager, ApprovalMode, ApprovalResult, OperationRequest } from './approval-modes.js';
 import { getSandboxManager, SandboxResult } from './sandbox.js';
 import { getSecurityModeManager, SecurityMode } from './security-modes.js';
-import { DataRedactionEngine, RedactionResult, getDataRedactionEngine } from './data-redaction.js';
+import { RedactionResult, getDataRedactionEngine } from './data-redaction.js';
 
 // ============================================================================
 // Types
@@ -248,7 +248,7 @@ export class SecurityManager extends EventEmitter {
    */
   getSummary(): SecuritySummary {
     const approvalManager = getApprovalModeManager();
-    const securityManager = getSecurityModeManager();
+    const _securityManager = getSecurityModeManager(); // For future security mode info
 
     return {
       config: { ...this.config },

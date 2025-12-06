@@ -89,13 +89,13 @@ export function analyzeDependencies(calls: ToolCall[]): Map<string, string[]> {
 
   // Build a map of what each call produces/consumes
   const producers = new Map<string, string>(); // resource -> producer call ID
-  const consumers = new Map<string, string[]>(); // call ID -> resources it consumes
+  const _consumers = new Map<string, string[]>(); // call ID -> resources it consumes (future use)
 
   for (const call of calls) {
     dependencies.set(call.id, []);
 
     // Analyze arguments for file paths or references to other outputs
-    const args = JSON.stringify(call.arguments).toLowerCase();
+    const _args = JSON.stringify(call.arguments).toLowerCase();
 
     // Check for file operations - sequential file ops on same file need ordering
     if (call.name.toLowerCase().includes("write") ||
@@ -132,7 +132,7 @@ export function analyzeDependencies(calls: ToolCall[]): Map<string, string[]> {
           command.includes("npm run") ||
           command.includes("build")) {
         // Depends on all previous edits
-        for (const [id, otherCall] of calls.entries()) {
+        for (const [_idx, otherCall] of calls.entries()) {
           if (otherCall.id !== call.id &&
               (otherCall.name.toLowerCase().includes("write") ||
                otherCall.name.toLowerCase().includes("edit"))) {
@@ -171,7 +171,7 @@ export function groupByDependency(calls: ToolCall[]): ExecutionGroup[] {
   if (calls.length === 0) return [];
 
   const dependencies = analyzeDependencies(calls);
-  const callMap = new Map(calls.map((c) => [c.id, c]));
+  const _callMap = new Map(calls.map((c) => [c.id, c])); // Reserved for future dependency resolution
   const levels: ExecutionGroup[] = [];
   const assigned = new Set<string>();
 

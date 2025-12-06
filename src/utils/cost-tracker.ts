@@ -2,6 +2,7 @@ import * as fs from "fs-extra";
 import * as path from "path";
 import * as os from "os";
 import { EventEmitter } from "events";
+import { getAnalyticsRepository, AnalyticsRepository } from '../database/repositories/analytics-repository.js';
 
 export interface TokenUsage {
   inputTokens: number;
@@ -28,6 +29,8 @@ export interface CostConfig {
   alertThreshold?: number;     // Alert at this percentage of budget
   trackHistory: boolean;       // Store usage history
   historyDays: number;         // Days of history to keep
+  /** Use SQLite database instead of JSON files */
+  useSQLite: boolean;
 }
 
 export interface ModelPricing {
@@ -49,6 +52,7 @@ const DEFAULT_CONFIG: CostConfig = {
   trackHistory: true,
   historyDays: 30,
   alertThreshold: 0.8,
+  useSQLite: true, // SQLite by default
 };
 
 /**
@@ -61,6 +65,7 @@ export class CostTracker extends EventEmitter {
   private sessionUsage: TokenUsage[] = [];
   private history: TokenUsage[] = [];
   private sessionStart: Date;
+  private dbRepository: AnalyticsRepository | null = null;
 
   constructor(config: Partial<CostConfig> = {}) {
     super();
@@ -68,6 +73,16 @@ export class CostTracker extends EventEmitter {
     this.configPath = path.join(os.homedir(), ".grok", "cost-config.json");
     this.historyPath = path.join(os.homedir(), ".grok", "cost-history.json");
     this.sessionStart = new Date();
+
+    // Initialize SQLite repository if enabled
+    if (this.config.useSQLite) {
+      try {
+        this.dbRepository = getAnalyticsRepository();
+      } catch {
+        // Fallback to JSON if SQLite fails
+        this.config.useSQLite = false;
+      }
+    }
 
     this.loadConfig();
     this.loadHistory();
@@ -152,11 +167,29 @@ export class CostTracker extends EventEmitter {
     this.sessionUsage.push(usage);
     this.history.push(usage);
 
+    // Store in SQLite if enabled
+    if (this.dbRepository) {
+      const today = new Date().toISOString().split('T')[0];
+      this.dbRepository.recordAnalytics({
+        date: today,
+        model,
+        tokens_in: inputTokens,
+        tokens_out: outputTokens,
+        cost,
+        requests: 1,
+        tool_calls: 0,
+        errors: 0,
+        avg_response_time_ms: 0,
+        cache_hit_rate: 0,
+        session_count: 0,
+      });
+    }
+
     // Check budget alerts
     this.checkBudgetAlerts();
 
-    // Save history periodically
-    if (this.history.length % 10 === 0) {
+    // Save history periodically (only for JSON fallback)
+    if (!this.dbRepository && this.history.length % 10 === 0) {
       this.saveHistory();
     }
 

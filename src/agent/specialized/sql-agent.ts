@@ -5,9 +5,8 @@
  * Uses better-sqlite3 for in-memory SQL queries or alasql as fallback.
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdtempSync, rmSync } from 'fs';
-import { basename, extname, join } from 'path';
-import { tmpdir } from 'os';
+import { existsSync, readFileSync, writeFileSync, rmSync } from 'fs';
+import { basename, extname } from 'path';
 import {
   SpecializedAgent,
   SpecializedAgentConfig,
@@ -47,7 +46,6 @@ export class SQLAgent extends SpecializedAgent {
   async initialize(): Promise<void> {
     // Try to load better-sqlite3 first
     try {
-      // @ts-expect-error - Optional dependency
       const sqliteModule = await import('better-sqlite3');
       this.sqlite = sqliteModule.default || sqliteModule;
       this.isInitialized = true;

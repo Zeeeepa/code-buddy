@@ -6,7 +6,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { SemanticCache, CacheConfig, getApiCache } from '../utils/semantic-cache.js';
+import { SemanticCache } from '../utils/semantic-cache.js';
 import { ToolResult } from '../types/index.js';
 
 // ============================================================================

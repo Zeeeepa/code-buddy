@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { ToolResult } from '../types/index.js';
+import { ToolResult, getErrorMessage } from '../types/index.js';
 
 export type ExportFormat = 'json' | 'markdown' | 'html' | 'txt' | 'pdf';
 
@@ -8,7 +8,7 @@ export interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp?: string;
-  toolCalls?: any[];
+  toolCalls?: unknown[];
 }
 
 export interface ConversationExport {
@@ -93,10 +93,10 @@ export class ExportTool {
         output: `📤 Exported conversation to ${outputPath}`,
         data: { path: outputPath, format: options.format, size: content.length }
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: `Export failed: ${error.message}`
+        error: `Export failed: ${getErrorMessage(error)}`
       };
     }
   }
@@ -105,11 +105,25 @@ export class ExportTool {
    * Convert to JSON
    */
   private toJSON(conversation: ConversationExport, options: ExportOptions): string {
-    const data: any = {
+    interface ExportMessage {
+      role: string;
+      content: string;
+      timestamp?: string;
+      tool_calls?: unknown[];
+    }
+
+    interface ExportData {
+      title?: string;
+      exported_at: string;
+      messages: ExportMessage[];
+      metadata?: ConversationExport['metadata'];
+    }
+
+    const data: ExportData = {
       title: conversation.title,
       exported_at: conversation.timestamp,
       messages: conversation.messages.map(m => {
-        const msg: any = {
+        const msg: ExportMessage = {
           role: m.role,
           content: m.content
         };
@@ -418,10 +432,10 @@ export class ExportTool {
         output: `📤 HTML export created: ${htmlPath}\nNote: Install wkhtmltopdf for PDF export: sudo apt install wkhtmltopdf`,
         data: { path: htmlPath, format: 'html' }
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: `PDF export failed: ${error.message}`
+        error: `PDF export failed: ${getErrorMessage(error)}`
       };
     }
   }
@@ -430,7 +444,7 @@ export class ExportTool {
    * Export data to CSV
    */
   async exportToCSV(
-    data: Array<Record<string, any>>,
+    data: Array<Record<string, unknown>>,
     outputPath?: string
   ): Promise<ToolResult> {
     try {
@@ -470,10 +484,10 @@ export class ExportTool {
         output: `📤 Exported ${data.length} rows to CSV: ${filePath}`,
         data: { path: filePath, rows: data.length }
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: `CSV export failed: ${error.message}`
+        error: `CSV export failed: ${getErrorMessage(error)}`
       };
     }
   }
@@ -526,10 +540,10 @@ export class ExportTool {
         output: `📤 Exported ${snippets.length} code snippets:\n${summary}`,
         data: { snippets, directory: snippetDir }
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: `Code export failed: ${error.message}`
+        error: `Code export failed: ${getErrorMessage(error)}`
       };
     }
   }
@@ -565,10 +579,10 @@ export class ExportTool {
         success: true,
         output: `Exports in ${this.outputDir}:\n${list}`
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: `Failed to list exports: ${error.message}`
+        error: `Failed to list exports: ${getErrorMessage(error)}`
       };
     }
   }

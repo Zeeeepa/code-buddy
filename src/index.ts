@@ -516,7 +516,7 @@ program
       if (options.cache === false) {
         console.log("📦 Response cache: DISABLED");
         // Disable performance caching when cache is disabled
-        const perfManager = getPerformanceManager({ enabled: false });
+        getPerformanceManager({ enabled: false });
       } else {
         // Initialize performance optimizations (lazy loading, tool caching, request optimization)
         await initializePerformanceManager();

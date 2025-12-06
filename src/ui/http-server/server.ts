@@ -389,10 +389,18 @@ export class HttpServer {
       return div;
     }
 
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
     function formatContent(content) {
-      // Basic markdown-like formatting
-      return content
-        .replace(/\`\`\`([\\s\\S]*?)\`\`\`/g, '<pre><code>$1</code></pre>')
+      // First escape HTML to prevent XSS
+      let escaped = escapeHtml(content);
+      // Then apply markdown-like formatting on the escaped content
+      return escaped
+        .replace(/\`\`\`([^]*?)\`\`\`/g, '<pre><code>$1</code></pre>')
         .replace(/\`([^\`]+)\`/g, '<code>$1</code>')
         .replace(/\\n/g, '<br>');
     }

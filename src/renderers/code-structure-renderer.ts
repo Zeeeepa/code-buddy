@@ -8,7 +8,6 @@
  * - Variables
  */
 
-import stringWidth from 'string-width';
 import {
   Renderer,
   RenderContext,

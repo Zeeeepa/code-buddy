@@ -331,8 +331,8 @@ export class ExcelAgent extends SpecializedAgent {
     }
 
     const inputFile = task.inputFiles[0];
-    const inputExt = extname(inputFile).toLowerCase();
-    const outputExt = extname(task.outputFile).toLowerCase();
+    const _inputExt = extname(inputFile).toLowerCase();
+    const _outputExt = extname(task.outputFile).toLowerCase();
 
     // Read input
     const readResult = await this.readFile({ action: 'read', inputFiles: [inputFile] }, startTime);

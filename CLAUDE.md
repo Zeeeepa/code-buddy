@@ -84,6 +84,18 @@ User Input → ChatInterface (Ink/React) → GrokAgent → Grok API
 - **src/mcp/** - Model Context Protocol integration
 - **src/hooks/** - Event hooks system (PreToolUse, PostToolUse, etc.)
 - **src/memory/** - Persistent memory system
+- **src/database/** - SQLite database for persistent storage
+  - **src/database/schema.ts** - Database schema with 11 tables (memories, sessions, messages, etc.)
+  - **src/database/database-manager.ts** - Connection management, migrations, WAL mode
+  - **src/database/repositories/** - Repository pattern for each entity
+  - **src/database/migration.ts** - JSON to SQLite migration utility
+  - **src/database/integration.ts** - High-level API for database operations
+- **src/embeddings/** - Vector embeddings for semantic search
+  - **src/embeddings/embedding-provider.ts** - Local (transformers.js) or API-based embeddings
+- **src/learning/** - Persistent learning system
+  - **src/learning/persistent-learning.ts** - Repair strategies, conventions, tool effectiveness
+- **src/analytics/** - Analytics and cost tracking
+  - **src/analytics/persistent-analytics.ts** - Budget tracking, usage trends, cost alerts
 - **src/skills/** - Auto-activating specialized abilities
 - **src/utils/** - Utility modules
   - **src/utils/semantic-cache.ts** - Semantic API response caching (68% API reduction)
@@ -118,6 +130,11 @@ User Input → ChatInterface (Ink/React) → GrokAgent → Grok API
 - `ModelRouter` (src/optimization/model-routing.ts) - Tiered model routing for cost optimization (FrugalGPT)
 - `ParallelExecutor` (src/optimization/parallel-executor.ts) - Parallel tool execution with dependency analysis
 - `LatencyOptimizer` (src/optimization/latency-optimizer.ts) - Latency tracking and caching for flow state
+- `DatabaseManager` (src/database/database-manager.ts) - SQLite connection with WAL mode and migrations
+- `DatabaseIntegration` (src/database/integration.ts) - Unified API for all database operations
+- `EmbeddingProvider` (src/embeddings/embedding-provider.ts) - Vector embeddings (local/API/mock)
+- `PersistentLearning` (src/learning/persistent-learning.ts) - Continuous learning from repairs and tools
+- `PersistentAnalytics` (src/analytics/persistent-analytics.ts) - Cost tracking with budget alerts
 
 ### Research-Based Improvements
 
@@ -140,6 +157,34 @@ Based on recent scientific publications in AI-assisted software development:
 | Model Tier Routing | FrugalGPT (Stanford) | 30-70% cost reduction |
 | Parallel Tool Execution | LLMCompiler/AsyncLM | 2.5-4.6x speedup |
 | Latency Optimization | Replit/Human-AI research | Sub-500ms for flow state |
+| SQLite Persistence | Best practices | Reliable data storage with WAL mode |
+| Vector Embeddings | Sentence transformers | Real semantic search (384-dim) |
+| Persistent Learning | ML best practices | Continuous improvement from feedback |
+
+### Database System
+
+SQLite-based persistence with the following tables:
+
+| Table | Purpose |
+|-------|---------|
+| `memories` | Long-term memory with vector embeddings for semantic search |
+| `sessions` | Conversation sessions with cost tracking |
+| `messages` | Individual messages within sessions |
+| `code_embeddings` | Vector embeddings for code chunks (semantic code search) |
+| `tool_stats` | Tool usage statistics and success rates |
+| `repair_learning` | What repair strategies work for which error patterns |
+| `analytics` | Daily aggregated usage and cost data |
+| `conventions` | Learned coding conventions per project |
+| `checkpoints` | File checkpoints for undo/restore |
+| `checkpoint_files` | Individual file snapshots |
+| `cache` | General-purpose cache with TTL |
+
+Key features:
+- **WAL mode** for better concurrency
+- **Vector embeddings** for semantic search (local or API-based)
+- **Automatic migration** from JSON files
+- **Repository pattern** for clean data access
+- **Budget alerts** when costs exceed limits
 
 ### Slash Commands
 
@@ -163,11 +208,13 @@ Key interactive commands available during sessions:
 
 - `.grok/settings.json` - Project settings
 - `~/.grok/user-settings.json` - User settings
+- `~/.grok/grok.db` - SQLite database (memories, sessions, analytics, etc.)
+- `~/.grok/models/` - Local embedding models cache
 - `.grok/hooks.json` - Event hooks
 - `.grok/mcp.json` - MCP server configuration
 - `.grok/approval-mode.json` - Current approval mode
-- `.grok/cache/semantic-cache.json` - Cached API responses
-- `.grok/cache/tool-cache.json` - Cached tool results
+- `.grok/cache/semantic-cache.json` - Cached API responses (legacy, migrated to DB)
+- `.grok/cache/tool-cache.json` - Cached tool results (legacy, migrated to DB)
 
 ## Coding Conventions
 

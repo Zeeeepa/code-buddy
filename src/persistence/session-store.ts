@@ -2,6 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { ChatEntry } from '../agent/grok-agent.js';
+import { getSessionRepository, SessionRepository } from '../database/repositories/session-repository.js';
+import type { Session as DBSession, Message as DBMessage } from '../database/schema.js';
 
 export interface Session {
   id: string;
@@ -25,14 +27,37 @@ export interface SessionMessage {
 const SESSIONS_DIR = path.join(os.homedir(), '.grok', 'sessions');
 const MAX_SESSIONS = 50;
 
+export interface SessionStoreConfig {
+  /** Use SQLite database instead of JSON files */
+  useSQLite: boolean;
+}
+
+const DEFAULT_CONFIG: SessionStoreConfig = {
+  useSQLite: true, // SQLite by default
+};
+
 /**
  * Session Store for persisting and restoring chat sessions
  */
 export class SessionStore {
   private currentSessionId: string | null = null;
   private autoSave: boolean = true;
+  private config: SessionStoreConfig;
+  private dbRepository: SessionRepository | null = null;
 
-  constructor() {
+  constructor(config: Partial<SessionStoreConfig> = {}) {
+    this.config = { ...DEFAULT_CONFIG, ...config };
+
+    // Initialize SQLite repository if enabled
+    if (this.config.useSQLite) {
+      try {
+        this.dbRepository = getSessionRepository();
+      } catch {
+        // Fallback to JSON if SQLite fails
+        this.config.useSQLite = false;
+      }
+    }
+
     this.ensureSessionsDirectory();
   }
 
@@ -58,6 +83,16 @@ export class SessionStore {
       createdAt: new Date(),
       lastAccessedAt: new Date()
     };
+
+    // Store in SQLite if enabled
+    if (this.dbRepository) {
+      this.dbRepository.createSession({
+        id: session.id,
+        project_path: session.workingDirectory,
+        name: session.name,
+        model: session.model,
+      });
+    }
 
     this.saveSession(session);
     this.currentSessionId = session.id;
@@ -127,8 +162,21 @@ export class SessionStore {
     const session = this.loadSession(this.currentSessionId);
     if (!session) return;
 
-    session.messages.push(this.convertChatEntryToMessage(entry));
+    const message = this.convertChatEntryToMessage(entry);
+    session.messages.push(message);
     session.lastAccessedAt = new Date();
+
+    // Store in SQLite if enabled
+    if (this.dbRepository) {
+      const dbMessage: Omit<DBMessage, 'id' | 'created_at'> = {
+        session_id: this.currentSessionId,
+        role: message.type === 'tool_result' ? 'tool' : message.type === 'tool_call' ? 'assistant' : message.type,
+        content: message.content,
+        tool_calls: message.toolCallName ? [{ name: message.toolCallName }] : undefined,
+        metadata: message.toolCallSuccess !== undefined ? { success: message.toolCallSuccess } : undefined,
+      };
+      this.dbRepository.addMessage(dbMessage);
+    }
 
     this.saveSession(session);
   }

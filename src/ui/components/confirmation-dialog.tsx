@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
 import { DiffRenderer } from "./diff-renderer.js";
 

@@ -1,7 +1,23 @@
 import fs from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
-import { ToolResult } from '../types/index.js';
+import { ToolResult, getErrorMessage } from '../types/index.js';
+
+interface FFProbeStream {
+  codec_type: string;
+  codec_name?: string;
+  width?: number;
+  height?: number;
+  r_frame_rate?: string;
+}
+
+interface FFProbeData {
+  streams?: FFProbeStream[];
+  format?: {
+    duration?: string;
+    bit_rate?: string;
+  };
+}
 
 export interface VideoInfo {
   filename: string;
@@ -74,10 +90,10 @@ export class VideoTool {
         output: this.formatVideoInfo(info),
         data: info
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: `Failed to get video info: ${error.message}`
+        error: `Failed to get video info: ${getErrorMessage(error)}`
       };
     }
   }
@@ -113,8 +129,8 @@ export class VideoTool {
         }
 
         try {
-          const data = JSON.parse(output);
-          const videoStream = data.streams?.find((s: any) => s.codec_type === 'video');
+          const data = JSON.parse(output) as FFProbeData;
+          const videoStream = data.streams?.find((s: FFProbeStream) => s.codec_type === 'video');
           const format = data.format;
 
           const info: Partial<VideoInfo> = {};
@@ -251,10 +267,10 @@ export class VideoTool {
         output: this.formatFrameExtraction(result),
         data: result
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: `Frame extraction failed: ${error.message}`
+        error: `Frame extraction failed: ${getErrorMessage(error)}`
       };
     }
   }
@@ -323,10 +339,10 @@ export class VideoTool {
         output: `Thumbnail created: ${thumbPath}`,
         data: { path: thumbPath, timestamp }
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: `Thumbnail creation failed: ${error.message}`
+        error: `Thumbnail creation failed: ${getErrorMessage(error)}`
       };
     }
   }
@@ -388,10 +404,10 @@ export class VideoTool {
           });
         });
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: `Audio extraction failed: ${error.message}`
+        error: `Audio extraction failed: ${getErrorMessage(error)}`
       };
     }
   }
@@ -450,10 +466,10 @@ export class VideoTool {
         success: true,
         output: `Video files in ${dirPath}:\n${videoList}`
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: `Failed to list videos: ${error.message}`
+        error: `Failed to list videos: ${getErrorMessage(error)}`
       };
     }
   }

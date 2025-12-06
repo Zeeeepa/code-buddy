@@ -17,6 +17,8 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
+import { getMemoryRepository, MemoryRepository } from '../database/repositories/memory-repository.js';
+import type { Memory as DBMemory, MemoryType as DBMemoryType } from '../database/schema.js';
 
 export interface MemoryEntry {
   id: string;
@@ -129,6 +131,8 @@ export interface MemoryConfig {
   summarizeThreshold: number;
   embeddingEnabled: boolean;
   embeddingModel?: string;
+  /** Use SQLite database instead of JSON files */
+  useSQLite: boolean;
 }
 
 const DEFAULT_CONFIG: MemoryConfig = {
@@ -140,6 +144,7 @@ const DEFAULT_CONFIG: MemoryConfig = {
   autoSummarize: true,
   summarizeThreshold: 20,
   embeddingEnabled: false,
+  useSQLite: true, // SQLite by default
 };
 
 /**
@@ -154,11 +159,23 @@ export class EnhancedMemory extends EventEmitter {
   private userProfile: UserProfile | null = null;
   private currentProjectId: string | null = null;
   private decayIntervalId: ReturnType<typeof setInterval> | null = null;
+  private dbRepository: MemoryRepository | null = null;
 
   constructor(config: Partial<MemoryConfig> = {}) {
     super();
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.dataDir = path.join(os.homedir(), '.grok', 'memory');
+
+    // Initialize SQLite repository if enabled
+    if (this.config.useSQLite) {
+      try {
+        this.dbRepository = getMemoryRepository();
+      } catch {
+        // Fallback to JSON if SQLite fails
+        this.config.useSQLite = false;
+      }
+    }
+
     this.initialize();
   }
 
@@ -180,9 +197,39 @@ export class EnhancedMemory extends EventEmitter {
   }
 
   /**
-   * Load memories from disk
+   * Load memories from disk or SQLite
    */
   private async loadMemories(): Promise<void> {
+    // Load from SQLite if enabled
+    if (this.dbRepository) {
+      try {
+        const dbMemories = this.dbRepository.find({ limit: this.config.maxMemories });
+        for (const dbMem of dbMemories) {
+          const entry: MemoryEntry = {
+            id: dbMem.id,
+            type: dbMem.type as MemoryType,
+            content: dbMem.content,
+            summary: dbMem.metadata?.summary as string | undefined,
+            embedding: dbMem.embedding ? Array.from(dbMem.embedding) : undefined,
+            importance: dbMem.importance,
+            accessCount: dbMem.access_count,
+            createdAt: new Date(dbMem.created_at),
+            updatedAt: new Date(dbMem.created_at),
+            lastAccessedAt: new Date(dbMem.last_accessed),
+            expiresAt: dbMem.expires_at ? new Date(dbMem.expires_at) : undefined,
+            tags: (dbMem.metadata?.tags as string[]) || [],
+            metadata: dbMem.metadata || {},
+            projectId: dbMem.project_id,
+          };
+          this.memories.set(entry.id, entry);
+        }
+        return;
+      } catch {
+        // Fallback to JSON
+      }
+    }
+
+    // Fallback: Load from JSON
     const indexPath = path.join(this.dataDir, 'memory-index.json');
 
     if (await fs.pathExists(indexPath)) {
@@ -315,6 +362,22 @@ export class EnhancedMemory extends EventEmitter {
       memory.embedding = await this.generateEmbedding(options.content);
     }
 
+    // Store in SQLite if enabled
+    if (this.dbRepository) {
+      const dbMemory: Omit<DBMemory, 'access_count' | 'created_at' | 'last_accessed'> = {
+        id,
+        type: options.type as DBMemoryType,
+        scope: options.projectId ? 'project' : 'user',
+        project_id: options.projectId || this.currentProjectId || undefined,
+        content: options.content,
+        embedding: memory.embedding ? new Float32Array(memory.embedding) : undefined,
+        importance: memory.importance,
+        expires_at: memory.expiresAt?.toISOString(),
+        metadata: { ...options.metadata, tags: options.tags, summary: options.summary },
+      };
+      this.dbRepository.create(dbMemory);
+    }
+
     this.memories.set(id, memory);
 
     // Add to project if applicable
@@ -326,7 +389,9 @@ export class EnhancedMemory extends EventEmitter {
       }
     }
 
-    await this.saveAll();
+    if (!this.dbRepository) {
+      await this.saveAll();
+    }
     await this.enforceMemoryLimits();
 
     this.emit('memory:stored', { memory });
@@ -507,6 +572,11 @@ export class EnhancedMemory extends EventEmitter {
     const memory = this.memories.get(id);
     if (!memory) return false;
 
+    // Remove from SQLite if enabled
+    if (this.dbRepository) {
+      this.dbRepository.delete(id);
+    }
+
     // Remove from project
     if (memory.projectId) {
       const project = this.projects.get(memory.projectId);
@@ -517,7 +587,9 @@ export class EnhancedMemory extends EventEmitter {
     }
 
     this.memories.delete(id);
-    await this.saveAll();
+    if (!this.dbRepository) {
+      await this.saveAll();
+    }
 
     this.emit('memory:forgotten', { id });
 

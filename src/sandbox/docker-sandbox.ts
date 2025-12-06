@@ -7,11 +7,9 @@
  * Inspired by VibeKit's E2B/Modal/Daytona sandbox integration.
  */
 
-import { spawn, ChildProcess } from 'child_process';
+import { spawn } from 'child_process';
 import { EventEmitter } from 'events';
 import * as path from 'path';
-import * as os from 'os';
-import * as fs from 'fs/promises';
 import { existsSync } from 'fs';
 
 // ============================================================================

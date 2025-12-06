@@ -6,7 +6,7 @@
  */
 
 import { existsSync, readFileSync, statSync } from 'fs';
-import { basename, extname } from 'path';
+import { extname } from 'path';
 import {
   SpecializedAgent,
   SpecializedAgentConfig,

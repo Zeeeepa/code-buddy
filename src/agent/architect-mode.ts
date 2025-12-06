@@ -1,5 +1,12 @@
-import { GrokClient, GrokMessage } from "../grok/client.js";
+import { GrokClient, GrokMessage, GrokTool } from "../grok/client.js";
 import { EventEmitter } from "events";
+import { getErrorMessage } from "../types/index.js";
+
+export interface StepResult {
+  step: ArchitectStep;
+  response: unknown;
+  success: boolean;
+}
 
 export interface ArchitectProposal {
   summary: string;
@@ -134,17 +141,17 @@ export class ArchitectMode extends EventEmitter {
       this.emit("architect:proposal", proposal);
 
       return proposal;
-    } catch (error: any) {
-      this.emit("architect:error", { error: error.message });
+    } catch (error: unknown) {
+      this.emit("architect:error", { error: getErrorMessage(error) });
       throw error;
     }
   }
 
   async implement(
     proposal?: ArchitectProposal,
-    tools?: any[],
-    onStepComplete?: (step: ArchitectStep, result: any) => void
-  ): Promise<{ success: boolean; results: any[] }> {
+    tools?: GrokTool[],
+    onStepComplete?: (step: ArchitectStep, result: StepResult) => void
+  ): Promise<{ success: boolean; results: StepResult[] }> {
     const targetProposal = proposal || this.currentProposal;
 
     if (!targetProposal) {
@@ -154,7 +161,7 @@ export class ArchitectMode extends EventEmitter {
     this.emit("editor:start", { proposal: targetProposal });
     this.isActive = true;
 
-    const results: any[] = [];
+    const results: StepResult[] = [];
 
     try {
       for (const step of targetProposal.steps) {
@@ -174,7 +181,7 @@ export class ArchitectMode extends EventEmitter {
 
         const response = await this.editorClient.chat(messages, tools);
 
-        const result = {
+        const result: StepResult = {
           step,
           response: response.choices[0]?.message,
           success: true,
@@ -191,8 +198,8 @@ export class ArchitectMode extends EventEmitter {
 
       this.emit("editor:complete", { results });
       return { success: true, results };
-    } catch (error: any) {
-      this.emit("editor:error", { error: error.message });
+    } catch (error: unknown) {
+      this.emit("editor:error", { error: getErrorMessage(error) });
       return { success: false, results };
     } finally {
       this.isActive = false;
@@ -221,9 +228,9 @@ export class ArchitectMode extends EventEmitter {
   async analyzeAndImplement(
     request: string,
     context?: string,
-    tools?: any[],
+    tools?: GrokTool[],
     onApproval?: (proposal: ArchitectProposal) => Promise<boolean>
-  ): Promise<{ proposal: ArchitectProposal; results: any[] }> {
+  ): Promise<{ proposal: ArchitectProposal; results: StepResult[] }> {
     // Phase 1: Architect designs the solution
     const proposal = await this.analyze(request, context);
 

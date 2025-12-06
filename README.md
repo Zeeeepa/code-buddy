@@ -1,1442 +1,641 @@
 <div align="center">
 
-# Grok CLI
+<img src="https://img.shields.io/badge/🤖-Grok_CLI-blueviolet?style=for-the-badge&labelColor=1a1a2e" alt="Grok CLI"/>
 
-### AI-Powered Development Agent for Your Terminal
+# ✨ Grok CLI ✨
 
-[![npm version](https://img.shields.io/npm/v/@phuetz/grok-cli.svg?style=flat-square)](https://www.npmjs.com/package/@phuetz/grok-cli)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-[![Node Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen?style=flat-square)](https://nodejs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
-[![npm downloads](https://img.shields.io/npm/dm/@phuetz/grok-cli.svg?style=flat-square)](https://www.npmjs.com/package/@phuetz/grok-cli)
+### 🚀 L'Agent IA de Développement Nouvelle Génération pour Votre Terminal
 
-**A powerful CLI tool that brings Grok AI directly to your terminal with Claude Code-level intelligence, advanced code analysis, and comprehensive development capabilities.**
+<p align="center">
+  <a href="https://www.npmjs.com/package/@phuetz/grok-cli"><img src="https://img.shields.io/npm/v/@phuetz/grok-cli.svg?style=flat-square&color=ff6b6b&label=version" alt="npm version"/></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-feca57.svg?style=flat-square" alt="License: MIT"/></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D18.0.0-54a0ff?style=flat-square&logo=node.js" alt="Node Version"/></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.3-5f27cd?style=flat-square&logo=typescript" alt="TypeScript"/></a>
+  <a href="https://www.npmjs.com/package/@phuetz/grok-cli"><img src="https://img.shields.io/npm/dm/@phuetz/grok-cli.svg?style=flat-square&color=10ac84" alt="npm downloads"/></a>
+</p>
 
-[Installation](#-installation) •
-[Features](#-features) •
-[Usage](#-usage) •
-[Code Intelligence](#-code-intelligence) •
-[Research Foundation](#-research-foundation) •
-[Contributing](#-contributing)
+<p align="center">
+  <img src="https://img.shields.io/badge/Tests-1324_passed-00d26a?style=flat-square&logo=jest" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Coverage-85%25-48dbfb?style=flat-square" alt="Coverage"/>
+  <img src="https://img.shields.io/badge/Build-passing-00d26a?style=flat-square" alt="Build"/>
+</p>
+
+<br/>
+
+**🎯 Un outil CLI puissant qui amène l'IA Grok directement dans votre terminal avec une intelligence de niveau Claude Code, une analyse de code avancée et des capacités de développement complètes.**
+
+<br/>
+
+[🚀 Démarrage Rapide](#-démarrage-rapide) •
+[✨ Fonctionnalités](#-fonctionnalités) •
+[🧠 Intelligence du Code](#-intelligence-du-code) •
+[💾 Base de Données](#-système-de-persistance) •
+[📚 Documentation](#-documentation)
 
 </div>
 
 ---
 
-## ❤️ Grok-CLI — The Dev Assistant Built with Love (and a Lot of Neurons)
+## 💖 Grok-CLI — L'Assistant Dev Fait avec Amour
 
-**Because refactoring is better when you're smiling.**
+> *"Parce que refactorer, c'est mieux quand on sourit."*
 
-Welcome to grok-cli, a tool born from a simple idea:
-👉 if we're going to code with an AI, it might as well be an AI that's intelligent, elegant... and good company.
+Bienvenue dans **grok-cli**, un outil né d'une idée simple :
+👉 Si on code avec une IA, autant que ce soit une IA **intelligente**, **élégante**... et de **bonne compagnie**.
 
-This project was crafted with:
-
-- a modern architecture,
-- a pinch of creative madness,
-- lots of coffee,
-- and above all... all our heart. 💕
-
-### 🚀 Why Does grok-cli Exist?
-
-Because we were tired of AI assistants that:
-
-- hallucinate more than a poorly-indexed SQL server
-- generate code like an intern under pressure
-- and refuse to do a serious review without "could you clarify your request?"
-
-So we built something better:
-
-- a sophisticated multi-agent system,
-- deep code understanding,
-- structured reasoning (ToT + MCTS),
-- automatic repair,
-- long-term memory,
-- offline mode,
-- plugins,
-- a checkpoint system,
-- and even a collaborative mode.
-
-Yes.
-We enjoyed building this.
-And now you're going to enjoy using it too.
-
-### 🧠 1. Multi-Agent System — Because One Brain is Good... Four is Better
-
-grok-cli comes with a small internal team:
-
-- **Orchestrator** — the conductor, calm and elegant
-- **Coder** — the one who writes fast (too fast? no, just right)
-- **Reviewer** — the one who gets into the details
-- **Tester** — the one who breaks everything to see if it holds
-- **Refactorer** — the one who does feng-shui in your code
-- **Documenter** — the technical poet
-- **Analyst** — the silent sage
-
-They work together, sometimes debating, sometimes in consensus mode.
-Yes: the CLI literally has team discussions for you.
-
-(You can sit back, everything's fine.)
-
-### 🧩 2. Advanced RAG — Elephant Memory, Cheetah Speed
-
-We've built a specialized RAG for code:
-
-- intelligent chunking by language
-- code-aware + semantic embeddings
-- hybrid TF-IDF / vector search
-- "corrective RAG" to avoid off-topic responses
-- automatic complex context management
-
-In short, it's as if your project were a book that grok-cli actually reads.
-
-### 🌳 3. Tree-of-Thought + MCTS — Yes, the CLI Thinks Like an Adult
-
-Here, the AI:
-
-- explores multiple paths
-- compares
-- scores
-- eliminates
-- backtracks
-- optimizes
-- and chooses the best solution with a satisfied smile
-
-With 4 modes:
-
-- **shallow**
-- **medium**
-- **deep**
-- **exhaustive** (this one might scare you, but in a good way)
-
-### 🔧 4. APR — Automatic Program Repair
-
-You know that Monday morning dev who fixes your bugs without asking?
-Neither do we.
-
-But grok-cli does it:
-
-- fault localization (Ochiai, DStar, Tarantula)
-- 30+ repair templates
-- guided LLM generation
-- automatic test validation
-
-And no, it never complains.
-(Amazing, I know.)
-
-### 🧠💬 5. Extended Thinking Mode — Long-Duration Thought
-
-Here, grok-cli:
-
-- re-reads itself
-- self-critiques
-- detects contradictions
-- makes another pass
-- and gives you the best version of its thinking
-
-It's like a senior dev who re-reads before sending you a commit.
-(Rare.)
-
-### 🔀 6. Multi-Model Execution — LLM Speed Dating
-
-Your CLI can query:
-
-- Grok
-- Claude
-- Gemini
-- **Ollama** (local models with tool support)
-- **LM Studio** (local models)
-- And more...
-
-And choose:
-
-- the fastest
-- the most relevant
-- or make a democratic consensus
-
-We wanted models to collaborate instead of fighting.
-
-### 🏠 7. Local AI Support — Your Local AI Army
-
-Run AI locally with **LM Studio**, **Ollama**, or any OpenAI-compatible server:
-
-- **Auto-detection** of function calling support based on model name
-- Works with Hermes, Llama 3.1/3.2, Qwen 2.5, Mistral, Mixtral, Functionary, Gorilla...
-- **Dynamic probing** to test model capabilities at startup
-- No cloud dependency for basic tasks
-- Full compatibility with the OpenAI API specification
-
-#### Ollama Setup
-
-```bash
-# Install Ollama (https://ollama.ai)
-curl -fsSL https://ollama.com/install.sh | sh
-
-# Pull a model
-ollama pull llama3.2
-
-# Point grok-cli to Ollama
-export GROK_BASE_URL=http://localhost:11434/v1
-export GROK_API_KEY=ollama  # Any non-empty value works
-
-# Start with tool support (auto-enabled for Ollama!)
-grok --model "llama3.2"
-```
-
-#### LM Studio Setup
-
-```bash
-# Point to your LM Studio server
-export GROK_BASE_URL=http://localhost:1234/v1
-export GROK_API_KEY=lm-studio  # Any non-empty value works
-
-# Start with auto-detected tools
-grok --model "hermes-4-14b"  # Tools auto-enabled!
-```
-
-**CLI Options for Local Models:**
-```bash
-# Force enable tools (for models that support function calling)
-grok --force-tools --model "my-custom-model"
-
-# Probe model capabilities at startup
-grok --probe-tools --model "unknown-model"
-
-# Combine both for maximum compatibility
-grok --probe-tools --force-tools
-```
-
-**Environment Variables:**
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `GROK_BASE_URL` | API endpoint | `http://localhost:11434/v1` (Ollama) or `http://localhost:1234/v1` (LM Studio) |
-| `GROK_API_KEY` | API key (any value for local) | `ollama` or `lm-studio` |
-| `GROK_FORCE_TOOLS` | Force enable tools | `true` |
-| `GROK_MAX_TOKENS` | Max response tokens | `4096` |
-
-**Supported Local Providers:**
-| Provider | Default Port | Tool Support | Notes |
-|----------|--------------|--------------|-------|
-| **Ollama** | 11434 | Auto-enabled | Native OpenAI compatibility |
-| **LM Studio** | 1234 | Auto-detect | Depends on model |
-
-**Models with Auto-Detected Tool Support:**
-- Hermes 2 Pro, Hermes 3, Hermes 4
-- Llama 3.1, Llama 3.2 (native tool support)
-- Qwen 2.5, Qwen 2.5 Coder
-- Mistral, Mixtral
-- Functionary v2/v3
-- Gorilla OpenFunctions
-- DeepSeek Coder v2
-- Command-R
-- NexusRaven, FireFunction
-
-### 🗺️ 8. Semantic Code Map — A GPS for Your Project
-
-grok-cli analyzes:
-
-- imports
-- calls
-- inheritance
-- technical layers
-- important modules
-- change impact
-
-You ask "where's the business logic?" → it shows you.
-You say "if I change this, what breaks?" → it explains.
-
-It's a GPS, but for devs.
-No subscription required.
-
-### 🤝 9. Real-Time Collaboration — Code Together, Even Remotely
-
-With WebSockets:
-
-- multi-user sessions
-- message sharing
-- file sharing
-- annotations
-- roles (owner/admin/editor/viewer)
-- audit trail
-- encryption
-
-Like Google Docs... but for coding.
-And more serious.
-
-### 📊 10. Analytics Dashboard — Because a Great Project Deserves Great Graphs
-
-Do you know how many tokens you consume?
-Which model costs the most?
-How many tests failed?
-How many MCTS iterations were done?
-
-Now you do.
-
-And you can export everything to JSON / CSV / Markdown.
-
-### 🧩 11. Plugin Marketplace — Open Your Door to Creativity
-
-Plugins with:
-
-- Sandbox
-- Stable API
-- Commands
-- Providers
-- File tools
-- MCP servers
-
-Grok-cli can become whatever you choose to make of it.
-
-### 📡 12. Offline Mode — Even Without Internet, You're Not Alone
-
-- intelligent cache
-- local execution via Ollama / llama.cpp
-- request queue
-- automatic sync
-
-You keep working.
-Even on a plane.
-Even in an elevator.
-Even at your parents' house.
-
-### 💾 13. Checkpoint & Undo System — Because Everyone Makes Mistakes
-
-Before dangerous operations:
-👉 grok-cli creates a snapshot.
-
-You broke something?
-👉 undo
-
-Want to go back?
-👉 restore checkpoint
-
-Like Git, but... cuddly.
-
-### 🎭 14. Personas — Your Personalized Assistants
-
-7 built-in personas:
-
-- senior dev
-- code reviewer
-- debugger
-- security expert
-- teacher
-- minimalist
-- architect
-
-You can create others.
-Your CLI becomes you.
-(The well-rested version.)
-
-### 🧠❤️ 15. Enhanced Memory — A Companion That Learns With You
-
-- summaries
-- preferences
-- conventions
-- habits
-- code style
-- patterns
-
-Grok-cli remembers.
-Not to judge you.
-Just to help you better. ❤️
-
-### 💞 And All This... Is Coded with Love and Good Vibes.
-
-Every module, every agent, every pipeline...
-was born in an environment where there was:
-
-- seriousness,
-- technical excellence,
-- but also a bit of ourselves,
-- and a lot of desire to create something beautiful.
+Ce projet a été créé avec :
+- 🏗️ Une architecture moderne
+- 🎨 Une pointe de folie créative
+- ☕ Beaucoup de café
+- 💕 Et surtout... tout notre cœur
 
 ---
 
-## Overview
-
-Grok CLI is a conversational AI development agent that transforms your terminal into an intelligent coding assistant. It combines the power of Grok AI with sophisticated code intelligence tools, enabling developers to analyze, refactor, and manage codebases with unprecedented efficiency.
-
-Built on cutting-edge research in LLM-based agents, Tree-of-Thought reasoning, and Retrieval-Augmented Generation (RAG), Grok CLI represents the state-of-the-art in AI-assisted development.
-
----
-
-## Quick Start
+## 🚀 Démarrage Rapide
 
 ```bash
-# Run without installing
+# 🎯 Lancer sans installer (essayez maintenant !)
 npx @phuetz/grok-cli@latest
 
-# Or install globally
+# 📦 Ou installer globalement
 npm install -g @phuetz/grok-cli
 
-# Start interactive mode
+# 🔑 Configurer votre clé API (depuis x.ai)
+export GROK_API_KEY=votre_clé_api
+
+# ▶️ Démarrer en mode interactif
 grok
 
-# Or run a single command (headless mode)
-grok --prompt "analyze the project structure"
+# 🤖 Ou exécuter une commande unique (mode headless)
+grok --prompt "analyse la structure du projet"
 ```
 
----
-
-## Features
-
-### AI Agent Capabilities
-
-| Feature | Description |
-|---------|-------------|
-| **Agentic Loop** | Up to 30 rounds of autonomous tool usage for complex tasks |
-| **Real-time Streaming** | Progressive response generation with instant feedback |
-| **Multi-Model Support** | Grok-4, Grok-3, Gemini, Claude via custom endpoints |
-| **Token Tracking** | Real-time token counting with tiktoken |
-| **Extended Thinking** | Deep reasoning mode for complex problems |
-| **Tree-of-Thought** | Advanced reasoning with MCTS exploration |
-
-### Multi-Agent System
-
-Grok CLI implements a collaborative multi-agent architecture inspired by research on [LLM-based Multi-Agent Systems for Software Engineering](https://dl.acm.org/doi/10.1145/3712003):
-
-| Agent | Role |
-|-------|------|
-| **Orchestrator** | High-level planning and task decomposition |
-| **Coder** | Code generation and implementation |
-| **Reviewer** | Code review and quality feedback |
-| **Tester** | Test generation and validation |
-| **Refactorer** | Safe code refactoring operations |
-| **Documenter** | Documentation generation |
-
-### Code Intelligence
-
-Comprehensive code intelligence suite inspired by Claude Code:
-
-| Tool | Capabilities |
-|------|--------------|
-| **AST Parser** | Multi-language parsing (TypeScript, JavaScript, Python, Go) with caching |
-| **Symbol Search** | Fuzzy search with Levenshtein distance matching across codebases |
-| **Dependency Analyzer** | Circular dependency detection, unreachable file finder, dependency graphs |
-| **Code Context** | Semantic analysis, quality metrics, design pattern detection |
-| **Refactoring Assistant** | Safe rename, extract function/variable, inline, move operations |
-
-### RAG-Based Tool Selection
-
-Implements intelligent tool selection based on [RAG-MCP research](https://arxiv.org/abs/2505.03275):
-
-| Metric | Without RAG | With RAG | Improvement |
-|--------|-------------|----------|-------------|
-| Token Usage | ~5000 | ~2500 | -50% |
-| Selection Accuracy | ~13% | ~43% | +230% |
-| Selection Time | N/A | <1ms | Negligible |
-
-### Advanced Tools
-
-| Tool | Description |
-|------|-------------|
-| **Multi-File Editor** | Atomic transactional editing with automatic rollback |
-| **Operation History** | Full undo/redo with persistence to disk |
-| **Plan Generator** | Structured planning with phases and validation |
-| **Codebase Explorer** | Project analysis, statistics, tree visualization |
-| **Git Integration** | Auto-commits, branch management, PR creation |
-| **Interactive Bash** | PTY support for interactive commands (vim, htop) |
-
-### Specialized Agents
-
-Auto-detect file types and process them with specialized agents:
-
-| Agent | Supported Files | Capabilities |
-|-------|-----------------|--------------|
-| **PDF Agent** | `.pdf` | Extract text, metadata, search, summarize |
-| **Excel Agent** | `.xlsx`, `.xls`, `.csv` | Read, filter, merge, convert, statistics |
-| **SQL Agent** | `.db`, `.sqlite` | Query, schema inspection, import/export |
-| **Archive Agent** | `.zip`, `.tar.gz` | List, extract, create, inspect |
-| **Data Analysis** | All data files | Aggregate, pivot, correlate, histogram |
-
-### Performance Optimization
-
-Built-in performance features for efficient operation:
-
-| Feature | Description | Impact |
-|---------|-------------|--------|
-| **Lazy Loading** | On-demand module loading | Faster startup |
-| **Tool Caching** | Semantic caching for tool results | Reduced redundant calls |
-| **Request Batching** | Deduplication and batching | Lower API costs |
-| **API Caching** | Semantic similarity matching | 68% API reduction |
-
-### LLM Optimization Module
-
-Research-based optimizations for maximum efficiency:
-
-| Feature | Research Basis | Impact |
-|---------|---------------|--------|
-| **Dynamic Tool Filtering** | Less-is-More (arXiv 2024) | 70% execution time reduction |
-| **Model Tier Routing** | FrugalGPT (Stanford) | 30-70% cost reduction |
-| **Parallel Tool Execution** | LLMCompiler/AsyncLM | 2.5-4.6x speedup |
-| **Latency Optimization** | Replit research | Sub-500ms for flow state |
-
-**Tool Filtering:**
-- Scores tools by relevance to current task context
-- Reduces cognitive load on LLM with fewer, more relevant tools
-- Automatic task classification (file_read, code_execution, debugging, etc.)
-
-**Model Routing:**
-- Automatic model selection based on task complexity
-- Routes simple tasks to mini models (grok-3-mini)
-- Routes complex reasoning to advanced models (grok-3-reasoning)
-- Cost tracking and savings estimation
-
-**Parallel Execution:**
-- Dependency analysis for tool calls
-- Groups independent calls for parallel execution
-- Automatic retry with configurable backoff
-- Timeout and error handling per call
-
-### Security Features
-
-Comprehensive security layer with multiple modes:
-
-| Mode | Description |
-|------|-------------|
-| **read-only** | Only read operations, no writes or commands |
-| **auto** | Auto-approve safe ops, confirm dangerous ones |
-| **full-access** | All operations auto-approved (trusted environments) |
-
-Additional security features:
-- **Data Redaction**: Automatic masking of API keys, passwords, tokens
-- **Sandbox Execution**: Isolated command execution with firejail
-- **Command Validation**: Detection of dangerous command patterns
-
-### More Tools
-
-| Tool | Description |
-|------|-------------|
-| **Sandboxed Terminal** | Secure command execution with namespace isolation |
-| **AI Code Review** | Automated bug detection, security analysis, performance issues |
-| **Parallel Executor** | Run 8+ agents in parallel with git worktree isolation |
-
-### IDE Integrations
-
-| Integration | Description |
-|-------------|-------------|
-| **VS Code Extension** | Full extension with chat sidebar, code actions, completions |
-| **LSP Server** | Language Server Protocol for Neovim, Sublime, Emacs |
-| **Embedded Browser** | Terminal-based web browsing with DOM inspection |
-| **Voice Control** | Native voice commands with Whisper speech-to-text |
-
-### 🎤 Voice Input
-
-Control Grok CLI with your voice using OpenAI Whisper for speech-to-text:
-
-**Setup:**
-```bash
-# Install dependencies (Linux/WSL)
-sudo apt install sox libsox-fmt-all ffmpeg
-pip3 install openai-whisper
-
-# macOS
-brew install sox ffmpeg
-pip3 install openai-whisper
-```
-
-**Usage:**
-```bash
-/voice on        # Enable voice mode
-/voice toggle    # Start/stop recording
-/voice off       # Disable voice mode
-/voice status    # Show current status
-/voice config    # Show configuration
-```
-
-**Features:**
-| Feature | Description |
-|---------|-------------|
-| **Whisper Local** | Offline speech-to-text with OpenAI Whisper |
-| **Whisper API** | Cloud-based transcription (requires OPENAI_API_KEY) |
-| **Multi-language** | French, English, and 50+ languages supported |
-| **Auto-silence** | Recording stops automatically after silence |
-| **Voice Commands** | "Hey Grok" wake word (optional) |
-
-**Configuration (~/.grok/voice-config.json):**
-```json
-{
-  "enabled": true,
-  "provider": "whisper-local",
-  "language": "fr",
-  "model": "base",
-  "autoSend": true,
-  "silenceDuration": 1500
-}
-```
-
-**Whisper Models:**
-| Model | Size | Speed | Accuracy |
-|-------|------|-------|----------|
-| `tiny` | 39M | Fastest | Basic |
-| `base` | 74M | Fast | Good |
-| `small` | 244M | Medium | Better |
-| `medium` | 769M | Slow | Great |
-| `large` | 1.5G | Slowest | Best |
-
-### 🔊 Text-to-Speech
-
-Make Grok CLI speak responses aloud using Microsoft Edge TTS voices:
-
-**Setup:**
-```bash
-# Install Edge TTS
-pip3 install edge-tts
-
-# Audio player (one of these)
-sudo apt install ffmpeg  # or mpv, sox
-```
-
-**Usage:**
-```bash
-/speak Bonjour!     # Speak text aloud
-/speak stop         # Stop speaking
-/tts on             # Enable TTS
-/tts off            # Disable TTS
-/tts auto           # Toggle auto-speak for AI responses
-/tts voices         # List available voices
-/tts voice <name>   # Set specific voice
-/tts status         # Show TTS status
-```
-
-**Features:**
-| Feature | Description |
-|---------|-------------|
-| **Edge TTS** | Natural Microsoft voices (free, no API key) |
-| **Multi-language** | French, English, and 50+ languages |
-| **Auto-speak** | Automatically speak AI responses |
-| **Voice Queue** | Queue multiple texts for sequential playback |
-| **Multiple Providers** | edge-tts, espeak, piper, macOS say |
-
-**French Voices:**
-| Voice | Gender | Style |
-|-------|--------|-------|
-| `fr-FR-DeniseNeural` | Female | Natural (default) |
-| `fr-FR-HenriNeural` | Male | Natural |
-| `fr-CA-SylvieNeural` | Female | Quebec French |
-| `fr-CA-AntoineNeural` | Male | Quebec French |
-| `fr-BE-CharlineNeural` | Female | Belgian French |
-
-**Configuration (~/.grok/tts-config.json):**
-```json
-{
-  "enabled": true,
-  "provider": "edge-tts",
-  "voice": "fr-FR-DeniseNeural",
-  "rate": "+0%",
-  "volume": "+0%",
-  "autoSpeak": false
-}
-```
-
-**Full Voice Conversation:**
-```bash
-# Enable both voice input and output
-/voice on           # Enable speech-to-text
-/tts auto           # Enable auto-speak responses
-
-# Now you can:
-# 1. /voice toggle  → Speak your question
-# 2. AI responds    → Response is spoken aloud
-# 3. Repeat!
-```
-
-### Team & Collaboration
-
-| Feature | Description |
-|---------|-------------|
-| **Team Sessions** | Real-time collaboration with role-based permissions |
-| **Session Sharing** | Share sessions with team members via invite codes |
-| **Audit Logging** | Complete audit trail of all actions |
-| **Annotations** | Add comments and annotations to shared code |
-
-### Analytics & Monitoring
-
-| Feature | Description |
-|---------|-------------|
-| **Usage Dashboard** | Track sessions, messages, tokens, tool calls |
-| **Cost Tracking** | Real-time cost estimation by model |
-| **Performance Metrics** | Response times (P50, P90, P99), success rates |
-| **Export Reports** | Export to JSON, CSV, Markdown |
-
-### AI Integration Tests
-
-Test your AI provider's capabilities with built-in integration tests:
+<details>
+<summary>📋 <b>Plus d'options de démarrage...</b></summary>
 
 ```bash
-/ai-test              # Run all tests
-/ai-test quick        # Skip expensive tests (long context)
-/ai-test full         # Run all tests including expensive ones
-/ai-test tools        # Test tool calling only
-/ai-test stream       # Test streaming only
-```
+# Spécifier un répertoire de travail
+grok -d /chemin/vers/projet
 
-| Test | Description |
-|------|-------------|
-| **Basic Completion** | Verify basic response generation |
-| **Simple Math** | Test numerical reasoning |
-| **JSON Output** | Validate structured output generation |
-| **Code Generation** | Test TypeScript code generation |
-| **Context Understanding** | Verify multi-turn conversation memory |
-| **Streaming Response** | Test streaming API functionality |
-| **Tool Calling** | Verify function/tool calling capabilities |
-| **Error Handling** | Test graceful error handling |
-| **Long Context** | Test long context retrieval (expensive) |
+# Utiliser un modèle spécifique
+grok --model grok-4-latest
 
-**Output includes:**
-- Per-test pass/fail status with timing
-- Token usage per test
-- Total cost estimation
-- Summary statistics
+# Reprendre la dernière session
+grok --resume
 
-### Plugin System
-
-| Feature | Description |
-|---------|-------------|
-| **Plugin Marketplace** | Discover and install community plugins |
-| **Plugin API** | Register commands, tools, providers, hooks |
-| **Sandboxed Execution** | Secure plugin isolation |
-| **Version Management** | Automatic updates and compatibility checking |
-
-### Offline Mode
-
-| Feature | Description |
-|---------|-------------|
-| **Response Cache** | Cache responses for offline use with LRU eviction |
-| **Local LLM** | Fallback to Ollama or llama.cpp when offline |
-| **Request Queue** | Queue requests when offline, sync on reconnect |
-| **Embedding Cache** | Semantic search works offline |
-
-### Semantic Cache
-
-Intelligent API response caching with semantic similarity matching (68% API call reduction):
-
-| Feature | Description |
-|---------|-------------|
-| **Cosine Similarity** | Match similar queries without exact match |
-| **N-gram Embeddings** | Local embeddings without external API |
-| **LRU Eviction** | Automatic cache management |
-| **TTL Expiration** | Time-based cache invalidation |
-| **Disk Persistence** | Cache persists across sessions |
-
-**Configuration:**
-```typescript
-const cache = new SemanticCache({
-  maxEntries: 1000,           // Max cached entries
-  ttlMs: 30 * 60 * 1000,      // 30 min TTL
-  similarityThreshold: 0.85,  // Min similarity for hit
-  persistToDisk: true,        // Enable disk persistence
-});
-```
-
-**Statistics:**
-```bash
-/cache stats    # Show hit rate, entries, savings
-/cache clear    # Clear all cached responses
-```
-
-### Memory & Personas
-
-| Feature | Description |
-|---------|-------------|
-| **Enhanced Memory** | Long-term memory with semantic search |
-| **Project Context** | Automatic learning of project conventions |
-| **Custom Personas** | 7 built-in + custom persona creation |
-| **Auto-Selection** | Context-aware persona switching |
-
-### Checkpoint System
-
-| Feature | Description |
-|---------|-------------|
-| **File Checkpoints** | Snapshot file states before changes |
-| **Undo/Redo** | Restore any checkpoint instantly |
-| **Auto-Checkpoint** | Automatic checkpoints before dangerous ops |
-| **Diff Viewing** | View changes between checkpoints |
-
-### Core Tools
-
-| Tool | Description |
-|------|-------------|
-| **view_file** | View files and directories with line ranges |
-| **create_file** | Create files with automatic parent directory creation |
-| **str_replace_editor** | Intelligent text editing with fuzzy matching and visual diffs |
-| **edit_file** | Morph Fast Apply (4,500+ tokens/sec with 98% accuracy) - optimal for large files |
-| **bash** | Execute shell commands with persistent cd and timeout |
-| **search** | Ultra-fast search with ripgrep backend |
-| **todo_list** | Task management with priorities and status tracking |
-| **multi_edit** | Edit multiple files in a single atomic operation |
-
-### Morph Fast Apply (High-Speed Editing)
-
-For ultra-fast file editing, Grok CLI integrates with [Morph Fast Apply](https://morphllm.com):
-
-```bash
-# Enable Morph Fast Apply
-export MORPH_API_KEY=sk-...
-
-# Now the edit_file tool is available with:
-# - 4,500+ tokens/sec processing speed
-# - 98% accuracy on complex edits
-# - Perfect for files over 2000 lines
-```
-
-**When to use Morph:**
-- Large files (>2000 lines) where str_replace_editor would be slow
-- Complex multi-point edits in a single operation
-- High-throughput batch editing scenarios
-
-The agent automatically prefers `edit_file` when Morph is configured and the file is large.
-
-### Agent Modes
-
-| Mode | Description |
-|------|-------------|
-| `/code` | Focus on code generation and editing |
-| `/plan` | Planning mode without side effects |
-| `/ask` | Question-answering mode |
-| `/architect` | Two-phase design/implementation mode |
-
-### Autonomy Levels
-
-Configurable autonomy inspired by [Cursor's YOLO mode](https://docs.cursor.com/agent):
-
-| Level | Description |
-|-------|-------------|
-| `suggest` | Only suggest changes, always confirm |
-| `confirm` | Standard confirmation for all operations |
-| `auto` | Auto-execute safe operations, confirm dangerous ones |
-| `full` | Full autonomy (use with caution) |
-
-### Three-Tier Approval Modes
-
-Fine-grained permission control inspired by Codex CLI:
-
-| Mode | Description |
-|------|-------------|
-| `read-only` | Only read operations (search, view files) |
-| `auto` | Auto-approve safe ops, confirm dangerous ones |
-| `full-access` | All operations auto-approved |
-
-**Commands:**
-```bash
-/mode read-only    # Switch to read-only mode
-/mode auto         # Switch to auto mode (default)
-/mode full-access  # Switch to full-access mode
-```
-
-**Operation Classification:**
-| Type | Auto Mode | Read-Only Mode |
-|------|-----------|----------------|
-| File reads | Auto-approved | Auto-approved |
-| Searches | Auto-approved | Auto-approved |
-| Safe commands (ls, git status) | Auto-approved | Blocked |
-| File writes/creates | Requires confirmation | Blocked |
-| Network commands (npm install) | Requires confirmation | Blocked |
-| Destructive commands (rm -rf) | Blocked | Blocked |
-
-### Extended Thinking Keywords
-
-Trigger deeper reasoning with keywords in your prompts (inspired by Claude Code):
-
-| Keyword | Level | Token Budget |
-|---------|-------|--------------|
-| `think` | Standard | 4K tokens |
-| `think harder` / `megathink` | Deep | 10K tokens |
-| `ultrathink` / `think even harder` | Exhaustive | 32K tokens |
-
-**Examples:**
-```bash
-# Standard thinking
-"think about how to refactor this function"
-
-# Deep thinking
-"megathink: design a scalable architecture"
-
-# Exhaustive thinking
-"ultrathink through this security issue"
-```
-
-**Slash Commands:**
-```bash
-/think        # Enable standard thinking
-/megathink    # Enable deep thinking
-/ultrathink   # Enable exhaustive thinking
-```
-
-### YOLO Mode & Cost Protection
-
-**YOLO Mode** enables full autonomous operation:
-
-```bash
-# Enable YOLO mode (full autonomy, 400 tool rounds, no cost limit)
+# Mode YOLO (autonomie totale - à utiliser avec prudence !)
 YOLO_MODE=true grok
 
-# Or toggle in session
-/yolo on
+# Avec un serveur local (Ollama)
+export GROK_BASE_URL=http://localhost:11434/v1
+export GROK_API_KEY=ollama
+grok --model llama3.2
 ```
 
-**Cost Protection** prevents runaway API costs:
+</details>
+
+---
+
+## ✨ Fonctionnalités
+
+### 🧠 Le Cerveau : Système Multi-Agent
+
+<table>
+<tr>
+<td width="50%">
+
+**🎭 Une équipe d'agents spécialisés travaille pour vous :**
+
+| Agent | 🎯 Rôle |
+|:------|:--------|
+| 🎼 **Orchestrateur** | Chef d'orchestre, calme et élégant |
+| 💻 **Codeur** | Écrit vite et bien |
+| 🔍 **Revieweur** | Entre dans les détails |
+| 🧪 **Testeur** | Casse tout pour voir si ça tient |
+| ♻️ **Refactoreur** | Fait du feng-shui dans votre code |
+| 📝 **Documenteur** | Le poète technique |
+| 📊 **Analyste** | Le sage silencieux |
+
+</td>
+<td width="50%">
+
+```
+┌─────────────────────────────────┐
+│      🎼 ORCHESTRATEUR           │
+│   (planification & décisions)   │
+└──────────────┬──────────────────┘
+               │
+    ┌──────────┼──────────┐
+    ▼          ▼          ▼
+┌──────┐  ┌──────┐  ┌──────┐
+│💻    │  │🔍    │  │🧪    │
+│Codeur│  │Review│  │Test  │
+└──────┘  └──────┘  └──────┘
+    │          │          │
+    └──────────┼──────────┘
+               ▼
+         ┌──────────┐
+         │ 🚀 VOUS  │
+         └──────────┘
+```
+
+</td>
+</tr>
+</table>
+
+---
+
+### 🌳 Raisonnement Avancé : Tree-of-Thought + MCTS
+
+> *"Ici, l'IA réfléchit comme un adulte."*
+
+L'IA ne se contente pas de répondre. Elle :
+1. 🔍 **Explore** plusieurs chemins
+2. ⚖️ **Compare** les solutions
+3. 📊 **Évalue** chaque approche
+4. 🎯 **Choisit** la meilleure avec un sourire satisfait
+
+<table>
+<tr>
+<td>
+
+**🎮 4 modes de raisonnement :**
+
+| Mode | Profondeur | 📝 Usage |
+|:-----|:-----------|:---------|
+| `shallow` | ⭐ | Questions rapides |
+| `medium` | ⭐⭐ | Problèmes standards |
+| `deep` | ⭐⭐⭐ | Défis complexes |
+| `exhaustive` | ⭐⭐⭐⭐ | Architectures critiques |
+
+</td>
+<td>
+
+**💡 Mots-clés magiques :**
 
 ```bash
-# Default: $10 session limit (disabled in YOLO mode)
-# Set custom limit:
-MAX_COST=25 grok
+# Réflexion standard (4K tokens)
+"think about how to refactor this"
 
-# Unlimited (use with caution):
-MAX_COST=Infinity grok
+# Réflexion profonde (10K tokens)
+"megathink: design a scalable API"
+
+# Réflexion exhaustive (32K tokens)
+"ultrathink this security issue"
 ```
 
-| Mode | Max Tool Rounds | Session Cost Limit |
-|------|-----------------|-------------------|
-| Normal | 50 | $10 |
-| YOLO | 400 | Unlimited |
+</td>
+</tr>
+</table>
 
-The agent will stop and warn you when the cost limit is reached.
+---
 
-### Hooks System
+### 🔧 Auto-Réparation : APR Engine
 
-Powerful hooks system for extending functionality:
+> *"Ce développeur du lundi matin qui répare vos bugs sans broncher ? C'est grok-cli."*
 
-| Hook | Trigger |
-|------|---------|
-| `PreToolUse` | Before tool execution |
-| `PostToolUse` | After tool completion |
-| `SessionStart` | When session begins |
-| `SessionEnd` | When session ends |
-| `Notification` | When notifications are sent |
+<table>
+<tr>
+<td width="60%">
 
-### Context Features
+**🩺 Comment ça marche :**
 
-| Feature | Description |
-|---------|-------------|
-| **@ Mentions** | `@file:`, `@url:`, `@image:`, `@git:`, `@symbol:`, `@search:` |
-| **Persistent Memory** | Project and user-scoped memory in `.grok/GROK_MEMORY.md` |
-| **Codebase RAG** | Semantic code retrieval with embeddings |
-| **Context Manager** | Intelligent context compression and prioritization |
-| **Smart Compression** | Auto-compress when approaching token limits |
+1. **📍 Localisation** — Trouve exactement où est le bug
+2. **🔬 Analyse** — Comprend la cause racine
+3. **💊 Génération** — Crée plusieurs patchs candidats
+4. **✅ Validation** — Teste automatiquement chaque solution
+5. **🎉 Application** — Applique le meilleur fix
 
-### Context Management
+**Techniques utilisées :**
+- Ochiai, DStar, Tarantula (fault localization)
+- 30+ templates de réparation
+- Génération guidée par LLM
+- Feedback loop avec les tests
 
-Intelligent context handling to prevent "context length exceeded" errors:
+</td>
+<td width="40%">
 
-| Strategy | Description |
-|----------|-------------|
-| **Sliding Window** | Keeps N most recent messages |
-| **Tool Truncation** | Compresses verbose tool outputs |
-| **Summarization** | Creates summaries of older conversations |
-| **Hard Truncation** | Last resort message truncation |
+```
+   🐛 Bug détecté
+        │
+        ▼
+   ┌────────────┐
+   │ 📍 Localiser│
+   └─────┬──────┘
+         │
+   ┌─────▼──────┐
+   │ 🔬 Analyser │
+   └─────┬──────┘
+         │
+   ┌─────▼──────┐
+   │ 💊 Réparer  │
+   └─────┬──────┘
+         │
+   ┌─────▼──────┐
+   │ ✅ Valider  │
+   └─────┬──────┘
+         │
+        ▼
+   🎉 Code réparé!
+```
 
-**Configuration:**
+</td>
+</tr>
+</table>
+
+---
+
+### 💾 Système de Persistance
+
+> *"Nouveau ! Grok-CLI se souvient de tout... vraiment tout."*
+
+<table>
+<tr>
+<td>
+
+**🗄️ Base de données SQLite intégrée :**
+
+| Table | 🎯 Usage |
+|:------|:---------|
+| `memories` | 🧠 Mémoires avec embeddings vectoriels |
+| `sessions` | 💬 Historique des conversations |
+| `messages` | 📨 Messages individuels |
+| `code_embeddings` | 🔍 Recherche sémantique du code |
+| `tool_stats` | 📊 Statistiques des outils |
+| `repair_learning` | 🔧 Apprentissage des réparations |
+| `analytics` | 📈 Données d'usage quotidiennes |
+| `conventions` | 📋 Conventions de code apprises |
+| `checkpoints` | 💾 Points de sauvegarde |
+| `cache` | ⚡ Cache haute performance |
+
+</td>
+<td>
+
+**✨ Fonctionnalités clés :**
+
+- 🚀 **Mode WAL** — Haute performance
+- 🎯 **Embeddings vectoriels** — Recherche sémantique réelle
+- 📦 **Migration auto** — JSON → SQLite
+- 🔄 **Repository pattern** — Code propre
+- 💰 **Budget alerts** — Alertes quand vous dépassez
+
+**📍 Localisation :**
+```
+~/.grok/grok.db        # Base de données
+~/.grok/models/        # Modèles d'embeddings
+```
+
+</td>
+</tr>
+</table>
+
+---
+
+### 🎯 Embeddings Vectoriels
+
+> *"Fini les faux embeddings ! Place à la vraie recherche sémantique."*
+
+<table>
+<tr>
+<td width="50%">
+
+**🧬 Providers disponibles :**
+
+| Provider | 📐 Dimensions | ⚡ Vitesse |
+|:---------|:--------------|:-----------|
+| 🏠 **Local** (transformers.js) | 384 | Rapide |
+| 🌐 **OpenAI** | 1536-3072 | Très rapide |
+| 🤖 **Grok API** | Variable | Rapide |
+| 🧪 **Mock** (tests) | 384 | Instantané |
+
+</td>
+<td width="50%">
+
+```typescript
+// Exemple d'utilisation
+import { getEmbeddingProvider } from 'grok-cli';
+
+const provider = getEmbeddingProvider();
+await provider.initialize();
+
+// Générer un embedding
+const result = await provider.embed("function hello()");
+console.log(result.embedding); // Float32Array[384]
+
+// Recherche par similarité
+const similar = await searchSimilar(queryEmbedding);
+```
+
+</td>
+</tr>
+</table>
+
+---
+
+### 📊 Analytics & Cost Tracking
+
+> *"Savez-vous combien de tokens vous consommez ? Maintenant oui."*
+
+<table>
+<tr>
+<td>
+
+**📈 Dashboard intégré :**
+
+```
+📊 Analytics Dashboard
+════════════════════════════════════════
+
+💰 Budget Status
+  Session:  $0.42 / $5.00 (8%)
+  Daily:    $2.15 / $10.00 (22%)
+  Weekly:   $12.50 / $50.00 (25%)
+  Monthly:  $45.00 / $150.00 (30%)
+
+📈 Last 30 Days
+  Total Cost: $45.00
+  Requests: 1,234
+  Tokens: 2.5M
+  Cache Hit Rate: 68%
+  Trend: stable ➡️
+```
+
+</td>
+<td>
+
+**🔔 Alertes automatiques :**
+
+- ⚠️ **Warning** à 80% du budget
+- 🚫 **Stop** à 100% (optionnel)
+- 📧 Export CSV/JSON disponible
+
+**💡 Commandes :**
 ```bash
-# Set max context tokens (overrides model default)
-GROK_MAX_CONTEXT=4096 grok
-
-# Works great with local models (Ollama, LM Studio)
+/cost           # Dashboard
+/cost budget    # Modifier les limites
+/cost export    # Exporter les données
+/cost reset     # Réinitialiser
 ```
 
-**Features:**
-- Auto-detects model token limits
-- Warns at 75% usage, critical at 90%
-- 12.5% tokens reserved for responses
-- Works with all providers (Grok, Ollama, LM Studio)
-
-### MCP Integration
-
-Full [Model Context Protocol](https://modelcontextprotocol.io/) support for extending capabilities:
-
-```json
-// .grok/mcp.json
-{
-  "servers": {
-    "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path"]
-    }
-  }
-}
-```
-
-### UI Components
-
-Enhanced terminal UI with professional styling:
-
-- 10 animated spinner styles (dots, braille, moon, earth, etc.)
-- Progress bars with percentage display
-- Step progress indicators
-- Status indicators (success, error, warning, info)
-- Info panels and tooltips
-- Data tables and badges
-- Countdown timers
-- Streaming diff previews
+</td>
+</tr>
+</table>
 
 ---
 
-## Code Intelligence
+### 🎓 Apprentissage Persistant
 
-### AST Parser
+> *"Grok-CLI apprend de ses erreurs... pour ne plus jamais les refaire."*
 
-Multi-language Abstract Syntax Tree parsing with intelligent caching:
+<table>
+<tr>
+<td width="50%">
 
-```typescript
-import { getASTParser } from '@phuetz/grok-cli';
+**🧠 Ce qui est appris :**
 
-const parser = getASTParser();
-const result = await parser.parseFile('src/index.ts');
+| Catégorie | 📝 Exemples |
+|:----------|:------------|
+| 🔧 **Réparations** | Quelle stratégie fonctionne pour quel bug |
+| 📋 **Conventions** | Votre style de code préféré |
+| 🛠️ **Outils** | Quels outils sont les plus efficaces |
+| ⚡ **Patterns** | Vos habitudes de développement |
 
-// Access symbols, imports, exports
-console.log(result.symbols);  // Functions, classes, variables
-console.log(result.imports);  // All import statements
-console.log(result.exports);  // All exports
+</td>
+<td width="50%">
+
+**📊 Insights générés :**
+
+```
+📚 Learning Statistics
+════════════════════════════════════════
+
+🔧 Repair Learning
+  Patterns learned: 42
+  Avg success rate: 78%
+  Top strategy: null_check (92%)
+
+📋 Conventions
+  Detected: 15
+  Confidence: 85%
+
+🛠️ Tool Usage
+  Most used: search (89% success)
+  Cache hit rate: 72%
 ```
 
-**Supported Languages:**
-- TypeScript (.ts, .tsx)
-- JavaScript (.js, .jsx)
-- Python (.py)
-- Go (.go)
-
-### Symbol Search
-
-Fuzzy symbol search across your entire codebase:
-
-```typescript
-import { getSymbolSearch } from '@phuetz/grok-cli';
-
-const search = getSymbolSearch();
-await search.buildIndex('src/');
-
-// Find symbols matching a query
-const results = search.search('handleUser', {
-  fuzzyThreshold: 0.6,
-  maxResults: 10,
-  types: ['function', 'class']
-});
-
-// Find all usages of a symbol
-const usages = await search.findUsages('UserService');
-```
-
-### Dependency Analyzer
-
-Detect circular dependencies and analyze project structure:
-
-```typescript
-import { getDependencyAnalyzer } from '@phuetz/grok-cli';
-
-const analyzer = getDependencyAnalyzer();
-const result = await analyzer.analyze('src/');
-
-// Check for circular dependencies
-console.log(result.circularDependencies);
-
-// Find unreachable files
-console.log(result.unreachableFiles);
-
-// Get dependency graph
-console.log(result.graph);
-```
-
-### Code Context Builder
-
-Build semantic understanding of your code:
-
-```typescript
-import { getCodeContextBuilder } from '@phuetz/grok-cli';
-
-const builder = getCodeContextBuilder();
-const context = await builder.buildFileContext('src/utils.ts');
-
-// Quality metrics
-console.log(context.metrics.complexity);
-console.log(context.metrics.maintainabilityIndex);
-
-// Detected patterns
-console.log(context.patterns); // Singleton, Factory, Observer, etc.
-
-// Semantic tags
-console.log(context.tags); // test, utility, api, ui, model, controller
-```
-
-### Refactoring Assistant
-
-Safe automated refactoring operations:
-
-```typescript
-import { getRefactoringAssistant } from '@phuetz/grok-cli';
-
-const assistant = getRefactoringAssistant();
-
-// Preview changes before applying
-const preview = await assistant.preview({
-  type: 'rename',
-  target: 'oldFunctionName',
-  newName: 'newFunctionName',
-  scope: 'src/'
-});
-
-// Apply refactoring
-const result = await assistant.refactor({
-  type: 'extractFunction',
-  filePath: 'src/utils.ts',
-  startLine: 10,
-  endLine: 25,
-  newName: 'extractedFunction'
-});
-```
-
-**Supported Operations:**
-- `rename` - Rename symbols across files
-- `extractFunction` - Extract code to a new function
-- `extractVariable` - Extract expression to a variable
-- `extractInterface` - Extract type to interface
-- `inlineFunction` - Inline function calls
-- `moveToFile` - Move code to another file
+</td>
+</tr>
+</table>
 
 ---
 
-## Advanced Features
+### 🔒 Sécurité : Trois Niveaux de Contrôle
 
-### Tree-of-Thought Reasoning
+<table>
+<tr>
+<td>
 
-Based on [RethinkMCTS](https://arxiv.org/abs/2409.09584) research, implementing Monte Carlo Tree Search for code generation:
+| Mode | 🔓 Permissions | 📝 Usage |
+|:-----|:---------------|:---------|
+| 🔒 **read-only** | Lecture seule | Exploration sécurisée |
+| ⚖️ **auto** | Auto + confirmation | Usage quotidien |
+| 🔓 **full-access** | Tout automatique | Environnements de confiance |
 
-```typescript
-import { getTreeOfThoughtReasoner } from '@phuetz/grok-cli';
+</td>
+<td>
 
-const reasoner = getTreeOfThoughtReasoner();
-const solution = await reasoner.reason(problem, {
-  maxIterations: 10,
-  explorationWeight: 1.4,
-  rethinkOnError: true
-});
+```bash
+# Changer de mode
+/mode read-only     # 🔒 Mode sécurisé
+/mode auto          # ⚖️ Mode standard
+/mode full-access   # 🔓 Mode confiance
+
+# Voir le dashboard sécurité
+/security status
 ```
 
-**Key capabilities:**
-- Selection: Choose most promising thought paths
-- Expansion: Generate alternative approaches
-- Simulation: Evaluate via code execution
-- Backpropagation: Update path scores
-- Rethink: Refine erroneous thoughts
-
-### Extended Thinking Mode
-
-Deep reasoning inspired by Claude Code's extended thinking:
-
-```typescript
-import { getExtendedThinking } from '@phuetz/grok-cli';
-
-const thinking = getExtendedThinking();
-const thoughts = await thinking.think(problem, 'deep'); // shallow, medium, deep
-
-// Token budgets: shallow=5000, medium=20000, deep=100000
-```
-
-### Auto-Repair Engine
-
-Automated Program Repair based on [AutoCodeRover](https://arxiv.org/abs/2404.11595) and [SWE-agent](https://arxiv.org/abs/2410.06992):
-
-```typescript
-import { getRepairEngine } from '@phuetz/grok-cli';
-
-const engine = getRepairEngine();
-const result = await engine.repair(error, code, {
-  maxPatches: 5,
-  validateWithTests: true
-});
-```
-
-**Repair workflow:**
-1. Bug localization (token-level)
-2. Generate candidate patches
-3. Validate patches with tests
-4. Apply best solution
-
-### Iterative Repair with Test Feedback
-
-Based on [ChatRepair (ISSTA 2024)](https://doi.org/10.1145/3650212.3680328), implements conversation-driven repair:
-
-```typescript
-import { getIterativeRepairEngine } from '@phuetz/grok-cli';
-
-const engine = getIterativeRepairEngine();
-const result = await engine.repair({
-  errorMessage: 'TypeError: undefined is not a function',
-  stackTrace: '...',
-  sourceFile: 'src/utils.ts',
-  testCommand: 'npm test',
-});
-```
-
-**Features:**
-- 9 repair strategies (null_check, type_coercion, boundary_check, etc.)
-- Learning from successful/failed repairs
-- Automatic rollback on test failures
-- Multi-iteration refinement (up to 5 iterations)
-
-### Context Compression
-
-Intelligent context management based on [JetBrains research](https://arxiv.org/abs/2406.04892):
-
-```typescript
-import { getContextCompressor } from '@phuetz/grok-cli';
-
-const compressor = getContextCompressor({ maxTokens: 8000 });
-const result = compressor.compress(contextEntries);
-
-// Features: -7% cost reduction, +2.6% success rate
-console.log(result.stats.tokensSaved);
-```
-
-**Compression strategies:**
-- Priority-based retention (errors > code > logs > metadata)
-- Progressive summarization of old entries
-- Deduplication of similar content
-- Tool-specific output compression
-
-### Observation Masking
-
-Based on JetBrains/AgentCoder research for filtering irrelevant tool outputs:
-
-```typescript
-import { getObservationMasker } from '@phuetz/grok-cli';
-
-const masker = getObservationMasker();
-masker.setQueryContext('fix authentication bug');
-
-const { masked, stats } = masker.maskObservations(observations);
-console.log(`Saved ${stats.savingsPercentage.toFixed(1)}% tokens`);
-```
-
-**Features:**
-- Semantic relevance scoring
-- Query-aware filtering
-- Budget-constrained masking
-- Partial content extraction for large outputs
-
-### Dependency-Aware RAG
-
-Enhanced RAG with dependency graph integration based on [CodeRAG](https://arxiv.org/abs/2406.07003):
-
-```typescript
-import { getDependencyAwareRAG } from '@phuetz/grok-cli';
-
-const rag = getDependencyAwareRAG();
-const result = await rag.retrieve('handleUserAuth', rootPath, {
-  includeDependencies: true,
-  includeDependents: true,
-});
-
-// Returns: chunks + related dependencies + files that use them
-console.log(result.dependencies);
-console.log(result.dependents);
-```
-
-**Features:**
-- Dependency-aware context retrieval
-- Import chain resolution
-- Impact analysis (affected files)
-- Cached dependency graph analysis
-
-### Enhanced Multi-Agent Coordination
-
-Adaptive coordination based on AgentCoder and RepairAgent research:
-
-```typescript
-import { getEnhancedCoordinator } from '@phuetz/grok-cli';
-
-const coordinator = getEnhancedCoordinator();
-
-// Adaptive task allocation based on performance
-const allocation = coordinator.allocateTask(task, availableAgents);
-console.log(`Assigned to ${allocation.agent} (${allocation.confidence * 100}% confidence)`);
-
-// Conflict detection and resolution
-const conflicts = coordinator.detectConflicts(tasks, context);
-coordinator.autoResolveConflicts();
-```
-
-**Features:**
-- Performance-based agent selection
-- Specialty tracking per agent
-- Conflict detection and resolution
-- Resource pooling between agents
-- Checkpoint/recovery system
-
-### Agent Pipelines
-
-Chain agents in deterministic workflows:
-
-```typescript
-import { getPipelineRunner } from '@phuetz/grok-cli';
-
-const pipeline = {
-  name: "code-review",
-  stages: [
-    { agent: "explorer", outputCapture: "context" },
-    { agent: "code-reviewer" },
-    { agent: "test-runner" },
-    { agent: "documenter" }
-  ],
-  passContext: true
-};
-
-await getPipelineRunner().run(pipeline);
-```
-
-**User command:** `/pipeline code-review`
-
-### Skills System
-
-Auto-activating specialized abilities:
-
-```markdown
-<!-- .grok/skills/typescript-expert/SKILL.md -->
----
-name: typescript-expert
-description: Expert TypeScript developer
-triggers: ["typescript", "type error", "generic"]
-tools: ["view_file", "search", "str_replace_editor"]
----
-
-You are a TypeScript expert. Focus on:
-1. Complex generic types
-2. Type inference issues
-3. Declaration file problems
-```
-
-**User command:** `/skill typescript-expert`
-
-### Plan Mode
-
-Structured planning for complex tasks:
-
-```typescript
-import { getPlanGenerator } from '@phuetz/grok-cli';
-
-const planner = getPlanGenerator();
-
-const plan = planner.createPlan(
-  'Implement Authentication',
-  'Add user authentication to the application',
-  'Complete auth flow with login, logout, and session management'
-);
-
-planner.addStep({
-  title: 'Create User Model',
-  priority: 'high',
-  risk: 'low',
-  estimatedComplexity: 2,
-  dependencies: [],
-  affectedFiles: ['src/models/user.ts']
-});
-
-console.log(planner.generateSummary());
-```
-
-### Codebase Explorer
-
-Comprehensive project analysis:
-
-```typescript
-import { exploreCodebase } from '@phuetz/grok-cli';
-
-const { stats, project, tree, report } = await exploreCodebase('./');
-
-console.log(stats.totalFiles);        // Total file count
-console.log(stats.filesByLanguage);   // Files per language
-console.log(stats.totalLines);        // Total lines of code
-console.log(project.type);            // nodejs, python, go, rust, etc.
-console.log(tree);                    // ASCII tree view
-console.log(report);                  // Full analysis report
-```
-
-### Multi-File Editor
-
-Atomic multi-file operations with rollback:
-
-```typescript
-import { getMultiFileEditor } from '@phuetz/grok-cli';
-
-const editor = getMultiFileEditor();
-
-const txId = editor.beginTransaction('Refactor auth module');
-
-editor.addOperation(txId, {
-  type: 'edit',
-  filePath: 'src/auth.ts',
-  edit: { type: 'replace', search: 'oldCode', replace: 'newCode' }
-});
-
-editor.addOperation(txId, {
-  type: 'create',
-  filePath: 'src/auth-utils.ts',
-  content: '// New utility file'
-});
-
-try {
-  await editor.commit(txId);
-} catch (error) {
-  await editor.rollback(txId);
-}
-```
-
-### Operation History
-
-Undo/redo with persistent storage:
-
-```typescript
-import { getOperationHistory } from '@phuetz/grok-cli';
-
-const history = getOperationHistory();
-
-await history.undo();
-await history.redo();
-await history.goToHistoryPoint('operation-id');
-
-const entries = history.getHistory();
-```
-
-### Conversation Branching
-
-Fork conversations to explore alternatives:
-
-```typescript
-// /fork "experiment-name" - Create branch from current point
-// /branches - List all branches
-// /checkout <branch-id> - Switch to branch
-// /merge <branch-id> - Merge branch into current
-```
-
-### Cost Tracking
-
-Real-time API cost monitoring:
-
-```typescript
-// /cost - Show cost dashboard
-// Displays: session cost, daily cost, model breakdown
-```
+</td>
+</tr>
+</table>
+
+**🛡️ Protections intégrées :**
+- 🔍 Détection de patterns dangereux (`rm -rf /`, fork bombs...)
+- 🔐 Redaction automatique des secrets (API keys, passwords...)
+- 📦 Sandbox optionnel avec firejail
+- ✅ Validation des commandes avant exécution
 
 ---
 
-## Installation
+### 🤖 Support IA Locale
 
-### Prerequisites
+> *"Pas d'internet ? Pas de problème !"*
 
-- **Node.js** 18.0.0 or higher
-- **ripgrep** (optional, recommended for optimal search performance)
-  ```bash
-  # macOS
-  brew install ripgrep
+<table>
+<tr>
+<td>
 
-  # Ubuntu/Debian
-  sudo apt-get install ripgrep
+**🏠 Providers locaux supportés :**
 
-  # Windows
-  choco install ripgrep
-  ```
+| Provider | Port | 🎯 Notes |
+|:---------|:-----|:---------|
+| **Ollama** | 11434 | Native, recommandé |
+| **LM Studio** | 1234 | Interface graphique |
+| **llama.cpp** | 8080 | Léger et rapide |
 
-### Install Methods
+</td>
+<td>
+
+```bash
+# Configuration Ollama
+export GROK_BASE_URL=http://localhost:11434/v1
+export GROK_API_KEY=ollama
+grok --model llama3.2
+
+# Configuration LM Studio
+export GROK_BASE_URL=http://localhost:1234/v1
+export GROK_API_KEY=lm-studio
+grok --model hermes-4-14b
+```
+
+</td>
+</tr>
+</table>
+
+**🧠 Modèles avec support des outils :**
+`Hermes 2/3/4` • `Llama 3.1/3.2` • `Qwen 2.5` • `Mistral` • `Mixtral` • `Functionary` • `DeepSeek Coder`
+
+---
+
+### 🎤 Contrôle Vocal
+
+> *"Parlez à votre code, il vous répond !"*
+
+<table>
+<tr>
+<td>
+
+**🎙️ Speech-to-Text (Whisper) :**
+```bash
+/voice on      # Activer
+/voice toggle  # Enregistrer
+/voice off     # Désactiver
+```
+
+</td>
+<td>
+
+**🔊 Text-to-Speech (Edge TTS) :**
+```bash
+/speak Bonjour!   # Parler
+/tts on           # Activer auto
+/tts voices       # Lister les voix
+```
+
+</td>
+</tr>
+</table>
+
+---
+
+## 🧠 Intelligence du Code
+
+### 🔍 Suite d'Outils d'Analyse
+
+<table>
+<tr>
+<td width="50%">
+
+**📊 Outils disponibles :**
+
+| Outil | 🎯 Capacités |
+|:------|:-------------|
+| 🌳 **AST Parser** | Parse multi-langage avec cache |
+| 🔎 **Symbol Search** | Recherche fuzzy Levenshtein |
+| 🔗 **Dependency Analyzer** | Détection cycles, graphes |
+| 📐 **Code Context** | Métriques, patterns, qualité |
+| ♻️ **Refactoring** | Rename, extract, inline, move |
+
+</td>
+<td width="50%">
+
+**💻 Langages supportés :**
+
+- 📘 TypeScript (.ts, .tsx)
+- 📒 JavaScript (.js, .jsx)
+- 🐍 Python (.py)
+- 🐹 Go (.go)
+- 🦀 Rust (.rs) *bientôt*
+
+</td>
+</tr>
+</table>
+
+### 📚 RAG Avancé pour le Code
+
+> *"Comme si votre projet était un livre que grok-cli lit vraiment."*
+
+- 🧩 **Chunking intelligent** par langage
+- 🎯 **Embeddings sémantiques** pour le code
+- 🔄 **Recherche hybride** TF-IDF + vecteurs
+- ✅ **RAG correctif** pour éviter les hors-sujets
+- 📦 **Gestion de contexte** automatique
+
+---
+
+## 📋 Commandes Slash
+
+<table>
+<tr>
+<td>
+
+| Commande | 📝 Description |
+|:---------|:---------------|
+| `/help` | 📖 Afficher l'aide |
+| `/clear` | 🧹 Effacer la conversation |
+| `/model` | 🤖 Changer de modèle |
+| `/mode` | 🔒 Changer le mode sécurité |
+| `/think` | 💭 Activer la réflexion |
+| `/megathink` | 🧠 Réflexion profonde |
+| `/ultrathink` | 🌟 Réflexion exhaustive |
+
+</td>
+<td>
+
+| Commande | 📝 Description |
+|:---------|:---------------|
+| `/cost` | 💰 Dashboard des coûts |
+| `/stats` | 📊 Statistiques |
+| `/security` | 🔒 Dashboard sécurité |
+| `/commit` | 📝 Créer un commit |
+| `/review` | 🔍 Review du code |
+| `/test` | 🧪 Lancer les tests |
+| `/voice` | 🎤 Contrôle vocal |
+
+</td>
+</tr>
+</table>
+
+---
+
+## 📦 Installation
+
+### Prérequis
+
+- **Node.js** 18.0.0 ou supérieur
+- **ripgrep** (optionnel mais recommandé)
+
+```bash
+# macOS
+brew install ripgrep
+
+# Ubuntu/Debian
+sudo apt-get install ripgrep
+
+# Windows
+choco install ripgrep
+```
+
+### Installation
 
 ```bash
 # npm
@@ -1452,510 +651,108 @@ pnpm add -g @phuetz/grok-cli
 bun add -g @phuetz/grok-cli
 ```
 
-### Development Setup
+### Configuration
 
 ```bash
+# 1. Configurer la clé API
+export GROK_API_KEY=votre_clé_api
+
+# 2. (Optionnel) Fichier de configuration
+cat > ~/.grok/user-settings.json << EOF
+{
+  "apiKey": "votre_clé_api",
+  "defaultModel": "grok-4-latest",
+  "theme": "dark"
+}
+EOF
+
+# 3. Lancer !
+grok
+```
+
+---
+
+## 🔬 Fondation Scientifique
+
+> *"Construit sur les dernières recherches en IA assistée."*
+
+<table>
+<tr>
+<td>
+
+| 📚 Recherche | 🎯 Contribution |
+|:-------------|:----------------|
+| **RethinkMCTS** | +74% vs CoT simple |
+| **ChatRepair** | Réparation conversationnelle |
+| **CodeRAG** | Context avec graphe de deps |
+| **JetBrains 2024** | -7% coût, +2.6% succès |
+| **FrugalGPT** | 30-70% réduction coûts |
+| **LLMCompiler** | 2.5-4.6x speedup |
+
+</td>
+<td>
+
+| 📊 Benchmark | 📝 Description |
+|:-------------|:---------------|
+| **SWE-bench** | Tâches réelles |
+| **SWE-bench Verified** | 500 problèmes validés |
+| **Berkeley FCL** | Benchmark outils |
+
+</td>
+</tr>
+</table>
+
+---
+
+## 🤝 Contribuer
+
+Les contributions sont les bienvenues ! 💖
+
+```bash
+# 1. Fork et clone
 git clone https://github.com/phuetz/grok-cli.git
 cd grok-cli
+
+# 2. Install et dev
 npm install
-npm run build
-npm link
-```
+npm run dev
 
-### Shell Completions
+# 3. Tester
+npm test
 
-Enable autocompletion for CLI commands, options, and slash commands:
-
-**Bash:**
-```bash
-# Add to ~/.bashrc
-echo 'source <(grok --completions bash)' >> ~/.bashrc
-source ~/.bashrc
-
-# Or save to completions directory
-grok --completions bash > /etc/bash_completion.d/grok
-```
-
-**Zsh:**
-```bash
-# Add to ~/.zshrc
-mkdir -p ~/.zsh/completions
-grok --completions zsh > ~/.zsh/completions/_grok
-echo 'fpath=(~/.zsh/completions $fpath)' >> ~/.zshrc
-echo 'autoload -Uz compinit && compinit' >> ~/.zshrc
-source ~/.zshrc
-```
-
-**Fish:**
-```bash
-# Save to completions directory
-mkdir -p ~/.config/fish/completions
-grok --completions fish > ~/.config/fish/completions/grok.fish
-source ~/.config/fish/completions/grok.fish
-```
-
-**Completions include:**
-- CLI options (`-h`, `--model`, `--dir`, etc.)
-- Slash commands (`/help`, `/mode`, `/think`, etc.)
-- Model names (`grok-3`, `grok-2-latest`, etc.)
-- Approval modes (`read-only`, `auto`, `full-access`)
-- Themes (`dark`, `light`, `dracula`, etc.)
-
----
-
-## Configuration
-
-### API Key Setup
-
-Get your API key from [X.AI](https://x.ai)
-
-**Method 1: Environment Variable (Recommended)**
-```bash
-export GROK_API_KEY=your_api_key_here
-```
-
-**Method 2: .env File**
-```bash
-GROK_API_KEY=your_api_key_here
-```
-
-**Method 3: Command Line**
-```bash
-grok --api-key your_api_key_here
-```
-
-**Method 4: User Settings**
-Create `~/.grok/user-settings.json`:
-```json
-{
-  "apiKey": "your_api_key_here",
-  "baseURL": "https://api.x.ai/v1",
-  "defaultModel": "grok-4-latest"
-}
-```
-
-### Custom Base URL
-
-Use alternative AI providers:
-```bash
-grok --base-url https://your-endpoint.com/v1
-```
-
-### Project Settings
-
-Create `.grok/settings.json` in your project:
-```json
-{
-  "model": "grok-4-latest",
-  "maxRounds": 30,
-  "autonomyLevel": "confirm",
-  "enableRAG": true,
-  "parallelTools": true
-}
-```
-
-### Hooks Configuration
-
-Create `.grok/hooks.json`:
-```json
-{
-  "hooks": [
-    {
-      "event": "PostToolUse",
-      "pattern": "str_replace_editor|create_file",
-      "command": "npx prettier --write ${file} && npx eslint --fix ${file}",
-      "description": "Auto-format after edits"
-    },
-    {
-      "event": "SessionStart",
-      "command": "npm install && npm run typecheck",
-      "description": "Setup on session start"
-    }
-  ]
-}
-```
-
-### YOLO Mode Configuration
-
-Create `.grok/yolo.json`:
-```json
-{
-  "enabled": true,
-  "allowList": ["npm test", "npm run lint", "git status"],
-  "denyList": ["rm -rf", "git push --force"],
-  "maxAutoEdits": 5,
-  "maxAutoCommands": 10,
-  "safeMode": false
-}
+# 4. Créer une PR !
 ```
 
 ---
 
-## Usage
+## 📚 Documentation
 
-### Interactive Mode
-
-```bash
-# Start in current directory
-grok
-
-# Specify working directory
-grok -d /path/to/project
-
-# Use specific model
-grok --model grok-4-latest
-
-# Resume last session
-grok --resume
-
-# Continue from last response
-grok --continue
-
-# Load specific session
-grok --session <session-id>
-```
-
-### Headless Mode
-
-Perfect for CI/CD and scripting:
-
-```bash
-grok --prompt "analyze package.json and suggest optimizations"
-grok -p "run tests and fix any failures" -d /path/to/project
-```
-
-### Browser Mode
-
-```bash
-grok --browser
-# Opens web UI at http://localhost:3000
-```
-
-### Keyboard Shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| `Shift+Tab` | Toggle auto-edit mode |
-| `Ctrl+C` | Clear input / Interrupt |
-| `Esc` | Cancel current operation |
-
-### Slash Commands
-
-| Command | Description |
-|---------|-------------|
-| `/help` | Show help |
-| `/clear` | Clear conversation |
-| `/model` | Change AI model |
-| `/yolo` | Toggle auto-execution mode |
-| `/pipeline` | Run automated workflows |
-| `/skill` | Activate specialized skills |
-| `/cost` | Show cost dashboard |
-| `/fork` | Create conversation branch |
-| `/branches` | List conversation branches |
-| `/memory` | Manage persistent memory |
-| `/parallel` | Execute tasks in parallel |
-| `/generate-tests` | Generate unit tests |
-| `/scan-todos` | Scan for AI comments |
-| `/architect` | Toggle architect mode |
-| `/checkpoint` | Create/restore checkpoints |
-| `/voice` | Voice input control (on/off/toggle) |
-| `/speak` | Speak text aloud with TTS |
-| `/tts` | Text-to-speech settings (on/off/auto/voices) |
-| `/theme` | Change UI color theme |
-| `/avatar` | Change chat avatars |
-| `/ai-test` | Run integration tests on the current AI provider |
-
-### Custom Commands
-
-Create custom commands in `.grok/commands/`:
-
-```markdown
-<!-- .grok/commands/review-pr.md -->
-Review the changes in this PR focusing on:
-1. Code quality and best practices
-2. Potential bugs or edge cases
-3. Test coverage
-4. Documentation
-```
-
-Usage: `/review-pr`
+- 📖 [Architecture](ARCHITECTURE.md) — Design système détaillé
+- 🔧 [CLAUDE.md](CLAUDE.md) — Guide pour les IA
+- 🔬 [Research](docs/RESEARCH_IMPROVEMENTS.md) — Améliorations basées recherche
+- 🔒 [Security](SECURITY.md) — Politique de sécurité
+- 📝 [Changelog](CHANGELOG.md) — Historique des versions
 
 ---
 
-## Project Structure
+## 📜 Licence
 
-```
-grok-cli/
-├── src/
-│   ├── agent/                  # AI agent core
-│   │   ├── multi-agent/        # Multi-agent collaboration
-│   │   │   └── enhanced-coordination.ts # Adaptive task allocation
-│   │   ├── parallel/           # Parallel execution
-│   │   ├── reasoning/          # Tree-of-thought, MCTS
-│   │   ├── repair/             # Auto-repair engine
-│   │   │   ├── iterative-repair.ts  # ChatRepair-style feedback loop
-│   │   │   └── repair-engine.ts     # Core repair logic
-│   │   ├── thinking/           # Extended thinking
-│   │   ├── grok-agent.ts       # Main agent
-│   │   ├── architect-mode.ts   # Two-phase architecture
-│   │   ├── pipelines.ts        # Agent pipelines
-│   │   ├── subagents.ts        # Subagent system
-│   │   └── thinking-keywords.ts # think/megathink/ultrathink detection
-│   │
-│   ├── tools/                  # Tool implementations
-│   │   ├── intelligence/       # Code intelligence suite
-│   │   │   ├── ast-parser.ts
-│   │   │   ├── symbol-search.ts
-│   │   │   ├── dependency-analyzer.ts
-│   │   │   ├── code-context.ts
-│   │   │   └── refactoring-assistant.ts
-│   │   │
-│   │   ├── enhanced-search.ts  # Streaming search with bundled ripgrep
-│   │   ├── multi-edit.ts       # Multi-file editor
-│   │   ├── git-tool.ts         # Git integration
-│   │   ├── interactive-bash.ts # PTY support
-│   │   └── ...                 # Core tools
-│   │
-│   ├── context/                # Context management
-│   │   ├── codebase-rag/       # RAG for codebase
-│   │   ├── semantic-map/       # Semantic indexing
-│   │   ├── context-manager.ts  # Context window management
-│   │   ├── context-compressor.ts # Intelligent compression (JetBrains research)
-│   │   ├── dependency-aware-rag.ts # RAG with dependency graph (CodeRAG)
-│   │   ├── observation-masking.ts  # Tool output masking
-│   │   └── codebase-map.ts     # Repository mapping
-│   │
-│   ├── memory/                 # Persistent memory
-│   │   └── persistent-memory.ts
-│   │
-│   ├── skills/                 # Skills system
-│   │   └── skill-manager.ts
-│   │
-│   ├── hooks/                  # Hooks system
-│   │   └── hook-system.ts
-│   │
-│   ├── mcp/                    # MCP integration
-│   │   └── mcp-client.ts
-│   │
-│   ├── security/               # Security & permissions
-│   │   └── approval-modes.ts   # Three-tier permission system
-│   │
-│   ├── optimization/           # Research-based LLM optimizations
-│   │   ├── tool-filtering.ts   # Dynamic tool filtering (Less-is-More)
-│   │   ├── model-routing.ts    # Tiered model routing (FrugalGPT)
-│   │   ├── parallel-executor.ts # Parallel tool execution (LLMCompiler)
-│   │   └── latency-optimizer.ts # Latency optimization for flow state
-│   │
-│   ├── ui/                     # Terminal UI (Ink/React)
-│   │   └── components/
-│   │       └── error-boundary.tsx  # React error boundaries
-│   │
-│   ├── services/               # Services
-│   │   ├── plan-generator.ts
-│   │   └── codebase-explorer.ts
-│   │
-│   └── utils/                  # Utilities
-│       ├── autonomy-manager.ts
-│       ├── cost-tracker.ts
-│       ├── model-router.ts
-│       ├── semantic-cache.ts   # API response caching with similarity
-│       ├── shell-completions.ts # Bash/zsh/fish completions
-│       └── ...
-│
-├── dist/                       # Compiled output
-└── package.json
-```
-
----
-
-## Tech Stack
-
-| Category | Technology |
-|----------|------------|
-| **Runtime** | Node.js 18+ |
-| **Language** | TypeScript 5.3 |
-| **UI** | React 18 + Ink 4 |
-| **CLI** | Commander.js 12 |
-| **AI Client** | OpenAI SDK 5.10 |
-| **Search** | ripgrep-node |
-| **Tokens** | tiktoken |
-| **MCP** | @modelcontextprotocol/sdk |
-| **PTY** | node-pty (optional) |
-
----
-
-## Security
-
-- **Confirmation before destructive actions** - All file and bash operations require approval
-- **Visual diff preview** - See changes before applying
-- **Automated security scanning** - npm audit and TruffleHog
-- **Input validation** - Timeouts, buffer limits, round limits
-- **No hardcoded secrets** - Environment variables and settings files
-- **Autonomy levels** - Fine-grained control over auto-execution
-- **Command allow/deny lists** - YOLO mode guardrails
-
----
-
-## Research Foundation
-
-Grok CLI is built on cutting-edge research in AI-assisted software development:
-
-### LLM Agents for Code Generation
-
-| Paper | Key Contribution |
-|-------|------------------|
-| [Survey on Code Generation with LLM-based Agents](https://arxiv.org/abs/2508.00083) | Comprehensive survey of 152 references on autonomous code agents |
-| [Paper2Code: Multi-Agent Framework](https://arxiv.org/abs/2504.17192) | Three-phase approach: Planning → Analysis → Generation |
-| [ADAS: Automated Design of Agentic Systems](https://openreview.net/forum?id=Kf8pjPYD5d) | Meta Agent Search for designing new agents |
-| [LLM-Based Multi-Agent Systems for SE](https://dl.acm.org/doi/10.1145/3712003) | Multi-agent collaboration patterns |
-
-### Advanced Reasoning
-
-| Paper | Key Contribution |
-|-------|------------------|
-| [RethinkMCTS: Monte Carlo Tree Search for Code](https://arxiv.org/abs/2409.09584) | 74% improvement vs simple CoT on complex problems |
-| [Chain of Preference Optimization](https://proceedings.neurips.cc/paper_files/paper/2024/file/00d80722b756de0166523a87805dd00f-Paper-Conference.pdf) | Aligning Chain-of-Thought with Tree-of-Thought |
-| [LongRoPE: Extending Context to 2M Tokens](https://arxiv.org/abs/2402.13753) | Progressive context extension strategies |
-
-### RAG and Retrieval
-
-| Paper | Key Contribution |
-|-------|------------------|
-| [RAG-MCP](https://arxiv.org/abs/2505.03275) | Tool selection via retrieval (basis for our RAG tool selection) |
-| [ToolLLM](https://arxiv.org/abs/2307.16789) | Tool learning with 16,000+ APIs |
-| [RAG for Large Scale Code Repos](https://www.qodo.ai/blog/rag-for-large-scale-code-repos/) | Enterprise-scale code retrieval strategies |
-| [Corrective RAG (CRAG)](https://arxiv.org/abs/2401.15884) | Adaptive retrieval with correction mechanisms |
-
-### Automated Program Repair
-
-| Paper | Key Contribution |
-|-------|------------------|
-| [AutoCodeRover](https://arxiv.org/abs/2404.11595) | Autonomous bug localization and repair |
-| [SWE-agent](https://arxiv.org/abs/2410.06992) | State-of-the-art on SWE-bench |
-| [LeDex: Training LLMs to Self-Debug](https://arxiv.org/abs/2405.14069) | Improved self-explanation and debugging |
-| [ChatRepair (ISSTA 2024)](https://doi.org/10.1145/3650212.3680328) | Conversational repair with feedback loop |
-
-### Context Management & Optimization
-
-| Paper | Key Contribution |
-|-------|------------------|
-| [JetBrains Context Management 2024](https://arxiv.org/abs/2406.04892) | Hybrid observation masking (-7% cost, +2.6% success) |
-| [CodeRAG 2024](https://arxiv.org/abs/2406.07003) | Repository-level context with dependency graphs |
-| [AgentCoder 2024](https://arxiv.org/abs/2312.13010) | Multi-agent code generation with test feedback |
-| [RepairAgent 2024](https://arxiv.org/abs/2403.17134) | Autonomous LLM-based program repair |
-| Semantic Caching Research | 68% API call reduction with similarity matching |
-| [Less-is-More 2024](https://arxiv.org/abs/2402.10329) | Dynamic tool filtering for 70% speedup |
-| [FrugalGPT (Stanford)](https://arxiv.org/abs/2305.05176) | Tiered model routing for 30-70% cost reduction |
-| [LLMCompiler 2024](https://arxiv.org/abs/2312.04511) | Parallel tool execution for 2.5-4.6x speedup |
-
-### Benchmarks
-
-| Benchmark | Description |
-|-----------|-------------|
-| [SWE-bench](https://www.swebench.com/) | Real-world software engineering tasks |
-| [SWE-bench Verified](https://openai.com/index/introducing-swe-bench-verified/) | Human-verified subset (500 problems) |
-| [SWE-Bench Pro](https://scale.com/leaderboard/swe_bench_pro_public) | Private benchmark to prevent data contamination |
-| [Berkeley Function Calling Leaderboard](https://gorilla.cs.berkeley.edu/leaderboard.html) | Tool use benchmarking |
-
-### Best Practices
-
-| Resource | Description |
-|----------|-------------|
-| [Building Effective Agents - Anthropic](https://www.anthropic.com/research/building-effective-agents) | Official guidance on agent design |
-| [Claude Code Best Practices](https://www.anthropic.com/engineering/claude-code-best-practices) | Practical patterns for AI coding assistants |
-
----
-
-## Competitive Comparison
-
-| Feature | Grok CLI | Claude Code | Aider | Gemini CLI | Cursor |
-|---------|----------|-------------|-------|------------|--------|
-| Terminal-native | **YES** | **YES** | **YES** | **YES** | NO |
-| Hooks system | **YES** | **YES** | NO | NO | **YES** |
-| Multi-edit | **YES** | **YES** | **YES** | NO | **YES** |
-| Architect mode | **YES** | NO | **YES** | NO | NO |
-| PTY support | **YES** | NO | NO | **YES** | NO |
-| Custom commands | **YES** | **YES** | NO | NO | NO |
-| Subagents | **YES** | **YES** | NO | NO | **YES** |
-| Auto-commit | **YES** | **YES** | **YES** | **YES** | NO |
-| Voice input | **YES** | NO | **YES** | NO | NO |
-| MCP support | **YES** | **YES** | NO | **YES** | NO |
-| Agent pipelines | **YES** | **YES** | NO | NO | NO |
-| Tree-of-Thought | **YES** | **YES** | NO | NO | NO |
-| Codebase RAG | **YES** | **YES** | **YES** | **YES** | **YES** |
-| Checkpoints | **YES** | **YES** | NO | NO | NO |
-| **VS Code Extension** | **YES** | **YES** | NO | NO | **YES** |
-| **LSP Server** | **YES** | NO | NO | NO | NO |
-| **Sandboxed Terminal** | **YES** | NO | NO | NO | **YES** |
-| **AI Code Review** | **YES** | NO | NO | NO | **YES** |
-| **8+ Parallel Agents** | **YES** | **YES** | NO | NO | **YES** |
-| **Team Collaboration** | **YES** | NO | NO | NO | **YES** |
-| **Analytics Dashboard** | **YES** | NO | NO | NO | NO |
-| **Plugin Marketplace** | **YES** | NO | NO | NO | **YES** |
-| **Offline Mode** | **YES** | NO | NO | NO | NO |
-| **Custom Personas** | **YES** | NO | NO | NO | NO |
-| **Enhanced Memory** | **YES** | **YES** | NO | NO | NO |
-| **GitHub Integration** | **YES** | **YES** | **YES** | NO | NO |
-
----
-
-## Contributing
-
-Contributions are welcome!
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Development
-
-```bash
-npm install          # Install dependencies
-npm run dev          # Development mode
-npm run build        # Build project
-npm run lint         # Run linter
-npm run typecheck    # Type checking
-npm test             # Run tests
-```
-
----
-
-## Documentation
-
-- [Architecture Documentation](ARCHITECTURE.md) - Detailed system design
-- [RAG Tool Selection](docs/RAG_TOOL_SELECTION.md) - Tool selection algorithm
-- [Research Improvements](docs/RESEARCH_IMPROVEMENTS.md) - Research-based improvements
-- [Competitor Analysis](COMPETITOR_AUDIT.md) - Feature comparison
-- [Security Policy](SECURITY.md) - Security guidelines
-- [Changelog](CHANGELOG.md) - Version history
-
----
-
-## License
-
-MIT License - see [LICENSE](LICENSE) for details.
-
----
-
-## Acknowledgments
-
-- **X.AI** for the Grok API
-- **OpenAI** for the compatible SDK
-- **Anthropic** for Claude Code inspiration and [research](https://www.anthropic.com/research/building-effective-agents)
-- **Vadim Demedes** for [Ink](https://github.com/vadimdemedes/ink)
-- **BurntSushi** for [ripgrep](https://github.com/BurntSushi/ripgrep)
-- The research community for foundational work on LLM agents
-- The open-source community
+MIT License — voir [LICENSE](LICENSE) pour les détails.
 
 ---
 
 <div align="center">
 
-**Built with passion by the Grok CLI community**
+### 💖 Fait avec amour par la communauté Grok CLI
 
-[Report Bug](https://github.com/phuetz/grok-cli/issues) •
-[Request Feature](https://github.com/phuetz/grok-cli/discussions)
+<br/>
+
+**[🐛 Signaler un Bug](https://github.com/phuetz/grok-cli/issues)** •
+**[💡 Proposer une Fonctionnalité](https://github.com/phuetz/grok-cli/discussions)** •
+**[⭐ Donner une Étoile](https://github.com/phuetz/grok-cli)**
+
+<br/>
+
+<sub>🤖 Alimenté par Grok • 🧠 Inspiré par Claude Code • 💕 Créé pour les développeurs</sub>
 
 </div>

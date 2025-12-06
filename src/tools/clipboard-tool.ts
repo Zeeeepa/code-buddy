@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { spawn, execSync, spawnSync } from 'child_process';
-import { ToolResult } from '../types/index.js';
+import { ToolResult, getErrorMessage } from '../types/index.js';
 
 /**
  * Escape a string for safe use in shell commands
@@ -67,10 +67,10 @@ export class ClipboardTool {
         output: `📋 Clipboard text (${text.length} chars):\n${text.slice(0, 2000)}${text.length > 2000 ? '\n... [truncated]' : ''}`,
         data: { type: 'text', content: text }
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: `Failed to read clipboard: ${error.message}`
+        error: `Failed to read clipboard: ${getErrorMessage(error)}`
       };
     }
   }
@@ -113,10 +113,10 @@ export class ClipboardTool {
         success: true,
         output: `📋 Copied ${text.length} characters to clipboard`
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: `Failed to write to clipboard: ${error.message}`
+        error: `Failed to write to clipboard: ${getErrorMessage(error)}`
       };
     }
   }
@@ -193,10 +193,10 @@ end try`;
         output: `🖼️ Image saved from clipboard:\n   Path: ${imagePath}\n   Size: ${this.formatSize(stats.size)}`,
         data: { type: 'image', imagePath }
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: `Failed to read image from clipboard: ${error.message}`
+        error: `Failed to read image from clipboard: ${getErrorMessage(error)}`
       };
     }
   }
@@ -239,10 +239,10 @@ end try`;
         success: true,
         output: `🖼️ Image copied to clipboard: ${imagePath}`
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: `Failed to copy image to clipboard: ${error.message}`
+        error: `Failed to copy image to clipboard: ${getErrorMessage(error)}`
       };
     }
   }
@@ -292,10 +292,10 @@ end try`;
         output: `📋 Clipboard HTML (${html.length} chars):\n${html.slice(0, 1000)}${html.length > 1000 ? '\n... [truncated]' : ''}`,
         data: { type: 'html', html }
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: `Failed to read HTML from clipboard: ${error.message}`
+        error: `Failed to read HTML from clipboard: ${getErrorMessage(error)}`
       };
     }
   }
@@ -315,10 +315,10 @@ end try`;
       }
 
       return await this.writeText(resolvedPath);
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: `Failed to copy file path: ${error.message}`
+        error: `Failed to copy file path: ${getErrorMessage(error)}`
       };
     }
   }
@@ -339,10 +339,10 @@ end try`;
 
       const content = fs.readFileSync(resolvedPath, 'utf8');
       return await this.writeText(content);
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: `Failed to copy file content: ${error.message}`
+        error: `Failed to copy file content: ${getErrorMessage(error)}`
       };
     }
   }
@@ -399,10 +399,10 @@ end try`;
         output: 'Clipboard is empty or contains unknown content type',
         data: { type: 'empty' }
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: `Failed to determine clipboard type: ${error.message}`
+        error: `Failed to determine clipboard type: ${getErrorMessage(error)}`
       };
     }
   }
@@ -435,10 +435,10 @@ end try`;
         success: true,
         output: '📋 Clipboard cleared'
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: `Failed to clear clipboard: ${error.message}`
+        error: `Failed to clear clipboard: ${getErrorMessage(error)}`
       };
     }
   }

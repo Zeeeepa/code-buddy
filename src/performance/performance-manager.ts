@@ -8,7 +8,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { LazyLoader, getLazyLoader, initializeLazyLoader, LoadMetrics } from './lazy-loader.js';
+import { LazyLoader, initializeLazyLoader } from './lazy-loader.js';
 import { ToolCache, getToolCache, ToolCacheStats } from './tool-cache.js';
 import { RequestOptimizer, getRequestOptimizer, RequestStats } from './request-optimizer.js';
 import { SemanticCache, getApiCache } from '../utils/semantic-cache.js';
