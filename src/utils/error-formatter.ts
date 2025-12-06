@@ -125,6 +125,63 @@ export const ERROR_TEMPLATES = {
     suggestion: "Check tool parameters and try again",
     exitCode: EXIT_CODES.TOOL_EXECUTION_FAILED,
   },
+
+  PATH_TRAVERSAL: {
+    code: "PATH_TRAVERSAL",
+    message: "Path traversal attempt blocked",
+    suggestion: "Use paths within the project directory only",
+    exitCode: EXIT_CODES.SECURITY_ERROR,
+  },
+
+  VALIDATION_ERROR: {
+    code: "VALIDATION_ERROR",
+    message: "Input validation failed",
+    suggestion: "Check the input format and try again",
+    exitCode: EXIT_CODES.VALIDATION_ERROR,
+  },
+
+  SESSION_EXPIRED: {
+    code: "SESSION_EXPIRED",
+    message: "Session has expired",
+    suggestion: "Start a new session with `grok`",
+    exitCode: EXIT_CODES.SESSION_ERROR,
+  },
+
+  CHECKPOINT_NOT_FOUND: {
+    code: "CHECKPOINT_NOT_FOUND",
+    message: "Checkpoint not found",
+    suggestion: "Use `/checkpoints` to see available checkpoints",
+    exitCode: EXIT_CODES.CHECKPOINT_ERROR,
+  },
+
+  MEMORY_LIMIT: {
+    code: "MEMORY_LIMIT",
+    message: "Memory limit exceeded",
+    suggestion: "Try with smaller files or fewer concurrent operations",
+    exitCode: EXIT_CODES.RESOURCE_ERROR,
+  },
+
+  DEPENDENCY_MISSING: {
+    code: "DEPENDENCY_MISSING",
+    message: "Required dependency is not installed",
+    suggestion: "Run `npm install` or install the missing dependency",
+    exitCode: EXIT_CODES.DEPENDENCY_ERROR,
+  },
+
+  SANDBOX_VIOLATION: {
+    code: "SANDBOX_VIOLATION",
+    message: "Operation blocked by sandbox",
+    suggestion: "This command requires elevated permissions. Use --allow-dangerous or run in full-auto mode",
+    docUrl: "https://github.com/phuetz/grok-cli#security-modes",
+    exitCode: EXIT_CODES.SECURITY_ERROR,
+  },
+
+  CONTEXT_TOO_LARGE: {
+    code: "CONTEXT_TOO_LARGE",
+    message: "Context is too large for the model",
+    suggestion: "Try with fewer files or use `/compact` to summarize context",
+    exitCode: EXIT_CODES.CONTEXT_ERROR,
+  },
 } as const;
 
 /**

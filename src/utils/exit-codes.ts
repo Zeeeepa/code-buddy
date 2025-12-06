@@ -59,6 +59,27 @@ export const EXIT_CODES = {
 
   /** Model not available */
   MODEL_NOT_AVAILABLE: 15,
+
+  /** Security violation (sandbox, path traversal) */
+  SECURITY_ERROR: 16,
+
+  /** Input validation error */
+  VALIDATION_ERROR: 17,
+
+  /** Session error */
+  SESSION_ERROR: 18,
+
+  /** Checkpoint error */
+  CHECKPOINT_ERROR: 19,
+
+  /** Resource error (memory, CPU) */
+  RESOURCE_ERROR: 20,
+
+  /** Dependency error */
+  DEPENDENCY_ERROR: 21,
+
+  /** Context error (too large, etc.) */
+  CONTEXT_ERROR: 22,
 } as const;
 
 /**
@@ -87,6 +108,13 @@ export const EXIT_CODE_DESCRIPTIONS: Record<ExitCode, string> = {
   [EXIT_CODES.TOOL_EXECUTION_FAILED]: "Tool execution failed",
   [EXIT_CODES.MCP_ERROR]: "MCP server error",
   [EXIT_CODES.MODEL_NOT_AVAILABLE]: "Model not available",
+  [EXIT_CODES.SECURITY_ERROR]: "Security violation",
+  [EXIT_CODES.VALIDATION_ERROR]: "Input validation failed",
+  [EXIT_CODES.SESSION_ERROR]: "Session error",
+  [EXIT_CODES.CHECKPOINT_ERROR]: "Checkpoint error",
+  [EXIT_CODES.RESOURCE_ERROR]: "Resource error",
+  [EXIT_CODES.DEPENDENCY_ERROR]: "Dependency error",
+  [EXIT_CODES.CONTEXT_ERROR]: "Context error",
 };
 
 /**
