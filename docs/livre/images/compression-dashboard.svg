@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 300">
+  <defs>
+    <linearGradient id="bgGradCD" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="300" fill="url(#bgGradCD)"/>
+
+  <!-- Title -->
+  <text x="400" y="28" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle">COMPRESSION DASHBOARD</text>
+
+  <!-- Tokens section -->
+  <rect x="40" y="50" width="230" height="120" rx="8" fill="#1e3a3a" stroke="#2ecc71"/>
+  <text x="60" y="75" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#2ecc71">🔢 TOKENS</text>
+
+  <text x="60" y="100" font-family="Arial, sans-serif" font-size="9" fill="#888888">├─ Original</text>
+  <text x="180" y="100" font-family="monospace" font-size="9" fill="#cccccc">150,000</text>
+
+  <text x="60" y="118" font-family="Arial, sans-serif" font-size="9" fill="#888888">├─ Compressed</text>
+  <text x="180" y="118" font-family="monospace" font-size="9" fill="#cccccc">45,000</text>
+
+  <text x="60" y="136" font-family="Arial, sans-serif" font-size="9" fill="#888888">└─ Ratio</text>
+  <text x="180" y="136" font-family="monospace" font-size="9" fill="#2ecc71">30%</text>
+  <text x="210" y="136" font-family="Arial, sans-serif" font-size="9" fill="#2ecc71">(💚 70% saved)</text>
+
+  <!-- Operations section -->
+  <rect x="285" y="50" width="230" height="120" rx="8" fill="#3a3a1e" stroke="#f39c12"/>
+  <text x="305" y="75" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#f39c12">🔧 OPERATIONS</text>
+
+  <text x="305" y="100" font-family="Arial, sans-serif" font-size="9" fill="#888888">├─ Messages</text>
+  <text x="430" y="100" font-family="monospace" font-size="9" fill="#cccccc">247</text>
+
+  <text x="305" y="118" font-family="Arial, sans-serif" font-size="9" fill="#888888">├─ Summarizations</text>
+  <text x="430" y="118" font-family="monospace" font-size="9" fill="#cccccc">38</text>
+
+  <text x="305" y="136" font-family="Arial, sans-serif" font-size="9" fill="#888888">└─ Masked obs.</text>
+  <text x="430" y="136" font-family="monospace" font-size="9" fill="#cccccc">124</text>
+
+  <!-- Savings section -->
+  <rect x="530" y="50" width="230" height="120" rx="8" fill="#2a1e3a" stroke="#9b59b6"/>
+  <text x="550" y="75" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#9b59b6">💰 ÉCONOMIES</text>
+
+  <text x="550" y="105" font-family="Arial, sans-serif" font-size="9" fill="#888888">Estimated saved</text>
+
+  <text x="645" y="140" font-family="Arial, sans-serif" font-size="24" fill="#2ecc71" text-anchor="middle">$847.32</text>
+
+  <!-- Progress bars -->
+  <rect x="40" y="185" width="720" height="100" rx="8" fill="#2d2d44" stroke="#4a4a6a"/>
+  <text x="400" y="210" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#ffffff" text-anchor="middle">RÉPARTITION</text>
+
+  <!-- Compression ratio bar -->
+  <text x="60" y="235" font-family="Arial, sans-serif" font-size="9" fill="#888888">Token reduction</text>
+  <rect x="180" y="225" width="400" height="16" rx="3" fill="#1a1a2e"/>
+  <rect x="180" y="225" width="280" height="16" rx="3" fill="#2ecc71"/>
+  <text x="600" y="237" font-family="monospace" font-size="9" fill="#2ecc71">70%</text>
+
+  <!-- Masked observations bar -->
+  <text x="60" y="260" font-family="Arial, sans-serif" font-size="9" fill="#888888">Masked observations</text>
+  <rect x="180" y="250" width="400" height="16" rx="3" fill="#1a1a2e"/>
+  <rect x="180" y="250" width="200" height="16" rx="3" fill="#f39c12"/>
+  <text x="600" y="262" font-family="monospace" font-size="9" fill="#f39c12">50%</text>
+</svg>

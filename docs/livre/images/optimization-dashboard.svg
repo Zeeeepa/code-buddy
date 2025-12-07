@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 420">
+  <defs>
+    <linearGradient id="bgGradOD" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="420" fill="url(#bgGradOD)"/>
+
+  <!-- Title -->
+  <text x="400" y="28" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle">OPTIMIZATION DASHBOARD</text>
+
+  <!-- Semantic Cache panel -->
+  <rect x="40" y="50" width="350" height="130" rx="8" fill="#2a1e3a" stroke="#9b59b6"/>
+  <text x="60" y="75" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#9b59b6">🔮 SEMANTIC CACHE</text>
+
+  <!-- Hit Rate bar -->
+  <text x="60" y="100" font-family="Arial, sans-serif" font-size="9" fill="#888888">Hit Rate</text>
+  <rect x="140" y="88" width="150" height="14" rx="2" fill="#1a1a2e"/>
+  <rect x="140" y="88" width="117" height="14" rx="2" fill="#9b59b6"/>
+  <text x="300" y="100" font-family="monospace" font-size="9" fill="#9b59b6">78%</text>
+
+  <text x="60" y="120" font-family="Arial, sans-serif" font-size="9" fill="#cccccc">Hits/Misses : 7,823 / 2,177</text>
+  <text x="60" y="138" font-family="Arial, sans-serif" font-size="9" fill="#cccccc">Avg Similarity : 94.3%</text>
+  <text x="60" y="156" font-family="Arial, sans-serif" font-size="9" fill="#cccccc">Entries : 8,432</text>
+  <text x="60" y="174" font-family="Arial, sans-serif" font-size="9" fill="#2ecc71">Est. Savings : $234.69</text>
+
+  <!-- Tool Cache panel -->
+  <rect x="410" y="50" width="350" height="130" rx="8" fill="#3a3a1e" stroke="#f39c12"/>
+  <text x="430" y="75" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#f39c12">🔧 TOOL CACHE</text>
+
+  <!-- Hit Rate bar -->
+  <text x="430" y="100" font-family="Arial, sans-serif" font-size="9" fill="#888888">Hit Rate</text>
+  <rect x="510" y="88" width="150" height="14" rx="2" fill="#1a1a2e"/>
+  <rect x="510" y="88" width="93" height="14" rx="2" fill="#f39c12"/>
+  <text x="670" y="100" font-family="monospace" font-size="9" fill="#f39c12">62%</text>
+
+  <text x="430" y="120" font-family="Arial, sans-serif" font-size="9" fill="#cccccc">Hits/Misses : 1,245 / 763</text>
+  <text x="430" y="138" font-family="Arial, sans-serif" font-size="9" fill="#cccccc">Invalidations : 89</text>
+  <text x="430" y="156" font-family="Arial, sans-serif" font-size="9" fill="#cccccc">Entries : 234</text>
+  <text x="430" y="174" font-family="Arial, sans-serif" font-size="9" fill="#cccccc">Memory : 12.4 MB</text>
+
+  <!-- Cost Analysis panel -->
+  <rect x="40" y="195" width="720" height="110" rx="8" fill="#1e3a3a" stroke="#2ecc71"/>
+  <text x="60" y="220" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#2ecc71">💰 COST ANALYSIS</text>
+
+  <!-- Without cache bar -->
+  <text x="60" y="250" font-family="Arial, sans-serif" font-size="9" fill="#e74c3c">Without cache</text>
+  <rect x="170" y="238" width="400" height="18" rx="3" fill="#3a1e2a"/>
+  <text x="580" y="252" font-family="monospace" font-size="10" fill="#e74c3c">$500.00</text>
+
+  <!-- With cache bar -->
+  <text x="60" y="278" font-family="Arial, sans-serif" font-size="9" fill="#2ecc71">With cache</text>
+  <rect x="170" y="266" width="400" height="18" rx="3" fill="#1a1a2e"/>
+  <rect x="170" y="266" width="136" height="18" rx="3" fill="#2ecc71"/>
+  <text x="580" y="280" font-family="monospace" font-size="10" fill="#2ecc71">$170.31</text>
+
+  <!-- Savings -->
+  <rect x="620" y="238" width="120" height="58" rx="4" fill="#2d2d44"/>
+  <text x="680" y="262" font-family="Arial, sans-serif" font-size="10" fill="#f39c12" text-anchor="middle">💵 Savings</text>
+  <text x="680" y="285" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#2ecc71" text-anchor="middle">65.9%</text>
+
+  <!-- Performance panel -->
+  <rect x="40" y="320" width="720" height="85" rx="8" fill="#2d2d44" stroke="#3498db"/>
+  <text x="60" y="345" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#3498db">⏱️ PERFORMANCE</text>
+
+  <rect x="60" y="358" width="155" height="35" rx="4" fill="#1a1a2e"/>
+  <text x="137" y="375" font-family="Arial, sans-serif" font-size="9" fill="#888888" text-anchor="middle">Cache lookup</text>
+  <text x="137" y="388" font-family="monospace" font-size="10" fill="#2ecc71" text-anchor="middle">0.8ms</text>
+
+  <rect x="230" y="358" width="155" height="35" rx="4" fill="#1a1a2e"/>
+  <text x="307" y="375" font-family="Arial, sans-serif" font-size="9" fill="#888888" text-anchor="middle">Embedding calc</text>
+  <text x="307" y="388" font-family="monospace" font-size="10" fill="#f39c12" text-anchor="middle">45ms</text>
+
+  <rect x="400" y="358" width="155" height="35" rx="4" fill="#1a1a2e"/>
+  <text x="477" y="375" font-family="Arial, sans-serif" font-size="9" fill="#888888" text-anchor="middle">LLM call</text>
+  <text x="477" y="388" font-family="monospace" font-size="10" fill="#e74c3c" text-anchor="middle">1,200ms</text>
+
+  <rect x="570" y="358" width="170" height="35" rx="4" fill="#1e3a3a"/>
+  <text x="655" y="375" font-family="Arial, sans-serif" font-size="9" fill="#2ecc71" text-anchor="middle">Cache hit total</text>
+  <text x="655" y="388" font-family="monospace" font-size="10" fill="#2ecc71" text-anchor="middle">46ms (96% faster)</text>
+</svg>
