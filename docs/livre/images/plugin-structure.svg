@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 380">
+  <defs>
+    <linearGradient id="bgGradPS2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="380" fill="url(#bgGradPS2)"/>
+
+  <!-- Title -->
+  <text x="400" y="28" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle">STRUCTURE D'UN PLUGIN</text>
+
+  <!-- File tree section -->
+  <rect x="40" y="50" width="330" height="180" rx="8" fill="#1e3a3a" stroke="#2ecc71" stroke-width="2"/>
+  <text x="60" y="75" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#2ecc71">📁 Arborescence</text>
+
+  <text x="60" y="100" font-family="monospace" font-size="10" fill="#f39c12">~/.grok/plugins/</text>
+  <text x="70" y="118" font-family="monospace" font-size="10" fill="#888888">└── my-plugin/</text>
+  <text x="90" y="136" font-family="monospace" font-size="10" fill="#3498db">├── manifest.json</text>
+  <text x="230" y="136" font-family="Arial, sans-serif" font-size="9" fill="#888888"># Métadonnées</text>
+  <text x="90" y="154" font-family="monospace" font-size="10" fill="#2ecc71">├── index.ts</text>
+  <text x="230" y="154" font-family="Arial, sans-serif" font-size="9" fill="#888888"># Point d'entrée</text>
+  <text x="90" y="172" font-family="monospace" font-size="10" fill="#9b59b6">├── package.json</text>
+  <text x="230" y="172" font-family="Arial, sans-serif" font-size="9" fill="#888888"># Dépendances</text>
+  <text x="90" y="190" font-family="monospace" font-size="10" fill="#888888">└── tools/</text>
+  <text x="110" y="208" font-family="monospace" font-size="10" fill="#f39c12">├── tool-one.ts</text>
+  <text x="110" y="224" font-family="monospace" font-size="10" fill="#f39c12">└── tool-two.ts</text>
+
+  <!-- Manifest section -->
+  <rect x="390" y="50" width="370" height="180" rx="8" fill="#3a3a1e" stroke="#f39c12" stroke-width="2"/>
+  <text x="410" y="75" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#f39c12">📋 manifest.json</text>
+
+  <text x="410" y="100" font-family="monospace" font-size="10" fill="#888888">{</text>
+  <text x="420" y="118" font-family="monospace" font-size="10" fill="#3498db">"id"</text>
+  <text x="450" y="118" font-family="monospace" font-size="10" fill="#888888">:</text>
+  <text x="460" y="118" font-family="monospace" font-size="10" fill="#2ecc71">"my-plugin"</text>
+  <text x="540" y="118" font-family="monospace" font-size="10" fill="#888888">,</text>
+
+  <text x="420" y="136" font-family="monospace" font-size="10" fill="#3498db">"name"</text>
+  <text x="468" y="136" font-family="monospace" font-size="10" fill="#888888">:</text>
+  <text x="478" y="136" font-family="monospace" font-size="10" fill="#2ecc71">"My Custom Plugin"</text>
+  <text x="615" y="136" font-family="monospace" font-size="10" fill="#888888">,</text>
+
+  <text x="420" y="154" font-family="monospace" font-size="10" fill="#3498db">"version"</text>
+  <text x="492" y="154" font-family="monospace" font-size="10" fill="#888888">:</text>
+  <text x="502" y="154" font-family="monospace" font-size="10" fill="#2ecc71">"1.0.0"</text>
+  <text x="558" y="154" font-family="monospace" font-size="10" fill="#888888">,</text>
+
+  <text x="420" y="172" font-family="monospace" font-size="10" fill="#3498db">"main"</text>
+  <text x="462" y="172" font-family="monospace" font-size="10" fill="#888888">:</text>
+  <text x="472" y="172" font-family="monospace" font-size="10" fill="#2ecc71">"index.ts"</text>
+  <text x="550" y="172" font-family="monospace" font-size="10" fill="#888888">,</text>
+
+  <text x="420" y="190" font-family="monospace" font-size="10" fill="#3498db">"tools"</text>
+  <text x="470" y="190" font-family="monospace" font-size="10" fill="#888888">: [{ "name": "tool_one" }, ...]</text>
+  <text x="700" y="190" font-family="monospace" font-size="10" fill="#888888">,</text>
+
+  <text x="420" y="208" font-family="monospace" font-size="10" fill="#3498db">"permissions"</text>
+  <text x="520" y="208" font-family="monospace" font-size="10" fill="#888888">:</text>
+  <text x="530" y="208" font-family="monospace" font-size="10" fill="#e74c3c">["read", "network"]</text>
+
+  <text x="410" y="224" font-family="monospace" font-size="10" fill="#888888">}</text>
+
+  <!-- Key fields section -->
+  <rect x="40" y="250" width="720" height="115" rx="8" fill="#2d2d44" stroke="#4a4a6a"/>
+  <text x="400" y="275" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle">CHAMPS OBLIGATOIRES</text>
+
+  <!-- Field boxes -->
+  <rect x="60" y="290" width="100" height="55" rx="4" fill="#1e3a3a"/>
+  <text x="110" y="310" font-family="monospace" font-size="10" fill="#3498db" text-anchor="middle">id</text>
+  <text x="110" y="330" font-family="Arial, sans-serif" font-size="8" fill="#cccccc" text-anchor="middle">Identifiant</text>
+  <text x="110" y="342" font-family="Arial, sans-serif" font-size="8" fill="#888888" text-anchor="middle">(kebab-case)</text>
+
+  <rect x="175" y="290" width="100" height="55" rx="4" fill="#1e3a3a"/>
+  <text x="225" y="310" font-family="monospace" font-size="10" fill="#3498db" text-anchor="middle">name</text>
+  <text x="225" y="330" font-family="Arial, sans-serif" font-size="8" fill="#cccccc" text-anchor="middle">Nom</text>
+  <text x="225" y="342" font-family="Arial, sans-serif" font-size="8" fill="#888888" text-anchor="middle">affichable</text>
+
+  <rect x="290" y="290" width="100" height="55" rx="4" fill="#1e3a3a"/>
+  <text x="340" y="310" font-family="monospace" font-size="10" fill="#3498db" text-anchor="middle">version</text>
+  <text x="340" y="330" font-family="Arial, sans-serif" font-size="8" fill="#cccccc" text-anchor="middle">Version</text>
+  <text x="340" y="342" font-family="Arial, sans-serif" font-size="8" fill="#888888" text-anchor="middle">(semver)</text>
+
+  <rect x="405" y="290" width="100" height="55" rx="4" fill="#3a3a1e"/>
+  <text x="455" y="310" font-family="monospace" font-size="10" fill="#f39c12" text-anchor="middle">main</text>
+  <text x="455" y="330" font-family="Arial, sans-serif" font-size="8" fill="#cccccc" text-anchor="middle">Point</text>
+  <text x="455" y="342" font-family="Arial, sans-serif" font-size="8" fill="#888888" text-anchor="middle">d'entrée</text>
+
+  <rect x="520" y="290" width="100" height="55" rx="4" fill="#3a3a1e"/>
+  <text x="570" y="310" font-family="monospace" font-size="10" fill="#f39c12" text-anchor="middle">tools</text>
+  <text x="570" y="330" font-family="Arial, sans-serif" font-size="8" fill="#cccccc" text-anchor="middle">Liste des</text>
+  <text x="570" y="342" font-family="Arial, sans-serif" font-size="8" fill="#888888" text-anchor="middle">outils</text>
+
+  <rect x="635" y="290" width="110" height="55" rx="4" fill="#3a1e2a"/>
+  <text x="690" y="310" font-family="monospace" font-size="10" fill="#e74c3c" text-anchor="middle">permissions</text>
+  <text x="690" y="330" font-family="Arial, sans-serif" font-size="8" fill="#cccccc" text-anchor="middle">Droits</text>
+  <text x="690" y="342" font-family="Arial, sans-serif" font-size="8" fill="#888888" text-anchor="middle">requis</text>
+</svg>
