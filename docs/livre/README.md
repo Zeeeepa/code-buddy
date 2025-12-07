@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/cover-image.png" alt="Couverture du livre" width="400"/>
+  <img src="images/cover-image.png" alt="Couverture du livre" width="600"/>
 </p>
 
 # Construire un Agent LLM Moderne
