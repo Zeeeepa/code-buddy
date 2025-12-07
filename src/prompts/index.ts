@@ -5,6 +5,7 @@
 export {
   getBaseSystemPrompt,
   getSystemPromptForMode,
+  getChatOnlySystemPrompt,
   YOLO_MODE_ADDITIONS,
   SAFE_MODE_ADDITIONS,
   CODE_MODE_ADDITIONS,

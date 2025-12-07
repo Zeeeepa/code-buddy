@@ -29,7 +29,7 @@ import { getAgentModeManager, AgentModeManager, AgentMode } from "./agent-mode.j
 import { getSandboxManager, SandboxManager } from "../security/sandbox.js";
 import { getMCPClient, MCPClient } from "../mcp/mcp-client.js";
 import { getSettingsManager } from "../utils/settings-manager.js";
-import { getSystemPromptForMode } from "../prompts/index.js";
+import { getSystemPromptForMode, getChatOnlySystemPrompt } from "../prompts/index.js";
 import { getCostTracker, CostTracker } from "../utils/cost-tracker.js";
 import { getAutonomyManager } from "../utils/autonomy-manager.js";
 import { ContextManagerV2, createContextManager } from "../context/context-manager-v2.js";
@@ -1239,6 +1239,26 @@ export class GrokAgent extends EventEmitter {
    */
   async probeToolSupport(): Promise<boolean> {
     return this.grokClient.probeToolSupport();
+  }
+
+  /**
+   * Switch to chat-only mode (no tools)
+   * Updates the system prompt to a simpler version suitable for models without tool support
+   */
+  switchToChatOnlyMode(): void {
+    const customInstructions = loadCustomInstructions();
+    const chatOnlyPrompt = getChatOnlySystemPrompt(process.cwd(), customInstructions || undefined);
+
+    // Replace the system message
+    if (this.messages.length > 0 && this.messages[0].role === 'system') {
+      this.messages[0].content = chatOnlyPrompt;
+    } else {
+      // Insert at the beginning if no system message exists
+      this.messages.unshift({
+        role: 'system',
+        content: chatOnlyPrompt,
+      });
+    }
   }
 
   abortCurrentOperation(): void {

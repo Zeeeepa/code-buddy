@@ -518,7 +518,8 @@ program
         console.log("🔍 Probing model for tool support...");
         const hasToolSupport = await agent.probeToolSupport();
         if (!hasToolSupport) {
-          console.log("ℹ️ Tool support: NOT DETECTED (using chat-only mode)");
+          console.log("ℹ️ Tool support: NOT DETECTED (switching to chat-only mode)");
+          agent.switchToChatOnlyMode();
         }
       }
 
