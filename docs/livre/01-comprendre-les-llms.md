@@ -81,24 +81,7 @@ Dans les années 2010, une nouvelle approche émergea : les réseaux de neurones
 
 Imaginez un lecteur humain parcourant un texte. À chaque mot, il ne repart pas de zéro : il accumule une compréhension du contexte, des personnages, du ton. Les RNN tentaient de reproduire ce mécanisme. L'état caché à l'étape t dépendait de l'entrée actuelle ET de l'état caché à l'étape t-1, créant une chaîne théoriquement capable de transporter l'information sur des distances arbitraires.
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    RÉSEAU RÉCURRENT (RNN)                           │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│   Entrée:   x₁ ──→ x₂ ──→ x₃ ──→ x₄ ──→ x₅                         │
-│              ↓      ↓      ↓      ↓      ↓                          │
-│   États:    h₁ ──→ h₂ ──→ h₃ ──→ h₄ ──→ h₅                         │
-│              ↓      ↓      ↓      ↓      ↓                          │
-│   Sortie:   y₁     y₂     y₃     y₄     y₅                         │
-│                                                                     │
-│   hₜ = f(W_h × hₜ₋₁ + W_x × xₜ + b)                                 │
-│                                                                     │
-│   ⚠️ Problème : le signal s'affaiblit exponentiellement             │
-│      quand il traverse de nombreuses étapes                         │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
-```
+![Architecture RNN](images/rnn-architecture.svg)
 
 Les variantes comme LSTM (Long Short-Term Memory) et GRU (Gated Recurrent Unit) ajoutèrent des mécanismes de "portes" pour mieux contrôler le flux d'information. Ces architectures connurent un succès considérable et dominèrent le NLP pendant plusieurs années.
 
@@ -127,33 +110,7 @@ L'intuition derrière cette approche était profonde. Dans un RNN, l'information
 
 C'est exactement ce que fait le mécanisme d'attention : il permet à chaque position dans la séquence de calculer une connexion directe avec chaque autre position. La distance entre deux mots n'a plus d'importance — ils sont tous à "un saut d'attention" l'un de l'autre.
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                   LA RÉVOLUTION TRANSFORMER                          │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│   AVANT (RNN) :                                                     │
-│                                                                     │
-│   mot₁ ──→ mot₂ ──→ mot₃ ──→ mot₄ ──→ mot₅                         │
-│   └──────────────────────────────────────────┘                      │
-│           ⚠️ Information doit traverser toute la chaîne             │
-│                                                                     │
-│   APRÈS (Transformer) :                                             │
-│                                                                     │
-│            mot₁ ←──────────→ mot₂                                   │
-│              ↕   ╲        ╱    ↕                                    │
-│            mot₃ ←──╲────╱──→ mot₄                                   │
-│              ↕      ╲╱       ↕                                      │
-│            mot₅ ←────╳────→ mot₆                                    │
-│                     ╱╲                                              │
-│                    ╱  ╲                                             │
-│                                                                     │
-│   ✅ Chaque mot peut directement "voir" tous les autres             │
-│   ✅ Calcul entièrement parallélisable sur GPU                      │
-│   ✅ Distance = 1 pour toutes les paires de mots                    │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
-```
+![La Révolution Transformer](images/transformer-revolution.svg)
 
 Les résultats furent spectaculaires. Sur la tâche de traduction anglais-allemand du benchmark WMT 2014, le Transformer atteignit un score BLEU de 28.4, surpassant tous les modèles précédents de plus de 2 points — une marge énorme dans ce domaine. Plus impressionnant encore : l'entraînement ne prenait que 3.5 jours sur 8 GPUs, contre des semaines pour les meilleurs modèles RNN.
 
@@ -204,31 +161,7 @@ Après entraînement sur un grand corpus, le vocabulaire contient :
 - Des mots fréquents entiers ("the", "is", "de", "le")
 - Des fragments de mots moins courants
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                 TOKENISATION BPE EN ACTION                          │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  Entrée : "Le développeur implémente un algorithme"                 │
-│                                                                     │
-│  Tokenisation :                                                     │
-│  ┌────┐┌────┐┌──────┐┌────┐┌──────┐┌────┐┌──────────┐              │
-│  │ Le ││ dé ││velopp││ eur││implém││ente││algorithme│              │
-│  └────┘└────┘└──────┘└────┘└──────┘└────┘└──────────┘              │
-│    ↓     ↓      ↓      ↓      ↓      ↓       ↓                     │
-│   453  8721  34502  2174   9821   3241    15678                    │
-│                                                                     │
-│  Total : 7 tokens (vs 5 mots)                                       │
-│                                                                     │
-│  Ratio tokens/mots :                                                │
-│  • Anglais simple : ~1.1                                            │
-│  • Français : ~1.3                                                  │
-│  • Allemand : ~1.5                                                  │
-│  • Code Python : ~1.8                                               │
-│  • Japonais/Chinois : ~2.5                                          │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
-```
+![Tokenisation BPE en Action](images/bpe-tokenization.svg)
 
 **Implications pratiques pour les développeurs**
 
@@ -341,34 +274,7 @@ Le softmax convertit les scores bruts en une distribution de probabilité. Le to
 
 Finalement, les values sont combinées selon ces poids. Le résultat est un vecteur qui "résume" l'information pertinente de toute la séquence, pondérée par l'importance contextuelle de chaque token.
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    EXEMPLE CONCRET D'ATTENTION                       │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  Phrase : "Le développeur senior qui travaille sur ce projet        │
-│            depuis trois ans était finalement satisfait"             │
-│                                                                     │
-│  Quand le modèle traite "était", il doit déterminer le sujet.       │
-│                                                                     │
-│  Poids d'attention pour "était" :                                   │
-│                                                                     │
-│  Token          │ Poids │ Interprétation                            │
-│  ─────────────────────────────────────────────────────────          │
-│  "Le"           │ 0.02  │ Article, peu informatif                   │
-│  "développeur"  │ 0.45  │ ⭐ SUJET — attention maximale             │
-│  "senior"       │ 0.12  │ Modificateur du sujet                     │
-│  "qui"          │ 0.03  │ Pronom relatif                            │
-│  "travaille"    │ 0.08  │ Verbe de la subordonnée                   │
-│  ...            │ ...   │ ...                                       │
-│  "était"        │ 0.15  │ Le token lui-même (self)                  │
-│  "satisfait"    │ 0.10  │ Attribut du sujet                         │
-│                                                                     │
-│  Le modèle "comprend" que malgré 15 mots d'écart,                   │
-│  "développeur" est le sujet de "était".                             │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
-```
+![Exemple Concret d'Attention](images/attention-example.svg)
 
 ### 1.3.3 Multi-Head Attention : Plusieurs Perspectives Simultanées
 
@@ -419,37 +325,7 @@ Chaque bloc Transformer contient :
 
 Ces blocs sont empilés en profondeur. GPT-3 en a 96, GPT-4 probablement davantage. Chaque couche successif raffine la représentation, capturant des abstractions de plus en plus haut niveau.
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    BLOC TRANSFORMER (×N)                            │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│     Entrée                                                          │
-│        ↓                                                            │
-│   ┌────────────────────────────────┐                               │
-│   │    Multi-Head Attention        │ ←── Contexte global           │
-│   └────────────────────────────────┘                               │
-│        ↓                                                            │
-│   ┌────────────────────────────────┐                               │
-│   │    Add & Layer Normalize       │ ←── Stabilise l'entraînement  │
-│   └────────────────────────────────┘                               │
-│        ↓                                                            │
-│   ┌────────────────────────────────┐                               │
-│   │    Feed Forward Network        │ ←── Transformation non-lin.   │
-│   │    (Linear → GeLU → Linear)    │                               │
-│   └────────────────────────────────┘                               │
-│        ↓                                                            │
-│   ┌────────────────────────────────┐                               │
-│   │    Add & Layer Normalize       │                               │
-│   └────────────────────────────────┘                               │
-│        ↓                                                            │
-│     Sortie                                                          │
-│                                                                     │
-│   Les connexions résiduelles (Add) permettent aux gradients         │
-│   de traverser 96+ couches sans s'évanouir.                         │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
-```
+![Bloc Transformer](images/transformer-block.svg)
 
 ---
 
@@ -502,33 +378,7 @@ Les hallucinations sont peut-être le problème le plus médiatisé des LLMs. Un
 
 Il est crucial de comprendre ce que fait réellement un LLM : il prédit le token le plus probable étant donné le contexte. Il n'a pas de "base de connaissances" séparée qu'il consulte, pas de mécanisme pour vérifier la véracité de ses affirmations. Il génère du texte qui **ressemble** à du texte vrai, sans savoir ce que "vrai" signifie.
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    ANATOMIE D'UNE HALLUCINATION                      │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  Prompt : "Cite les travaux du Professeur Jean Dupont sur les       │
-│            algorithmes quantiques"                                  │
-│                                                                     │
-│  Processus interne du LLM :                                         │
-│                                                                     │
-│  1. Pattern reconnu : demande de citation académique                │
-│  2. Éléments attendus : nom, année, titre, journal                  │
-│  3. Génération statistique :                                        │
-│     - "Dupont" + "algorithmes" → titre plausible                    │
-│     - Format académique typique → "Journal of..."                   │
-│     - Années probables → 2018-2023                                  │
-│                                                                     │
-│  Résultat : "Dupont, J. (2021). Quantum Algorithm Optimization      │
-│              for Graph Problems. Journal of Computational           │
-│              Quantum Science, 15(3), 234-251."                      │
-│                                                                     │
-│  ⚠️ Cette citation est ENTIÈREMENT INVENTÉE !                       │
-│     Le journal, le titre, les pages — tout est fictif mais          │
-│     statistiquement plausible.                                      │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
-```
+![Anatomie d'une Hallucination](images/hallucination-anatomy.svg)
 
 ### 1.6.2 Causes Structurelles
 
@@ -580,27 +430,7 @@ Comprendre le fonctionnement des LLMs change fondamentalement la façon dont on 
 
 ### 1.7.3 Bonnes Pratiques
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    GUIDE DU DÉVELOPPEUR LLM                          │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  ✅ À FAIRE :                                                        │
-│  • Fournir du contexte explicite (fichiers, types, imports)         │
-│  • Valider toujours le code généré (tests, review)                  │
-│  • Utiliser des exemples (few-shot prompting)                       │
-│  • Décomposer les tâches complexes en étapes                        │
-│  • Spécifier le langage, version, frameworks                        │
-│                                                                     │
-│  ❌ À ÉVITER :                                                       │
-│  • Faire confiance aveuglément aux imports suggérés                 │
-│  • Copier-coller sans comprendre                                    │
-│  • Demander des algorithmes cryptographiques                        │
-│  • Utiliser pour du code safety-critical sans audit                 │
-│  • Supposer que le code est optimal ou idiomatique                  │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
-```
+![Guide du Développeur LLM](images/developer-guide.svg)
 
 ---
 

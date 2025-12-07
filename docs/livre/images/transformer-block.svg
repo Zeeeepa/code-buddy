@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">
+  <defs>
+    <linearGradient id="bgGradBlk" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="attGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#9b59b6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8e44ad;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="normGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#3498db;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2980b9;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="ffnGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2ecc71;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#27ae60;stop-opacity:1" />
+    </linearGradient>
+    <marker id="arrowBlk" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#4a4a6a"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="500" fill="url(#bgGradBlk)"/>
+
+  <!-- Title -->
+  <text x="400" y="35" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#ffffff" text-anchor="middle">BLOC TRANSFORMER (xN)</text>
+
+  <!-- Main container -->
+  <rect x="200" y="55" width="400" height="390" rx="15" fill="none" stroke="#4a4a6a" stroke-width="2" stroke-dasharray="8,4"/>
+
+  <!-- Input -->
+  <rect x="320" y="65" width="160" height="35" rx="8" fill="#2d2d44" stroke="#f39c12" stroke-width="2"/>
+  <text x="400" y="88" font-family="Arial, sans-serif" font-size="14" fill="#f39c12" text-anchor="middle">Entree</text>
+
+  <!-- Arrow to attention -->
+  <line x1="400" y1="100" x2="400" y2="125" stroke="#4a4a6a" stroke-width="2" marker-end="url(#arrowBlk)"/>
+
+  <!-- Multi-Head Attention -->
+  <rect x="250" y="130" width="300" height="50" rx="10" fill="url(#attGrad)"/>
+  <text x="400" y="160" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle">Multi-Head Attention</text>
+  <text x="620" y="160" font-family="Arial, sans-serif" font-size="11" fill="#9b59b6">Contexte global</text>
+
+  <!-- Arrow to norm 1 -->
+  <line x1="400" y1="180" x2="400" y2="205" stroke="#4a4a6a" stroke-width="2" marker-end="url(#arrowBlk)"/>
+
+  <!-- Add & Norm 1 -->
+  <rect x="250" y="210" width="300" height="45" rx="10" fill="url(#normGrad)"/>
+  <text x="400" y="238" font-family="Arial, sans-serif" font-size="13" fill="#ffffff" text-anchor="middle">Add &amp; Layer Normalize</text>
+  <text x="620" y="238" font-family="Arial, sans-serif" font-size="10" fill="#3498db">Stabilise</text>
+  <text x="620" y="252" font-family="Arial, sans-serif" font-size="10" fill="#3498db">l'entrainement</text>
+
+  <!-- Residual connection 1 -->
+  <path d="M 240 85 L 200 85 L 200 232 L 245 232" stroke="#f39c12" stroke-width="2" fill="none" stroke-dasharray="5,3"/>
+  <circle cx="200" cy="85" r="4" fill="#f39c12"/>
+
+  <!-- Arrow to FFN -->
+  <line x1="400" y1="255" x2="400" y2="280" stroke="#4a4a6a" stroke-width="2" marker-end="url(#arrowBlk)"/>
+
+  <!-- Feed Forward Network -->
+  <rect x="250" y="285" width="300" height="60" rx="10" fill="url(#ffnGrad)"/>
+  <text x="400" y="312" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle">Feed Forward Network</text>
+  <text x="400" y="332" font-family="monospace" font-size="11" fill="#d5f5e3" text-anchor="middle">(Linear - GeLU - Linear)</text>
+  <text x="620" y="318" font-family="Arial, sans-serif" font-size="10" fill="#2ecc71">Transformation</text>
+  <text x="620" y="332" font-family="Arial, sans-serif" font-size="10" fill="#2ecc71">non-lineaire</text>
+
+  <!-- Arrow to norm 2 -->
+  <line x1="400" y1="345" x2="400" y2="370" stroke="#4a4a6a" stroke-width="2" marker-end="url(#arrowBlk)"/>
+
+  <!-- Add & Norm 2 -->
+  <rect x="250" y="375" width="300" height="45" rx="10" fill="url(#normGrad)"/>
+  <text x="400" y="403" font-family="Arial, sans-serif" font-size="13" fill="#ffffff" text-anchor="middle">Add &amp; Layer Normalize</text>
+
+  <!-- Residual connection 2 -->
+  <path d="M 240 232 L 180 232 L 180 397 L 245 397" stroke="#f39c12" stroke-width="2" fill="none" stroke-dasharray="5,3"/>
+  <circle cx="240" cy="232" r="4" fill="#f39c12"/>
+
+  <!-- Arrow to output -->
+  <line x1="400" y1="420" x2="400" y2="445" stroke="#4a4a6a" stroke-width="2" marker-end="url(#arrowBlk)"/>
+
+  <!-- Output -->
+  <rect x="320" y="450" width="160" height="35" rx="8" fill="#2d2d44" stroke="#2ecc71" stroke-width="2"/>
+  <text x="400" y="473" font-family="Arial, sans-serif" font-size="14" fill="#2ecc71" text-anchor="middle">Sortie</text>
+
+  <!-- Legend -->
+  <rect x="50" y="460" width="150" height="30" rx="5" fill="#2d2d44" stroke="#f39c12" stroke-width="1"/>
+  <line x1="60" y1="475" x2="90" y2="475" stroke="#f39c12" stroke-width="2" stroke-dasharray="5,3"/>
+  <text x="100" y="480" font-family="Arial, sans-serif" font-size="10" fill="#f39c12">Residual</text>
+</svg>

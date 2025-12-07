@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450">
+  <defs>
+    <linearGradient id="bgGradReact" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
+    </linearGradient>
+    <marker id="arrowReact" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#4a4a6a"/>
+    </marker>
+    <marker id="arrowCycle" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2ecc71"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="450" fill="url(#bgGradReact)"/>
+
+  <!-- Title -->
+  <text x="400" y="35" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#ffffff" text-anchor="middle">LE PATTERN ReAct</text>
+  <text x="400" y="55" font-family="Arial, sans-serif" font-size="12" fill="#888888" text-anchor="middle">Reasoning + Acting</text>
+
+  <!-- THOUGHT box -->
+  <rect x="200" y="80" width="400" height="90" rx="10" fill="#3a3a1e" stroke="#f39c12" stroke-width="2"/>
+  <text x="400" y="105" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#f39c12" text-anchor="middle">THOUGHT (Raisonnement)</text>
+  <text x="230" y="130" font-family="Arial, sans-serif" font-size="10" fill="#cccccc">"Je dois d'abord comprendre le probleme..."</text>
+  <text x="230" y="147" font-family="Arial, sans-serif" font-size="10" fill="#cccccc">"Les tests echouent probablement a cause de..."</text>
+  <text x="230" y="164" font-family="Arial, sans-serif" font-size="10" fill="#cccccc">"Ma prochaine action devrait etre..."</text>
+
+  <!-- Arrow down -->
+  <line x1="400" y1="175" x2="400" y2="200" stroke="#4a4a6a" stroke-width="2" marker-end="url(#arrowReact)"/>
+
+  <!-- ACTION box -->
+  <rect x="200" y="210" width="400" height="90" rx="10" fill="#1e3a3a" stroke="#3498db" stroke-width="2"/>
+  <text x="400" y="235" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#3498db" text-anchor="middle">ACTION (Execution d'outil)</text>
+  <text x="230" y="260" font-family="monospace" font-size="10" fill="#cccccc">Bash("npm test")</text>
+  <text x="230" y="277" font-family="monospace" font-size="10" fill="#cccccc">Read("src/auth.ts")</text>
+  <text x="230" y="294" font-family="monospace" font-size="10" fill="#cccccc">Edit("src/auth.ts", {...})</text>
+
+  <!-- Arrow down -->
+  <line x1="400" y1="305" x2="400" y2="330" stroke="#4a4a6a" stroke-width="2" marker-end="url(#arrowReact)"/>
+
+  <!-- OBSERVATION box -->
+  <rect x="200" y="340" width="400" height="90" rx="10" fill="#2a1e3a" stroke="#9b59b6" stroke-width="2"/>
+  <text x="400" y="365" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#9b59b6" text-anchor="middle">OBSERVATION (Resultat)</text>
+  <text x="230" y="390" font-family="Arial, sans-serif" font-size="10" fill="#cccccc">"3 tests ont echoue: TestLogin, TestLogout..."</text>
+  <text x="230" y="407" font-family="Arial, sans-serif" font-size="10" fill="#cccccc">"Contenu du fichier: ..."</text>
+  <text x="230" y="424" font-family="Arial, sans-serif" font-size="10" fill="#cccccc">"Modification appliquee avec succes"</text>
+
+  <!-- Cycle arrow back to THOUGHT -->
+  <path d="M 605 385 Q 700 385 700 135 Q 700 85 605 100" stroke="#2ecc71" stroke-width="3" fill="none" marker-end="url(#arrowCycle)"/>
+  <text x="720" y="240" font-family="Arial, sans-serif" font-size="11" fill="#2ecc71">(cycle)</text>
+
+  <!-- Side annotations -->
+  <rect x="50" y="115" width="120" height="40" rx="5" fill="#2d2d44"/>
+  <text x="110" y="140" font-family="Arial, sans-serif" font-size="10" fill="#f39c12" text-anchor="middle">Planification</text>
+
+  <rect x="50" y="245" width="120" height="40" rx="5" fill="#2d2d44"/>
+  <text x="110" y="270" font-family="Arial, sans-serif" font-size="10" fill="#3498db" text-anchor="middle">Execution</text>
+
+  <rect x="50" y="375" width="120" height="40" rx="5" fill="#2d2d44"/>
+  <text x="110" y="400" font-family="Arial, sans-serif" font-size="10" fill="#9b59b6" text-anchor="middle">Feedback</text>
+</svg>
