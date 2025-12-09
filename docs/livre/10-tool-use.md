@@ -288,23 +288,24 @@ const results = await Promise.all(
 
 ---
 
-## 10.3 📦 Les 41 Outils de Grok-CLI
+## 10.3 📦 Les 45+ Outils de Grok-CLI
 
 ### 10.3.1 Catalogue complet
 
-Grok-CLI inclut 41 outils organisés par catégorie :
+Grok-CLI inclut plus de 45 outils organisés par catégorie :
 
 ![Catalogue d'outils Grok-CLI](images/tool-catalog.svg)
 
 | Catégorie | Nombre | Exemples |
 |-----------|:------:|----------|
-| 📁 Fichiers | 12 | read, write, edit, search |
-| ⚡ Shell | 4 | bash, background_task |
-| 🔀 Git | 5 | status, diff, commit |
-| 🔍 Recherche | 4 | search_code, find_symbol |
-| 🎬 Médias | 5 | screenshot, transcribe |
-| 📄 Documents | 5 | pdf_extract, excel |
-| 🖥️ Système | 6 | memory, http, spawn |
+| 📁 Fichiers | 14 | read, write, edit, search, multi-edit, morph |
+| ⚡ Shell | 5 | bash, interactive_bash, background_task |
+| 🔀 Git | 6 | status, diff, commit, review |
+| 🔍 Recherche | 5 | search_code, find_symbol, enhanced_search |
+| 🎬 Médias | 6 | screenshot, image, video, audio, ocr |
+| 📄 Documents | 6 | pdf, excel, archive, document, notebook |
+| 🖥️ Système | 6 | memory, http, fetch, spawn, env |
+| 🗄️ Data | 3 | sql, export, qr |
 
 ### 10.3.2 Outils critiques
 

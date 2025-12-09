@@ -64,6 +64,7 @@ User Input → ChatInterface (Ink/React) → GrokAgent → Grok API
   - **src/context/context-compressor.ts** - Intelligent context compression (JetBrains research)
   - **src/context/dependency-aware-rag.ts** - RAG with dependency graph integration (CodeRAG)
   - **src/context/observation-masking.ts** - Tool output masking for irrelevant results
+  - **src/context/cross-encoder-reranker.ts** - Cross-encoder reranking for improved RAG precision
 - **src/renderers/** - Specialized output renderers for structured data display
   - **src/renderers/render-manager.ts** - Central render orchestration with type detection
   - **src/renderers/specialized/** - Test results, weather, code structure renderers
@@ -83,9 +84,11 @@ User Input → ChatInterface (Ink/React) → GrokAgent → Grok API
   - **src/optimization/latency-optimizer.ts** - Latency optimization for flow state
 - **src/mcp/** - Model Context Protocol integration
 - **src/hooks/** - Event hooks system (PreToolUse, PostToolUse, etc.)
-- **src/memory/** - Persistent memory system
+- **src/memory/** - Persistent memory system (4 types: episodic, semantic, procedural, prospective)
+  - **src/memory/prospective-memory.ts** - Goal-oriented memory for tasks, goals, and reminders
+  - **src/memory/enhanced-memory.ts** - Unified memory with vector embeddings
 - **src/database/** - SQLite database for persistent storage
-  - **src/database/schema.ts** - Database schema with 11 tables (memories, sessions, messages, etc.)
+  - **src/database/schema.ts** - Database schema with 14 tables (memories, sessions, tasks, goals, etc.)
   - **src/database/database-manager.ts** - Connection management, migrations, WAL mode
   - **src/database/repositories/** - Repository pattern for each entity
   - **src/database/migration.ts** - JSON to SQLite migration utility
@@ -135,6 +138,8 @@ User Input → ChatInterface (Ink/React) → GrokAgent → Grok API
 - `EmbeddingProvider` (src/embeddings/embedding-provider.ts) - Vector embeddings (local/API/mock)
 - `PersistentLearning` (src/learning/persistent-learning.ts) - Continuous learning from repairs and tools
 - `PersistentAnalytics` (src/analytics/persistent-analytics.ts) - Cost tracking with budget alerts
+- `ProspectiveMemory` (src/memory/prospective-memory.ts) - Goal-oriented task/reminder management
+- `CrossEncoderReranker` (src/context/cross-encoder-reranker.ts) - Cross-encoder reranking for RAG (+15% precision)
 
 ### Research-Based Improvements
 
@@ -160,6 +165,8 @@ Based on recent scientific publications in AI-assisted software development:
 | SQLite Persistence | Best practices | Reliable data storage with WAL mode |
 | Vector Embeddings | Sentence transformers | Real semantic search (384-dim) |
 | Persistent Learning | ML best practices | Continuous improvement from feedback |
+| Cross-Encoder Reranking | Sentence-BERT research | +15% precision on RAG results |
+| Prospective Memory | MemGPT (UC Berkeley) | Goal/task management with triggers |
 
 ### Database System
 
@@ -178,6 +185,9 @@ SQLite-based persistence with the following tables:
 | `checkpoints` | File checkpoints for undo/restore |
 | `checkpoint_files` | Individual file snapshots |
 | `cache` | General-purpose cache with TTL |
+| `prospective_tasks` | Future tasks with triggers and dependencies |
+| `goals` | Long-term objectives composed of tasks |
+| `reminders` | Contextual and time-based reminders |
 
 Key features:
 - **WAL mode** for better concurrency

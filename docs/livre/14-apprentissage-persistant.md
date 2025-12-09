@@ -1122,31 +1122,79 @@ export class ProceduralMemory {
 
 ## 14.6 🔮 Mémoire Prospective : Tâches Futures
 
-La mémoire prospective gère les **tâches planifiées** et les **rappels contextuels**.
+La mémoire prospective gère les **tâches planifiées**, les **objectifs** (goals), et les **rappels contextuels**. C'est le système qui permet à l'agent de se souvenir de ce qu'il doit faire dans le futur.
 
-### 14.6.1 🔧 Implémentation
+### 14.6.1 📊 Composants de la Mémoire Prospective
+
+| Composant | Icône | Description | Exemples |
+|-----------|:-----:|-------------|----------|
+| **Tasks** | 📋 | Tâches à accomplir avec priorité et deadline | "Refactorer AuthService" |
+| **Goals** | 🎯 | Objectifs à long terme composés de tâches | "Améliorer la sécurité du projet" |
+| **Reminders** | 🔔 | Rappels temporels ou contextuels | "Rappeler les tests après modif auth.ts" |
+| **Subtasks** | ✅ | Sous-tâches d'une tâche principale | "Ajouter validation, écrire tests" |
+
+### 14.6.2 🔧 Structure des Données
 
 ```typescript
 // src/memory/prospective-memory.ts
 
 /**
- * 📦 Structure d'une intention
+ * 📋 Structure d'une tâche prospective
  */
-interface Intention {
+interface ProspectiveTask {
   id: string;
-  description: string;
-  trigger: IntentionTrigger;
-  action: string;
-  priority: 'high' | 'medium' | 'low';
-  createdAt: number;
-  status: 'pending' | 'triggered' | 'completed' | 'expired';
+  title: string;
+  description?: string;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'deferred';
+  trigger: TaskTrigger;
+  context?: TaskContext;
+  progress: number;           // 0-100
+  subtasks?: SubTask[];
+  dependencies?: string[];    // Task IDs
+  tags: string[];
+  projectId?: string;
+  dueAt?: Date;
+  completedAt?: Date;
 }
 
-type IntentionTrigger =
-  | { type: 'time'; at: number }
-  | { type: 'context'; pattern: string }
-  | { type: 'file'; path: string }
-  | { type: 'event'; name: string };
+/**
+ * 🎯 Structure d'un objectif
+ */
+interface Goal {
+  id: string;
+  title: string;
+  description?: string;
+  targetDate?: Date;
+  tasks: string[];            // Task IDs contributing to this goal
+  progress: number;           // Auto-calculated from tasks
+  status: 'active' | 'achieved' | 'abandoned';
+  milestones?: Milestone[];
+}
+
+/**
+ * 🔔 Structure d'un rappel
+ */
+interface Reminder {
+  id: string;
+  taskId?: string;
+  message: string;
+  triggerAt: Date;
+  recurring?: {
+    interval: 'daily' | 'weekly' | 'monthly';
+    count?: number;
+  };
+  dismissed: boolean;
+}
+
+/**
+ * ⚡ Types de déclencheurs
+ */
+type TaskTrigger =
+  | { type: 'time'; schedule: string }      // ISO date or cron
+  | { type: 'event'; event: string }        // Event name to listen for
+  | { type: 'condition'; condition: string } // Condition to evaluate
+  | { type: 'manual'; fired: boolean };     // Manual trigger
 
 /**
  * 🔮 ProspectiveMemory - Gestionnaire de tâches futures

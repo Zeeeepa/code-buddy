@@ -31,7 +31,7 @@
 - [09. Compression de Contexte](09-context-compression.md) — Priorités, résumé, observation masking
 
 ### Partie IV : Action et Outils
-- [10. Tool-Use](10-tool-use.md) — 41 outils Grok-CLI, validation, exécution parallèle
+- [10. Tool-Use](10-tool-use.md) — 45+ outils Grok-CLI, validation, exécution parallèle
 - [11. Plugins et MCP](11-plugins-mcp.md) — Architecture plugin, Model Context Protocol, transports
 
 ### Partie V : Optimisation
@@ -39,7 +39,7 @@
 - [13. Optimisations Système](13-optimisations-systeme.md) — Model routing (FrugalGPT), parallélisation (LLMCompiler), lazy loading
 
 ### Partie VI : Apprentissage
-- [14. Apprentissage Persistant](14-apprentissage-persistant.md) — Mémoire épisodique, sémantique, procédurale
+- [14. Apprentissage Persistant](14-apprentissage-persistant.md) — Mémoire épisodique, sémantique, procédurale, prospective (Goals/Tasks)
 
 ### Partie VII : Sécurité et Architecture
 - [15. Architecture Complète](15-architecture-complete.md) — Grok-CLI de A à Z, 6 couches, intégration
@@ -148,10 +148,12 @@ Le livre s'appuie sur des publications récentes :
 | Métrique | Valeur |
 |----------|--------|
 | **Chapitres** | 17 + annexes |
-| **Mots estimés** | ~70,000 |
-| **Pages imprimées** | ~220 |
-| **Schémas SVG** | 5+ |
+| **Mots estimés** | ~75,000 |
+| **Pages imprimées** | ~230 |
+| **Schémas SVG** | 15+ |
 | **Exercices** | 50+ |
+| **Outils documentés** | 45+ |
+| **Tables SQLite** | 14 |
 
 ---
 
