@@ -3,6 +3,12 @@ import * as path from "path";
 import { writeFile as writeFilePromise } from "fs/promises";
 import { ToolResult, EditorCommand, getErrorMessage } from "../types/index.js";
 import { ConfirmationService } from "../utils/confirmation-service.js";
+import {
+  findBestFuzzyMatch,
+  generateFuzzyDiff,
+  suggestWhitespaceFixes,
+  FuzzyMatchResult,
+} from "../utils/fuzzy-match.js";
 
 export class TextEditorTool {
   private editHistory: EditorCommand[] = [];
@@ -141,20 +147,32 @@ export class TextEditorTool {
       const content = await fs.readFile(resolvedPath, "utf-8");
 
       if (!content.includes(oldStr)) {
-        if (oldStr.includes('\n')) {
-          const fuzzyResult = this.findFuzzyMatch(content, oldStr);
-          if (fuzzyResult) {
-            oldStr = fuzzyResult;
-          } else {
-            return {
-              success: false,
-              error: `String not found in file. For multi-line replacements, consider using line-based editing.`,
-            };
-          }
+        // Try fuzzy matching with 90% similarity threshold (like mistral-vibe)
+        const fuzzyResult = findBestFuzzyMatch(content, oldStr, 0.9);
+
+        if (fuzzyResult) {
+          // Found a fuzzy match - show diff and use it
+          const fuzzyDiff = generateFuzzyDiff(oldStr, fuzzyResult.match, filePath, fuzzyResult);
+          console.log(fuzzyDiff);
+
+          // Use the actual match from the file
+          oldStr = fuzzyResult.match;
         } else {
+          // No match found - provide helpful error with suggestions
+          const suggestions = suggestWhitespaceFixes(oldStr, content);
+          let errorMessage = `String not found in file: "${oldStr.substring(0, 100)}${oldStr.length > 100 ? '...' : ''}"`;
+
+          if (suggestions.length > 0) {
+            errorMessage += '\n\n💡 Possible issues:\n' + suggestions.map(s => `  • ${s}`).join('\n');
+          }
+
+          if (oldStr.includes('\n')) {
+            errorMessage += '\n\n💡 Tip: For multi-line replacements, ensure exact whitespace match or use line-based editing.';
+          }
+
           return {
             success: false,
-            error: `String not found in file: "${oldStr}"`,
+            error: errorMessage,
           };
         }
       }
@@ -517,78 +535,9 @@ export class TextEditorTool {
     }
   }
 
-  private findFuzzyMatch(content: string, searchStr: string): string | null {
-    const functionMatch = searchStr.match(/function\s+(\w+)/);
-    if (!functionMatch) return null;
-    
-    const functionName = functionMatch[1];
-    const contentLines = content.split('\n');
-    
-    let functionStart = -1;
-    for (let i = 0; i < contentLines.length; i++) {
-      if (contentLines[i].includes(`function ${functionName}`) && contentLines[i].includes('{')) {
-        functionStart = i;
-        break;
-      }
-    }
-    
-    if (functionStart === -1) return null;
-    
-    let braceCount = 0;
-    let functionEnd = functionStart;
-    
-    for (let i = functionStart; i < contentLines.length; i++) {
-      const line = contentLines[i];
-      for (const char of line) {
-        if (char === '{') braceCount++;
-        if (char === '}') braceCount--;
-      }
-      
-      if (braceCount === 0 && i > functionStart) {
-        functionEnd = i;
-        break;
-      }
-    }
-    
-    const actualFunction = contentLines.slice(functionStart, functionEnd + 1).join('\n');
-    
-    const searchNormalized = this.normalizeForComparison(searchStr);
-    const actualNormalized = this.normalizeForComparison(actualFunction);
-    
-    if (this.isSimilarStructure(searchNormalized, actualNormalized)) {
-      return actualFunction;
-    }
-    
-    return null;
-  }
-  
-  private normalizeForComparison(str: string): string {
-    return str
-      .replace(/["'`]/g, '"')
-      .replace(/\s+/g, ' ')
-      .replace(/{\s+/g, '{ ')
-      .replace(/\s+}/g, ' }')
-      .replace(/;\s*/g, ';')
-      .trim();
-  }
-  
-  private isSimilarStructure(search: string, actual: string): boolean {
-    const extractTokens = (str: string) => {
-      const tokens = str.match(/\b(function|console\.log|return|if|else|for|while)\b/g) || [];
-      return tokens;
-    };
-    
-    const searchTokens = extractTokens(search);
-    const actualTokens = extractTokens(actual);
-    
-    if (searchTokens.length !== actualTokens.length) return false;
-    
-    for (let i = 0; i < searchTokens.length; i++) {
-      if (searchTokens[i] !== actualTokens[i]) return false;
-    }
-    
-    return true;
-  }
+  // Note: Old findFuzzyMatch, normalizeForComparison, and isSimilarStructure
+  // have been replaced by the improved fuzzy-match.ts utility which uses
+  // LCS-based similarity matching like mistral-vibe's difflib.SequenceMatcher
 
   private generateDiff(
     oldLines: string[],

@@ -24,6 +24,12 @@ export interface ContextManagerConfig {
   compressionRatio: number;
   /** Model name for token counting */
   model: string;
+  /** Auto-compact threshold in tokens (like mistral-vibe's 200K) */
+  autoCompactThreshold: number;
+  /** Warning thresholds as percentages (e.g., [50, 75, 90]) */
+  warningThresholds: number[];
+  /** Enable context warnings */
+  enableWarnings: boolean;
 }
 
 export interface ContextStats {
@@ -51,6 +57,10 @@ export class ContextManagerV2 {
   private tokenCounter: TokenCounter;
   private summaries: ConversationSummary[] = [];
   private systemMessage: GrokMessage | null = null;
+  /** Track which warning thresholds have been triggered (to avoid duplicate warnings) */
+  private triggeredWarnings: Set<number> = new Set();
+  /** Last token count for auto-compact tracking */
+  private lastTokenCount: number = 0;
 
   // Default configuration based on research recommendations
   static readonly DEFAULT_CONFIG: ContextManagerConfig = {
@@ -60,6 +70,9 @@ export class ContextManagerV2 {
     enableSummarization: true,
     compressionRatio: 4,
     model: 'gpt-4',
+    autoCompactThreshold: 200000, // Like mistral-vibe's 200K default
+    warningThresholds: [50, 75, 90], // Warn at 50%, 75%, and 90%
+    enableWarnings: true,
   };
 
   constructor(config: Partial<ContextManagerConfig> = {}) {
@@ -109,12 +122,18 @@ export class ContextManagerV2 {
   /**
    * Prepare messages for API call, managing context as needed
    * Returns optimized message array that fits within token limits
+   *
+   * Implements auto-compact like mistral-vibe's AutoCompactMiddleware
    */
   prepareMessages(messages: GrokMessage[]): GrokMessage[] {
     const stats = this.getStats(messages);
 
-    // If within limits, return as-is
-    if (!stats.isNearLimit) {
+    // Check for auto-compact threshold (like mistral-vibe)
+    const shouldCompact = this.shouldAutoCompact(messages) || stats.isNearLimit;
+
+    // If within limits and below auto-compact threshold, return as-is
+    if (!shouldCompact) {
+      this.lastTokenCount = stats.totalTokens;
       return messages;
     }
 
@@ -130,6 +149,14 @@ export class ContextManagerV2 {
       optimizedMsgs = [systemMsg, ...optimizedMsgs];
     }
 
+    // Track token reduction for metrics
+    const newStats = this.getStats(optimizedMsgs);
+    const tokensReduced = stats.totalTokens - newStats.totalTokens;
+    if (tokensReduced > 0) {
+      console.log(`📦 Auto-compact: Reduced ${tokensReduced.toLocaleString()} tokens (${stats.totalTokens.toLocaleString()} → ${newStats.totalTokens.toLocaleString()})`);
+    }
+
+    this.lastTokenCount = newStats.totalTokens;
     return optimizedMsgs;
   }
 
@@ -292,25 +319,64 @@ export class ContextManagerV2 {
 
   /**
    * Check if context is approaching limits and emit warning
+   * Implements multi-threshold warnings with deduplication (like mistral-vibe's ContextWarningMiddleware)
    */
-  shouldWarn(messages: GrokMessage[]): { warn: boolean; message: string } {
-    const stats = this.getStats(messages);
-
-    if (stats.isCritical) {
-      return {
-        warn: true,
-        message: `⚠️ Context critical: ${stats.totalTokens}/${stats.maxTokens} tokens (${stats.usagePercent.toFixed(1)}%). Messages will be compressed.`,
-      };
+  shouldWarn(messages: GrokMessage[]): { warn: boolean; message: string; threshold?: number } {
+    if (!this.config.enableWarnings) {
+      return { warn: false, message: '' };
     }
 
-    if (stats.isNearLimit) {
-      return {
-        warn: true,
-        message: `📊 Context usage: ${stats.totalTokens}/${stats.maxTokens} tokens (${stats.usagePercent.toFixed(1)}%)`,
-      };
+    const stats = this.getStats(messages);
+
+    // Check each threshold in descending order (highest first)
+    const sortedThresholds = [...this.config.warningThresholds].sort((a, b) => b - a);
+
+    for (const threshold of sortedThresholds) {
+      if (stats.usagePercent >= threshold && !this.triggeredWarnings.has(threshold)) {
+        // Mark this threshold as triggered (don't warn again)
+        this.triggeredWarnings.add(threshold);
+
+        // Generate appropriate message based on threshold level
+        let emoji = '📊';
+        let level = 'Info';
+        if (threshold >= 90) {
+          emoji = '🔴';
+          level = 'Critical';
+        } else if (threshold >= 75) {
+          emoji = '🟡';
+          level = 'Warning';
+        } else if (threshold >= 50) {
+          emoji = '🟢';
+          level = 'Notice';
+        }
+
+        const message = `${emoji} Context ${level}: You have used ${stats.usagePercent.toFixed(1)}% of your total context (${stats.totalTokens.toLocaleString()}/${stats.maxTokens.toLocaleString()} tokens)`;
+
+        return {
+          warn: true,
+          message,
+          threshold,
+        };
+      }
     }
 
     return { warn: false, message: '' };
+  }
+
+  /**
+   * Check if auto-compact should be triggered
+   * Returns true if token count exceeds autoCompactThreshold
+   */
+  shouldAutoCompact(messages: GrokMessage[]): boolean {
+    const stats = this.getStats(messages);
+    return stats.totalTokens >= this.config.autoCompactThreshold;
+  }
+
+  /**
+   * Reset warning triggers (call when starting new conversation)
+   */
+  resetWarnings(): void {
+    this.triggeredWarnings.clear();
   }
 
   /**
@@ -336,6 +402,15 @@ export class ContextManagerV2 {
   dispose(): void {
     this.tokenCounter.dispose();
     this.summaries = [];
+    this.triggeredWarnings.clear();
+    this.lastTokenCount = 0;
+  }
+
+  /**
+   * Get last token count (useful for tracking auto-compact effectiveness)
+   */
+  getLastTokenCount(): number {
+    return this.lastTokenCount;
   }
 }
 

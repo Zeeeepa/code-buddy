@@ -1,63 +1,215 @@
 import { ToolResult } from '../types/index.js';
 
-interface TodoItem {
+export interface TodoItem {
   id: string;
   content: string;
   status: 'pending' | 'in_progress' | 'completed';
   priority: 'high' | 'medium' | 'low';
+  /** Optional due date */
+  dueDate?: string;
+  /** Optional tags */
+  tags?: string[];
 }
+
+export interface TodoStats {
+  total: number;
+  pending: number;
+  inProgress: number;
+  completed: number;
+  byPriority: {
+    high: number;
+    medium: number;
+    low: number;
+  };
+}
+
+// Priority values for sorting (higher = more important)
+const PRIORITY_ORDER: Record<string, number> = {
+  high: 3,
+  medium: 2,
+  low: 1,
+};
+
+// Status values for sorting (in_progress first, then pending, then completed)
+const STATUS_ORDER: Record<string, number> = {
+  in_progress: 3,
+  pending: 2,
+  completed: 1,
+};
 
 export class TodoTool {
   private todos: TodoItem[] = [];
+  private maxItems: number = 100; // Match mistral-vibe's limit
+
+  /**
+   * Get priority icon for display
+   */
+  private getPriorityIcon(priority: string): string {
+    switch (priority) {
+      case 'high':
+        return '🔴';
+      case 'medium':
+        return '🟡';
+      case 'low':
+        return '🟢';
+      default:
+        return '⚪';
+    }
+  }
+
+  /**
+   * Get status checkbox for display
+   */
+  private getCheckbox(status: string): string {
+    switch (status) {
+      case 'completed':
+        return '✅';
+      case 'in_progress':
+        return '🔄';
+      case 'pending':
+        return '⬜';
+      default:
+        return '⬜';
+    }
+  }
+
+  /**
+   * Get ANSI color code for status
+   */
+  private getStatusColor(status: string): string {
+    switch (status) {
+      case 'completed':
+        return '\x1b[32m'; // Green
+      case 'in_progress':
+        return '\x1b[36m'; // Cyan
+      case 'pending':
+        return '\x1b[37m'; // White/default
+      default:
+        return '\x1b[0m'; // Reset
+    }
+  }
+
+  /**
+   * Sort todos by priority and status
+   */
+  private sortTodos(todos: TodoItem[]): TodoItem[] {
+    return [...todos].sort((a, b) => {
+      // First sort by status (in_progress > pending > completed)
+      const statusDiff = STATUS_ORDER[b.status] - STATUS_ORDER[a.status];
+      if (statusDiff !== 0) return statusDiff;
+
+      // Then by priority (high > medium > low)
+      return PRIORITY_ORDER[b.priority] - PRIORITY_ORDER[a.priority];
+    });
+  }
+
+  /**
+   * Get statistics about todos
+   */
+  getStats(): TodoStats {
+    const stats: TodoStats = {
+      total: this.todos.length,
+      pending: 0,
+      inProgress: 0,
+      completed: 0,
+      byPriority: { high: 0, medium: 0, low: 0 },
+    };
+
+    for (const todo of this.todos) {
+      if (todo.status === 'pending') stats.pending++;
+      else if (todo.status === 'in_progress') stats.inProgress++;
+      else if (todo.status === 'completed') stats.completed++;
+
+      stats.byPriority[todo.priority]++;
+    }
+
+    return stats;
+  }
 
   formatTodoList(): string {
     if (this.todos.length === 0) {
       return 'No todos created yet';
     }
 
-    const getCheckbox = (status: string): string => {
-      switch (status) {
-        case 'completed':
-          return '●';
-        case 'in_progress':
-          return '◐';
-        case 'pending':
-          return '○';
-        default:
-          return '○';
-      }
-    };
-
-    const getStatusColor = (status: string): string => {
-      switch (status) {
-        case 'completed':
-          return '\x1b[32m'; // Green
-        case 'in_progress':
-          return '\x1b[36m'; // Cyan
-        case 'pending':
-          return '\x1b[37m'; // White/default
-        default:
-          return '\x1b[0m'; // Reset
-      }
-    };
-
     const reset = '\x1b[0m';
+    const bold = '\x1b[1m';
+    const dim = '\x1b[2m';
     let output = '';
 
-    this.todos.forEach((todo, index) => {
-      const checkbox = getCheckbox(todo.status);
-      const statusColor = getStatusColor(todo.status);
-      const strikethrough = todo.status === 'completed' ? '\x1b[9m' : '';
-      const indent = index === 0 ? '' : '  ';
+    // Sort todos by status and priority
+    const sortedTodos = this.sortTodos(this.todos);
 
-      output += `${indent}${statusColor}${strikethrough}${checkbox} ${todo.content}${reset}\n`;
-    });
+    // Group by status for better visualization
+    const groups: Record<string, TodoItem[]> = {
+      in_progress: [],
+      pending: [],
+      completed: [],
+    };
 
-    return output;
+    for (const todo of sortedTodos) {
+      groups[todo.status].push(todo);
+    }
+
+    // Display in_progress first
+    if (groups.in_progress.length > 0) {
+      output += `${bold}🔄 In Progress${reset}\n`;
+      for (const todo of groups.in_progress) {
+        const priority = this.getPriorityIcon(todo.priority);
+        output += `  ${priority} ${todo.content}\n`;
+      }
+      output += '\n';
+    }
+
+    // Then pending
+    if (groups.pending.length > 0) {
+      output += `${bold}⬜ Pending${reset}\n`;
+      for (const todo of groups.pending) {
+        const priority = this.getPriorityIcon(todo.priority);
+        output += `  ${priority} ${todo.content}\n`;
+      }
+      output += '\n';
+    }
+
+    // Then completed
+    if (groups.completed.length > 0) {
+      output += `${dim}✅ Completed${reset}\n`;
+      for (const todo of groups.completed) {
+        output += `  ${dim}${todo.content}${reset}\n`;
+      }
+    }
+
+    // Add stats summary
+    const stats = this.getStats();
+    output += `\n📊 ${stats.completed}/${stats.total} completed`;
+    if (stats.byPriority.high > 0) {
+      output += ` | 🔴 ${stats.byPriority.high} high priority`;
+    }
+
+    return output.trim();
   }
 
   async createTodoList(todos: TodoItem[]): Promise<ToolResult> {
     try {
+      // Check max items limit (like mistral-vibe)
+      if (todos.length > this.maxItems) {
+        return {
+          success: false,
+          error: `Cannot create more than ${this.maxItems} todos. Received ${todos.length}.`,
+        };
+      }
+
+      // Validate unique IDs (like mistral-vibe)
+      const ids = new Set<string>();
+      for (const todo of todos) {
+        if (ids.has(todo.id)) {
+          return {
+            success: false,
+            error: `Duplicate todo ID: ${todo.id}. Todo IDs must be unique.`,
+          };
+        }
+        ids.add(todo.id);
+      }
+
       // Validate todos
       for (const todo of todos) {
         if (!todo.id || !todo.content || !todo.status || !todo.priority) {
@@ -84,9 +236,15 @@ export class TodoTool {
 
       this.todos = todos;
 
+      const stats = this.getStats();
       return {
         success: true,
         output: this.formatTodoList(),
+        data: {
+          message: `Created ${todos.length} todos`,
+          count: todos.length,
+          stats,
+        },
       };
     } catch (error) {
       return {
