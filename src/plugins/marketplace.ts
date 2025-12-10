@@ -186,6 +186,7 @@ export class PluginMarketplace extends EventEmitter {
   private tools: Map<string, { pluginId: string; tool: ToolDefinition }> = new Map();
   private providers: Map<string, { pluginId: string; provider: ProviderDefinition }> = new Map();
   private hooks: Map<string, Array<{ pluginId: string; handler: HookHandler }>> = new Map();
+  private updateCheckerIntervalId: ReturnType<typeof setInterval> | null = null;
 
   constructor(config: Partial<MarketplaceConfig> = {}) {
     super();
@@ -465,7 +466,7 @@ export class PluginMarketplace extends EventEmitter {
    * Start update checker
    */
   private startUpdateChecker(): void {
-    setInterval(() => {
+    this.updateCheckerIntervalId = setInterval(() => {
       this.checkUpdates();
     }, this.config.checkUpdatesInterval);
   }
@@ -887,6 +888,10 @@ export class PluginMarketplace extends EventEmitter {
    * Dispose
    */
   async dispose(): Promise<void> {
+    if (this.updateCheckerIntervalId) {
+      clearInterval(this.updateCheckerIntervalId);
+      this.updateCheckerIntervalId = null;
+    }
     for (const pluginId of this.loadedPlugins.keys()) {
       await this.unloadPlugin(pluginId);
     }
