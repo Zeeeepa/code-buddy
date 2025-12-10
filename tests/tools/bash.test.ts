@@ -10,7 +10,6 @@
  */
 
 import { BashTool } from '../../src/tools/bash';
-import { ConfirmationService } from '../../src/utils/confirmation-service';
 import path from 'path';
 import os from 'os';
 
