@@ -225,8 +225,15 @@ interface Intention {
   description: string;
   trigger: { type: 'time'; at: number } | { type: 'file'; path: string } | { type: 'event'; name: string };
   action: string;
-  priority: 'high' | 'medium' | 'low';
+  priority: TodoPriority;  // Système de priorité enrichi
   status: 'pending' | 'triggered' | 'completed';
+}
+
+// Système de priorité inspiré de Mistral-Vibe
+enum TodoPriority {
+  HIGH = 'high',     // Tâches critiques, blocantes
+  MEDIUM = 'medium', // Tâches normales
+  LOW = 'low'        // Nice-to-have, améliorations
 }
 
 class ProspectiveMemory {
@@ -260,7 +267,118 @@ class ProspectiveMemory {
 
 ---
 
-## 4. Edge Cases et Pièges
+## 4. Todo avec Priorité (Inspiré de Mistral-Vibe)
+
+### Le Problème
+
+Une liste de 50 tâches sans hiérarchie. L'agent traite les tâches dans l'ordre d'ajout. Les bugs critiques attendent que les refactorings mineurs soient terminés.
+
+### Solution : Système de Priorité
+
+```typescript
+enum TodoPriority {
+  HIGH = 'high',     // 🔴 Blocant, critique
+  MEDIUM = 'medium', // 🟡 Normal
+  LOW = 'low'        // 🟢 Nice-to-have
+}
+
+interface TodoItem {
+  id: string;
+  content: string;
+  status: 'pending' | 'in_progress' | 'completed';
+  priority: TodoPriority;
+  createdAt: Date;
+}
+
+class TodoManager {
+  private todos: TodoItem[] = [];
+
+  // Ajouter avec priorité
+  add(content: string, priority: TodoPriority = TodoPriority.MEDIUM): TodoItem {
+    const todo: TodoItem = {
+      id: crypto.randomUUID(),
+      content,
+      status: 'pending',
+      priority,
+      createdAt: new Date()
+    };
+    this.todos.push(todo);
+    return todo;
+  }
+
+  // Trier par priorité puis par date
+  getSorted(): TodoItem[] {
+    const priorityOrder = { high: 0, medium: 1, low: 2 };
+    return [...this.todos].sort((a, b) => {
+      const pDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+      if (pDiff !== 0) return pDiff;
+      return a.createdAt.getTime() - b.createdAt.getTime();
+    });
+  }
+
+  // Affichage avec icônes
+  formatTodos(): string {
+    const icons = { high: '🔴', medium: '🟡', low: '🟢' };
+    const statusIcons = { pending: '⬜', in_progress: '🔄', completed: '✅' };
+
+    return this.getSorted()
+      .map(t => `${statusIcons[t.status]} ${icons[t.priority]} ${t.content}`)
+      .join('\n');
+  }
+
+  // Statistiques
+  getStats(): { total: number; byPriority: Record<TodoPriority, number> } {
+    const byPriority = { high: 0, medium: 0, low: 0 };
+    for (const todo of this.todos.filter(t => t.status !== 'completed')) {
+      byPriority[todo.priority]++;
+    }
+    return { total: this.todos.length, byPriority };
+  }
+}
+```
+
+### Exemple d'Utilisation
+
+```
+> todo add "Fix security vulnerability" --priority high
+> todo add "Update documentation"
+> todo add "Refactor utils module" --priority low
+> todo list
+
+🔴 HIGH (1):
+  ⬜ Fix security vulnerability
+
+🟡 MEDIUM (1):
+  ⬜ Update documentation
+
+🟢 LOW (1):
+  ⬜ Refactor utils module
+
+📊 Stats: 3 pending | 0 in progress | 0 completed
+```
+
+### Intégration avec la Mémoire Prospective
+
+```typescript
+class EnhancedProspectiveMemory {
+  // Les tâches HIGH sont aussi des intentions avec trigger immédiat
+  async addHighPriorityTask(task: TodoItem): Promise<void> {
+    if (task.priority === TodoPriority.HIGH) {
+      await this.memory.remember(MemoryType.PROSPECTIVE, {
+        description: task.content,
+        trigger: { type: 'event', name: 'session_start' },
+        action: `Priorité critique: ${task.content}`,
+        priority: 'high',
+        status: 'pending'
+      }, 0.95);  // Importance très haute
+    }
+  }
+}
+```
+
+---
+
+## 5. Edge Cases et Pièges
 
 ### Piège 1 : Mémoire qui ne s'oublie jamais
 
@@ -351,7 +469,7 @@ class IndexedMemorySystem extends MemorySystem {
 
 ---
 
-## 5. Optimisation : Intégration dans l'Agent
+## 6. Optimisation : Intégration dans l'Agent
 
 ```typescript
 class AgentWithMemory {

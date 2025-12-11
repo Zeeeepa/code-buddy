@@ -320,6 +320,135 @@ async function main() {
 
 ---
 
+## 7. Session Resume (Inspiré de Mistral-Vibe)
+
+### Le Problème
+
+L'utilisateur ferme le terminal. Tout l'historique de conversation est perdu. Il doit re-expliquer le contexte.
+
+### Solution : Flags CLI pour Session Management
+
+```bash
+# Reprendre la dernière session
+grok --continue
+
+# Reprendre une session spécifique (match partiel)
+grok --resume abc123
+
+# Nouveau mode headless avec auto-approve
+grok -p "Fix the bug" --auto-approve --max-price 5.0
+```
+
+### Implémentation
+
+```typescript
+// src/persistence/session-store.ts
+class SessionStore {
+  resumeLastSession(): Session | null {
+    const sessions = this.listSessions();
+    if (sessions.length === 0) return null;
+
+    const last = sessions[0];  // Trié par lastAccessedAt
+    return this.resumeSession(last.id);
+  }
+
+  getSessionByPartialId(partial: string): Session | null {
+    return this.listSessions().find(s =>
+      s.id.includes(partial) || s.id.startsWith(partial)
+    ) || null;
+  }
+
+  continueLastSession(): { session: Session; messages: Message[] } | null {
+    const session = this.resumeLastSession();
+    if (!session) return null;
+
+    // Restaurer les messages dans l'agent
+    return {
+      session,
+      messages: this.convertMessagesToChatEntries(session.messages)
+    };
+  }
+}
+```
+
+### Stockage SQLite
+
+```sql
+CREATE TABLE sessions (
+  id TEXT PRIMARY KEY,
+  name TEXT,
+  project_path TEXT,
+  model TEXT,
+  total_cost REAL DEFAULT 0,
+  message_count INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id TEXT REFERENCES sessions(id),
+  role TEXT NOT NULL,  -- 'user' | 'assistant' | 'tool'
+  content TEXT,
+  tool_calls TEXT,     -- JSON
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+---
+
+## 8. History Manager avec Prefix Filtering
+
+### Navigation dans l'Historique
+
+```typescript
+class HistoryManager {
+  private history: HistoryEntry[] = [];
+  private navigationIndex = -1;
+
+  // Ctrl+Up : Remonter avec filtre par préfixe
+  getPrevious(currentInput: string, prefix?: string): string {
+    const filtered = prefix
+      ? this.history.filter(e => e.text.startsWith(prefix))
+      : this.history;
+
+    if (this.navigationIndex < filtered.length - 1) {
+      this.navigationIndex++;
+    }
+
+    return filtered[filtered.length - 1 - this.navigationIndex]?.text || currentInput;
+  }
+
+  // Ctrl+R : Recherche fuzzy dans l'historique
+  search(query: string): HistoryEntry[] {
+    return this.history
+      .filter(e => e.text.toLowerCase().includes(query.toLowerCase()))
+      .slice(-10)
+      .reverse();
+  }
+
+  // Stockage persistant
+  private saveHistory(): void {
+    fs.writeFileSync(
+      '~/.grok/history.json',
+      JSON.stringify(this.history)
+    );
+  }
+}
+```
+
+### Exemple d'Utilisation
+
+```
+grok> git status
+grok> git diff
+grok> npm run test
+grok> git    ← tape "git" puis Ctrl+Up
+grok> git diff    ← historique filtré par "git"
+```
+
+---
+
 ## Ce Qui Vient Ensuite
 
 L'agent est rapide et économique, mais chaque session repart de zéro. Le **Chapitre 14** introduit l'apprentissage persistant : comment un agent peut se souvenir de vos préférences et apprendre de ses erreurs.

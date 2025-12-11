@@ -343,6 +343,95 @@ class ToolCache {
 
 ---
 
+## 7. Context Warnings Multi-Seuils (Inspiré de Mistral-Vibe)
+
+### Le Problème
+
+L'utilisateur ne sait pas qu'il approche de la limite de contexte. Soudain : "Error: Maximum context length exceeded". Frustration garantie.
+
+### Solution : Warnings Progressifs
+
+```typescript
+interface ContextManagerConfig {
+  warningThresholds: number[];  // [50, 75, 90]
+  autoCompactThreshold: number; // 200_000 tokens
+  enableWarnings: boolean;
+}
+
+class ContextManagerV2 {
+  private triggeredWarnings: Set<number> = new Set();
+
+  shouldWarn(messages: Message[]): WarningResult {
+    const stats = this.getStats(messages);
+    const thresholds = [90, 75, 50];  // Ordre décroissant
+
+    for (const threshold of thresholds) {
+      if (stats.usagePercent >= threshold && !this.triggeredWarnings.has(threshold)) {
+        this.triggeredWarnings.add(threshold);  // Ne warn qu'une fois
+
+        return {
+          warn: true,
+          message: this.formatWarning(threshold, stats),
+          threshold,
+        };
+      }
+    }
+
+    return { warn: false, message: '' };
+  }
+
+  private formatWarning(threshold: number, stats: ContextStats): string {
+    const emoji = threshold >= 90 ? '🔴' : threshold >= 75 ? '🟡' : '🟢';
+    const level = threshold >= 90 ? 'Critical' : threshold >= 75 ? 'Warning' : 'Notice';
+
+    return `${emoji} Context ${level}: ${stats.usagePercent.toFixed(1)}% used (${stats.totalTokens.toLocaleString()}/${stats.maxTokens.toLocaleString()} tokens)`;
+  }
+}
+```
+
+### Auto-Compact (comme Mistral-Vibe)
+
+```typescript
+prepareMessages(messages: Message[]): Message[] {
+  const stats = this.getStats(messages);
+
+  // Déclencher auto-compact à 200K tokens
+  if (stats.totalTokens >= this.config.autoCompactThreshold) {
+    console.log('📦 Auto-compact triggered...');
+
+    const optimized = this.applyStrategies(messages);
+    const newStats = this.getStats(optimized);
+
+    console.log(`📦 Reduced ${(stats.totalTokens - newStats.totalTokens).toLocaleString()} tokens`);
+    return optimized;
+  }
+
+  return messages;
+}
+```
+
+### Affichage dans le Terminal
+
+```
+🟢 Context Notice: 52.3% used (104,600/200,000 tokens)
+    ...conversation continues...
+🟡 Context Warning: 76.1% used (152,200/200,000 tokens)
+    ...conversation continues...
+🔴 Context Critical: 91.2% used (182,400/200,000 tokens)
+📦 Auto-compact: Reduced 45,000 tokens (182,400 → 137,400)
+```
+
+### Configuration
+
+| Seuil | Emoji | Action |
+|:-----:|:-----:|--------|
+| 50% | 🟢 | Notification informative |
+| 75% | 🟡 | Avertissement |
+| 90% | 🔴 | Critique + auto-compact proche |
+| 100% | 📦 | Auto-compact déclenché |
+
+---
+
 ## Tableau Récapitulatif
 
 | Métrique | Sans Cache | Avec Cache Sémantique | Amélioration |

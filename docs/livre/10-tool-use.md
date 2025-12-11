@@ -320,6 +320,167 @@ const result = validateToolArgs(readFileTool, { path: 123 });
 
 ---
 
+## 6. Fuzzy Search/Replace (Inspiré de Mistral-Vibe)
+
+Quand le LLM envoie un `str_replace` avec du code légèrement différent du fichier réel :
+
+```typescript
+// Le LLM veut remplacer ça :
+const oldStr = `function hello() {
+  console.log("hello");
+}`;
+
+// Mais le fichier contient ça (guillemets simples) :
+const actualFile = `function hello() {
+  console.log('hello');
+}`;
+
+// ❌ Match exact échoue
+if (!content.includes(oldStr)) {
+  return { success: false, error: 'String not found' };
+}
+```
+
+### Solution : LCS-Based Similarity Matching
+
+```typescript
+import { findBestFuzzyMatch } from './utils/fuzzy-match.js';
+
+async execute({ path, oldStr, newStr }) {
+  const content = await fs.readFile(path, 'utf-8');
+
+  if (!content.includes(oldStr)) {
+    // Essayer fuzzy match à 90% de similarité
+    const fuzzyMatch = findBestFuzzyMatch(content, oldStr, 0.9);
+
+    if (fuzzyMatch) {
+      console.log(`🔍 Fuzzy match: ${fuzzyMatch.similarityPercent} similarity`);
+      oldStr = fuzzyMatch.match;  // Utiliser le match réel
+    } else {
+      return { success: false, error: 'String not found (even with fuzzy matching)' };
+    }
+  }
+
+  const newContent = content.replace(oldStr, newStr);
+  await fs.writeFile(path, newContent);
+  return { success: true };
+}
+```
+
+### Algorithme LCS (Longest Common Subsequence)
+
+```typescript
+function calculateSimilarity(a: string, b: string): number {
+  const lcs = lcsLength(a, b);
+  return (2 * lcs) / (a.length + b.length);  // Ratio comme difflib
+}
+
+// "hello" vs "hallo" → 80% similarity (4/5 chars match)
+```
+
+**Seuil recommandé** : 90% — Assez strict pour éviter les faux positifs.
+
+---
+
+## 7. Tool Permissions : ALWAYS / ASK / NEVER
+
+Système de permissions granulaire inspiré de Mistral-Vibe :
+
+```typescript
+enum ToolPermission {
+  ALWAYS = 'always',  // ✅ Exécution auto
+  ASK = 'ask',        // ❓ Demande confirmation
+  NEVER = 'never',    // 🚫 Bloqué
+}
+
+interface ToolPermissionConfig {
+  default: ToolPermission;
+  rules: ToolPermissionRule[];
+  allowlist: string[];  // Patterns auto-approuvés
+  denylist: string[];   // Patterns bloqués
+}
+```
+
+### Configuration (`~/.grok/tool-permissions.json`)
+
+```json
+{
+  "default": "ask",
+  "rules": [
+    { "pattern": "read_*", "permission": "always" },
+    { "pattern": "write_*", "permission": "ask" },
+    { "pattern": "bash", "permission": "ask" }
+  ],
+  "allowlist": [
+    "git status *",
+    "npm run test*",
+    "ls *"
+  ],
+  "denylist": [
+    "rm -rf *",
+    "sudo *",
+    "vim *"
+  ]
+}
+```
+
+### Pattern Matching
+
+```typescript
+function matchesPattern(input: string, pattern: string): boolean {
+  // Regex avec préfixe "re:"
+  if (pattern.startsWith('re:')) {
+    return new RegExp(pattern.slice(3)).test(input);
+  }
+
+  // Glob pattern → Regex
+  const regex = pattern
+    .replace(/\*/g, '.*')
+    .replace(/\?/g, '.');
+
+  return new RegExp(`^${regex}$`, 'i').test(input);
+}
+
+// Exemples
+matchesPattern('read_file', 'read_*');      // true
+matchesPattern('git status', 'git *');       // true
+matchesPattern('rm -rf /', 're:^rm\\s+-rf'); // true
+```
+
+### Décision d'Exécution
+
+```typescript
+function shouldExecute(toolName: string, args?: string): Decision {
+  const pm = getToolPermissionManager();
+
+  // Denylist prioritaire
+  if (pm.shouldBlock(toolName, args)) {
+    return { allowed: false, reason: 'Blocked by denylist' };
+  }
+
+  // Allowlist pour commandes bash
+  if (pm.shouldAutoApprove(toolName, args)) {
+    return { allowed: true, autoApprove: true };
+  }
+
+  // Sinon, selon la permission du tool
+  const { permission } = pm.getPermission(toolName);
+
+  if (permission === ToolPermission.ALWAYS) {
+    return { allowed: true, autoApprove: true };
+  }
+
+  if (permission === ToolPermission.NEVER) {
+    return { allowed: false, reason: 'Tool blocked by policy' };
+  }
+
+  // ASK → Demander confirmation
+  return { allowed: true, requiresConfirmation: true };
+}
+```
+
+---
+
 ## Tableau Récapitulatif : Niveaux de Danger
 
 | Niveau | Outils | Confirmation |

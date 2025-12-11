@@ -239,7 +239,144 @@ ADDITIONAL SECURITY (local model):
 
 ---
 
-## 5. Optimisation : 3 Modes de Sécurité
+## 5. Tool Permissions : ALWAYS / ASK / NEVER (Inspiré de Mistral-Vibe)
+
+### Le Problème
+
+L'utilisateur doit approuver chaque opération. 50 lectures de fichier = 50 clics. Productivité ruinée.
+
+### Solution : Système de Permissions Granulaire
+
+```typescript
+enum ToolPermission {
+  ALWAYS = 'always',   // ✅ Exécution automatique
+  ASK = 'ask',         // ❓ Demande confirmation
+  NEVER = 'never',     // 🚫 Bloqué
+}
+
+interface ToolPermissionConfig {
+  /** Permission par défaut */
+  default: ToolPermission;
+  /** Règles par outil */
+  rules: ToolPermissionRule[];
+  /** Patterns auto-approuvés (bash) */
+  allowlist: string[];
+  /** Patterns toujours bloqués */
+  denylist: string[];
+}
+
+interface ToolPermissionRule {
+  pattern: string;        // Glob ou regex avec "re:"
+  permission: ToolPermission;
+  reason?: string;
+}
+```
+
+### Configuration (`~/.grok/tool-permissions.json`)
+
+```json
+{
+  "default": "ask",
+  "rules": [
+    { "pattern": "read_*", "permission": "always" },
+    { "pattern": "glob", "permission": "always" },
+    { "pattern": "grep", "permission": "always" },
+    { "pattern": "write_*", "permission": "ask" },
+    { "pattern": "bash", "permission": "ask" }
+  ],
+  "allowlist": [
+    "echo *",
+    "ls *",
+    "git status *",
+    "git diff *",
+    "npm run test*",
+    "npm run build*"
+  ],
+  "denylist": [
+    "rm -rf /*",
+    "rm -rf ~*",
+    "sudo *",
+    "vim *",
+    "nano *"
+  ]
+}
+```
+
+### Pattern Matching
+
+```typescript
+function matchesPattern(input: string, pattern: string): boolean {
+  // Regex avec préfixe "re:"
+  if (pattern.startsWith('re:')) {
+    return new RegExp(pattern.slice(3)).test(input);
+  }
+
+  // Glob → Regex
+  const regex = pattern
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    .replace(/\*/g, '.*')
+    .replace(/\?/g, '.');
+
+  return new RegExp(`^${regex}$`, 'i').test(input);
+}
+
+// Exemples
+matchesPattern('read_file', 'read_*');      // true
+matchesPattern('git status', 'git *');       // true
+matchesPattern('rm -rf /', 're:^rm\\s+-rf'); // true
+```
+
+### Décision d'Exécution
+
+```typescript
+class ToolPermissionManager {
+  getPermission(toolName: string, args?: string): { permission: ToolPermission; reason?: string } {
+    const fullCommand = args ? `${toolName} ${args}` : toolName;
+
+    // 1. Denylist prioritaire
+    for (const pattern of this.config.denylist) {
+      if (matchesPattern(fullCommand, pattern)) {
+        return { permission: ToolPermission.NEVER, reason: `Blocked: ${pattern}` };
+      }
+    }
+
+    // 2. Allowlist pour commandes bash
+    if (args) {
+      for (const pattern of this.config.allowlist) {
+        if (matchesPattern(fullCommand, pattern)) {
+          return { permission: ToolPermission.ALWAYS, reason: `Allowed: ${pattern}` };
+        }
+      }
+    }
+
+    // 3. Règles spécifiques
+    for (const rule of this.config.rules) {
+      if (matchesPattern(toolName, rule.pattern)) {
+        return { permission: rule.permission, reason: rule.reason };
+      }
+    }
+
+    // 4. Défaut
+    return { permission: this.config.default };
+  }
+}
+```
+
+### Tableau des Permissions par Défaut
+
+| Outil | Permission | Raison |
+|-------|:----------:|--------|
+| `read_file` | ✅ ALWAYS | Lecture seule |
+| `glob`, `grep` | ✅ ALWAYS | Recherche |
+| `git_status`, `git_diff` | ✅ ALWAYS | Lecture Git |
+| `write_file`, `edit_file` | ❓ ASK | Modification fichier |
+| `bash` | ❓ ASK | Exécution shell |
+| `rm -rf /` | 🚫 NEVER | Dangereux |
+| `sudo *` | 🚫 NEVER | Privilèges root |
+
+---
+
+## 6. Optimisation : 3 Modes de Sécurité
 
 ```typescript
 type ApprovalMode = 'safe' | 'auto' | 'full-access';
@@ -289,7 +426,7 @@ class ApprovalModeManager {
 
 ---
 
-## 6. Audit et Logging
+## 7. Audit et Logging
 
 ```typescript
 class AuditLogger {
