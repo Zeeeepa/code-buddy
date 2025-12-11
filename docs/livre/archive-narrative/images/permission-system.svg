@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 320">
+  <defs>
+    <linearGradient id="bgGradPS" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="320" fill="url(#bgGradPS)"/>
+
+  <!-- Title -->
+  <text x="400" y="28" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle">SYSTEME DE PERMISSIONS</text>
+
+  <!-- Permission matrix -->
+  <rect x="50" y="50" width="700" height="130" rx="8" fill="#2d2d44" stroke="#4a4a6a" stroke-width="2"/>
+
+  <!-- Header row -->
+  <text x="80" y="78" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#888888">Mode</text>
+  <text x="200" y="78" font-family="Arial, sans-serif" font-size="10" fill="#888888">READ</text>
+  <text x="280" y="78" font-family="Arial, sans-serif" font-size="10" fill="#888888">WRITE</text>
+  <text x="370" y="78" font-family="Arial, sans-serif" font-size="10" fill="#888888">EXECUTE</text>
+  <text x="470" y="78" font-family="Arial, sans-serif" font-size="10" fill="#888888">NETWORK</text>
+  <text x="570" y="78" font-family="Arial, sans-serif" font-size="10" fill="#888888">SYSTEM</text>
+
+  <!-- read-only row -->
+  <rect x="60" y="90" width="110" height="25" rx="4" fill="#3a1e2a"/>
+  <text x="115" y="107" font-family="Arial, sans-serif" font-size="10" fill="#e74c3c" text-anchor="middle">read-only</text>
+  <text x="210" y="107" font-family="Arial, sans-serif" font-size="14" fill="#2ecc71" text-anchor="middle">✓</text>
+  <text x="295" y="107" font-family="Arial, sans-serif" font-size="14" fill="#e74c3c" text-anchor="middle">✗</text>
+  <text x="400" y="107" font-family="Arial, sans-serif" font-size="14" fill="#e74c3c" text-anchor="middle">✗</text>
+  <text x="500" y="107" font-family="Arial, sans-serif" font-size="14" fill="#e74c3c" text-anchor="middle">✗</text>
+  <text x="600" y="107" font-family="Arial, sans-serif" font-size="14" fill="#e74c3c" text-anchor="middle">✗</text>
+
+  <!-- auto row -->
+  <rect x="60" y="120" width="110" height="25" rx="4" fill="#3a3a1e"/>
+  <text x="115" y="137" font-family="Arial, sans-serif" font-size="10" fill="#f39c12" text-anchor="middle">auto</text>
+  <text x="210" y="137" font-family="Arial, sans-serif" font-size="14" fill="#2ecc71" text-anchor="middle">✓</text>
+  <text x="295" y="137" font-family="Arial, sans-serif" font-size="14" fill="#2ecc71" text-anchor="middle">✓</text>
+  <text x="400" y="137" font-family="Arial, sans-serif" font-size="14" fill="#2ecc71" text-anchor="middle">✓</text>
+  <text x="500" y="137" font-family="Arial, sans-serif" font-size="14" fill="#e74c3c" text-anchor="middle">✗</text>
+  <text x="600" y="137" font-family="Arial, sans-serif" font-size="14" fill="#e74c3c" text-anchor="middle">✗</text>
+
+  <!-- full row -->
+  <rect x="60" y="150" width="110" height="25" rx="4" fill="#1e3a3a"/>
+  <text x="115" y="167" font-family="Arial, sans-serif" font-size="10" fill="#2ecc71" text-anchor="middle">full</text>
+  <text x="210" y="167" font-family="Arial, sans-serif" font-size="14" fill="#2ecc71" text-anchor="middle">✓</text>
+  <text x="295" y="167" font-family="Arial, sans-serif" font-size="14" fill="#2ecc71" text-anchor="middle">✓</text>
+  <text x="400" y="167" font-family="Arial, sans-serif" font-size="14" fill="#2ecc71" text-anchor="middle">✓</text>
+  <text x="500" y="167" font-family="Arial, sans-serif" font-size="14" fill="#2ecc71" text-anchor="middle">✓</text>
+  <text x="600" y="167" font-family="Arial, sans-serif" font-size="14" fill="#2ecc71" text-anchor="middle">✓</text>
+
+  <!-- Tools by permission -->
+  <rect x="50" y="195" width="700" height="110" rx="8" fill="#1a1a2e"/>
+  <text x="400" y="218" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#888888" text-anchor="middle">Outils par permission :</text>
+
+  <text x="80" y="245" font-family="Arial, sans-serif" font-size="10" fill="#3498db">READ:</text>
+  <text x="130" y="245" font-family="monospace" font-size="9" fill="#cccccc">read_file, list_directory, search_*, find_*</text>
+
+  <text x="80" y="263" font-family="Arial, sans-serif" font-size="10" fill="#f39c12">WRITE:</text>
+  <text x="130" y="263" font-family="monospace" font-size="9" fill="#cccccc">write_file, edit_file, multi_edit, delete_file</text>
+
+  <text x="80" y="281" font-family="Arial, sans-serif" font-size="10" fill="#e74c3c">EXECUTE:</text>
+  <text x="150" y="281" font-family="monospace" font-size="9" fill="#cccccc">bash, background_task</text>
+
+  <text x="400" y="281" font-family="Arial, sans-serif" font-size="10" fill="#9b59b6">NETWORK:</text>
+  <text x="480" y="281" font-family="monospace" font-size="9" fill="#cccccc">http_request, search_web</text>
+</svg>

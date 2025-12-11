@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400">
+  <defs>
+    <linearGradient id="bgGradRnn" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="nodeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#3498db;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2980b9;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="hiddenGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#9b59b6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8e44ad;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="outputGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2ecc71;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#27ae60;stop-opacity:1" />
+    </linearGradient>
+    <marker id="arrowRnn" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#4a4a6a"/>
+    </marker>
+    <marker id="arrowPurple" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#9b59b6"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="400" fill="url(#bgGradRnn)"/>
+
+  <!-- Title -->
+  <text x="400" y="35" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#ffffff" text-anchor="middle">RESEAU RECURRENT (RNN)</text>
+
+  <!-- Labels -->
+  <text x="60" y="100" font-family="Arial, sans-serif" font-size="12" fill="#3498db">Entree:</text>
+  <text x="60" y="180" font-family="Arial, sans-serif" font-size="12" fill="#9b59b6">Etats:</text>
+  <text x="60" y="260" font-family="Arial, sans-serif" font-size="12" fill="#2ecc71">Sortie:</text>
+
+  <!-- Input nodes -->
+  <circle cx="150" cy="95" r="25" fill="url(#nodeGrad)"/>
+  <text x="150" y="100" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle">x1</text>
+
+  <circle cx="280" cy="95" r="25" fill="url(#nodeGrad)"/>
+  <text x="280" y="100" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle">x2</text>
+
+  <circle cx="410" cy="95" r="25" fill="url(#nodeGrad)"/>
+  <text x="410" y="100" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle">x3</text>
+
+  <circle cx="540" cy="95" r="25" fill="url(#nodeGrad)"/>
+  <text x="540" y="100" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle">x4</text>
+
+  <circle cx="670" cy="95" r="25" fill="url(#nodeGrad)"/>
+  <text x="670" y="100" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle">x5</text>
+
+  <!-- Input to hidden arrows -->
+  <line x1="150" y1="120" x2="150" y2="150" stroke="#4a4a6a" stroke-width="2" marker-end="url(#arrowRnn)"/>
+  <line x1="280" y1="120" x2="280" y2="150" stroke="#4a4a6a" stroke-width="2" marker-end="url(#arrowRnn)"/>
+  <line x1="410" y1="120" x2="410" y2="150" stroke="#4a4a6a" stroke-width="2" marker-end="url(#arrowRnn)"/>
+  <line x1="540" y1="120" x2="540" y2="150" stroke="#4a4a6a" stroke-width="2" marker-end="url(#arrowRnn)"/>
+  <line x1="670" y1="120" x2="670" y2="150" stroke="#4a4a6a" stroke-width="2" marker-end="url(#arrowRnn)"/>
+
+  <!-- Hidden state nodes -->
+  <circle cx="150" cy="175" r="25" fill="url(#hiddenGrad)"/>
+  <text x="150" y="180" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle">h1</text>
+
+  <circle cx="280" cy="175" r="25" fill="url(#hiddenGrad)"/>
+  <text x="280" y="180" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle">h2</text>
+
+  <circle cx="410" cy="175" r="25" fill="url(#hiddenGrad)"/>
+  <text x="410" y="180" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle">h3</text>
+
+  <circle cx="540" cy="175" r="25" fill="url(#hiddenGrad)"/>
+  <text x="540" y="180" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle">h4</text>
+
+  <circle cx="670" cy="175" r="25" fill="url(#hiddenGrad)"/>
+  <text x="670" y="180" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle">h5</text>
+
+  <!-- Recurrent connections (horizontal arrows between hidden states) -->
+  <line x1="175" y1="175" x2="250" y2="175" stroke="#9b59b6" stroke-width="3" marker-end="url(#arrowPurple)"/>
+  <line x1="305" y1="175" x2="380" y2="175" stroke="#9b59b6" stroke-width="3" marker-end="url(#arrowPurple)"/>
+  <line x1="435" y1="175" x2="510" y2="175" stroke="#9b59b6" stroke-width="3" marker-end="url(#arrowPurple)"/>
+  <line x1="565" y1="175" x2="640" y2="175" stroke="#9b59b6" stroke-width="3" marker-end="url(#arrowPurple)"/>
+
+  <!-- Hidden to output arrows -->
+  <line x1="150" y1="200" x2="150" y2="230" stroke="#4a4a6a" stroke-width="2" marker-end="url(#arrowRnn)"/>
+  <line x1="280" y1="200" x2="280" y2="230" stroke="#4a4a6a" stroke-width="2" marker-end="url(#arrowRnn)"/>
+  <line x1="410" y1="200" x2="410" y2="230" stroke="#4a4a6a" stroke-width="2" marker-end="url(#arrowRnn)"/>
+  <line x1="540" y1="200" x2="540" y2="230" stroke="#4a4a6a" stroke-width="2" marker-end="url(#arrowRnn)"/>
+  <line x1="670" y1="200" x2="670" y2="230" stroke="#4a4a6a" stroke-width="2" marker-end="url(#arrowRnn)"/>
+
+  <!-- Output nodes -->
+  <circle cx="150" cy="255" r="25" fill="url(#outputGrad)"/>
+  <text x="150" y="260" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle">y1</text>
+
+  <circle cx="280" cy="255" r="25" fill="url(#outputGrad)"/>
+  <text x="280" y="260" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle">y2</text>
+
+  <circle cx="410" cy="255" r="25" fill="url(#outputGrad)"/>
+  <text x="410" y="260" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle">y3</text>
+
+  <circle cx="540" cy="255" r="25" fill="url(#outputGrad)"/>
+  <text x="540" y="260" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle">y4</text>
+
+  <circle cx="670" cy="255" r="25" fill="url(#outputGrad)"/>
+  <text x="670" y="260" font-family="Arial, sans-serif" font-size="14" fill="#ffffff" text-anchor="middle">y5</text>
+
+  <!-- Formula box -->
+  <rect x="200" y="300" width="400" height="40" rx="8" fill="#2d2d44" stroke="#9b59b6" stroke-width="2"/>
+  <text x="400" y="325" font-family="monospace" font-size="14" fill="#e1bee7" text-anchor="middle">ht = f(Wh × ht-1 + Wx × xt + b)</text>
+
+  <!-- Warning box -->
+  <rect x="150" y="350" width="500" height="35" rx="8" fill="#3d1f1f" stroke="#e74c3c" stroke-width="1"/>
+  <text x="400" y="373" font-family="Arial, sans-serif" font-size="12" fill="#e74c3c" text-anchor="middle">Le signal s'affaiblit exponentiellement quand il traverse de nombreuses etapes</text>
+</svg>

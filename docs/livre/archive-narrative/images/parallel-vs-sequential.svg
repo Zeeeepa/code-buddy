@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 280">
+  <defs>
+    <linearGradient id="bgGradPVS" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="280" fill="url(#bgGradPVS)"/>
+
+  <!-- Title -->
+  <text x="400" y="28" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle">PARALLEL vs SEQUENTIAL</text>
+
+  <!-- Sequential -->
+  <rect x="50" y="50" width="700" height="100" rx="8" fill="#3a1e2a" stroke="#e74c3c" stroke-width="2"/>
+  <text x="80" y="75" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#e74c3c">SEQUENTIAL (lent) :</text>
+
+  <text x="80" y="100" font-family="monospace" font-size="9" fill="#cccccc">read_file(a)</text>
+  <rect x="175" y="90" width="120" height="16" rx="3" fill="#e74c3c"/>
+  <text x="310" y="102" font-family="monospace" font-size="8" fill="#888888">500ms</text>
+
+  <text x="310" y="100" font-family="monospace" font-size="9" fill="#cccccc">read_file(b)</text>
+  <rect x="410" y="90" width="120" height="16" rx="3" fill="#f39c12"/>
+  <text x="545" y="102" font-family="monospace" font-size="8" fill="#888888">500ms</text>
+
+  <text x="545" y="100" font-family="monospace" font-size="9" fill="#cccccc">search(c)</text>
+  <rect x="620" y="90" width="110" height="16" rx="3" fill="#9b59b6"/>
+
+  <text x="400" y="140" font-family="Arial, sans-serif" font-size="11" fill="#e74c3c" text-anchor="middle">Total: 1800ms</text>
+
+  <!-- Parallel -->
+  <rect x="50" y="160" width="700" height="105" rx="8" fill="#1e3a3a" stroke="#2ecc71" stroke-width="2"/>
+  <text x="80" y="185" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#2ecc71">PARALLEL (rapide) :</text>
+
+  <text x="80" y="208" font-family="monospace" font-size="9" fill="#cccccc">read_file(a)</text>
+  <rect x="175" y="198" width="120" height="14" rx="3" fill="#3498db"/>
+  <text x="310" y="208" font-family="monospace" font-size="8" fill="#888888">500ms</text>
+
+  <text x="80" y="225" font-family="monospace" font-size="9" fill="#cccccc">read_file(b)</text>
+  <rect x="175" y="215" width="120" height="14" rx="3" fill="#3498db"/>
+
+  <text x="80" y="242" font-family="monospace" font-size="9" fill="#cccccc">search(c)</text>
+  <rect x="175" y="232" width="180" height="14" rx="3" fill="#9b59b6"/>
+  <text x="370" y="242" font-family="monospace" font-size="8" fill="#888888">800ms</text>
+
+  <text x="550" y="225" font-family="Arial, sans-serif" font-size="11" fill="#2ecc71">Total: 800ms (le plus long)</text>
+  <text x="550" y="245" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#2ecc71">→ 2.25x plus rapide</text>
+</svg>

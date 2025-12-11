@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 420">
+  <defs>
+    <linearGradient id="bgGradMCP" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
+    </linearGradient>
+    <marker id="arrowMCP" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#3498db"/>
+    </marker>
+    <marker id="arrowMCPRev" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto">
+      <polygon points="10 0, 0 3.5, 10 7" fill="#3498db"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="420" fill="url(#bgGradMCP)"/>
+
+  <!-- Title -->
+  <text x="400" y="28" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle">MODEL CONTEXT PROTOCOL (MCP)</text>
+
+  <!-- Client-Server diagram -->
+  <rect x="80" y="55" width="150" height="70" rx="8" fill="#1e3a3a" stroke="#2ecc71" stroke-width="2"/>
+  <text x="155" y="85" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#2ecc71" text-anchor="middle">CLIENT</text>
+  <text x="155" y="105" font-family="Arial, sans-serif" font-size="10" fill="#cccccc" text-anchor="middle">(Grok Agent)</text>
+
+  <!-- Bidirectional arrow -->
+  <line x1="235" y1="90" x2="365" y2="90" stroke="#3498db" stroke-width="2" marker-end="url(#arrowMCP)"/>
+  <line x1="365" y1="90" x2="235" y2="90" stroke="#3498db" stroke-width="2" marker-end="url(#arrowMCPRev)"/>
+  <rect x="270" y="70" width="60" height="20" rx="4" fill="#1a1a2e"/>
+  <text x="300" y="84" font-family="Arial, sans-serif" font-size="9" fill="#3498db" text-anchor="middle">MCP</text>
+  <text x="300" y="110" font-family="monospace" font-size="8" fill="#888888" text-anchor="middle">JSON-RPC 2.0</text>
+
+  <rect x="370" y="55" width="150" height="70" rx="8" fill="#2a1e3a" stroke="#9b59b6" stroke-width="2"/>
+  <text x="445" y="85" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#9b59b6" text-anchor="middle">SERVER</text>
+  <text x="445" y="105" font-family="Arial, sans-serif" font-size="10" fill="#cccccc" text-anchor="middle">(Outil/API)</text>
+
+  <!-- Features section -->
+  <rect x="40" y="145" width="350" height="145" rx="8" fill="#2d2d44" stroke="#4a4a6a"/>
+  <text x="215" y="170" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#f39c12" text-anchor="middle">FONCTIONNALITÉS MCP</text>
+
+  <!-- Tools -->
+  <rect x="55" y="185" width="70" height="40" rx="4" fill="#1e3a3a"/>
+  <text x="90" y="205" font-family="Arial, sans-serif" font-size="10" fill="#2ecc71" text-anchor="middle">🔧 Tools</text>
+  <text x="90" y="218" font-family="Arial, sans-serif" font-size="7" fill="#888888" text-anchor="middle">Outils</text>
+
+  <!-- Resources -->
+  <rect x="135" y="185" width="70" height="40" rx="4" fill="#1e3a3a"/>
+  <text x="170" y="205" font-family="Arial, sans-serif" font-size="10" fill="#3498db" text-anchor="middle">📄 Resources</text>
+  <text x="170" y="218" font-family="Arial, sans-serif" font-size="7" fill="#888888" text-anchor="middle">Données</text>
+
+  <!-- Prompts -->
+  <rect x="215" y="185" width="70" height="40" rx="4" fill="#1e3a3a"/>
+  <text x="250" y="205" font-family="Arial, sans-serif" font-size="10" fill="#f39c12" text-anchor="middle">📝 Prompts</text>
+  <text x="250" y="218" font-family="Arial, sans-serif" font-size="7" fill="#888888" text-anchor="middle">Templates</text>
+
+  <!-- Sampling -->
+  <rect x="295" y="185" width="80" height="40" rx="4" fill="#1e3a3a"/>
+  <text x="335" y="205" font-family="Arial, sans-serif" font-size="10" fill="#9b59b6" text-anchor="middle">🤖 Sampling</text>
+  <text x="335" y="218" font-family="Arial, sans-serif" font-size="7" fill="#888888" text-anchor="middle">Génération</text>
+
+  <!-- Feature descriptions -->
+  <text x="55" y="245" font-family="Arial, sans-serif" font-size="8" fill="#cccccc">🔧 Serveur expose des outils appelables par le LLM</text>
+  <text x="55" y="260" font-family="Arial, sans-serif" font-size="8" fill="#cccccc">📄 Serveur expose des ressources (fichiers, configs)</text>
+  <text x="55" y="275" font-family="Arial, sans-serif" font-size="8" fill="#cccccc">📝 Templates de prompts pré-définis</text>
+
+  <!-- Transports section -->
+  <rect x="410" y="145" width="350" height="145" rx="8" fill="#2d2d44" stroke="#4a4a6a"/>
+  <text x="585" y="170" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#3498db" text-anchor="middle">TRANSPORTS SUPPORTÉS</text>
+
+  <!-- stdio -->
+  <rect x="425" y="185" width="100" height="50" rx="4" fill="#3a3a1e" stroke="#f39c12"/>
+  <text x="475" y="205" font-family="Arial, sans-serif" font-size="11" fill="#f39c12" text-anchor="middle">📟 stdio</text>
+  <text x="475" y="222" font-family="Arial, sans-serif" font-size="8" fill="#cccccc" text-anchor="middle">Process local</text>
+  <text x="475" y="232" font-family="Arial, sans-serif" font-size="7" fill="#888888" text-anchor="middle">(stdin/stdout)</text>
+
+  <!-- HTTP -->
+  <rect x="535" y="185" width="100" height="50" rx="4" fill="#1e3a3a" stroke="#2ecc71"/>
+  <text x="585" y="205" font-family="Arial, sans-serif" font-size="11" fill="#2ecc71" text-anchor="middle">🌐 HTTP</text>
+  <text x="585" y="222" font-family="Arial, sans-serif" font-size="8" fill="#cccccc" text-anchor="middle">Serveur distant</text>
+  <text x="585" y="232" font-family="Arial, sans-serif" font-size="7" fill="#888888" text-anchor="middle">(REST API)</text>
+
+  <!-- SSE -->
+  <rect x="645" y="185" width="100" height="50" rx="4" fill="#2a1e3a" stroke="#9b59b6"/>
+  <text x="695" y="205" font-family="Arial, sans-serif" font-size="11" fill="#9b59b6" text-anchor="middle">📡 SSE</text>
+  <text x="695" y="222" font-family="Arial, sans-serif" font-size="8" fill="#cccccc" text-anchor="middle">Streaming</text>
+  <text x="695" y="232" font-family="Arial, sans-serif" font-size="7" fill="#888888" text-anchor="middle">(Server-Sent Events)</text>
+
+  <!-- Transport note -->
+  <text x="425" y="260" font-family="Arial, sans-serif" font-size="8" fill="#cccccc">📟 stdio : Idéal pour outils CLI locaux (npx, node)</text>
+  <text x="425" y="275" font-family="Arial, sans-serif" font-size="8" fill="#cccccc">🌐 HTTP : Pour services distants et microservices</text>
+
+  <!-- Methods section -->
+  <rect x="40" y="305" width="720" height="100" rx="8" fill="#1a1a2e" stroke="#3498db"/>
+  <text x="400" y="328" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#3498db" text-anchor="middle">MÉTHODES PRINCIPALES</text>
+
+  <!-- Methods grid -->
+  <rect x="55" y="340" width="105" height="50" rx="4" fill="#2d2d44"/>
+  <text x="107" y="358" font-family="monospace" font-size="9" fill="#2ecc71" text-anchor="middle">initialize</text>
+  <text x="107" y="375" font-family="Arial, sans-serif" font-size="8" fill="#888888" text-anchor="middle">🤝 Handshake</text>
+
+  <rect x="170" y="340" width="105" height="50" rx="4" fill="#2d2d44"/>
+  <text x="222" y="358" font-family="monospace" font-size="9" fill="#2ecc71" text-anchor="middle">tools/list</text>
+  <text x="222" y="375" font-family="Arial, sans-serif" font-size="8" fill="#888888" text-anchor="middle">🔧 Lister outils</text>
+
+  <rect x="285" y="340" width="105" height="50" rx="4" fill="#2d2d44"/>
+  <text x="337" y="358" font-family="monospace" font-size="9" fill="#f39c12" text-anchor="middle">tools/call</text>
+  <text x="337" y="375" font-family="Arial, sans-serif" font-size="8" fill="#888888" text-anchor="middle">▶️ Appeler outil</text>
+
+  <rect x="400" y="340" width="105" height="50" rx="4" fill="#2d2d44"/>
+  <text x="452" y="358" font-family="monospace" font-size="9" fill="#3498db" text-anchor="middle">resources/list</text>
+  <text x="452" y="375" font-family="Arial, sans-serif" font-size="8" fill="#888888" text-anchor="middle">📄 Ressources</text>
+
+  <rect x="515" y="340" width="105" height="50" rx="4" fill="#2d2d44"/>
+  <text x="567" y="358" font-family="monospace" font-size="9" fill="#3498db" text-anchor="middle">resources/read</text>
+  <text x="567" y="375" font-family="Arial, sans-serif" font-size="8" fill="#888888" text-anchor="middle">📖 Lire data</text>
+
+  <rect x="630" y="340" width="115" height="50" rx="4" fill="#2d2d44"/>
+  <text x="687" y="358" font-family="monospace" font-size="9" fill="#9b59b6" text-anchor="middle">prompts/get</text>
+  <text x="687" y="375" font-family="Arial, sans-serif" font-size="8" fill="#888888" text-anchor="middle">📝 Templates</text>
+</svg>
