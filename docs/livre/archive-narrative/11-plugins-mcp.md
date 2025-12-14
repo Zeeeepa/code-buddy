@@ -101,7 +101,7 @@ export interface PluginManifest {
 
 ```typescript
 // plugins/hello-world/index.ts
-import { Plugin, Tool, PluginContext } from '@grok-cli/plugin-sdk';
+import { Plugin, Tool, PluginContext } from '@code-buddy/plugin-sdk';
 
 export default class HelloWorldPlugin implements Plugin {
   id = 'hello-world';
@@ -363,7 +363,7 @@ export class MCPClient {
     const response = await this.request('initialize', {
       protocolVersion: '0.1.0',
       clientInfo: {
-        name: 'grok-cli',
+        name: 'code-buddy',
         version: '1.0.0'
       },
       capabilities: {

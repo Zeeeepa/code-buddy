@@ -104,7 +104,7 @@ Cette version **narrative** du livre privilégie :
 
 ## 🔗 Liens Utiles
 
-- [📦 Repository grok-cli](https://github.com/phuetz/grok-cli)
+- [📦 Repository code-buddy](https://github.com/phuetz/code-buddy)
 - [📖 Version Pratique du Livre](../README.md)
 - [🚀 Guide de Démarrage Rapide](../../GETTING_STARTED.md)
 
