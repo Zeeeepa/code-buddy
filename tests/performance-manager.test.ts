@@ -5,7 +5,6 @@ import {
   PerformanceManager,
   getPerformanceManager,
   resetPerformanceManager,
-  initializePerformanceManager,
   measureOperation,
 } from '../src/performance/performance-manager';
 import {

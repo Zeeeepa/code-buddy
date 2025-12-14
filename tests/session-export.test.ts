@@ -8,10 +8,7 @@ import {
   SessionPlayer,
   getSessionRecorder,
   resetSessionRecorder,
-  exportSession,
   type ExportedSession,
-  type SessionMessage,
-  type ExportFormat,
 } from '../src/persistence/session-export.js';
 
 describe('SessionRecorder', () => {

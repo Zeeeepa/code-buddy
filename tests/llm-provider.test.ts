@@ -169,7 +169,7 @@ describe('LLM Provider', () => {
 
     it('should register provider', async () => {
       // Mock the OpenAI import for testing
-      const mockProvider = {
+      const _mockProvider = {
         type: 'grok' as ProviderType,
         name: 'Test Provider',
         defaultModel: 'test-model',

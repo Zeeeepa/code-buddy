@@ -91,6 +91,7 @@ describe('AdvancedParallelExecutor', () => {
         { name: 'Agent 2', task: 'Task 2' },
       ];
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const results = await executor.executeParallel(tasks as any);
 
       expect(results[0].agentId).toMatch(/^agent_\d+$/);

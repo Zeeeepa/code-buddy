@@ -16,9 +16,6 @@
 
 import { EventEmitter } from 'events';
 import * as net from 'net';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
 
 // ============================================================================
 // Types
@@ -39,16 +36,16 @@ export interface IDEConnection {
 export interface IDERequest {
   id: string;
   method: string;
-  params: Record<string, any>;
+  params: Record<string, unknown>;
 }
 
 export interface IDEResponse {
   id: string;
-  result?: any;
+  result?: unknown;
   error?: {
     code: number;
     message: string;
-    data?: any;
+    data?: unknown;
   };
 }
 
@@ -127,7 +124,7 @@ export interface CodeAction {
   command?: {
     command: string;
     title: string;
-    arguments?: any[];
+    arguments?: unknown[];
   };
 }
 
@@ -172,7 +169,7 @@ export class IDEExtensionsServer extends EventEmitter {
   private config: IDEExtensionsConfig;
   private server: net.Server | null = null;
   private connections: Map<string, IDEConnection> = new Map();
-  private handlers: Map<string, (request: IDERequest, connection: IDEConnection) => Promise<any>> = new Map();
+  private handlers: Map<string, (request: IDERequest, connection: IDEConnection) => Promise<unknown>> = new Map();
   private running = false;
 
   constructor(config: Partial<IDEExtensionsConfig> = {}) {
@@ -246,7 +243,7 @@ export class IDEExtensionsServer extends EventEmitter {
   /**
    * Send notification to all connected clients
    */
-  broadcast(method: string, params: any): void {
+  broadcast(method: string, params: unknown): void {
     const message = JSON.stringify({ method, params });
 
     for (const conn of this.connections.values()) {
@@ -259,7 +256,7 @@ export class IDEExtensionsServer extends EventEmitter {
   /**
    * Send notification to specific client
    */
-  notify(connectionId: string, method: string, params: any): void {
+  notify(connectionId: string, method: string, params: unknown): void {
     const conn = this.connections.get(connectionId);
     if (conn?.socket && conn.connected) {
       const message = JSON.stringify({ method, params });
@@ -270,7 +267,7 @@ export class IDEExtensionsServer extends EventEmitter {
   /**
    * Register request handler
    */
-  registerHandler(method: string, handler: (request: IDERequest, connection: IDEConnection) => Promise<any>): void {
+  registerHandler(method: string, handler: (request: IDERequest, connection: IDEConnection) => Promise<unknown>): void {
     this.handlers.set(method, handler);
   }
 
@@ -921,9 +918,9 @@ return M
     this.registerHandler('initialize', async (request, connection) => {
       const params = request.params;
 
-      connection.type = this.detectIDEType(params.ide);
-      connection.name = params.ide || 'Unknown';
-      connection.version = params.version;
+      connection.type = this.detectIDEType(params.ide as string);
+      connection.name = (params.ide as string) || 'Unknown';
+      connection.version = params.version as string | undefined;
 
       return {
         capabilities: {
@@ -937,7 +934,7 @@ return M
     });
 
     // Completion handler (stub - integrate with actual AI)
-    this.registerHandler('completion', async (request) => {
+    this.registerHandler('completion', async (_request) => {
       // This would integrate with the actual Grok agent
       return {
         items: [],

@@ -13,11 +13,12 @@ import {
 } from '../src/testing/ai-integration-tests.js';
 
 // Mock GrokClient for testing
-const mockGrokClient = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockGrokClient: any = {
   getCurrentModel: () => 'grok-3-latest',
   chat: jest.fn(),
   chatStream: jest.fn(),
-} as any;
+};
 
 describe('AITestRunner', () => {
   describe('Initialization', () => {

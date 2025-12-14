@@ -2,7 +2,7 @@
  * Tests for BackgroundTaskManager
  */
 
-import { BackgroundTaskManager, BackgroundTask, TaskStatus } from "../../src/tasks/background-tasks";
+import { BackgroundTaskManager } from "../../src/tasks/background-tasks";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";

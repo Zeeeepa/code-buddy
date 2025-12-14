@@ -8,7 +8,6 @@ import * as fs from 'fs/promises';
 import {
   SmartContextPreloader,
   createSmartPreloader,
-  type PreloadedContext,
   type PreloaderConfig,
 } from '../src/context/smart-preloader.js';
 

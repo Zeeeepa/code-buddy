@@ -8,10 +8,6 @@ import {
   PrometheusExporter,
   getMetricsCollector,
   resetMetricsCollector,
-  getTerminalDashboard,
-  getPrometheusExporter,
-  type ToolMetrics,
-  type ProviderMetrics,
 } from '../src/observability/dashboard.js';
 
 describe('MetricsCollector', () => {

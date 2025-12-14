@@ -25,7 +25,7 @@ export function loadMCPConfig(): MCPConfig {
 
       for (const [name, config] of Object.entries(mcpServers)) {
         if (!seenServers.has(name)) {
-          servers.push({ name, ...(config as any) });
+          servers.push({ ...(config as MCPServerConfig), name });
           seenServers.add(name);
         }
       }
@@ -55,7 +55,7 @@ export function loadMCPConfig(): MCPConfig {
 
       for (const [name, config] of Object.entries(mcpServers)) {
         if (!seenServers.has(name)) {
-          servers.push({ name, ...(config as any) });
+          servers.push({ ...(config as MCPServerConfig), name });
           seenServers.add(name);
         }
       }
@@ -102,7 +102,7 @@ export function removeMCPServer(serverName: string): void {
 export function getMCPServer(serverName: string): MCPServerConfig | undefined {
   const manager = getSettingsManager();
   const projectSettings = manager.loadProjectSettings();
-  return projectSettings.mcpServers?.[serverName];
+  return projectSettings.mcpServers?.[serverName] as MCPServerConfig | undefined;
 }
 
 // Predefined server configurations

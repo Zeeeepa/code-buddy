@@ -3,13 +3,14 @@
  */
 
 import { ThemeManager } from "../../src/themes/theme-manager";
-import { Theme, ThemeColors, AvatarConfig } from "../../src/themes/theme";
+import { Theme } from "../../src/themes/theme";
 
 describe("ThemeManager", () => {
   let themeManager: ThemeManager;
 
   beforeEach(() => {
     // Reset singleton for each test
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (ThemeManager as any).instance = undefined;
     themeManager = ThemeManager.getInstance();
   });

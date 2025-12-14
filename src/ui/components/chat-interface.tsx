@@ -20,6 +20,11 @@ import { getErrorMessage } from "../../types/index.js";
 import { MiniStatusBar } from "./status-bar.js";
 import { KeyboardHelp, useKeyboardHelp, KeyboardHelpButton } from "./keyboard-help.js";
 import { ToastProvider } from "./toast-notifications.js";
+import {
+  announceToScreenReader,
+  useAccessibilitySettings,
+  useKeyboardShortcuts,
+} from "../utils/accessibility.js";
 
 interface ChatInterfaceProps {
   agent?: GrokAgent;
@@ -35,6 +40,7 @@ function ChatInterfaceWithAgent({
   initialMessage?: string;
 }) {
   const { colors, theme } = useTheme();
+  const { settings } = useAccessibilitySettings();
   const [chatHistory, setChatHistory] = useState<ChatEntry[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingTime, setProcessingTime] = useState(0);
@@ -43,6 +49,7 @@ function ChatInterfaceWithAgent({
   const [confirmationOptions, setConfirmationOptions] =
     useState<ConfirmationOptions | null>(null);
   const [sessionStartTime] = useState(new Date());
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const scrollRef = useRef<any>();
   const processingStartTime = useRef<number>(0);
 
@@ -55,6 +62,27 @@ function ChatInterfaceWithAgent({
       keyboardHelp.toggle();
     }
   });
+
+  // Keyboard shortcuts with accessibility support
+  useKeyboardShortcuts([
+    {
+      keys: ['ctrl', 'h'],
+      description: 'Show help',
+      handler: () => {
+        // This would trigger help display
+        announceToScreenReader('Opening help', 'polite');
+      },
+      enabled: !confirmationOptions && !isProcessing,
+    },
+    {
+      keys: ['ctrl', '/'],
+      description: 'Toggle accessibility settings',
+      handler: () => {
+        announceToScreenReader('Accessibility settings', 'polite');
+      },
+      enabled: !confirmationOptions,
+    },
+  ]);
 
   // Optimized update functions to avoid O(n²) array spreading on each streaming chunk
   // These use indexed updates instead of mapping the entire array
@@ -154,7 +182,15 @@ function ChatInterfaceWithAgent({
     console.log(" "); // Spacing after logo
 
     setChatHistory([]);
-  }, []);
+
+    // Announce to screen readers
+    if (settings.screenReader) {
+      announceToScreenReader(
+        'Grok CLI started. Chat interface ready. Press Ctrl+H for help.',
+        'polite'
+      );
+    }
+  }, [settings.screenReader]);
 
   // Process initial message if provided (streaming for faster feedback)
   useEffect(() => {
@@ -238,13 +274,19 @@ function ChatInterfaceWithAgent({
             }
           }
         } catch (error) {
+          const errorMessage = getErrorMessage(error);
           const errorEntry: ChatEntry = {
             type: "assistant",
-            content: `Error: ${getErrorMessage(error)}`,
+            content: `Error: ${errorMessage}`,
             timestamp: new Date(),
           };
           setChatHistory((prev) => [...prev, errorEntry]);
           setIsStreaming(false);
+
+          // Announce errors to screen readers
+          if (settings.screenReader) {
+            announceToScreenReader(`Error occurred: ${errorMessage}`, 'assertive');
+          }
         }
 
         setIsProcessing(false);
@@ -292,6 +334,11 @@ function ChatInterfaceWithAgent({
   const handleConfirmation = (dontAskAgain?: boolean) => {
     confirmationService.confirmOperation(true, dontAskAgain);
     setConfirmationOptions(null);
+
+    // Announce to screen readers
+    if (settings.screenReader) {
+      announceToScreenReader('Operation confirmed', 'polite');
+    }
   };
 
   const handleRejection = (feedback?: string) => {
@@ -304,6 +351,11 @@ function ChatInterfaceWithAgent({
     setTokenCount(0);
     setProcessingTime(0);
     processingStartTime.current = 0;
+
+    // Announce to screen readers
+    if (settings.screenReader) {
+      announceToScreenReader('Operation cancelled', 'polite');
+    }
   };
 
   return (
