@@ -17,7 +17,6 @@ import {
 } from './theme.js';
 import { BUILTIN_THEMES, DEFAULT_THEME } from './default-themes.js';
 import { themeSchema, themePreferencesSchema } from './theme-schema.js';
-import { ZodError } from 'zod';
 
 /**
  * Singleton manager for themes and avatars

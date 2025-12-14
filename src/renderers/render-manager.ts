@@ -240,7 +240,7 @@ export class RenderManager {
     }
 
     // Render as list
-    const lines = arr.map((item, i) => {
+    const lines = arr.map((item, _i) => {
       const bullet = ctx.emoji ? '•' : '-';
       const rendered = typeof item === 'object' && item !== null
         ? this.renderGeneric(item, ctx).split('\n').map((l, j) => j === 0 ? l : '  ' + l).join('\n')

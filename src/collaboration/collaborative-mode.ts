@@ -144,7 +144,7 @@ export class CollaborationServer extends EventEmitter {
             try {
               const message = JSON.parse(data.toString()) as CollaborationMessage;
               this.handleMessage(connectionId, ws, message);
-            } catch (error) {
+            } catch {
               this.sendError(ws, 'Invalid message format');
             }
           });

@@ -465,7 +465,7 @@ export class AITestRunner extends EventEmitter {
         details: 'API handled empty content gracefully',
         tokensUsed: response.usage?.total_tokens,
       };
-    } catch (error) {
+    } catch {
       // Expected - API rejected empty content
       return {
         name: 'Error Handling',

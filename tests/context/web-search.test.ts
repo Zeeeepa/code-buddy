@@ -63,7 +63,7 @@ describe("WebSearchManager", () => {
         expect(Array.isArray(response.results)).toBe(true);
         expect(response.searchTime).toBeGreaterThanOrEqual(0);
         expect(response.timestamp).toBeDefined();
-      } catch (error) {
+      } catch {
         // Network error - skip test
         console.log("Skipping search test due to network error");
       }

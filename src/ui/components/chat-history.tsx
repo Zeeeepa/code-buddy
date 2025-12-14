@@ -75,7 +75,7 @@ function StructuredContent({ content, color }: { content: string; color?: string
         ))}
       </Box>
     );
-  } catch (error) {
+  } catch {
     return (
       <Text color="yellow">
         ⚠ Error rendering structured content
@@ -128,7 +128,7 @@ const MemoizedChatEntry = React.memo(
             </Text>
           );
         });
-      } catch (error) {
+      } catch {
         return (
           <Text color="yellow">
             ⚠ Error rendering file content (file too large or invalid format)

@@ -10,9 +10,6 @@
  */
 
 import type { CommandHandlerResult } from './branch-handlers.js';
-import type { ChatEntry } from '../../agent/grok-agent.js';
-import fs from 'fs';
-import path from 'path';
 
 // ============================================================================
 // /reload - Reload Configuration

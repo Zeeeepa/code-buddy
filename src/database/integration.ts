@@ -84,7 +84,7 @@ export class DatabaseIntegration extends EventEmitter {
       await initializeEmbeddingProvider({
         provider: this.config.embeddingProvider || 'local',
       });
-    } catch (error) {
+    } catch {
       // Continue without embeddings - mock will be used
       this.emit('warning', { type: 'embeddings', message: 'Using mock embeddings' });
     }
@@ -117,7 +117,7 @@ export class DatabaseIntegration extends EventEmitter {
       try {
         const result = await embeddingProvider.embed(content);
         embedding = result.embedding;
-      } catch (error) {
+      } catch {
         // Continue without embedding
       }
     }

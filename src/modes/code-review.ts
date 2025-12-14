@@ -236,7 +236,7 @@ const REVIEW_RULES: ReviewRule[] = [
     message: 'Use strict equality (===) instead of loose equality (==).',
     suggestion: 'Replace == with === for type-safe comparison.',
     languages: ['typescript', 'javascript'],
-    autoFix: (_match, line) => ({
+    autoFix: (_match, _line) => ({
       type: 'replace',
       line: 0,
       oldText: '==',
