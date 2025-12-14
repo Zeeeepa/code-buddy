@@ -10,6 +10,7 @@ import {
   validateCommand as validateCommandSafety,
   sanitizeForShell
 } from '../utils/input-validator.js';
+import { rgPath } from '@vscode/ripgrep';
 import path from 'path';
 import os from 'os';
 
@@ -480,8 +481,55 @@ export class BashTool {
       };
     }
 
-    const safePattern = sanitizeForShell(pattern);
-    const safeFiles = sanitizeForShell(files);
-    return this.execute(`grep -r ${safePattern} ${safeFiles}`);
+    // Use ripgrep for ultra-fast searching
+    return new Promise((resolve) => {
+      const args = [
+        '--no-heading',
+        '--line-number',
+        '--color', 'never',
+        '--max-count', '100', // Limit results for performance
+        pattern,
+        files
+      ];
+
+      const rg = spawn(rgPath, args, {
+        cwd: this.currentDirectory,
+        env: process.env,
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      rg.stdout?.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      rg.stderr?.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      rg.on('close', (code) => {
+        // ripgrep returns 1 if no matches found (not an error)
+        if (code === 0 || code === 1) {
+          resolve({
+            success: true,
+            output: stdout || 'No matches found',
+          });
+        } else {
+          resolve({
+            success: false,
+            error: stderr || `ripgrep exited with code ${code}`,
+            output: stdout,
+          });
+        }
+      });
+
+      rg.on('error', (error) => {
+        resolve({
+          success: false,
+          error: `ripgrep error: ${error.message}`,
+        });
+      });
+    });
   }
 }
