@@ -217,6 +217,7 @@ function renderDiffLine(
   }
 
   // Clean ANSI codes for length calculation
+  // eslint-disable-next-line no-control-regex
   const cleanContent = content.replace(/\x1b\[[0-9;]*m/g, '');
   const padding = ' '.repeat(Math.max(0, width - cleanContent.length - 10));
 
