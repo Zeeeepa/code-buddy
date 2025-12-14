@@ -13,7 +13,7 @@
  */
 
 import { EventEmitter } from 'events';
-import * as fs from 'fs-extra';
+import fs from 'fs-extra';
 import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
@@ -265,6 +265,12 @@ export class EnhancedMemory extends EventEmitter {
    */
   private async loadProjects(): Promise<void> {
     const projectsDir = path.join(this.dataDir, 'projects');
+
+    // Check if directory exists before reading
+    if (!await fs.pathExists(projectsDir)) {
+      return;
+    }
+
     const files = await fs.readdir(projectsDir);
 
     for (const file of files) {
