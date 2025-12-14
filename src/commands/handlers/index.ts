@@ -4,6 +4,7 @@ export {
   handleBranches,
   handleCheckout,
   handleMerge,
+  handleDiffCheckpoints,
 } from './branch-handlers.js';
 
 // Memory handlers
@@ -66,6 +67,18 @@ export {
   handleSkill,
   handleSaveConversation,
 } from './core-handlers.js';
+
+// Export handlers
+export {
+  handleExport,
+  handleExportList,
+  handleExportFormats,
+} from './export-handlers.js';
+
+// Session handlers
+export {
+  handleSessions,
+} from './session-handlers.js';
 
 // Re-export CommandHandlerResult type
 export type { CommandHandlerResult } from './branch-handlers.js';

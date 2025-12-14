@@ -102,6 +102,17 @@ export class SlashCommandManager {
         ]
       },
       {
+        name: 'diff',
+        description: 'Show diff between two checkpoints',
+        prompt: '__DIFF_CHECKPOINTS__',
+        filePath: '',
+        isBuiltin: true,
+        arguments: [
+          { name: 'from', description: 'First checkpoint ID (or "last" for last two)', required: false },
+          { name: 'to', description: 'Second checkpoint ID', required: false }
+        ]
+      },
+      {
         name: 'review',
         description: 'Review code changes before commit',
         prompt: `You are a code reviewer. Analyze the current git changes and provide a detailed code review.
@@ -345,6 +356,17 @@ Be systematic and thorough in your analysis.`,
           { name: 'action', description: 'status, mode <mode>, reset', required: false }
         ]
       },
+      // Session Management (Mistral Vibe-style)
+      {
+        name: 'sessions',
+        description: 'List recent sessions with interaction history',
+        prompt: '__SESSIONS__',
+        filePath: '',
+        isBuiltin: true,
+        arguments: [
+          { name: 'action', description: 'list, show <id>, replay <id>, delete <id>', required: false }
+        ]
+      },
       {
         name: 'fork',
         description: 'Fork conversation into a new branch',
@@ -489,6 +511,31 @@ Be systematic and thorough in your analysis.`,
         arguments: [
           { name: 'filename', description: 'Output filename (optional, defaults to timestamp)', required: false }
         ]
+      },
+      {
+        name: 'export',
+        description: 'Export session to various formats (JSON, Markdown, HTML, Text)',
+        prompt: '__EXPORT__',
+        filePath: '',
+        isBuiltin: true,
+        arguments: [
+          { name: 'format', description: 'Export format: json, markdown, html, text (default: markdown)', required: false },
+          { name: 'session', description: 'session:<id> to export specific session', required: false }
+        ]
+      },
+      {
+        name: 'export-list',
+        description: 'List all exported files',
+        prompt: '__EXPORT_LIST__',
+        filePath: '',
+        isBuiltin: true
+      },
+      {
+        name: 'export-formats',
+        description: 'Show available export formats and options',
+        prompt: '__EXPORT_FORMATS__',
+        filePath: '',
+        isBuiltin: true
       },
       {
         name: 'cache',

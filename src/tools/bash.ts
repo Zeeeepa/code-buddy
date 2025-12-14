@@ -4,6 +4,12 @@ import { ConfirmationService } from '../utils/confirmation-service.js';
 import { getSandboxManager } from '../security/sandbox.js';
 import { getSelfHealingEngine, SelfHealingEngine } from '../utils/self-healing.js';
 import { parseTestOutput, isLikelyTestOutput } from '../utils/test-output-parser.js';
+import {
+  bashToolSchemas,
+  validateWithSchema,
+  validateCommand as validateCommandSafety,
+  sanitizeForShell
+} from '../utils/input-validator.js';
 import path from 'path';
 import os from 'os';
 
@@ -84,7 +90,8 @@ export class BashTool {
   }
 
   /**
-   * Execute a command using spawn (safer than exec)
+   * Execute a command using spawn with process group isolation (safer than exec)
+   * Inspired by mistral-vibe's robust process handling
    */
   private executeWithSpawn(
     command: string,
@@ -95,22 +102,79 @@ export class BashTool {
       let stderr = '';
       let timedOut = false;
 
+      const isWindows = process.platform === 'win32';
+
+      // Controlled environment variables for deterministic output
+      const controlledEnv: Record<string, string> = {
+        ...process.env,
+        // Disable history to prevent command logging
+        HISTFILE: '/dev/null',
+        HISTSIZE: '0',
+        // CI mode for consistent behavior
+        CI: 'true',
+        // Disable color output for clean parsing
+        NO_COLOR: '1',
+        TERM: 'dumb',
+        // Disable TTY for non-interactive mode
+        NO_TTY: '1',
+        // Disable interactive features
+        GIT_TERMINAL_PROMPT: '0',
+        NPM_CONFIG_YES: 'true',
+        YARN_ENABLE_PROGRESS_BARS: 'false',
+        // Locale settings for consistent encoding
+        LC_ALL: 'C.UTF-8',
+        LANG: 'C.UTF-8',
+        PYTHONIOENCODING: 'utf-8',
+        // Force non-interactive for common tools
+        DEBIAN_FRONTEND: 'noninteractive',
+      };
+
       const spawnOptions: SpawnOptions = {
         shell: true,
         cwd: options.cwd,
-        env: {
-          ...process.env,
-          // Disable history to prevent command logging
-          HISTFILE: '/dev/null',
-          HISTSIZE: '0',
-        }
+        env: controlledEnv,
+        // Process group isolation on Unix (allows killing entire process tree)
+        detached: !isWindows,
+        // Don't inherit stdin - commands should be non-interactive
+        stdio: ['ignore', 'pipe', 'pipe'],
       };
 
       const proc = spawn('bash', ['-c', command], spawnOptions);
 
+      // Store process group ID for cleanup
+      const pgid = proc.pid;
+
+      // Graceful termination: SIGTERM first, then SIGKILL after grace period
+      const gracePeriod = 3000; // 3 seconds grace period
+      let gracefulTerminationTimer: NodeJS.Timeout | null = null;
+
+      const killProcess = (signal: NodeJS.Signals = 'SIGKILL') => {
+        try {
+          if (!isWindows && pgid) {
+            // Kill the entire process group
+            process.kill(-pgid, signal);
+          } else {
+            proc.kill(signal);
+          }
+        } catch {
+          // Process may have already exited
+          try {
+            proc.kill('SIGKILL');
+          } catch {
+            // Ignore - process is already gone
+          }
+        }
+      };
+
       const timer = setTimeout(() => {
         timedOut = true;
-        proc.kill('SIGKILL');
+        // Try graceful termination first (SIGTERM)
+        killProcess('SIGTERM');
+
+        // If still running after grace period, force kill
+        gracefulTerminationTimer = setTimeout(() => {
+          killProcess('SIGKILL');
+        }, gracePeriod);
       }, options.timeout);
 
       const maxBuffer = 1024 * 1024; // 1MB limit
@@ -131,10 +195,13 @@ export class BashTool {
 
       proc.on('close', (exitCode: number | null) => {
         clearTimeout(timer);
+        if (gracefulTerminationTimer) {
+          clearTimeout(gracefulTerminationTimer);
+        }
         if (timedOut) {
           resolve({
             stdout: stdout.trim(),
-            stderr: 'Command timed out',
+            stderr: 'Command timed out (graceful termination attempted)',
             exitCode: 124
           });
         } else {
@@ -148,6 +215,9 @@ export class BashTool {
 
       proc.on('error', (error: Error) => {
         clearTimeout(timer);
+        if (gracefulTerminationTimer) {
+          clearTimeout(gracefulTerminationTimer);
+        }
         resolve({
           stdout: '',
           stderr: error.message,
@@ -159,7 +229,30 @@ export class BashTool {
 
   async execute(command: string, timeout: number = 30000): Promise<ToolResult> {
     try {
-      // Validate command before any execution
+      // Validate input with schema (enhanced validation)
+      const schemaValidation = validateWithSchema(
+        bashToolSchemas.execute,
+        { command, timeout },
+        'execute'
+      );
+
+      if (!schemaValidation.valid) {
+        return {
+          success: false,
+          error: `Invalid input: ${schemaValidation.error}`,
+        };
+      }
+
+      // Additional command safety validation
+      const commandSafetyValidation = validateCommandSafety(command);
+      if (!commandSafetyValidation.valid) {
+        return {
+          success: false,
+          error: `Command blocked: ${commandSafetyValidation.error}`,
+        };
+      }
+
+      // Validate command before any execution (legacy validation)
       const validation = this.validateCommand(command);
       if (!validation.valid) {
         return {
@@ -332,19 +425,61 @@ export class BashTool {
   }
 
   async listFiles(directory: string = '.'): Promise<ToolResult> {
-    const safeDir = this.escapeShellArg(directory);
+    // Validate input with schema
+    const validation = validateWithSchema(
+      bashToolSchemas.listFiles,
+      { directory },
+      'listFiles'
+    );
+
+    if (!validation.valid) {
+      return {
+        success: false,
+        error: `Invalid input: ${validation.error}`,
+      };
+    }
+
+    const safeDir = sanitizeForShell(directory);
     return this.execute(`ls -la ${safeDir}`);
   }
 
   async findFiles(pattern: string, directory: string = '.'): Promise<ToolResult> {
-    const safeDir = this.escapeShellArg(directory);
-    const safePattern = this.escapeShellArg(pattern);
+    // Validate input with schema
+    const validation = validateWithSchema(
+      bashToolSchemas.findFiles,
+      { pattern, directory },
+      'findFiles'
+    );
+
+    if (!validation.valid) {
+      return {
+        success: false,
+        error: `Invalid input: ${validation.error}`,
+      };
+    }
+
+    const safeDir = sanitizeForShell(directory);
+    const safePattern = sanitizeForShell(pattern);
     return this.execute(`find ${safeDir} -name ${safePattern} -type f`);
   }
 
   async grep(pattern: string, files: string = '.'): Promise<ToolResult> {
-    const safePattern = this.escapeShellArg(pattern);
-    const safeFiles = this.escapeShellArg(files);
+    // Validate input with schema
+    const validation = validateWithSchema(
+      bashToolSchemas.grep,
+      { pattern, files },
+      'grep'
+    );
+
+    if (!validation.valid) {
+      return {
+        success: false,
+        error: `Invalid input: ${validation.error}`,
+      };
+    }
+
+    const safePattern = sanitizeForShell(pattern);
+    const safeFiles = sanitizeForShell(files);
     return this.execute(`grep -r ${safePattern} ${safeFiles}`);
   }
 }

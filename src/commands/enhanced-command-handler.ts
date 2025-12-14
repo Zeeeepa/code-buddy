@@ -8,6 +8,7 @@ import {
   handleBranches,
   handleCheckout,
   handleMerge,
+  handleDiffCheckpoints,
   // Memory handlers
   handleMemory,
   handleRemember,
@@ -45,6 +46,12 @@ import {
   handleModelRouter,
   handleSkill,
   handleSaveConversation,
+  // Export handlers
+  handleExport,
+  handleExportList,
+  handleExportFormats,
+  // Session handlers
+  handleSessions,
   // Type
   CommandHandlerResult,
 } from "./handlers/index.js";
@@ -135,6 +142,9 @@ export class EnhancedCommandHandler {
       case "__MERGE__":
         return handleMerge(args);
 
+      case "__DIFF_CHECKPOINTS__":
+        return handleDiffCheckpoints(args);
+
       // Memory & TODOs
       case "__MEMORY__":
         return handleMemory(args);
@@ -162,6 +172,15 @@ export class EnhancedCommandHandler {
       case "__SAVE_CONVERSATION__":
         return handleSaveConversation(args, this.conversationHistory);
 
+      case "__EXPORT__":
+        return handleExport(args);
+
+      case "__EXPORT_LIST__":
+        return handleExportList();
+
+      case "__EXPORT_FORMATS__":
+        return handleExportFormats();
+
       // Testing
       case "__GENERATE_TESTS__":
         return handleGenerateTests(args);
@@ -185,6 +204,10 @@ export class EnhancedCommandHandler {
 
       case "__TTS__":
         return handleTTS(args);
+
+      // Sessions
+      case "__SESSIONS__":
+        return handleSessions(args);
 
       default:
         return { handled: false };
