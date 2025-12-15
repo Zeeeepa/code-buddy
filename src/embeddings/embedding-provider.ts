@@ -17,7 +17,7 @@ import * as os from 'os';
 // Types
 // ============================================================================
 
-export type EmbeddingProviderType = 'local' | 'openai' | 'codebuddy' | 'mock';
+export type EmbeddingProviderType = 'local' | 'openai' | 'grok' | 'mock';
 
 export interface EmbeddingConfig {
   provider: EmbeddingProviderType;
@@ -151,7 +151,7 @@ export class EmbeddingProvider extends EventEmitter {
         return this.embedLocal(text);
       case 'openai':
         return this.embedOpenAI(text);
-      case 'codebuddy':
+      case 'grok':
         return this.embedGrok(text);
       case 'mock':
         return this.embedMock(text);
@@ -179,7 +179,7 @@ export class EmbeddingProvider extends EventEmitter {
         return this.embedBatchLocal(texts);
       case 'openai':
         return this.embedBatchOpenAI(texts);
-      case 'codebuddy':
+      case 'grok':
         return this.embedBatchGrok(texts);
       case 'mock':
         return this.embedBatchMock(texts);
@@ -335,7 +335,7 @@ export class EmbeddingProvider extends EventEmitter {
     return {
       embedding: result.embeddings[0],
       dimensions: result.dimensions,
-      provider: 'codebuddy',
+      provider: 'grok',
     };
   }
 
@@ -374,7 +374,7 @@ export class EmbeddingProvider extends EventEmitter {
     return {
       embeddings: sorted.map(d => new Float32Array(d.embedding)),
       dimensions: sorted[0]?.embedding.length || this.getDimensions(),
-      provider: 'codebuddy',
+      provider: 'grok',
       totalTokens: data.usage?.total_tokens,
     };
   }

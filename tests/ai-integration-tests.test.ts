@@ -89,7 +89,7 @@ describe('AITestRunner', () => {
   describe('Result Formatting', () => {
     it('should format results correctly', () => {
       const suite: AITestSuite = {
-        provider: 'codebuddy',
+        provider: 'grok',
         model: 'grok-3-latest',
         timestamp: Date.now(),
         duration: 5000,
@@ -111,7 +111,7 @@ describe('AITestRunner', () => {
       const output = AITestRunner.formatResults(suite);
 
       expect(output).toContain('AI INTEGRATION TEST RESULTS');
-      expect(output).toContain('codebuddy');
+      expect(output).toContain('grok');
       expect(output).toContain('grok-3-latest');
       expect(output).toContain('Test 1');
       expect(output).toContain('Test 2');
@@ -120,7 +120,7 @@ describe('AITestRunner', () => {
 
     it('should include error details in output', () => {
       const suite: AITestSuite = {
-        provider: 'codebuddy',
+        provider: 'grok',
         model: 'test',
         timestamp: Date.now(),
         duration: 1000,
@@ -144,7 +144,7 @@ describe('AITestRunner', () => {
 
     it('should show token and cost summary', () => {
       const suite: AITestSuite = {
-        provider: 'codebuddy',
+        provider: 'grok',
         model: 'test',
         timestamp: Date.now(),
         duration: 1000,

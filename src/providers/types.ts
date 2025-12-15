@@ -4,7 +4,7 @@
  * Type definitions for the multi-LLM provider system.
  */
 
-export type ProviderType = 'codebuddy' | 'claude' | 'openai' | 'gemini';
+export type ProviderType = 'grok' | 'claude' | 'openai' | 'gemini';
 
 export interface LLMMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';

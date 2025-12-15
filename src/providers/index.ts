@@ -23,7 +23,7 @@ export type {
 export { LLMProvider, BaseLLMProvider } from './base-provider.js';
 
 // Individual providers
-export { CodeBuddyProvider } from './codebuddy-provider.js';
+export { GrokProvider } from './grok-provider.js';
 export { ClaudeProvider } from './claude-provider.js';
 export { OpenAIProvider } from './openai-provider.js';
 export { GeminiProvider } from './gemini-provider.js';

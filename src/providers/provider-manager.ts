@@ -14,7 +14,7 @@ import type {
   LLMResponse,
   StreamChunk,
 } from './types.js';
-import { CodeBuddyProvider } from './codebuddy-provider.js';
+import { GrokProvider } from './grok-provider.js';
 import { ClaudeProvider } from './claude-provider.js';
 import { OpenAIProvider } from './openai-provider.js';
 import { GeminiProvider } from './gemini-provider.js';
@@ -25,7 +25,7 @@ import { GeminiProvider } from './gemini-provider.js';
 
 export class ProviderManager extends EventEmitter {
   private providers: Map<ProviderType, LLMProvider> = new Map();
-  private activeProvider: ProviderType = 'codebuddy';
+  private activeProvider: ProviderType = 'grok';
   private configs: Map<ProviderType, ProviderConfig> = new Map();
 
   /**
@@ -46,8 +46,8 @@ export class ProviderManager extends EventEmitter {
    */
   private createProvider(type: ProviderType): LLMProvider {
     switch (type) {
-      case 'codebuddy':
-        return new CodeBuddyProvider();
+      case 'grok':
+        return new GrokProvider();
       case 'claude':
         return new ClaudeProvider();
       case 'openai':
@@ -195,7 +195,7 @@ export async function autoConfigureProviders(): Promise<ProviderManager> {
 
   // Grok (xAI)
   if (process.env.GROK_API_KEY || process.env.XAI_API_KEY) {
-    await manager.registerProvider('codebuddy', {
+    await manager.registerProvider('grok', {
       apiKey: process.env.GROK_API_KEY || process.env.XAI_API_KEY || '',
     });
   }

@@ -4,7 +4,7 @@
 
 import {
   ProviderManager,
-  CodeBuddyProvider,
+  GrokProvider,
   ClaudeProvider,
   OpenAIProvider,
   GeminiProvider,
@@ -16,11 +16,11 @@ import {
 } from '../src/providers/llm-provider.js';
 
 describe('LLM Provider', () => {
-  describe('CodeBuddyProvider', () => {
-    let provider: CodeBuddyProvider;
+  describe('GrokProvider', () => {
+    let provider: GrokProvider;
 
     beforeEach(() => {
-      provider = new CodeBuddyProvider();
+      provider = new GrokProvider();
     });
 
     afterEach(() => {
@@ -28,7 +28,7 @@ describe('LLM Provider', () => {
     });
 
     it('should have correct type and name', () => {
-      expect(provider.type).toBe('codebuddy');
+      expect(provider.type).toBe('grok');
       expect(provider.name).toBe('Grok (xAI)');
       expect(provider.defaultModel).toBe('grok-3-latest');
     });
@@ -170,7 +170,7 @@ describe('LLM Provider', () => {
     it('should register provider', async () => {
       // Mock the OpenAI import for testing
       const _mockProvider = {
-        type: 'codebuddy' as ProviderType,
+        type: 'grok' as ProviderType,
         name: 'Test Provider',
         defaultModel: 'test-model',
         isReady: () => true,
@@ -199,7 +199,7 @@ describe('LLM Provider', () => {
     it('should select best provider based on requirements', async () => {
       // Without any providers registered, should return default
       const result = await manager.selectBestProvider({ costSensitive: true });
-      expect(result).toBe('codebuddy'); // Default active provider
+      expect(result).toBe('grok'); // Default active provider
     });
   });
 

@@ -1,7 +1,7 @@
 /**
  * Grok Provider (xAI)
  *
- * LLM provider implementation for CodeBuddy API.
+ * LLM provider implementation for Grok API (xAI).
  */
 
 import { BaseLLMProvider } from './base-provider.js';
@@ -15,8 +15,8 @@ import type {
   ToolDefinition,
 } from './types.js';
 
-export class CodeBuddyProvider extends BaseLLMProvider {
-  readonly type: ProviderType = 'codebuddy';
+export class GrokProvider extends BaseLLMProvider {
+  readonly type: ProviderType = 'grok';
   readonly name = 'Grok (xAI)';
   readonly defaultModel = 'grok-3-latest';
 

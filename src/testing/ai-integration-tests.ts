@@ -142,7 +142,7 @@ export class AITestRunner extends EventEmitter {
     }
 
     const suite: AITestSuite = {
-      provider: 'codebuddy',
+      provider: 'grok',
       model: this.client.getCurrentModel(),
       timestamp: Date.now(),
       duration: Date.now() - startTime,

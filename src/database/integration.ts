@@ -25,7 +25,7 @@ export interface DatabaseIntegrationConfig {
   dbPath?: string;
   inMemory?: boolean;
   autoMigrate?: boolean;
-  embeddingProvider?: 'local' | 'openai' | 'codebuddy' | 'mock';
+  embeddingProvider?: 'local' | 'openai' | 'grok' | 'mock';
 }
 
 export interface MemoryAddOptions {
