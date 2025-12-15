@@ -3,7 +3,7 @@
  *
  * Manages the state of the agent including mode, cost tracking,
  * session management, and configuration.
- * Extracted from GrokAgent for better modularity and testability.
+ * Extracted from CodeBuddyAgent for better modularity and testability.
  */
 
 import { EventEmitter } from "events";
@@ -286,7 +286,7 @@ export class AgentState extends EventEmitter {
    * Get context statistics
    */
   getContextStats(messages: unknown[]) {
-    // Cast to expected type - context manager expects GrokMessage[]
+    // Cast to expected type - context manager expects CodeBuddyMessage[]
     return this.contextManager.getStats(messages as never[]);
   }
 

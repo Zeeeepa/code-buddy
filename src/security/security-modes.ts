@@ -182,7 +182,7 @@ export class SecurityModeManager extends EventEmitter {
    * Load saved configuration from file
    */
   private loadSavedConfig(): void {
-    const configPath = path.join(this.workingDirectory, '.grok', 'security.json');
+    const configPath = path.join(this.workingDirectory, '.codebuddy', 'security.json');
 
     if (fs.existsSync(configPath)) {
       try {
@@ -221,7 +221,7 @@ export class SecurityModeManager extends EventEmitter {
    * Save current configuration
    */
   saveConfig(): void {
-    const configPath = path.join(this.workingDirectory, '.grok', 'security.json');
+    const configPath = path.join(this.workingDirectory, '.codebuddy', 'security.json');
     const configDir = path.dirname(configPath);
 
     if (!fs.existsSync(configDir)) {

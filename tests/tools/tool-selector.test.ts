@@ -14,10 +14,10 @@ import {
   getToolSelectionMetrics,
   formatToolSelectionMetrics,
 } from "../../src/tools/tool-selector";
-import { GrokTool } from "../../src/grok/client";
+import { CodeBuddyTool } from "../../src/codebuddy/client";
 
 // Mock tools for testing
-const createMockTool = (name: string, description: string): GrokTool => ({
+const createMockTool = (name: string, description: string): CodeBuddyTool => ({
   type: "function" as const,
   function: {
     name,
@@ -26,7 +26,7 @@ const createMockTool = (name: string, description: string): GrokTool => ({
   },
 });
 
-const mockTools: GrokTool[] = [
+const mockTools: CodeBuddyTool[] = [
   createMockTool("view_file", "View file contents or directory listings"),
   createMockTool("create_file", "Create new files with content"),
   createMockTool("str_replace_editor", "Replace text in existing files"),

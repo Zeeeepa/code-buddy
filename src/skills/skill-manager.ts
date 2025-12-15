@@ -176,7 +176,7 @@ export class SkillManager extends EventEmitter {
 
   constructor(projectRoot: string = process.cwd()) {
     super();
-    this.skillsDir = path.join(projectRoot, ".grok", "skills");
+    this.skillsDir = path.join(projectRoot, ".codebuddy", "skills");
 
     // Load predefined skills
     for (const [name, skill] of Object.entries(PREDEFINED_SKILLS)) {
@@ -193,7 +193,7 @@ export class SkillManager extends EventEmitter {
   }
 
   /**
-   * Load custom skills from .grok/skills/ directory
+   * Load custom skills from .codebuddy/skills/ directory
    */
   private async loadCustomSkills(): Promise<void> {
     if (!(await fs.pathExists(this.skillsDir))) {

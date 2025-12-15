@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { ChatEntry } from '../agent/grok-agent.js';
+import { ChatEntry } from '../agent/codebuddy-agent.js';
 import { getSessionRepository, SessionRepository } from '../database/repositories/session-repository.js';
 import type { Message as DBMessage } from '../database/schema.js';
 
@@ -24,7 +24,7 @@ export interface SessionMessage {
   toolCallSuccess?: boolean;
 }
 
-const SESSIONS_DIR = path.join(os.homedir(), '.grok', 'sessions');
+const SESSIONS_DIR = path.join(os.homedir(), '.codebuddy', 'sessions');
 const MAX_SESSIONS = 50;
 
 export interface SessionStoreConfig {
@@ -346,7 +346,7 @@ export class SessionStore {
     const session = this.loadSession(sessionId);
     if (!session) return null;
 
-    const fileName = outputPath || `grok-session-${session.id.slice(0, 8)}.md`;
+    const fileName = outputPath || `codebuddy-session-${session.id.slice(0, 8)}.md`;
     const fullPath = path.resolve(process.cwd(), fileName);
 
     fs.writeFileSync(fullPath, markdown);
@@ -575,8 +575,8 @@ CLI Flags:
   --session <id>      Load a specific session
 
 Examples:
-  grok --resume
-  grok --session abc123
+  codebuddy --resume
+  codebuddy --session abc123
   /session clone abc123 "My experiment"
 `;
   }

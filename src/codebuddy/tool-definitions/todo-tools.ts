@@ -6,10 +6,10 @@
  * - Update todo items
  */
 
-import type { GrokTool } from './types.js';
+import type { CodeBuddyTool } from './types.js';
 
 // Create todo list
-export const CREATE_TODO_LIST_TOOL: GrokTool = {
+export const CREATE_TODO_LIST_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "create_todo_list",
@@ -52,7 +52,7 @@ export const CREATE_TODO_LIST_TOOL: GrokTool = {
 };
 
 // Update todo list
-export const UPDATE_TODO_LIST_TOOL: GrokTool = {
+export const UPDATE_TODO_LIST_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "update_todo_list",
@@ -97,7 +97,7 @@ export const UPDATE_TODO_LIST_TOOL: GrokTool = {
 /**
  * All todo tools as an array
  */
-export const TODO_TOOLS: GrokTool[] = [
+export const TODO_TOOLS: CodeBuddyTool[] = [
   CREATE_TODO_LIST_TOOL,
   UPDATE_TODO_LIST_TOOL,
 ];

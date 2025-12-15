@@ -198,9 +198,9 @@ export class AudioTool {
         return await this.transcribeWithWhisper(resolvedPath, openaiKey, options);
       }
 
-      // Check for Grok API (if it supports transcription)
-      const grokKey = process.env.GROK_API_KEY;
-      if (grokKey) {
+      // Check for CodeBuddy API (if it supports transcription)
+      const codebuddyKey = process.env.GROK_API_KEY;
+      if (codebuddyKey) {
         // Grok doesn't natively support audio transcription yet
         // Return instruction for user
         return {

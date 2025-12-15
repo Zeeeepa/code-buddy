@@ -79,9 +79,9 @@ jest.mock('vscode-languageserver-textdocument', () => ({
   },
 }));
 
-// Mock GrokClient
-jest.mock('../src/grok/client', () => ({
-  GrokClient: jest.fn().mockImplementation(() => ({
+// Mock CodeBuddyClient
+jest.mock('../src/codebuddy/client', () => ({
+  CodeBuddyClient: jest.fn().mockImplementation(() => ({
     chat: jest.fn().mockResolvedValue({
       choices: [{
         message: {

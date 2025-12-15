@@ -612,9 +612,9 @@ export function getConfigValidator(): ConfigValidator {
 /**
  * Validate configuration on startup
  */
-export async function validateStartupConfig(grokDir: string): Promise<boolean> {
+export async function validateStartupConfig(codebuddyDir: string): Promise<boolean> {
   const validator = getConfigValidator();
-  const results = await validator.validateDirectory(grokDir);
+  const results = await validator.validateDirectory(codebuddyDir);
 
   let allValid = true;
   for (const [file, result] of results) {

@@ -8,7 +8,7 @@
  * - AgentCoder (Huang et al., 2023)
  */
 
-import { GrokToolCall } from "../../grok/client.js";
+import { CodeBuddyToolCall } from "../../codebuddy/client.js";
 import { ToolResult } from "../../types/index.js";
 
 /**
@@ -291,7 +291,7 @@ export interface Decision {
 /**
  * Tool executor function type
  */
-export type ToolExecutor = (toolCall: GrokToolCall) => Promise<ToolResult>;
+export type ToolExecutor = (toolCall: CodeBuddyToolCall) => Promise<ToolResult>;
 
 /**
  * Event emitter types for the multi-agent system

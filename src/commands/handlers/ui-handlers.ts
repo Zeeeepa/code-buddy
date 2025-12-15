@@ -1,4 +1,4 @@
-import { ChatEntry } from "../../agent/grok-agent.js";
+import { ChatEntry } from "../../agent/codebuddy-agent.js";
 import { getThemeManager } from "../../themes/theme-manager.js";
 
 export interface CommandHandlerResult {

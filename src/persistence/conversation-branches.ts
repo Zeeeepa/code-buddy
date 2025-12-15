@@ -2,14 +2,14 @@ import * as fs from "fs-extra";
 import * as path from "path";
 import * as os from "os";
 import { EventEmitter } from "events";
-import { GrokMessage } from "../grok/client.js";
+import { CodeBuddyMessage } from "../codebuddy/client.js";
 
 export interface ConversationBranch {
   id: string;
   name: string;
   parentId?: string;
   parentMessageIndex?: number;  // Fork point in parent
-  messages: GrokMessage[];
+  messages: CodeBuddyMessage[];
   createdAt: Date;
   updatedAt: Date;
   metadata?: Record<string, any>;
@@ -30,7 +30,7 @@ export class ConversationBranchManager extends EventEmitter {
 
   constructor(sessionId?: string) {
     super();
-    const baseDir = path.join(os.homedir(), ".grok", "branches");
+    const baseDir = path.join(os.homedir(), ".codebuddy", "branches");
     this.storagePath = sessionId
       ? path.join(baseDir, sessionId)
       : path.join(baseDir, "default");
@@ -97,7 +97,7 @@ export class ConversationBranchManager extends EventEmitter {
     parentId?: string,
     parentMessageIndex?: number
   ): ConversationBranch {
-    let messages: GrokMessage[] = [];
+    let messages: CodeBuddyMessage[] = [];
 
     // Copy messages from parent up to fork point
     if (parentId) {
@@ -199,14 +199,14 @@ export class ConversationBranchManager extends EventEmitter {
   /**
    * Get messages from current branch
    */
-  getMessages(): GrokMessage[] {
+  getMessages(): CodeBuddyMessage[] {
     return this.getCurrentBranch().messages;
   }
 
   /**
    * Add message to current branch
    */
-  addMessage(message: GrokMessage): void {
+  addMessage(message: CodeBuddyMessage): void {
     const branch = this.getCurrentBranch();
     branch.messages.push(message);
     branch.updatedAt = new Date();
@@ -216,7 +216,7 @@ export class ConversationBranchManager extends EventEmitter {
   /**
    * Set messages for current branch
    */
-  setMessages(messages: GrokMessage[]): void {
+  setMessages(messages: CodeBuddyMessage[]): void {
     const branch = this.getCurrentBranch();
     branch.messages = messages;
     branch.updatedAt = new Date();

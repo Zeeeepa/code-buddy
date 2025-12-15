@@ -3,38 +3,38 @@
  */
 
 import {
-  GrokError,
+  CodeBuddyError,
   APIError,
   FileError,
   FileNotFoundError,
   InvalidCommandError,
   ValidationError,
   TimeoutError,
-  isGrokError,
+  isCodeBuddyError,
   getErrorMessage,
   withTimeout,
   withRetry,
 } from '../../src/utils/errors';
 
 describe('Error Classes', () => {
-  describe('GrokError', () => {
+  describe('CodeBuddyError', () => {
     it('should create error with message', () => {
-      const error = new GrokError('Test error');
+      const error = new CodeBuddyError('Test error');
       expect(error.message).toBe('Test error');
-      expect(error.name).toBe('GrokError');
+      expect(error.name).toBe('CodeBuddyError');
     });
 
     it('should include code and details', () => {
-      const error = new GrokError('Test error', 'TEST_CODE', { foo: 'bar' });
+      const error = new CodeBuddyError('Test error', 'TEST_CODE', { foo: 'bar' });
       expect(error.code).toBe('TEST_CODE');
       expect(error.details).toEqual({ foo: 'bar' });
     });
 
     it('should serialize to JSON', () => {
-      const error = new GrokError('Test', 'CODE', { key: 'value' });
+      const error = new CodeBuddyError('Test', 'CODE', { key: 'value' });
       const json = error.toJSON();
       expect(json).toEqual({
-        name: 'GrokError',
+        name: 'CodeBuddyError',
         message: 'Test',
         code: 'CODE',
         details: { key: 'value' },
@@ -89,26 +89,26 @@ describe('Error Classes', () => {
   });
 });
 
-describe('isGrokError', () => {
-  it('should return true for GrokError', () => {
-    const error = new GrokError('test');
-    expect(isGrokError(error)).toBe(true);
+describe('isCodeBuddyError', () => {
+  it('should return true for CodeBuddyError', () => {
+    const error = new CodeBuddyError('test');
+    expect(isCodeBuddyError(error)).toBe(true);
   });
 
   it('should return true for subclasses', () => {
     const error = new APIError('test', 500);
-    expect(isGrokError(error)).toBe(true);
+    expect(isCodeBuddyError(error)).toBe(true);
   });
 
   it('should return false for regular errors', () => {
     const error = new Error('test');
-    expect(isGrokError(error)).toBe(false);
+    expect(isCodeBuddyError(error)).toBe(false);
   });
 
   it('should return false for non-errors', () => {
-    expect(isGrokError('string')).toBe(false);
-    expect(isGrokError(null)).toBe(false);
-    expect(isGrokError(undefined)).toBe(false);
+    expect(isCodeBuddyError('string')).toBe(false);
+    expect(isCodeBuddyError(null)).toBe(false);
+    expect(isCodeBuddyError(undefined)).toBe(false);
   });
 });
 

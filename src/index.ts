@@ -11,7 +11,7 @@ import type { SecurityMode } from "./security/security-modes.js";
 const lazyImport = {
   React: () => import("react"),
   ink: () => import("ink"),
-  GrokAgent: () => import("./agent/grok-agent.js").then(m => m.GrokAgent),
+  CodeBuddyAgent: () => import("./agent/codebuddy-agent.js").then(m => m.CodeBuddyAgent),
   ChatInterface: () => import("./ui/components/chat-interface.js").then(m => m.default),
   ConfirmationService: () => import("./utils/confirmation-service.js").then(m => m.ConfirmationService),
   createMCPCommand: () => import("./commands/mcp.js").then(m => m.createMCPCommand),
@@ -86,11 +86,11 @@ async function saveCommandLineSettings(
     // Update with command line values
     if (apiKey) {
       manager.updateUserSetting("apiKey", apiKey);
-      console.log("✅ API key saved to ~/.grok/user-settings.json");
+      console.log("✅ API key saved to ~/.codebuddy/user-settings.json");
     }
     if (baseURL) {
       manager.updateUserSetting("baseURL", baseURL);
-      console.log("✅ Base URL saved to ~/.grok/user-settings.json");
+      console.log("✅ Base URL saved to ~/.codebuddy/user-settings.json");
     }
   } catch (error) {
     console.warn(
@@ -126,8 +126,8 @@ async function handleCommitAndPushHeadless(
   maxToolRounds?: number
 ): Promise<void> {
   try {
-    const GrokAgent = await lazyImport.GrokAgent();
-    const agent = new GrokAgent(apiKey, baseURL, model, maxToolRounds);
+    const CodeBuddyAgent = await lazyImport.CodeBuddyAgent();
+    const agent = new CodeBuddyAgent(apiKey, baseURL, model, maxToolRounds);
 
     // Configure confirmation service for headless mode (auto-approve all operations)
     const { ConfirmationService } = await import("./utils/confirmation-service.js");
@@ -252,8 +252,8 @@ async function processPromptHeadless(
   selfHealEnabled: boolean = true
 ): Promise<void> {
   try {
-    const GrokAgent = await lazyImport.GrokAgent();
-    const agent = new GrokAgent(apiKey, baseURL, model, maxToolRounds);
+    const CodeBuddyAgent = await lazyImport.CodeBuddyAgent();
+    const agent = new CodeBuddyAgent(apiKey, baseURL, model, maxToolRounds);
 
     // Configure self-healing
     if (!selfHealEnabled) {
@@ -331,17 +331,17 @@ async function processPromptHeadless(
 }
 
 program
-  .name("grok")
+  .name("codebuddy")
   .description(
     "A conversational AI CLI tool powered by Grok with text editor capabilities"
   )
   .version("1.0.1")
   .argument("[message...]", "Initial message to send to Grok")
   .option("-d, --directory <dir>", "set working directory", process.cwd())
-  .option("-k, --api-key <key>", "Grok API key (or set GROK_API_KEY env var)")
+  .option("-k, --api-key <key>", "CodeBuddy API key (or set GROK_API_KEY env var)")
   .option(
     "-u, --base-url <url>",
-    "Grok API base URL (or set GROK_BASE_URL env var)"
+    "CodeBuddy API base URL (or set GROK_BASE_URL env var)"
   )
   .option(
     "-m, --model <model>",
@@ -436,7 +436,7 @@ program
   )
   .option(
     "--system-prompt <id>",
-    "system prompt to use: default, minimal, secure, code-reviewer, architect (or custom from ~/.grok/prompts/)"
+    "system prompt to use: default, minimal, secure, code-reviewer, architect (or custom from ~/.codebuddy/prompts/)"
   )
   .option(
     "--list-prompts",
@@ -444,7 +444,7 @@ program
   )
   .option(
     "--agent <name>",
-    "use a custom agent configuration from ~/.grok/agents/ (like mistral-vibe)"
+    "use a custom agent configuration from ~/.codebuddy/agents/ (like mistral-vibe)"
   )
   .option(
     "--list-agents",
@@ -488,8 +488,8 @@ program
 
     // Handle --init flag
     if (options.init) {
-      const { initGrokProject, formatInitResult } = await lazyImport.initProject();
-      const result = initGrokProject();
+      const { initCodeBuddyProject, formatInitResult } = await lazyImport.initProject();
+      const result = initCodeBuddyProject();
       console.log(formatInitResult(result));
       process.exit(result.success ? 0 : 1);
     }
@@ -536,14 +536,14 @@ program
 
       const userPrompts = prompts.filter(p => p.source === 'user');
       if (userPrompts.length > 0) {
-        console.log("\n  User (~/.grok/prompts/):");
+        console.log("\n  User (~/.codebuddy/prompts/):");
         userPrompts.forEach(p => {
           console.log(`    • ${p.id}`);
         });
       }
 
       console.log("\n💡 Usage: grok --system-prompt <id>");
-      console.log("   Create custom prompts in ~/.grok/prompts/<name>.md");
+      console.log("   Create custom prompts in ~/.codebuddy/prompts/<name>.md");
       process.exit(0);
     }
 
@@ -557,8 +557,8 @@ program
 
       if (agents.length === 0) {
         console.log("  (no custom agents found)");
-        console.log("\n💡 Create agents in ~/.grok/agents/");
-        console.log("   Example: ~/.grok/agents/_example.toml");
+        console.log("\n💡 Create agents in ~/.codebuddy/agents/");
+        console.log("   Example: ~/.codebuddy/agents/_example.toml");
       } else {
         agents.forEach(agent => {
           const tags = agent.tags?.length ? ` [${agent.tags.join(', ')}]` : '';
@@ -633,7 +633,7 @@ program
 
       if (!apiKey) {
         console.error(
-          "❌ Error: API key required. Set GROK_API_KEY environment variable, use --api-key flag, or save to ~/.grok/user-settings.json"
+          "❌ Error: API key required. Set GROK_API_KEY environment variable, use --api-key flag, or save to ~/.codebuddy/user-settings.json"
         );
         process.exit(1);
       }
@@ -691,7 +691,7 @@ program
       // Handle tool filtering (like mistral-vibe --enabled-tools)
       if (options.enabledTools || options.disabledTools) {
         const { setToolFilter, createToolFilter, formatFilterResult, filterTools } = await import("./utils/tool-filter.js");
-        const { GROK_TOOLS } = await import("./grok/tools.js");
+        const { CODEBUDDY_TOOLS } = await import("./codebuddy/tools.js");
 
         const filter = createToolFilter({
           enabledTools: options.enabledTools,
@@ -699,7 +699,7 @@ program
         });
         setToolFilter(filter);
 
-        const result = filterTools(GROK_TOOLS, filter);
+        const result = filterTools(CODEBUDDY_TOOLS, filter);
         console.log(formatFilterResult(result));
       }
 
@@ -750,7 +750,7 @@ program
       });
 
       // Interactive mode: launch UI (lazy load heavy modules)
-      const GrokAgent = await lazyImport.GrokAgent();
+      const CodeBuddyAgent = await lazyImport.CodeBuddyAgent();
       let systemPromptId = options.systemPrompt;  // New: external prompt support
       let customAgentConfig = null;
 
@@ -779,7 +779,7 @@ program
         }
       }
 
-      const agent = new GrokAgent(apiKey, baseURL, model, maxToolRounds, true, systemPromptId);
+      const agent = new CodeBuddyAgent(apiKey, baseURL, model, maxToolRounds, true, systemPromptId);
 
       // Apply custom agent system prompt if configured
       if (customAgentConfig?.systemPrompt) {
@@ -880,10 +880,10 @@ gitCommand
   .command("commit-and-push")
   .description("Generate AI commit message and push to remote")
   .option("-d, --directory <dir>", "set working directory", process.cwd())
-  .option("-k, --api-key <key>", "Grok API key (or set GROK_API_KEY env var)")
+  .option("-k, --api-key <key>", "CodeBuddy API key (or set GROK_API_KEY env var)")
   .option(
     "-u, --base-url <url>",
-    "Grok API base URL (or set GROK_BASE_URL env var)"
+    "CodeBuddy API base URL (or set GROK_BASE_URL env var)"
   )
   .option(
     "-m, --model <model>",
@@ -917,7 +917,7 @@ gitCommand
 
       if (!apiKey) {
         console.error(
-          "❌ Error: API key required. Set GROK_API_KEY environment variable, use --api-key flag, or save to ~/.grok/user-settings.json"
+          "❌ Error: API key required. Set GROK_API_KEY environment variable, use --api-key flag, or save to ~/.codebuddy/user-settings.json"
         );
         process.exit(1);
       }

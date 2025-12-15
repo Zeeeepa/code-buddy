@@ -3,4 +3,4 @@
  */
 
 export * from "./constants.js";
-export * from "./grokrules.js";
+export * from "./codebuddyrules.js";

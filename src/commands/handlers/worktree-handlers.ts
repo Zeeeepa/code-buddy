@@ -8,7 +8,7 @@
  * simultaneously without stashing or switching.
  */
 
-import { ChatEntry } from "../../agent/grok-agent.js";
+import { ChatEntry } from "../../agent/codebuddy-agent.js";
 import { execSync } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';

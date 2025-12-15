@@ -11,7 +11,7 @@
 
 import { EventEmitter } from 'events';
 import stringWidth from 'string-width';
-import { GrokClient, type GrokMessage, type GrokTool, type GrokResponse } from '../grok/client.js';
+import { CodeBuddyClient, type CodeBuddyMessage, type CodeBuddyTool, type CodeBuddyResponse } from '../codebuddy/client.js';
 
 // ============================================================================
 // Types
@@ -56,10 +56,10 @@ export interface AITestOptions {
 // ============================================================================
 
 export class AITestRunner extends EventEmitter {
-  private client: GrokClient;
+  private client: CodeBuddyClient;
   private options: Required<AITestOptions>;
 
-  constructor(client: GrokClient, options: AITestOptions = {}) {
+  constructor(client: CodeBuddyClient, options: AITestOptions = {}) {
     super();
     this.client = client;
     this.options = {
@@ -72,16 +72,16 @@ export class AITestRunner extends EventEmitter {
   }
 
   /**
-   * Helper to extract content from GrokResponse
+   * Helper to extract content from CodeBuddyResponse
    */
-  private getContent(response: GrokResponse): string {
+  private getContent(response: CodeBuddyResponse): string {
     return response.choices[0]?.message?.content || '';
   }
 
   /**
-   * Helper to extract tool calls from GrokResponse
+   * Helper to extract tool calls from CodeBuddyResponse
    */
-  private getToolCalls(response: GrokResponse) {
+  private getToolCalls(response: CodeBuddyResponse) {
     return response.choices[0]?.message?.tool_calls || [];
   }
 
@@ -142,7 +142,7 @@ export class AITestRunner extends EventEmitter {
     }
 
     const suite: AITestSuite = {
-      provider: 'grok',
+      provider: 'codebuddy',
       model: this.client.getCurrentModel(),
       timestamp: Date.now(),
       duration: Date.now() - startTime,
@@ -182,7 +182,7 @@ export class AITestRunner extends EventEmitter {
   private async testBasicCompletion(): Promise<AITestResult> {
     const startTime = Date.now();
 
-    const messages: GrokMessage[] = [
+    const messages: CodeBuddyMessage[] = [
       { role: 'user', content: 'Say "Hello, World!" and nothing else.' }
     ];
 
@@ -205,7 +205,7 @@ export class AITestRunner extends EventEmitter {
   private async testSimpleMath(): Promise<AITestResult> {
     const startTime = Date.now();
 
-    const messages: GrokMessage[] = [
+    const messages: CodeBuddyMessage[] = [
       { role: 'user', content: 'What is 15 + 27? Reply with just the number.' }
     ];
 
@@ -228,7 +228,7 @@ export class AITestRunner extends EventEmitter {
   private async testJSONOutput(): Promise<AITestResult> {
     const startTime = Date.now();
 
-    const messages: GrokMessage[] = [
+    const messages: CodeBuddyMessage[] = [
       {
         role: 'user',
         content: 'Return a JSON object with keys "name" (string "test") and "value" (number 123). Only output valid JSON, no markdown.'
@@ -270,7 +270,7 @@ export class AITestRunner extends EventEmitter {
   private async testCodeGeneration(): Promise<AITestResult> {
     const startTime = Date.now();
 
-    const messages: GrokMessage[] = [
+    const messages: CodeBuddyMessage[] = [
       {
         role: 'user',
         content: 'Write a TypeScript function called "add" that takes two numbers and returns their sum. Only output the code.'
@@ -303,7 +303,7 @@ export class AITestRunner extends EventEmitter {
   private async testContextUnderstanding(): Promise<AITestResult> {
     const startTime = Date.now();
 
-    const messages: GrokMessage[] = [
+    const messages: CodeBuddyMessage[] = [
       { role: 'user', content: 'My name is Alice.' },
       { role: 'assistant', content: 'Hello Alice! Nice to meet you.' },
       { role: 'user', content: 'What is my name?' }
@@ -332,7 +332,7 @@ export class AITestRunner extends EventEmitter {
     let content = '';
 
     try {
-      const messages: GrokMessage[] = [
+      const messages: CodeBuddyMessage[] = [
         { role: 'user', content: 'Count from 1 to 5, one number per line.' }
       ];
 
@@ -372,7 +372,7 @@ export class AITestRunner extends EventEmitter {
   private async testToolCalling(): Promise<AITestResult> {
     const startTime = Date.now();
 
-    const tools: GrokTool[] = [
+    const tools: CodeBuddyTool[] = [
       {
         type: 'function',
         function: {
@@ -393,7 +393,7 @@ export class AITestRunner extends EventEmitter {
     ];
 
     try {
-      const messages: GrokMessage[] = [
+      const messages: CodeBuddyMessage[] = [
         { role: 'user', content: 'What is the weather in Paris?' }
       ];
 
@@ -451,7 +451,7 @@ export class AITestRunner extends EventEmitter {
 
     // Test with empty message - should handle gracefully
     try {
-      const messages: GrokMessage[] = [
+      const messages: CodeBuddyMessage[] = [
         { role: 'user', content: '' }
       ];
 
@@ -488,7 +488,7 @@ export class AITestRunner extends EventEmitter {
     );
     paragraphs[10] = 'IMPORTANT: The secret code is "ALPHA-7892". Remember this.';
 
-    const messages: GrokMessage[] = [
+    const messages: CodeBuddyMessage[] = [
       { role: 'user', content: paragraphs.join('\n\n') },
       { role: 'assistant', content: 'I have read all the paragraphs. What would you like to know?' },
       { role: 'user', content: 'What was the secret code mentioned in the text?' }
@@ -567,6 +567,6 @@ export class AITestRunner extends EventEmitter {
 // Factory
 // ============================================================================
 
-export function createAITestRunner(client: GrokClient, options?: AITestOptions): AITestRunner {
+export function createAITestRunner(client: CodeBuddyClient, options?: AITestOptions): AITestRunner {
   return new AITestRunner(client, options);
 }

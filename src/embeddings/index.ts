@@ -6,7 +6,7 @@
  * Supports:
  * - Local model (@xenova/transformers - all-MiniLM-L6-v2)
  * - OpenAI API (text-embedding-3-small, text-embedding-ada-002)
- * - Grok API (when available)
+ * - CodeBuddy API (when available)
  * - Mock embeddings (for testing)
  */
 

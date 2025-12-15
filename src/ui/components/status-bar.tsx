@@ -76,7 +76,7 @@ export function StatusBar({
   maxTokens = 128000,
   cost = 0,
   budget = 10,
-  modelName = 'grok-beta',
+  modelName = 'codebuddy',
   processingTime = 0,
   sessionStartTime,
   showDetails = false,

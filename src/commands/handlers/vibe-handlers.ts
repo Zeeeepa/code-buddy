@@ -151,7 +151,7 @@ export async function handleTools(args: string[]): Promise<CommandHandlerResult>
   const lines: string[] = [];
 
   try {
-    const { GROK_TOOLS } = await import('../../grok/tools.js');
+    const { CODEBUDDY_TOOLS } = await import('../../codebuddy/tools.js');
     const {
       getToolFilter,
       setToolFilter,
@@ -163,7 +163,7 @@ export async function handleTools(args: string[]): Promise<CommandHandlerResult>
     switch (action) {
       case 'list': {
         const currentFilter = getToolFilter();
-        const result = filterTools(GROK_TOOLS, currentFilter);
+        const result = filterTools(CODEBUDDY_TOOLS, currentFilter);
 
         lines.push('Available Tools');
         lines.push('='.repeat(50));
@@ -235,7 +235,7 @@ export async function handleTools(args: string[]): Promise<CommandHandlerResult>
           disabledPatterns: [],
         });
 
-        const result = filterTools(GROK_TOOLS, getToolFilter());
+        const result = filterTools(CODEBUDDY_TOOLS, getToolFilter());
         lines.push(`Tool filter applied: ${result.filteredCount}/${result.originalCount} tools enabled`);
         lines.push('');
         lines.push('Enabled tools:');
@@ -246,7 +246,7 @@ export async function handleTools(args: string[]): Promise<CommandHandlerResult>
       case 'reset': {
         resetToolFilter();
         lines.push('Tool filter reset. All tools are now enabled.');
-        lines.push(`Total: ${GROK_TOOLS.length} tools available`);
+        lines.push(`Total: ${CODEBUDDY_TOOLS.length} tools available`);
         break;
       }
 

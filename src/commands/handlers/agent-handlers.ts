@@ -74,7 +74,7 @@ Example:
   /agent create code-reviewer
   /agent create "Security Analyst"
 
-The agent will be created in ~/.grok/agents/ with a default template.
+The agent will be created in ~/.codebuddy/agents/ with a default template.
 You can then edit the .toml file to customize the system prompt and settings.`,
     };
   }

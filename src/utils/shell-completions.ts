@@ -96,7 +96,7 @@ function generateBashCompletion(): string {
 # Grok CLI Bash Completion
 # Source this file or add to ~/.bashrc
 
-_grok_completions() {
+_codebuddy_completions() {
     local cur prev opts
     COMPREPLY=()
     cur="\${COMP_WORDS[COMP_CWORD]}"
@@ -120,8 +120,8 @@ _grok_completions() {
             ;;
         --resume)
             # Complete session files
-            if [ -d ".grok/sessions" ]; then
-                local sessions=$(ls .grok/sessions/*.json 2>/dev/null | xargs -n1 basename 2>/dev/null)
+            if [ -d ".codebuddy/sessions" ]; then
+                local sessions=$(ls .codebuddy/sessions/*.json 2>/dev/null | xargs -n1 basename 2>/dev/null)
                 COMPREPLY=( $(compgen -W "\${sessions}" -- "\${cur}") )
             fi
             return 0
@@ -146,17 +146,17 @@ _grok_completions() {
 }
 
 # Register completion
-complete -F _grok_completions grok
-complete -F _grok_completions code-buddy
+complete -F _codebuddy_completions grok
+complete -F _codebuddy_completions code-buddy
 
 # Mode completion helper
-_grok_mode_completions() {
+_codebuddy_mode_completions() {
     local modes="${modes}"
     COMPREPLY=( $(compgen -W "\${modes}" -- "\${COMP_WORDS[COMP_CWORD]}") )
 }
 
 # Theme completion helper
-_grok_theme_completions() {
+_codebuddy_theme_completions() {
     local themes="${themes}"
     COMPREPLY=( $(compgen -W "\${themes}" -- "\${COMP_WORDS[COMP_CWORD]}") )
 }
@@ -189,9 +189,9 @@ function generateZshCompletion(): string {
 
   return `#compdef grok code-buddy
 # Grok CLI Zsh Completion
-# Save to ~/.zsh/completions/_grok or /usr/local/share/zsh/site-functions/_grok
+# Save to ~/.zsh/completions/_codebuddy or /usr/local/share/zsh/site-functions/_codebuddy
 
-_grok() {
+_codebuddy() {
     local -a options
     local -a slash_commands
     local -a models
@@ -221,7 +221,7 @@ ${slashCommandLines}
             return
             ;;
         --resume)
-            _files -g '*.json' -W '.grok/sessions'
+            _files -g '*.json' -W '.codebuddy/sessions'
             return
             ;;
     esac
@@ -242,7 +242,7 @@ ${slashCommandLines}
     _files
 }
 
-_grok "$@"
+_codebuddy "$@"
 `;
 }
 
@@ -272,14 +272,14 @@ function generateFishCompletion(): string {
 
   const slashCompletions = SLASH_COMMANDS.map((c) => {
     const desc = c.description.replace(/'/g, "\\'");
-    return `complete -c grok -n '__fish_grok_in_prompt' -a '${c.name}' -d '${desc}'`;
+    return `complete -c grok -n '__fish_codebuddy_in_prompt' -a '${c.name}' -d '${desc}'`;
   }).join('\n');
 
   return `# Grok CLI Fish Completion
 # Save to ~/.config/fish/completions/grok.fish
 
 # Helper function to detect if we're in the prompt context
-function __fish_grok_in_prompt
+function __fish_codebuddy_in_prompt
     # Check if current word starts with /
     set -l cmd (commandline -opc)
     set -l current (commandline -ct)
@@ -299,13 +299,13 @@ ${slashCompletions}
 complete -c grok -n '__fish_seen_subcommand_from -m --model' -a '${MODELS.join(' ')}' -d 'Model'
 
 # Mode completion
-complete -c grok -n '__fish_grok_mode_arg' -a '${APPROVAL_MODES.join(' ')}' -d 'Mode'
+complete -c grok -n '__fish_codebuddy_mode_arg' -a '${APPROVAL_MODES.join(' ')}' -d 'Mode'
 
 # Theme completion
-complete -c grok -n '__fish_grok_theme_arg' -a '${THEMES.join(' ')}' -d 'Theme'
+complete -c grok -n '__fish_codebuddy_theme_arg' -a '${THEMES.join(' ')}' -d 'Theme'
 
 # Default to file completion after options
-complete -c grok -n 'not __fish_grok_in_prompt' -a '(__fish_complete_path)'
+complete -c grok -n 'not __fish_codebuddy_in_prompt' -a '(__fish_complete_path)'
 `;
 }
 
@@ -357,7 +357,7 @@ echo 'source <(grok --completions zsh)' >> ~/.zshrc
 
 # Option 2: Save to completions directory
 mkdir -p ~/.zsh/completions
-grok --completions zsh > ~/.zsh/completions/_grok
+grok --completions zsh > ~/.zsh/completions/_codebuddy
 echo 'fpath=(~/.zsh/completions $fpath)' >> ~/.zshrc
 echo 'autoload -Uz compinit && compinit' >> ~/.zshrc
 

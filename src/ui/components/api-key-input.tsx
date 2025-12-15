@@ -1,10 +1,10 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { Box, Text, useInput, useApp } from "ink";
-import { GrokAgent } from "../../agent/grok-agent.js";
+import { CodeBuddyAgent } from "../../agent/codebuddy-agent.js";
 import { getSettingsManager } from "../../utils/settings-manager.js";
 
 interface ApiKeyInputProps {
-  onApiKeySet: (agent: GrokAgent) => void;
+  onApiKeySet: (agent: CodeBuddyAgent) => void;
 }
 
 function ApiKeyInputInner({ onApiKeySet }: ApiKeyInputProps) {
@@ -23,7 +23,7 @@ function ApiKeyInputInner({ onApiKeySet }: ApiKeyInputProps) {
     setIsSubmitting(true);
     try {
       const apiKey = input.trim();
-      const agent = new GrokAgent(apiKey);
+      const agent = new CodeBuddyAgent(apiKey);
 
       // Set environment variable for current process
       process.env.GROK_API_KEY = apiKey;
@@ -32,7 +32,7 @@ function ApiKeyInputInner({ onApiKeySet }: ApiKeyInputProps) {
       try {
         const manager = getSettingsManager();
         manager.updateUserSetting('apiKey', apiKey);
-        console.log(`\n✅ API key saved to ~/.grok/user-settings.json`);
+        console.log(`\n✅ API key saved to ~/.codebuddy/user-settings.json`);
       } catch (_error) {
         console.log('\n⚠️ Could not save API key to settings file');
         console.log('API key set for current session only');
@@ -83,9 +83,9 @@ function ApiKeyInputInner({ onApiKeySet }: ApiKeyInputProps) {
 
   return (
     <Box flexDirection="column" paddingX={2} paddingY={1}>
-      <Text color="yellow">🔑 Grok API Key Required</Text>
+      <Text color="yellow">🔑 CodeBuddy API Key Required</Text>
       <Box marginBottom={1}>
-        <Text color="gray">Please enter your Grok API key to continue:</Text>
+        <Text color="gray">Please enter your CodeBuddy API key to continue:</Text>
       </Box>
       
       <Box borderStyle="round" borderColor="blue" paddingX={1} marginBottom={1}>
@@ -102,7 +102,7 @@ function ApiKeyInputInner({ onApiKeySet }: ApiKeyInputProps) {
       <Box flexDirection="column" marginTop={1}>
         <Text color="gray" dimColor>• Press Enter to submit</Text>
         <Text color="gray" dimColor>• Press Ctrl+C to exit</Text>
-        <Text color="gray" dimColor>Note: API key will be saved to ~/.grok/user-settings.json</Text>
+        <Text color="gray" dimColor>Note: API key will be saved to ~/.codebuddy/user-settings.json</Text>
       </Box>
 
       {isSubmitting ? (

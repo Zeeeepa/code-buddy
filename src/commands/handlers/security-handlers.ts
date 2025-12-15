@@ -1,4 +1,4 @@
-import { ChatEntry } from "../../agent/grok-agent.js";
+import { ChatEntry } from "../../agent/codebuddy-agent.js";
 import { getSecurityManager, ApprovalMode } from "../../security/index.js";
 import { getCodeGuardianAgent, CodeGuardianMode } from "../../agent/specialized/code-guardian-agent.js";
 import { ConfirmationService } from "../../utils/confirmation-service.js";
@@ -190,7 +190,7 @@ Les modifications sont ${newMode === 'ANALYZE_ONLY' ? 'désactivées' : 'possibl
       handled: true,
       entry: {
         type: "assistant",
-        content: `🛡️ Grokinette - Code Guardian
+        content: `🛡️ CodeBuddynette - Code Guardian
 ═══════════════════════════════════════════════════
 
 Mode actuel: ${currentMode}

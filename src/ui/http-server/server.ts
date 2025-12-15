@@ -1,5 +1,5 @@
 import http from 'http';
-import { GrokAgent, ChatEntry } from '../../agent/grok-agent.js';
+import { CodeBuddyAgent, ChatEntry } from '../../agent/codebuddy-agent.js';
 
 /**
  * HTTP Server for Web Interface
@@ -11,12 +11,12 @@ import { GrokAgent, ChatEntry } from '../../agent/grok-agent.js';
 export interface HttpServerOptions {
   port?: number;
   host?: string;
-  agent: GrokAgent;
+  agent: CodeBuddyAgent;
 }
 
 export class HttpServer {
   private server: http.Server | null = null;
-  private agent: GrokAgent;
+  private agent: CodeBuddyAgent;
   private port: number;
   private host: string;
   private chatHistory: ChatEntry[] = [];

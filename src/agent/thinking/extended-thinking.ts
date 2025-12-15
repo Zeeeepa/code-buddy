@@ -12,7 +12,7 @@
  */
 
 import { EventEmitter } from "events";
-import { GrokClient, GrokMessage } from "../../grok/client.js";
+import { CodeBuddyClient, CodeBuddyMessage } from "../../codebuddy/client.js";
 import {
   ThinkingDepth,
   ThinkingConfig,
@@ -110,7 +110,7 @@ Provide:
  * Extended Thinking Engine
  */
 export class ExtendedThinkingEngine extends EventEmitter {
-  private client: GrokClient;
+  private client: CodeBuddyClient;
   private config: ThinkingConfig;
   private currentSession: ThinkingSession | null = null;
 
@@ -121,7 +121,7 @@ export class ExtendedThinkingEngine extends EventEmitter {
   ) {
     super();
     this.config = { ...DEFAULT_THINKING_CONFIG, ...config };
-    this.client = new GrokClient(
+    this.client = new CodeBuddyClient(
       apiKey,
       config.model || "grok-3-latest",
       baseURL
@@ -248,7 +248,7 @@ export class ExtendedThinkingEngine extends EventEmitter {
       .replace("{problem}", session.problem)
       .replace("{previous_thoughts}", previousThoughts || "None yet");
 
-    const messages: GrokMessage[] = [
+    const messages: CodeBuddyMessage[] = [
       { role: "system", content: THINKING_SYSTEM_PROMPT },
       { role: "user", content: prompt },
     ];
@@ -315,7 +315,7 @@ export class ExtendedThinkingEngine extends EventEmitter {
       .replace("{reasoning}", thought.reasoning || "N/A")
       .replace("{problem}", session.problem);
 
-    const messages: GrokMessage[] = [
+    const messages: CodeBuddyMessage[] = [
       { role: "system", content: "You are a careful reasoning verifier." },
       { role: "user", content: prompt },
     ];
@@ -399,7 +399,7 @@ export class ExtendedThinkingEngine extends EventEmitter {
       .replace("{problem}", session.problem)
       .replace("{thoughts}", thoughtsSummary);
 
-    const messages: GrokMessage[] = [
+    const messages: CodeBuddyMessage[] = [
       { role: "system", content: THINKING_SYSTEM_PROMPT },
       { role: "user", content: prompt },
     ];

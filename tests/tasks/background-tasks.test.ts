@@ -18,8 +18,8 @@ describe("BackgroundTaskManager", () => {
     originalHome = process.env.HOME || "";
     process.env.HOME = tempDir;
 
-    // Ensure .grok/tasks directory exists
-    const tasksDir = path.join(tempDir, ".grok", "tasks");
+    // Ensure .codebuddy/tasks directory exists
+    const tasksDir = path.join(tempDir, ".codebuddy", "tasks");
     fs.mkdirSync(tasksDir, { recursive: true });
 
     taskManager = new BackgroundTaskManager(3);

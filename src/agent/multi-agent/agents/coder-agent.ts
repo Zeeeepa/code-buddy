@@ -18,7 +18,7 @@ import {
   AgentExecutionResult,
   ToolExecutor,
 } from "../types.js";
-import { GrokTool } from "../../../grok/client.js";
+import { CodeBuddyTool } from "../../../codebuddy/client.js";
 
 const CODER_CONFIG: AgentConfig = {
   role: "coder",
@@ -104,7 +104,7 @@ export class CoderAgent extends BaseAgent {
   async generateCode(
     task: AgentTask,
     context: SharedContext,
-    tools: GrokTool[],
+    tools: CodeBuddyTool[],
     executeTool: ToolExecutor
   ): Promise<AgentExecutionResult> {
     // Enhance task description with coding-specific instructions
@@ -130,7 +130,7 @@ ADDITIONAL CODING INSTRUCTIONS:
   async implementFeature(
     specification: string,
     context: SharedContext,
-    tools: GrokTool[],
+    tools: CodeBuddyTool[],
     executeTool: ToolExecutor
   ): Promise<AgentExecutionResult> {
     const task: AgentTask = {
@@ -167,7 +167,7 @@ STEPS:
     bugAnalysis: string,
     suggestedFix: string,
     context: SharedContext,
-    tools: GrokTool[],
+    tools: CodeBuddyTool[],
     executeTool: ToolExecutor
   ): Promise<AgentExecutionResult> {
     const task: AgentTask = {
@@ -208,7 +208,7 @@ STEPS:
     feedback: string,
     targetFiles: string[],
     context: SharedContext,
-    tools: GrokTool[],
+    tools: CodeBuddyTool[],
     executeTool: ToolExecutor
   ): Promise<AgentExecutionResult> {
     const task: AgentTask = {
@@ -249,7 +249,7 @@ REFACTORING PRINCIPLES:
     targetCode: string,
     testFramework: string,
     context: SharedContext,
-    tools: GrokTool[],
+    tools: CodeBuddyTool[],
     executeTool: ToolExecutor
   ): Promise<AgentExecutionResult> {
     const task: AgentTask = {
@@ -287,7 +287,7 @@ TEST REQUIREMENTS:
    */
   async learnCodeStyle(
     filePath: string,
-    _tools: GrokTool[],
+    _tools: CodeBuddyTool[],
     _executeTool: ToolExecutor
   ): Promise<void> {
     // This would analyze the file and extract style patterns

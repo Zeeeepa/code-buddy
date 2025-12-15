@@ -1,5 +1,5 @@
 /**
- * Grokinette - Code Guardian Agent
+ * CodeBuddynette - Code Guardian Agent
  *
  * Agent spécialisé dans l'analyse de code source, la revue d'architecture,
  * la proposition de correctifs et l'amélioration progressive du projet.
@@ -153,7 +153,7 @@ export interface PatchDiff {
 
 const CODE_GUARDIAN_CONFIG: SpecializedAgentConfig = {
   id: 'code-guardian',
-  name: 'Grokinette - Code Guardian',
+  name: 'CodeBuddynette - Code Guardian',
   description: 'Agent spécialisé dans l\'analyse de code, revue d\'architecture et amélioration progressive',
   capabilities: ['code-analyze', 'code-review', 'code-refactor', 'code-security'],
   fileExtensions: [
@@ -632,7 +632,7 @@ export class CodeGuardianAgent extends SpecializedAgent {
   private formatFileAnalysis(analysis: FileAnalysis): string {
     const lines: string[] = [
       '╔══════════════════════════════════════════════════════════════╗',
-      '║  📊 ANALYSE DE CODE - Grokinette Code Guardian               ║',
+      '║  📊 ANALYSE DE CODE - CodeBuddynette Code Guardian               ║',
       '╠══════════════════════════════════════════════════════════════╣',
       '',
       `📁 Fichier: ${analysis.path}`,
@@ -878,7 +878,7 @@ export class CodeGuardianAgent extends SpecializedAgent {
   private formatCodeAnalysis(analysis: CodeAnalysis): string {
     const lines: string[] = [
       '╔══════════════════════════════════════════════════════════════════╗',
-      '║  🛡️ ANALYSE DE PROJET - Grokinette Code Guardian                 ║',
+      '║  🛡️ ANALYSE DE PROJET - CodeBuddynette Code Guardian                 ║',
       '╠══════════════════════════════════════════════════════════════════╣',
       '',
       `📁 Répertoire: ${analysis.rootDir}`,

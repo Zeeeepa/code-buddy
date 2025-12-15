@@ -2,7 +2,7 @@
  * Tool Executor Module
  *
  * Handles execution of all tools (built-in, MCP, and external).
- * Extracted from GrokAgent for better modularity and testability.
+ * Extracted from CodeBuddyAgent for better modularity and testability.
  */
 
 import {
@@ -16,12 +16,12 @@ import {
 } from "../tools/index.js";
 import type { ToolResult } from "../types/index.js";
 import { CheckpointManager } from "../checkpoints/checkpoint-manager.js";
-import { getMCPManager } from "../grok/tools.js";
+import { getMCPManager } from "../codebuddy/tools.js";
 
 /**
- * Tool call structure from OpenAI/Grok API
+ * Tool call structure from OpenAI/CodeBuddy API
  */
-export interface GrokToolCall {
+export interface CodeBuddyToolCall {
   id: string;
   type: "function";
   function: {
@@ -106,7 +106,7 @@ export class ToolExecutor {
   /**
    * Execute a tool call and return the result
    */
-  async execute(toolCall: GrokToolCall): Promise<ToolResult> {
+  async execute(toolCall: CodeBuddyToolCall): Promise<ToolResult> {
     const startTime = Date.now();
     this.recordToolRequest(toolCall.function.name);
     this.totalExecutions++;
@@ -139,7 +139,7 @@ export class ToolExecutor {
   private async dispatchTool(
     toolName: string,
     args: Record<string, unknown>,
-    toolCall: GrokToolCall
+    toolCall: CodeBuddyToolCall
   ): Promise<ToolResult> {
     switch (toolName) {
       case "view_file": {
@@ -231,7 +231,7 @@ export class ToolExecutor {
   /**
    * Execute an MCP tool
    */
-  private async executeMCPTool(toolCall: GrokToolCall): Promise<ToolResult> {
+  private async executeMCPTool(toolCall: CodeBuddyToolCall): Promise<ToolResult> {
     try {
       const args = JSON.parse(toolCall.function.arguments);
       const mcpManager = getMCPManager();
@@ -273,7 +273,7 @@ export class ToolExecutor {
   /**
    * Execute multiple tools in parallel (for read-only operations)
    */
-  async executeParallel(toolCalls: GrokToolCall[]): Promise<Map<string, ToolResult>> {
+  async executeParallel(toolCalls: CodeBuddyToolCall[]): Promise<Map<string, ToolResult>> {
     const results = new Map<string, ToolResult>();
 
     // Group tools by whether they can be parallelized
@@ -284,8 +284,8 @@ export class ToolExecutor {
       "web_fetch",
     ]);
 
-    const parallelizable: GrokToolCall[] = [];
-    const sequential: GrokToolCall[] = [];
+    const parallelizable: CodeBuddyToolCall[] = [];
+    const sequential: CodeBuddyToolCall[] = [];
 
     for (const toolCall of toolCalls) {
       if (readOnlyTools.has(toolCall.function.name)) {

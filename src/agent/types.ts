@@ -1,4 +1,4 @@
-import { GrokToolCall } from "../grok/client.js";
+import { CodeBuddyToolCall } from "../codebuddy/client.js";
 import { ToolResult } from "../types/index.js";
 
 /**
@@ -12,9 +12,9 @@ export interface ChatEntry {
   /** When this entry was created */
   timestamp: Date;
   /** Tool calls made by the assistant (if any) */
-  toolCalls?: GrokToolCall[];
+  toolCalls?: CodeBuddyToolCall[];
   /** Single tool call (for tool_call type) */
-  toolCall?: GrokToolCall;
+  toolCall?: CodeBuddyToolCall;
   /** Result of tool execution (for tool_result type) */
   toolResult?: { success: boolean; output?: string; error?: string };
   /** Whether this entry is currently being streamed */
@@ -30,9 +30,9 @@ export interface StreamingChunk {
   /** Text content (for content type) */
   content?: string;
   /** Tool calls made (for tool_calls type) */
-  toolCalls?: GrokToolCall[];
+  toolCalls?: CodeBuddyToolCall[];
   /** Single tool call (for tool_call type) */
-  toolCall?: GrokToolCall;
+  toolCall?: CodeBuddyToolCall;
   /** Result of tool execution (for tool_result type) */
   toolResult?: ToolResult;
   /** Current token count (for token_count type) */

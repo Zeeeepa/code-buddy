@@ -43,7 +43,7 @@ export interface UpdateNotifierConfig {
 // Update Notifier
 // ============================================================================
 
-const CACHE_FILE = join(homedir(), '.grok', 'update-cache.json');
+const CACHE_FILE = join(homedir(), '.codebuddy', 'update-cache.json');
 const DEFAULT_CONFIG: UpdateNotifierConfig = {
   enabled: true,
   checkIntervalHours: 24,

@@ -42,7 +42,7 @@ export class ResponseCache {
   constructor(options: { maxEntries?: number; defaultTTL?: number } = {}) {
     this.maxEntries = options.maxEntries || 1000;
     this.defaultTTL = options.defaultTTL || 86400; // 24 hours default
-    this.cacheDir = path.join(os.homedir(), '.grok', 'cache');
+    this.cacheDir = path.join(os.homedir(), '.codebuddy', 'cache');
     this.cacheFile = path.join(this.cacheDir, 'response-cache.json');
     // Start loading asynchronously
     this.loadPromise = this.loadCache();

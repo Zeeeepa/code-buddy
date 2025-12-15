@@ -2,7 +2,7 @@
  * Tests for ToolExecutor module
  */
 
-import { ToolExecutor, GrokToolCall } from "../../src/agent/tool-executor";
+import { ToolExecutor, CodeBuddyToolCall } from "../../src/agent/tool-executor";
 
 // Mock all dependencies
 jest.mock("../../src/tools/index.js", () => ({
@@ -40,7 +40,7 @@ jest.mock("../../src/checkpoints/checkpoint-manager.js", () => ({
   })),
 }));
 
-jest.mock("../../src/grok/tools.js", () => ({
+jest.mock("../../src/codebuddy/tools.js", () => ({
   getMCPManager: jest.fn().mockReturnValue({
     callTool: jest.fn().mockResolvedValue({
       isError: false,
@@ -89,7 +89,7 @@ describe("ToolExecutor", () => {
 
   describe("Tool Execution", () => {
     it("should execute view_file tool", async () => {
-      const toolCall: GrokToolCall = {
+      const toolCall: CodeBuddyToolCall = {
         id: "call_1",
         type: "function",
         function: {
@@ -105,7 +105,7 @@ describe("ToolExecutor", () => {
     });
 
     it("should execute view_file with line range", async () => {
-      const toolCall: GrokToolCall = {
+      const toolCall: CodeBuddyToolCall = {
         id: "call_2",
         type: "function",
         function: {
@@ -120,7 +120,7 @@ describe("ToolExecutor", () => {
     });
 
     it("should execute create_file tool with checkpoint", async () => {
-      const toolCall: GrokToolCall = {
+      const toolCall: CodeBuddyToolCall = {
         id: "call_3",
         type: "function",
         function: {
@@ -136,7 +136,7 @@ describe("ToolExecutor", () => {
     });
 
     it("should execute str_replace_editor tool with checkpoint", async () => {
-      const toolCall: GrokToolCall = {
+      const toolCall: CodeBuddyToolCall = {
         id: "call_4",
         type: "function",
         function: {
@@ -157,7 +157,7 @@ describe("ToolExecutor", () => {
     });
 
     it("should execute bash tool", async () => {
-      const toolCall: GrokToolCall = {
+      const toolCall: CodeBuddyToolCall = {
         id: "call_5",
         type: "function",
         function: {
@@ -173,7 +173,7 @@ describe("ToolExecutor", () => {
     });
 
     it("should execute search tool", async () => {
-      const toolCall: GrokToolCall = {
+      const toolCall: CodeBuddyToolCall = {
         id: "call_6",
         type: "function",
         function: {
@@ -189,7 +189,7 @@ describe("ToolExecutor", () => {
     });
 
     it("should execute web_search tool", async () => {
-      const toolCall: GrokToolCall = {
+      const toolCall: CodeBuddyToolCall = {
         id: "call_7",
         type: "function",
         function: {
@@ -205,7 +205,7 @@ describe("ToolExecutor", () => {
     });
 
     it("should execute web_fetch tool", async () => {
-      const toolCall: GrokToolCall = {
+      const toolCall: CodeBuddyToolCall = {
         id: "call_8",
         type: "function",
         function: {
@@ -221,7 +221,7 @@ describe("ToolExecutor", () => {
     });
 
     it("should handle unknown tool", async () => {
-      const toolCall: GrokToolCall = {
+      const toolCall: CodeBuddyToolCall = {
         id: "call_9",
         type: "function",
         function: {
@@ -237,7 +237,7 @@ describe("ToolExecutor", () => {
     });
 
     it("should handle invalid JSON arguments", async () => {
-      const toolCall: GrokToolCall = {
+      const toolCall: CodeBuddyToolCall = {
         id: "call_10",
         type: "function",
         function: {
@@ -255,7 +255,7 @@ describe("ToolExecutor", () => {
 
   describe("Morph Editor", () => {
     it("should execute edit_file with morph editor", async () => {
-      const toolCall: GrokToolCall = {
+      const toolCall: CodeBuddyToolCall = {
         id: "call_morph",
         type: "function",
         function: {
@@ -286,7 +286,7 @@ describe("ToolExecutor", () => {
         morphEditor: null,
       });
 
-      const toolCall: GrokToolCall = {
+      const toolCall: CodeBuddyToolCall = {
         id: "call_morph_fail",
         type: "function",
         function: {
@@ -308,7 +308,7 @@ describe("ToolExecutor", () => {
 
   describe("Metrics Tracking", () => {
     it("should track tool request counts", async () => {
-      const toolCall: GrokToolCall = {
+      const toolCall: CodeBuddyToolCall = {
         id: "call_m1",
         type: "function",
         function: {
@@ -327,7 +327,7 @@ describe("ToolExecutor", () => {
     });
 
     it("should track failed executions", async () => {
-      const toolCall: GrokToolCall = {
+      const toolCall: CodeBuddyToolCall = {
         id: "call_fail",
         type: "function",
         function: {
@@ -343,7 +343,7 @@ describe("ToolExecutor", () => {
     });
 
     it("should reset metrics", async () => {
-      const toolCall: GrokToolCall = {
+      const toolCall: CodeBuddyToolCall = {
         id: "call_reset",
         type: "function",
         function: {
@@ -361,7 +361,7 @@ describe("ToolExecutor", () => {
     });
 
     it("should format tool request counts", async () => {
-      const toolCall: GrokToolCall = {
+      const toolCall: CodeBuddyToolCall = {
         id: "call_fmt",
         type: "function",
         function: {
@@ -394,7 +394,7 @@ describe("ToolExecutor", () => {
 
   describe("Parallel Execution", () => {
     it("should execute read-only tools in parallel", async () => {
-      const toolCalls: GrokToolCall[] = [
+      const toolCalls: CodeBuddyToolCall[] = [
         {
           id: "call_p1",
           type: "function",
@@ -421,7 +421,7 @@ describe("ToolExecutor", () => {
     });
 
     it("should execute write tools sequentially", async () => {
-      const toolCalls: GrokToolCall[] = [
+      const toolCalls: CodeBuddyToolCall[] = [
         {
           id: "call_s1",
           type: "function",

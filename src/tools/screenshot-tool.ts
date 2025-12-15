@@ -26,7 +26,7 @@ export interface ScreenshotResult {
  * Works on Linux (with scrot/gnome-screenshot), macOS (screencapture), and Windows (PowerShell)
  */
 export class ScreenshotTool {
-  private readonly defaultOutputDir = path.join(process.cwd(), '.grok', 'screenshots');
+  private readonly defaultOutputDir = path.join(process.cwd(), '.codebuddy', 'screenshots');
 
   /**
    * Capture a screenshot

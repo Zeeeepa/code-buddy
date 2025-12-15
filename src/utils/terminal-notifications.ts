@@ -82,7 +82,7 @@ export function isNotificationSupported(): boolean {
  */
 function sendIterm2Notification(options: NotificationOptions): void {
   const message = options.message.replace(/"/g, '\\"');
-  const title = (options.title || 'Grok CLI').replace(/"/g, '\\"');
+  const title = (options.title || 'CodeBuddy CLI').replace(/"/g, '\\"');
 
   // iTerm2 proprietary escape sequence
   // ESC ] 9 ; <message> BEL
@@ -108,7 +108,7 @@ function sendOsc9Notification(options: NotificationOptions): void {
  * Send OSC 777 notification (Konsole, etc.)
  */
 function sendOsc777Notification(options: NotificationOptions): void {
-  const title = (options.title || 'Grok CLI').replace(/;/g, ' ');
+  const title = (options.title || 'CodeBuddy CLI').replace(/;/g, ' ');
   const message = options.message.replace(/;/g, ' ');
   process.stdout.write(`\x1b]777;notify;${title};${message}\x07`);
 }
@@ -128,11 +128,11 @@ async function sendDesktopNotification(options: NotificationOptions): Promise<vo
 
   if (platform === 'darwin') {
     // macOS: use osascript
-    const script = `display notification "${options.message}" with title "${options.title || 'Grok CLI'}"${options.sound ? ' sound name "default"' : ''}`;
+    const script = `display notification "${options.message}" with title "${options.title || 'CodeBuddy CLI'}"${options.sound ? ' sound name "default"' : ''}`;
     spawn('osascript', ['-e', script], { stdio: 'ignore', detached: true });
   } else if (platform === 'linux') {
     // Linux: use notify-send
-    const args = [options.title || 'Grok CLI', options.message];
+    const args = [options.title || 'CodeBuddy CLI', options.message];
     if (options.urgent) {
       args.unshift('-u', 'critical');
     }
@@ -143,10 +143,10 @@ async function sendDesktopNotification(options: NotificationOptions): Promise<vo
       [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
       $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)
       $text = $template.GetElementsByTagName("text")
-      $text[0].AppendChild($template.CreateTextNode("${options.title || 'Grok CLI'}")) | Out-Null
+      $text[0].AppendChild($template.CreateTextNode("${options.title || 'CodeBuddy CLI'}")) | Out-Null
       $text[1].AppendChild($template.CreateTextNode("${options.message}")) | Out-Null
       $toast = [Windows.UI.Notifications.ToastNotification]::new($template)
-      [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("Grok CLI").Show($toast)
+      [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("CodeBuddy CLI").Show($toast)
     `;
     spawn('powershell', ['-Command', ps], { stdio: 'ignore', detached: true, shell: true });
   }
@@ -216,7 +216,7 @@ export async function notify(options: NotificationOptions): Promise<void> {
  */
 export async function notifyNeedsAttention(reason: string = 'Action required'): Promise<void> {
   await notify({
-    title: 'Grok CLI',
+    title: 'CodeBuddy CLI',
     message: reason,
     urgent: true,
     sound: true,
@@ -228,7 +228,7 @@ export async function notifyNeedsAttention(reason: string = 'Action required'): 
  */
 export async function notifyTaskComplete(task: string = 'Task completed'): Promise<void> {
   await notify({
-    title: 'Grok CLI',
+    title: 'CodeBuddy CLI',
     message: task,
     urgent: false,
     sound: false,

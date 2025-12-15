@@ -126,7 +126,7 @@ export const DEFAULT_HISTORY_CONFIG: HistoryConfig = {
   retentionDays: 7,
   maxFileSize: 1024 * 1024, // 1MB
   excludePatterns: ["node_modules", ".git", "dist", "*.log"],
-  persistPath: "~/.grok/operation-history.json",
+  persistPath: "~/.codebuddy/operation-history.json",
 };
 
 /**

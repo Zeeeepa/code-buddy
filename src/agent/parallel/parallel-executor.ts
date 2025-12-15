@@ -11,7 +11,7 @@
  */
 
 import { EventEmitter } from "events";
-import { GrokClient, GrokMessage } from "../../grok/client.js";
+import { CodeBuddyClient, CodeBuddyMessage } from "../../codebuddy/client.js";
 import { getErrorMessage } from "../../types/index.js";
 import {
   ModelConfig,
@@ -37,7 +37,7 @@ import {
  */
 export class ParallelExecutor extends EventEmitter {
   private config: ParallelConfig;
-  private clients: Map<string, GrokClient> = new Map();
+  private clients: Map<string, CodeBuddyClient> = new Map();
   private cache: Map<string, CacheEntry> = new Map();
   private routingRules: RoutingRule[] = [];
   private modelStats: Map<string, { successes: number; failures: number; avgLatency: number }> = new Map();
@@ -56,7 +56,7 @@ export class ParallelExecutor extends EventEmitter {
       if (!model.enabled) continue;
 
       // For now, we primarily support Grok but structure allows expansion
-      const client = new GrokClient(
+      const client = new CodeBuddyClient(
         model.apiKey || process.env.XAI_API_KEY || "",
         model.model,
         model.baseURL
@@ -463,7 +463,7 @@ export class ParallelExecutor extends EventEmitter {
     }
 
     try {
-      const messages: GrokMessage[] = [];
+      const messages: CodeBuddyMessage[] = [];
       if (systemPrompt) {
         messages.push({ role: "system", content: systemPrompt });
       }
@@ -621,7 +621,7 @@ Synthesize these responses into a single, comprehensive answer that:
 <synthesized_answer>Your synthesized answer</synthesized_answer>
 <confidence>0.0-1.0</confidence>`;
 
-    const messages: GrokMessage[] = [
+    const messages: CodeBuddyMessage[] = [
       { role: "system", content: "You are an expert at synthesizing multiple perspectives into a coherent answer." },
       { role: "user", content: synthesisPrompt },
     ];
@@ -916,7 +916,7 @@ Synthesize these responses into a single, comprehensive answer that:
     }
 
     if (model.enabled) {
-      const client = new GrokClient(
+      const client = new CodeBuddyClient(
         model.apiKey || process.env.XAI_API_KEY || "",
         model.model,
         model.baseURL

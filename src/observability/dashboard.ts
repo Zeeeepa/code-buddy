@@ -659,55 +659,55 @@ export class PrometheusExporter {
     const data = this.collector.export();
 
     // Basic metrics
-    lines.push('# HELP grok_tokens_total Total tokens used');
-    lines.push('# TYPE grok_tokens_total counter');
-    lines.push(`grok_tokens_total ${this.collector.getTotalTokens()}`);
+    lines.push('# HELP codebuddy_tokens_total Total tokens used');
+    lines.push('# TYPE codebuddy_tokens_total counter');
+    lines.push(`codebuddy_tokens_total ${this.collector.getTotalTokens()}`);
     lines.push('');
 
-    lines.push('# HELP grok_cost_usd_total Total cost in USD');
-    lines.push('# TYPE grok_cost_usd_total counter');
-    lines.push(`grok_cost_usd_total ${this.collector.getTotalCost()}`);
+    lines.push('# HELP codebuddy_cost_usd_total Total cost in USD');
+    lines.push('# TYPE codebuddy_cost_usd_total counter');
+    lines.push(`codebuddy_cost_usd_total ${this.collector.getTotalCost()}`);
     lines.push('');
 
-    lines.push('# HELP grok_tool_calls_total Total tool calls');
-    lines.push('# TYPE grok_tool_calls_total counter');
-    lines.push(`grok_tool_calls_total ${this.collector.getTotalToolCalls()}`);
+    lines.push('# HELP codebuddy_tool_calls_total Total tool calls');
+    lines.push('# TYPE codebuddy_tool_calls_total counter');
+    lines.push(`codebuddy_tool_calls_total ${this.collector.getTotalToolCalls()}`);
     lines.push('');
 
     // Provider metrics
-    lines.push('# HELP grok_provider_requests_total Total requests per provider');
-    lines.push('# TYPE grok_provider_requests_total counter');
+    lines.push('# HELP codebuddy_provider_requests_total Total requests per provider');
+    lines.push('# TYPE codebuddy_provider_requests_total counter');
     for (const p of data.providers) {
-      lines.push(`grok_provider_requests_total{provider="${p.provider}",model="${p.model}"} ${p.totalRequests}`);
+      lines.push(`codebuddy_provider_requests_total{provider="${p.provider}",model="${p.model}"} ${p.totalRequests}`);
     }
     lines.push('');
 
-    lines.push('# HELP grok_provider_latency_ms Average latency per provider');
-    lines.push('# TYPE grok_provider_latency_ms gauge');
+    lines.push('# HELP codebuddy_provider_latency_ms Average latency per provider');
+    lines.push('# TYPE codebuddy_provider_latency_ms gauge');
     for (const p of data.providers) {
-      lines.push(`grok_provider_latency_ms{provider="${p.provider}",model="${p.model}"} ${p.avgLatency}`);
+      lines.push(`codebuddy_provider_latency_ms{provider="${p.provider}",model="${p.model}"} ${p.avgLatency}`);
     }
     lines.push('');
 
     // Tool metrics
-    lines.push('# HELP grok_tool_calls_total Total calls per tool');
-    lines.push('# TYPE grok_tool_calls_total counter');
+    lines.push('# HELP codebuddy_tool_calls_total Total calls per tool');
+    lines.push('# TYPE codebuddy_tool_calls_total counter');
     for (const t of data.tools) {
-      lines.push(`grok_tool_duration_ms{tool="${t.name}",stat="avg"} ${t.avgDuration}`);
-      lines.push(`grok_tool_duration_ms{tool="${t.name}",stat="max"} ${t.maxDuration}`);
+      lines.push(`codebuddy_tool_duration_ms{tool="${t.name}",stat="avg"} ${t.avgDuration}`);
+      lines.push(`codebuddy_tool_duration_ms{tool="${t.name}",stat="max"} ${t.maxDuration}`);
     }
     lines.push('');
 
     // Error rate
-    lines.push('# HELP grok_error_rate_percent Error rate percentage');
-    lines.push('# TYPE grok_error_rate_percent gauge');
-    lines.push(`grok_error_rate_percent ${this.collector.getErrorRate()}`);
+    lines.push('# HELP codebuddy_error_rate_percent Error rate percentage');
+    lines.push('# TYPE codebuddy_error_rate_percent gauge');
+    lines.push(`codebuddy_error_rate_percent ${this.collector.getErrorRate()}`);
     lines.push('');
 
     // Uptime
-    lines.push('# HELP grok_uptime_seconds Uptime in seconds');
-    lines.push('# TYPE grok_uptime_seconds counter');
-    lines.push(`grok_uptime_seconds ${Math.floor(data.uptime / 1000)}`);
+    lines.push('# HELP codebuddy_uptime_seconds Uptime in seconds');
+    lines.push('# TYPE codebuddy_uptime_seconds counter');
+    lines.push(`codebuddy_uptime_seconds ${Math.floor(data.uptime / 1000)}`);
 
     return lines.join('\n');
   }

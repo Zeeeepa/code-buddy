@@ -100,12 +100,12 @@ interface OldCostData {
 // ============================================================================
 
 const MIGRATION_PATHS = {
-  memories: path.join(os.homedir(), '.grok', 'memories.json'),
-  sessions: path.join(os.homedir(), '.grok', 'sessions'),
-  cache: path.join(os.homedir(), '.grok', 'cache', 'semantic-cache.json'),
-  costData: path.join(os.homedir(), '.grok', 'cost-history.json'),
-  projectMemories: (projectPath: string) => path.join(projectPath, '.grok', 'memories.json'),
-  projectSessions: (projectPath: string) => path.join(projectPath, '.grok', 'sessions'),
+  memories: path.join(os.homedir(), '.codebuddy', 'memories.json'),
+  sessions: path.join(os.homedir(), '.codebuddy', 'sessions'),
+  cache: path.join(os.homedir(), '.codebuddy', 'cache', 'semantic-cache.json'),
+  costData: path.join(os.homedir(), '.codebuddy', 'cost-history.json'),
+  projectMemories: (projectPath: string) => path.join(projectPath, '.codebuddy', 'memories.json'),
+  projectSessions: (projectPath: string) => path.join(projectPath, '.codebuddy', 'sessions'),
 };
 
 // ============================================================================

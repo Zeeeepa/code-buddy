@@ -59,7 +59,7 @@ describe('MetricsCollector', () => {
   describe('API Request Tracking', () => {
     it('should record API requests', () => {
       collector.recordAPIRequest({
-        provider: 'grok',
+        provider: 'codebuddy',
         model: 'grok-3-latest',
         promptTokens: 100,
         completionTokens: 200,
@@ -70,14 +70,14 @@ describe('MetricsCollector', () => {
 
       const metrics = collector.getProviderMetrics();
       expect(metrics).toHaveLength(1);
-      expect(metrics[0].provider).toBe('grok');
+      expect(metrics[0].provider).toBe('codebuddy');
       expect(metrics[0].totalRequests).toBe(1);
       expect(metrics[0].totalTokens).toBe(300);
     });
 
     it('should aggregate multiple requests', () => {
       collector.recordAPIRequest({
-        provider: 'grok',
+        provider: 'codebuddy',
         model: 'grok-3-latest',
         promptTokens: 100,
         completionTokens: 200,
@@ -87,7 +87,7 @@ describe('MetricsCollector', () => {
       });
 
       collector.recordAPIRequest({
-        provider: 'grok',
+        provider: 'codebuddy',
         model: 'grok-3-latest',
         promptTokens: 150,
         completionTokens: 250,
@@ -104,7 +104,7 @@ describe('MetricsCollector', () => {
 
     it('should track errors', () => {
       collector.recordAPIRequest({
-        provider: 'grok',
+        provider: 'codebuddy',
         model: 'grok-3-latest',
         promptTokens: 100,
         completionTokens: 0,
@@ -119,7 +119,7 @@ describe('MetricsCollector', () => {
 
     it('should calculate average latency', () => {
       collector.recordAPIRequest({
-        provider: 'grok',
+        provider: 'codebuddy',
         model: 'grok-3-latest',
         promptTokens: 100,
         completionTokens: 100,
@@ -129,7 +129,7 @@ describe('MetricsCollector', () => {
       });
 
       collector.recordAPIRequest({
-        provider: 'grok',
+        provider: 'codebuddy',
         model: 'grok-3-latest',
         promptTokens: 100,
         completionTokens: 100,
@@ -253,7 +253,7 @@ describe('MetricsCollector', () => {
 
     it('should calculate totals', () => {
       collector.recordAPIRequest({
-        provider: 'grok',
+        provider: 'codebuddy',
         model: 'grok-3-latest',
         promptTokens: 500,
         completionTokens: 500,
@@ -272,7 +272,7 @@ describe('MetricsCollector', () => {
 
     it('should calculate error rate', () => {
       collector.recordAPIRequest({
-        provider: 'grok',
+        provider: 'codebuddy',
         model: 'grok-3-latest',
         promptTokens: 100,
         completionTokens: 100,
@@ -282,7 +282,7 @@ describe('MetricsCollector', () => {
       });
 
       collector.recordAPIRequest({
-        provider: 'grok',
+        provider: 'codebuddy',
         model: 'grok-3-latest',
         promptTokens: 100,
         completionTokens: 0,
@@ -301,7 +301,7 @@ describe('MetricsCollector', () => {
       collector.on('error', () => {});
 
       collector.recordAPIRequest({
-        provider: 'grok',
+        provider: 'codebuddy',
         model: 'test',
         promptTokens: 100,
         completionTokens: 100,
@@ -325,7 +325,7 @@ describe('MetricsCollector', () => {
   describe('Reset', () => {
     it('should reset all metrics', () => {
       collector.recordAPIRequest({
-        provider: 'grok',
+        provider: 'codebuddy',
         model: 'test',
         promptTokens: 100,
         completionTokens: 100,
@@ -376,7 +376,7 @@ describe('TerminalDashboard', () => {
 
   it('should include metrics in render', () => {
     collector.recordAPIRequest({
-      provider: 'grok',
+      provider: 'codebuddy',
       model: 'grok-3-latest',
       promptTokens: 100,
       completionTokens: 100,
@@ -387,7 +387,7 @@ describe('TerminalDashboard', () => {
 
     const output = dashboard.render();
     expect(output).toContain('Providers');
-    expect(output).toContain('grok');
+    expect(output).toContain('codebuddy');
   });
 
   it('should include tool metrics', () => {
@@ -429,13 +429,13 @@ describe('PrometheusExporter', () => {
 
     expect(output).toContain('# HELP');
     expect(output).toContain('# TYPE');
-    expect(output).toContain('grok_tokens_total');
-    expect(output).toContain('grok_cost_usd_total');
+    expect(output).toContain('codebuddy_tokens_total');
+    expect(output).toContain('codebuddy_cost_usd_total');
   });
 
   it('should include provider metrics', () => {
     collector.recordAPIRequest({
-      provider: 'grok',
+      provider: 'codebuddy',
       model: 'grok-3-latest',
       promptTokens: 100,
       completionTokens: 100,
@@ -445,18 +445,18 @@ describe('PrometheusExporter', () => {
     });
 
     const output = exporter.export();
-    expect(output).toContain('grok_provider_requests_total');
-    expect(output).toContain('provider="grok"');
+    expect(output).toContain('codebuddy_provider_requests_total');
+    expect(output).toContain('provider="codebuddy"');
     expect(output).toContain('model="grok-3-latest"');
   });
 
   it('should include uptime', () => {
     const output = exporter.export();
-    expect(output).toContain('grok_uptime_seconds');
+    expect(output).toContain('codebuddy_uptime_seconds');
   });
 
   it('should include error rate', () => {
     const output = exporter.export();
-    expect(output).toContain('grok_error_rate_percent');
+    expect(output).toContain('codebuddy_error_rate_percent');
   });
 });

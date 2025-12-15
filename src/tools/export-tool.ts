@@ -38,7 +38,7 @@ export interface ExportOptions {
  * Supports JSON, Markdown, HTML, plain text, and PDF exports
  */
 export class ExportTool {
-  private readonly outputDir = path.join(process.cwd(), '.grok', 'exports');
+  private readonly outputDir = path.join(process.cwd(), '.codebuddy', 'exports');
 
   /**
    * Export conversation to specified format

@@ -323,23 +323,23 @@ export interface TemplateLiteral {
 // ============================================
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type GrokValue = any;
+export type CodeBuddyValue = any;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type GrokArray = any[];
+export type CodeBuddyArray = any[];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type GrokObject = Record<string, any>;
+export type CodeBuddyObject = Record<string, any>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type GrokFunction = (...args: any[]) => any;
+export type CodeBuddyFunction = (...args: any[]) => any;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type GrokPromise = Promise<any>;
+export type CodeBuddyPromise = Promise<any>;
 
 export interface RuntimeContext {
-  variables: Map<string, GrokValue>;
-  functions: Map<string, GrokFunction>;
+  variables: Map<string, CodeBuddyValue>;
+  functions: Map<string, CodeBuddyFunction>;
   parent?: RuntimeContext;
 }
 
@@ -347,7 +347,7 @@ export interface ScriptResult {
   success: boolean;
   output: string[];
   error?: string;
-  returnValue?: GrokValue;
+  returnValue?: CodeBuddyValue;
   duration: number;
 }
 
@@ -355,7 +355,7 @@ export interface ScriptResult {
 // Script Configuration
 // ============================================
 
-export interface GrokScriptConfig {
+export interface CodeBuddyScriptConfig {
   /** Working directory for file operations */
   workdir: string;
   /** Maximum execution time in ms (default: 300000 = 5 min) */
@@ -371,10 +371,10 @@ export interface GrokScriptConfig {
   /** Dry run mode - don't execute side effects */
   dryRun: boolean;
   /** Variables to inject into script */
-  variables?: Record<string, GrokValue>;
+  variables?: Record<string, CodeBuddyValue>;
 }
 
-export const DEFAULT_SCRIPT_CONFIG: GrokScriptConfig = {
+export const DEFAULT_SCRIPT_CONFIG: CodeBuddyScriptConfig = {
   workdir: process.cwd(),
   timeout: 300000,
   enableAI: true,

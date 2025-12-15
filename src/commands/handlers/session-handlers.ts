@@ -4,7 +4,7 @@
  * Manage session history with replay capability (Mistral Vibe-style).
  */
 
-import { ChatEntry } from '../../agent/grok-agent.js';
+import { ChatEntry } from '../../agent/codebuddy-agent.js';
 import {
   InteractionLogger,
   SessionData,

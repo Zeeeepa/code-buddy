@@ -65,7 +65,7 @@ const LOG_LEVEL_ICONS: Record<LogLevel, string> = {
  */
 function isDebugEnabled(): boolean {
   const debug = process.env.DEBUG;
-  return debug === 'true' || debug === '1' || debug === 'grok';
+  return debug === 'true' || debug === '1' || debug === 'codebuddy';
 }
 
 /**

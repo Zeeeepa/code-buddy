@@ -8,10 +8,10 @@
  * - Morph fast apply (conditional)
  */
 
-import type { GrokTool } from './types.js';
+import type { CodeBuddyTool } from './types.js';
 
 // View file or directory contents
-export const VIEW_FILE_TOOL: GrokTool = {
+export const VIEW_FILE_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "view_file",
@@ -38,7 +38,7 @@ export const VIEW_FILE_TOOL: GrokTool = {
 };
 
 // Create a new file
-export const CREATE_FILE_TOOL: GrokTool = {
+export const CREATE_FILE_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "create_file",
@@ -61,7 +61,7 @@ export const CREATE_FILE_TOOL: GrokTool = {
 };
 
 // String replace editor
-export const STR_REPLACE_EDITOR_TOOL: GrokTool = {
+export const STR_REPLACE_EDITOR_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "str_replace_editor",
@@ -92,7 +92,7 @@ export const STR_REPLACE_EDITOR_TOOL: GrokTool = {
 };
 
 // Bash command execution
-export const BASH_TOOL: GrokTool = {
+export const BASH_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "bash",
@@ -111,7 +111,7 @@ export const BASH_TOOL: GrokTool = {
 };
 
 // Morph Fast Apply tool (conditional on MORPH_API_KEY)
-export const MORPH_EDIT_TOOL: GrokTool = {
+export const MORPH_EDIT_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "edit_file",
@@ -160,7 +160,7 @@ Make edits to a file in a single edit_file call instead of multiple edit_file ca
 /**
  * Core tools array (without Morph - that's added conditionally)
  */
-export const CORE_TOOLS: GrokTool[] = [
+export const CORE_TOOLS: CodeBuddyTool[] = [
   VIEW_FILE_TOOL,
   CREATE_FILE_TOOL,
   STR_REPLACE_EDITOR_TOOL,

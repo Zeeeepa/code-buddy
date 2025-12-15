@@ -106,7 +106,7 @@ export class AutonomyManager {
   private configPath: string;
 
   constructor() {
-    this.configPath = path.join(process.cwd(), ".grok", "autonomy.json");
+    this.configPath = path.join(process.cwd(), ".codebuddy", "autonomy.json");
     this.config = this.loadConfig();
   }
 

@@ -229,10 +229,10 @@ export class FeatureFlagsManager extends EventEmitter {
 
   constructor(configDir?: string) {
     super();
-    this.configPath = path.join(configDir || process.cwd(), '.grok', 'feature-flags.json');
+    this.configPath = path.join(configDir || process.cwd(), '.codebuddy', 'feature-flags.json');
     this.userConfigPath = path.join(
       process.env.HOME || process.env.USERPROFILE || '~',
-      '.grok',
+      '.codebuddy',
       'feature-flags.json'
     );
     this.flags = new Map();

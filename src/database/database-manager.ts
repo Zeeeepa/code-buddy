@@ -38,7 +38,7 @@ export interface DatabaseStats {
 // ============================================================================
 
 const DEFAULT_CONFIG: DatabaseConfig = {
-  dbPath: path.join(os.homedir(), '.grok', 'grok.db'),
+  dbPath: path.join(os.homedir(), '.codebuddy', 'codebuddy.db'),
   inMemory: false,
   verbose: false,
   walMode: true,

@@ -6,7 +6,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { GrokClient, GrokMessage } from '../grok/client.js';
+import { CodeBuddyClient, CodeBuddyMessage } from '../codebuddy/client.js';
 import { BashTool } from './bash.js';
 import fs from 'fs-extra';
 import * as path from 'path';
@@ -127,7 +127,7 @@ Be thorough but avoid false positives. Only report genuine issues.`;
  */
 export class CodeReviewTool extends EventEmitter {
   private config: ReviewConfig;
-  private client: GrokClient | null = null;
+  private client: CodeBuddyClient | null = null;
   private bash: BashTool;
   private issueIdCounter: number = 0;
 
@@ -140,10 +140,10 @@ export class CodeReviewTool extends EventEmitter {
   /**
    * Initialize the AI client
    */
-  private ensureClient(): GrokClient {
+  private ensureClient(): CodeBuddyClient {
     if (!this.client) {
       const apiKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY || '';
-      this.client = new GrokClient(apiKey, this.config.model);
+      this.client = new CodeBuddyClient(apiKey, this.config.model);
     }
     return this.client;
   }
@@ -281,7 +281,7 @@ ${reviewContent}
 
 Provide your analysis in JSON format as specified.`;
 
-    const messages: GrokMessage[] = [
+    const messages: CodeBuddyMessage[] = [
       { role: 'system', content: REVIEW_SYSTEM_PROMPT },
       { role: 'user', content: userPrompt },
     ];

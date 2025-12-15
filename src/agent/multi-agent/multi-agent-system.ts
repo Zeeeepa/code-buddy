@@ -11,9 +11,9 @@
  */
 
 import { EventEmitter } from "events";
-import { GrokTool, GrokToolCall } from "../../grok/client.js";
+import { CodeBuddyTool, CodeBuddyToolCall } from "../../codebuddy/client.js";
 import { ToolResult, getErrorMessage } from "../../types/index.js";
-import { getAllGrokTools } from "../../grok/tools.js";
+import { getAllCodeBuddyTools } from "../../codebuddy/tools.js";
 import {
   AgentRole,
   AgentTask,
@@ -61,7 +61,7 @@ export class MultiAgentSystem extends EventEmitter {
   private currentPlan: ExecutionPlan | null = null;
   private sharedContext: SharedContext;
   private timeline: WorkflowEvent[] = [];
-  private tools: GrokTool[] = [];
+  private tools: CodeBuddyTool[] = [];
   private toolExecutor: ToolExecutor;
 
   constructor(
@@ -137,7 +137,7 @@ export class MultiAgentSystem extends EventEmitter {
   /**
    * Default tool executor (placeholder - should be replaced with actual implementation)
    */
-  private async defaultToolExecutor(_toolCall: GrokToolCall): Promise<ToolResult> {
+  private async defaultToolExecutor(_toolCall: CodeBuddyToolCall): Promise<ToolResult> {
     // This should be overridden by the actual tool executor
     return {
       success: false,
@@ -156,7 +156,7 @@ export class MultiAgentSystem extends EventEmitter {
    * Initialize tools
    */
   async initializeTools(): Promise<void> {
-    this.tools = await getAllGrokTools();
+    this.tools = await getAllCodeBuddyTools();
   }
 
   /**

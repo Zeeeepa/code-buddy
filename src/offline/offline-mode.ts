@@ -125,7 +125,7 @@ export class OfflineMode extends EventEmitter {
   constructor(config: Partial<OfflineConfig> = {}) {
     super();
     this.config = { ...DEFAULT_CONFIG, ...config };
-    this.dataDir = path.join(os.homedir(), '.grok', 'offline');
+    this.dataDir = path.join(os.homedir(), '.codebuddy', 'offline');
     this.cacheDir = path.join(this.dataDir, 'cache');
 
     // Initialize LRU caches with size limits

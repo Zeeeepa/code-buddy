@@ -1,5 +1,5 @@
-import { ChatEntry } from "../agent/grok-agent.js";
-import { GrokClient } from "../grok/client.js";
+import { ChatEntry } from "../agent/codebuddy-agent.js";
+import { CodeBuddyClient } from "../codebuddy/client.js";
 
 // Import all handlers from modular files
 import {
@@ -80,14 +80,14 @@ export { CommandHandlerResult };
  */
 export class EnhancedCommandHandler {
   private conversationHistory: ChatEntry[] = [];
-  private grokClient: GrokClient | null = null;
+  private codebuddyClient: CodeBuddyClient | null = null;
 
   setConversationHistory(history: ChatEntry[]): void {
     this.conversationHistory = history;
   }
 
-  setGrokClient(client: GrokClient): void {
-    this.grokClient = client;
+  setCodeBuddyClient(client: CodeBuddyClient): void {
+    this.codebuddyClient = client;
   }
 
   /**
@@ -198,7 +198,7 @@ export class EnhancedCommandHandler {
         return handleGenerateTests(args);
 
       case "__AI_TEST__":
-        return handleAITest(args, this.grokClient);
+        return handleAITest(args, this.codebuddyClient);
 
       // UI
       case "__THEME__":

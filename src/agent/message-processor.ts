@@ -2,7 +2,7 @@
  * Message Processor Module
  *
  * Handles message processing, streaming, and tool call extraction.
- * Extracted from GrokAgent for better modularity and testability.
+ * Extracted from CodeBuddyAgent for better modularity and testability.
  */
 
 import { EventEmitter } from "events";
@@ -14,15 +14,15 @@ export interface ChatEntry {
   type: "user" | "assistant" | "tool_result" | "system";
   content: string;
   timestamp: Date;
-  toolCalls?: GrokToolCall[];
-  toolCall?: GrokToolCall;
+  toolCalls?: CodeBuddyToolCall[];
+  toolCall?: CodeBuddyToolCall;
   toolResult?: ToolResult;
 }
 
 /**
- * Tool call structure from OpenAI/Grok API
+ * Tool call structure from OpenAI/CodeBuddy API
  */
-export interface GrokToolCall {
+export interface CodeBuddyToolCall {
   id: string;
   type: "function";
   function: {
@@ -46,7 +46,7 @@ export interface ToolResult {
 export interface Message {
   role: "system" | "user" | "assistant" | "tool";
   content: string | null;
-  tool_calls?: GrokToolCall[];
+  tool_calls?: CodeBuddyToolCall[];
   tool_call_id?: string;
 }
 
@@ -55,8 +55,8 @@ export interface Message {
  */
 export type StreamEvent =
   | { type: "content"; content: string }
-  | { type: "tool_calls"; toolCalls: GrokToolCall[] }
-  | { type: "tool_result"; toolCall: GrokToolCall; toolResult: ToolResult }
+  | { type: "tool_calls"; toolCalls: CodeBuddyToolCall[] }
+  | { type: "tool_result"; toolCall: CodeBuddyToolCall; toolResult: ToolResult }
   | { type: "token_count"; tokenCount: number }
   | { type: "done" };
 
@@ -171,7 +171,7 @@ export class MessageProcessor extends EventEmitter {
   /**
    * Add an assistant message to history
    */
-  addAssistantMessage(content: string, toolCalls?: GrokToolCall[]): void {
+  addAssistantMessage(content: string, toolCalls?: CodeBuddyToolCall[]): void {
     const entry: ChatEntry = {
       type: "assistant",
       content,
@@ -190,7 +190,7 @@ export class MessageProcessor extends EventEmitter {
   /**
    * Add a tool result to history
    */
-  addToolResult(toolCall: GrokToolCall, result: ToolResult): void {
+  addToolResult(toolCall: CodeBuddyToolCall, result: ToolResult): void {
     const entry: ChatEntry = {
       type: "tool_result",
       content: result.success ? result.output || "Success" : result.error || "Error",
@@ -315,9 +315,9 @@ export class MessageProcessor extends EventEmitter {
    */
   buildAccumulatedMessage(
     chunks: Array<{ choices: Array<{ delta: { content?: string; tool_calls?: unknown[] } }> }>
-  ): { content: string; tool_calls?: GrokToolCall[] } {
+  ): { content: string; tool_calls?: CodeBuddyToolCall[] } {
     let content = "";
-    let toolCalls: GrokToolCall[] | undefined;
+    let toolCalls: CodeBuddyToolCall[] | undefined;
 
     for (const chunk of chunks) {
       if (chunk.choices[0]?.delta?.content) {

@@ -5,7 +5,7 @@
  * Inspired by Mistral Vibe's elegant middleware architecture.
  */
 
-import type { GrokMessage } from '../grok/client.js';
+import type { CodeBuddyMessage } from '../codebuddy/client.js';
 
 // ============================================================================
 // Middleware Actions
@@ -74,7 +74,7 @@ export interface ModelInfo {
  */
 export interface ConversationContext {
   /** Current message history */
-  messages: GrokMessage[];
+  messages: CodeBuddyMessage[];
   /** Conversation statistics */
   stats: ConversationStats;
   /** Model information */

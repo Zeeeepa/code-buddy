@@ -23,7 +23,7 @@ export interface QRDecodeResult {
  * Generates QR codes in multiple formats including ASCII for terminal display
  */
 export class QRTool {
-  private readonly outputDir = path.join(process.cwd(), '.grok', 'qrcodes');
+  private readonly outputDir = path.join(process.cwd(), '.codebuddy', 'qrcodes');
 
   /**
    * Generate a QR code

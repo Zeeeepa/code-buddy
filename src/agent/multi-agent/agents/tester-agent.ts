@@ -18,7 +18,7 @@ import {
   AgentExecutionResult,
   ToolExecutor,
 } from "../types.js";
-import { GrokTool } from "../../../grok/client.js";
+import { CodeBuddyTool } from "../../../codebuddy/client.js";
 
 const TESTER_CONFIG: AgentConfig = {
   role: "tester",
@@ -139,7 +139,7 @@ export class TesterAgent extends BaseAgent {
    */
   async runTests(
     context: SharedContext,
-    tools: GrokTool[],
+    tools: CodeBuddyTool[],
     executeTool: ToolExecutor
   ): Promise<TestResult> {
     const task: AgentTask = {
@@ -180,7 +180,7 @@ Provide a comprehensive test report including:
   async runSpecificTests(
     testFiles: string[],
     context: SharedContext,
-    tools: GrokTool[],
+    tools: CodeBuddyTool[],
     executeTool: ToolExecutor
   ): Promise<TestResult> {
     const task: AgentTask = {
@@ -217,7 +217,7 @@ STEPS:
     bugDescription: string,
     fixedFiles: string[],
     context: SharedContext,
-    tools: GrokTool[],
+    tools: CodeBuddyTool[],
     executeTool: ToolExecutor
   ): Promise<TestResult> {
     const task: AgentTask = {
@@ -257,7 +257,7 @@ STEPS:
    */
   async analyzeCoverage(
     context: SharedContext,
-    tools: GrokTool[],
+    tools: CodeBuddyTool[],
     executeTool: ToolExecutor
   ): Promise<AgentExecutionResult> {
     const task: AgentTask = {
@@ -439,7 +439,7 @@ STEPS:
    * Detect test framework from project
    */
   async detectTestFramework(
-    _tools: GrokTool[],
+    _tools: CodeBuddyTool[],
     _executeTool: ToolExecutor
   ): Promise<string | null> {
     // This would analyze package.json and config files

@@ -3,18 +3,18 @@ import * as path from "path";
 import * as os from "os";
 
 /**
- * User-level settings stored in ~/.grok/user-settings.json
+ * User-level settings stored in ~/.codebuddy/user-settings.json
  * These are global settings that apply across all projects
  */
 export interface UserSettings {
-  apiKey?: string; // Grok API key
+  apiKey?: string; // CodeBuddy API key
   baseURL?: string; // API base URL
   defaultModel?: string; // User's preferred default model
   models?: string[]; // Available models list
 }
 
 /**
- * Project-level settings stored in .grok/settings.json
+ * Project-level settings stored in .codebuddy/settings.json
  * These are project-specific settings
  */
 export interface ProjectSettings {
@@ -54,17 +54,17 @@ export class SettingsManager {
   private projectSettingsPath: string;
 
   private constructor() {
-    // User settings path: ~/.grok/user-settings.json
+    // User settings path: ~/.codebuddy/user-settings.json
     this.userSettingsPath = path.join(
       os.homedir(),
-      ".grok",
+      ".codebuddy",
       "user-settings.json"
     );
 
-    // Project settings path: .grok/settings.json (in current working directory)
+    // Project settings path: .codebuddy/settings.json (in current working directory)
     this.projectSettingsPath = path.join(
       process.cwd(),
-      ".grok",
+      ".codebuddy",
       "settings.json"
     );
   }
@@ -90,7 +90,7 @@ export class SettingsManager {
   }
 
   /**
-   * Load user settings from ~/.grok/user-settings.json
+   * Load user settings from ~/.codebuddy/user-settings.json
    */
   public loadUserSettings(): UserSettings {
     try {
@@ -115,7 +115,7 @@ export class SettingsManager {
   }
 
   /**
-   * Save user settings to ~/.grok/user-settings.json
+   * Save user settings to ~/.codebuddy/user-settings.json
    */
   public saveUserSettings(settings: Partial<UserSettings>): void {
     try {
@@ -170,7 +170,7 @@ export class SettingsManager {
   }
 
   /**
-   * Load project settings from .grok/settings.json
+   * Load project settings from .codebuddy/settings.json
    */
   public loadProjectSettings(): ProjectSettings {
     try {
@@ -195,7 +195,7 @@ export class SettingsManager {
   }
 
   /**
-   * Save project settings to .grok/settings.json
+   * Save project settings to .codebuddy/settings.json
    */
   public saveProjectSettings(settings: Partial<ProjectSettings>): void {
     try {

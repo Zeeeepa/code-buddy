@@ -420,7 +420,7 @@ export class WorkspaceDetector extends EventEmitter {
   }
 
   /**
-   * Generate recommended .grok/settings.json
+   * Generate recommended .codebuddy/settings.json
    */
   async generateRecommendedSettings(config?: WorkspaceConfig): Promise<Record<string, any>> {
     const detected = config || await this.detect();

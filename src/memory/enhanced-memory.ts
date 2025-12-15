@@ -167,7 +167,7 @@ export class EnhancedMemory extends EventEmitter {
   constructor(config: Partial<MemoryConfig> = {}) {
     super();
     this.config = { ...DEFAULT_CONFIG, ...config };
-    this.dataDir = path.join(os.homedir(), '.grok', 'memory');
+    this.dataDir = path.join(os.homedir(), '.codebuddy', 'memory');
 
     // Initialize SQLite repository if enabled
     if (this.config.useSQLite) {

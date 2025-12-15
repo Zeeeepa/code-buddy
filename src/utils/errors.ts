@@ -5,7 +5,7 @@
 /**
  * Base error class for all Grok CLI errors
  */
-export class GrokError extends Error {
+export class CodeBuddyError extends Error {
   constructor(message: string, public code?: string, public details?: unknown) {
     super(message);
     this.name = this.constructor.name;
@@ -25,7 +25,7 @@ export class GrokError extends Error {
 /**
  * Error thrown when API key is missing or invalid
  */
-export class APIKeyError extends GrokError {
+export class APIKeyError extends CodeBuddyError {
   constructor(message: string = 'No API key found') {
     super(message, 'API_KEY_ERROR');
   }
@@ -34,7 +34,7 @@ export class APIKeyError extends GrokError {
 /**
  * Error thrown when API request fails
  */
-export class APIError extends GrokError {
+export class APIError extends CodeBuddyError {
   constructor(
     message: string,
     public statusCode?: number,
@@ -47,7 +47,7 @@ export class APIError extends GrokError {
 /**
  * Error thrown when network request fails
  */
-export class NetworkError extends GrokError {
+export class NetworkError extends CodeBuddyError {
   constructor(message: string, public originalError?: Error) {
     super(message, 'NETWORK_ERROR', originalError);
   }
@@ -56,7 +56,7 @@ export class NetworkError extends GrokError {
 /**
  * Error thrown when operation times out
  */
-export class TimeoutError extends GrokError {
+export class TimeoutError extends CodeBuddyError {
   constructor(message: string, public timeoutMs: number) {
     super(message, 'TIMEOUT_ERROR', { timeoutMs });
   }
@@ -65,7 +65,7 @@ export class TimeoutError extends GrokError {
 /**
  * Error thrown when file operation fails
  */
-export class FileError extends GrokError {
+export class FileError extends CodeBuddyError {
   constructor(
     message: string,
     public filePath: string,
@@ -88,7 +88,7 @@ export class FileNotFoundError extends FileError {
 /**
  * Error thrown when tool execution fails
  */
-export class ToolExecutionError extends GrokError {
+export class ToolExecutionError extends CodeBuddyError {
   constructor(
     message: string,
     public toolName: string,
@@ -101,7 +101,7 @@ export class ToolExecutionError extends GrokError {
 /**
  * Error thrown when bash command is invalid or dangerous
  */
-export class InvalidCommandError extends GrokError {
+export class InvalidCommandError extends CodeBuddyError {
   constructor(message: string, public command: string) {
     super(message, 'INVALID_COMMAND', { command });
   }
@@ -110,7 +110,7 @@ export class InvalidCommandError extends GrokError {
 /**
  * Error thrown when bash command execution fails
  */
-export class CommandExecutionError extends GrokError {
+export class CommandExecutionError extends CodeBuddyError {
   constructor(
     message: string,
     public command: string,
@@ -124,7 +124,7 @@ export class CommandExecutionError extends GrokError {
 /**
  * Error thrown when validation fails
  */
-export class ValidationError extends GrokError {
+export class ValidationError extends CodeBuddyError {
   constructor(message: string, public field?: string, public value?: unknown) {
     super(message, 'VALIDATION_ERROR', { field, value });
   }
@@ -133,7 +133,7 @@ export class ValidationError extends GrokError {
 /**
  * Error thrown when configuration is invalid
  */
-export class ConfigurationError extends GrokError {
+export class ConfigurationError extends CodeBuddyError {
   constructor(message: string, public configKey?: string) {
     super(message, 'CONFIGURATION_ERROR', { configKey });
   }
@@ -142,7 +142,7 @@ export class ConfigurationError extends GrokError {
 /**
  * Error thrown when MCP server communication fails
  */
-export class MCPError extends GrokError {
+export class MCPError extends CodeBuddyError {
   constructor(
     message: string,
     public serverName?: string,
@@ -155,7 +155,7 @@ export class MCPError extends GrokError {
 /**
  * Error thrown when search operation fails
  */
-export class SearchError extends GrokError {
+export class SearchError extends CodeBuddyError {
   constructor(
     message: string,
     public query?: string,
@@ -168,7 +168,7 @@ export class SearchError extends GrokError {
 /**
  * Error thrown when code parsing fails
  */
-export class ParserError extends GrokError {
+export class ParserError extends CodeBuddyError {
   constructor(
     message: string,
     public filePath?: string,
@@ -181,7 +181,7 @@ export class ParserError extends GrokError {
 /**
  * Error thrown when path traversal is attempted
  */
-export class PathTraversalError extends GrokError {
+export class PathTraversalError extends CodeBuddyError {
   constructor(message: string, public attemptedPath: string, public basePath?: string) {
     super(message, 'PATH_TRAVERSAL_ERROR', { attemptedPath, basePath });
   }
@@ -190,17 +190,17 @@ export class PathTraversalError extends GrokError {
 /**
  * Error thrown when JSON parsing fails
  */
-export class JSONParseError extends GrokError {
+export class JSONParseError extends CodeBuddyError {
   constructor(message: string, public input?: string) {
     super(message, 'JSON_PARSE_ERROR', { input: input?.substring(0, 200) });
   }
 }
 
 /**
- * Checks if an error is a GrokError or subclass
+ * Checks if an error is a CodeBuddyError or subclass
  */
-export function isGrokError(error: unknown): error is GrokError {
-  return error instanceof GrokError;
+export function isCodeBuddyError(error: unknown): error is CodeBuddyError {
+  return error instanceof CodeBuddyError;
 }
 
 /**

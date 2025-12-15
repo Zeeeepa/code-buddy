@@ -34,7 +34,7 @@ import {
 } from './protocol.js';
 
 // Import code-buddy internals (lazy loaded to reduce startup time)
-let grokClient: unknown = null;
+let codebuddyClient: unknown = null;
 let fcsRuntime: unknown = null;
 
 export interface JsonRpcServerOptions {
@@ -225,13 +225,13 @@ export class JsonRpcServer {
 
   private async handleAiComplete(params: AiCompleteParams): Promise<AiCompleteResult> {
     // Lazy load grok client
-    if (!grokClient) {
-      const { GrokClient } = await import('../../grok/index.js');
+    if (!codebuddyClient) {
+      const { CodeBuddyClient } = await import('../../codebuddy/index.js');
       const apiKey = this.options.apiKey || process.env.GROK_API_KEY || '';
-      grokClient = new GrokClient(apiKey);
+      codebuddyClient = new CodeBuddyClient(apiKey);
     }
 
-    const client = grokClient as { chat: (messages: Array<{ role: string; content: string }>) => Promise<{ choices: Array<{ message: { content: string } }>; usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number } }> };
+    const client = codebuddyClient as { chat: (messages: Array<{ role: string; content: string }>) => Promise<{ choices: Array<{ message: { content: string } }>; usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number } }> };
 
     const systemPrompt = params.context?.language
       ? `You are a code completion assistant for ${params.context.language}. Provide only the code to complete, no explanations.`
@@ -273,13 +273,13 @@ export class JsonRpcServer {
     history.push({ role: 'user', content: params.message });
 
     // Lazy load grok client
-    if (!grokClient) {
-      const { GrokClient } = await import('../../grok/index.js');
+    if (!codebuddyClient) {
+      const { CodeBuddyClient } = await import('../../codebuddy/index.js');
       const apiKey = this.options.apiKey || process.env.GROK_API_KEY || '';
-      grokClient = new GrokClient(apiKey);
+      codebuddyClient = new CodeBuddyClient(apiKey);
     }
 
-    const client = grokClient as { chat: (messages: Array<{ role: string; content: string }>) => Promise<{ choices: Array<{ message: { content: string } }> }> };
+    const client = codebuddyClient as { chat: (messages: Array<{ role: string; content: string }>) => Promise<{ choices: Array<{ message: { content: string } }> }> };
 
     // Build context from files
     let contextPrompt = '';

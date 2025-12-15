@@ -16,9 +16,9 @@ import {
 } from '../../src/agent/repair/repair-engine';
 import { EventEmitter } from 'events';
 
-// Mock the GrokClient
-jest.mock('../../src/grok/client', () => ({
-  GrokClient: jest.fn().mockImplementation(() => ({
+// Mock the CodeBuddyClient
+jest.mock('../../src/codebuddy/client', () => ({
+  CodeBuddyClient: jest.fn().mockImplementation(() => ({
     chat: jest.fn().mockResolvedValue({
       choices: [{
         message: {

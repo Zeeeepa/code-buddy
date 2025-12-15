@@ -20,7 +20,7 @@ import {
   AgentExecutionResult,
   ToolExecutor,
 } from "../types.js";
-import { GrokTool } from "../../../grok/client.js";
+import { CodeBuddyTool } from "../../../codebuddy/client.js";
 
 const REVIEWER_CONFIG: AgentConfig = {
   role: "reviewer",
@@ -127,7 +127,7 @@ export class ReviewerAgent extends BaseAgent {
   async reviewCode(
     files: string[],
     context: SharedContext,
-    tools: GrokTool[],
+    tools: CodeBuddyTool[],
     executeTool: ToolExecutor
   ): Promise<ReviewResult> {
     const task: AgentTask = {
@@ -168,7 +168,7 @@ Use the feedback format specified in your instructions.`,
   async reviewDiff(
     diff: string,
     context: SharedContext,
-    tools: GrokTool[],
+    tools: CodeBuddyTool[],
     executeTool: ToolExecutor
   ): Promise<ReviewResult> {
     const task: AgentTask = {
@@ -207,7 +207,7 @@ REVIEW FOCUS:
   async securityReview(
     files: string[],
     context: SharedContext,
-    tools: GrokTool[],
+    tools: CodeBuddyTool[],
     executeTool: ToolExecutor
   ): Promise<ReviewResult> {
     const task: AgentTask = {

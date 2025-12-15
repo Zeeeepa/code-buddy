@@ -9,7 +9,7 @@
  * - Synthesizing results from multiple agents
  */
 
-import { GrokTool } from "../../../grok/client.js";
+import { CodeBuddyTool } from "../../../codebuddy/client.js";
 import { BaseAgent, createId } from "../base-agent.js";
 import {
   AgentConfig,
@@ -99,7 +99,7 @@ export class OrchestratorAgent extends BaseAgent {
   async createPlan(
     goal: string,
     context: SharedContext,
-    tools: GrokTool[],
+    tools: CodeBuddyTool[],
     executeTool: ToolExecutor
   ): Promise<ExecutionPlan> {
     const planningTask: AgentTask = {
@@ -322,7 +322,7 @@ Explore the codebase to understand the current state, then create a comprehensiv
     plan: ExecutionPlan,
     results: Map<string, AgentExecutionResult>,
     context: SharedContext,
-    tools: GrokTool[],
+    tools: CodeBuddyTool[],
     executeTool: ToolExecutor
   ): Promise<string> {
     // Collect all artifacts

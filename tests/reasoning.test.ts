@@ -474,7 +474,7 @@ describe('TreeOfThoughtReasoner', () => {
       });
 
       // We can't actually run solve without a real API, but we can test the event setup
-      // For a real test, you'd mock the GrokClient
+      // For a real test, you'd mock the CodeBuddyClient
       done();
     });
   });

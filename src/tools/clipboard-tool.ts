@@ -26,7 +26,7 @@ export interface ClipboardContent {
  * Works on Linux (xclip/xsel), macOS (pbcopy/pbpaste), and Windows (PowerShell)
  */
 export class ClipboardTool {
-  private readonly imageOutputDir = path.join(process.cwd(), '.grok', 'clipboard');
+  private readonly imageOutputDir = path.join(process.cwd(), '.codebuddy', 'clipboard');
 
   /**
    * Read text from clipboard

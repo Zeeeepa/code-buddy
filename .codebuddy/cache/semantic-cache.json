@@ -1,0 +1,13 @@
+{
+  "entries": [],
+  "stats": {
+    "totalEntries": 0,
+    "hits": 0,
+    "misses": 0,
+    "hitRate": 0,
+    "semanticHits": 0,
+    "exactHits": 0,
+    "evictions": 0,
+    "avgSimilarity": 0
+  }
+}

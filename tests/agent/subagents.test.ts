@@ -16,9 +16,9 @@ import {
   resetParallelRunner,
 } from "../../src/agent/subagents";
 
-// Mock GrokClient
-jest.mock("../../src/grok/client.js", () => ({
-  GrokClient: jest.fn().mockImplementation(() => ({
+// Mock CodeBuddyClient
+jest.mock("../../src/codebuddy/client.js", () => ({
+  CodeBuddyClient: jest.fn().mockImplementation(() => ({
     chat: jest.fn().mockResolvedValue({
       choices: [{
         message: {

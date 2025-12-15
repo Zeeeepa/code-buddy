@@ -27,7 +27,7 @@ export interface SlashCommandResult {
 
 /**
  * Slash Commands Manager - Inspired by Claude Code
- * Supports custom commands from .grok/commands/*.md files
+ * Supports custom commands from .codebuddy/commands/*.md files
  */
 export class SlashCommandManager {
   private commands: Map<string, SlashCommand> = new Map();
@@ -37,8 +37,8 @@ export class SlashCommandManager {
   constructor(workingDirectory: string = process.cwd()) {
     this.workingDirectory = workingDirectory;
     this.commandsDirs = [
-      path.join(workingDirectory, '.grok', 'commands'),
-      path.join(os.homedir(), '.grok', 'commands')
+      path.join(workingDirectory, '.codebuddy', 'commands'),
+      path.join(os.homedir(), '.codebuddy', 'commands')
     ];
 
     this.loadBuiltinCommands();
@@ -647,7 +647,7 @@ Be systematic and thorough in your analysis.`,
         ]
       },
       // ==========================================
-      // Code Guardian - Grokinette
+      // Code Guardian - CodeBuddynette
       // ==========================================
       {
         name: 'guardian',
@@ -771,7 +771,7 @@ Be systematic and thorough in your analysis.`,
   }
 
   /**
-   * Load custom commands from .grok/commands/*.md files
+   * Load custom commands from .codebuddy/commands/*.md files
    */
   private loadCustomCommands(): void {
     for (const commandsDir of this.commandsDirs) {
@@ -991,7 +991,7 @@ Be systematic and thorough in your analysis.`,
       }
     }
 
-    output += '\n💡 Create custom commands in .grok/commands/*.md';
+    output += '\n💡 Create custom commands in .codebuddy/commands/*.md';
 
     return output;
   }
@@ -1009,7 +1009,7 @@ Be systematic and thorough in your analysis.`,
    * Create a new custom command template
    */
   createCommandTemplate(name: string, description: string): string {
-    const commandsDir = path.join(this.workingDirectory, '.grok', 'commands');
+    const commandsDir = path.join(this.workingDirectory, '.codebuddy', 'commands');
 
     // Ensure directory exists
     if (!fs.existsSync(commandsDir)) {

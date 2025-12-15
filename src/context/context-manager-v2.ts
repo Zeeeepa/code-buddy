@@ -8,7 +8,7 @@
  * - Event-centric Memory (LoCoMo)
  */
 
-import { GrokMessage } from '../grok/client.js';
+import { CodeBuddyMessage } from '../codebuddy/client.js';
 import { createTokenCounter, TokenCounter } from '../utils/token-counter.js';
 
 export interface ContextManagerConfig {
@@ -56,7 +56,7 @@ export class ContextManagerV2 {
   private config: ContextManagerConfig;
   private tokenCounter: TokenCounter;
   private summaries: ConversationSummary[] = [];
-  private systemMessage: GrokMessage | null = null;
+  private systemMessage: CodeBuddyMessage | null = null;
   /** Track which warning thresholds have been triggered (to avoid duplicate warnings) */
   private triggeredWarnings: Set<number> = new Set();
   /** Last token count for auto-compact tracking */
@@ -90,8 +90,8 @@ export class ContextManagerV2 {
   /**
    * Count tokens in messages
    */
-  countTokens(messages: GrokMessage[]): number {
-    // Map GrokMessage to the format expected by TokenCounter
+  countTokens(messages: CodeBuddyMessage[]): number {
+    // Map CodeBuddyMessage to the format expected by TokenCounter
     const tokenMessages = messages.map(msg => ({
       role: msg.role,
       content: typeof msg.content === 'string' ? msg.content : null,
@@ -103,7 +103,7 @@ export class ContextManagerV2 {
   /**
    * Get context statistics
    */
-  getStats(messages: GrokMessage[]): ContextStats {
+  getStats(messages: CodeBuddyMessage[]): ContextStats {
     const totalTokens = this.countTokens(messages);
     const maxTokens = this.effectiveLimit;
     const usagePercent = (totalTokens / maxTokens) * 100;
@@ -125,7 +125,7 @@ export class ContextManagerV2 {
    *
    * Implements auto-compact like mistral-vibe's AutoCompactMiddleware
    */
-  prepareMessages(messages: GrokMessage[]): GrokMessage[] {
+  prepareMessages(messages: CodeBuddyMessage[]): CodeBuddyMessage[] {
     const stats = this.getStats(messages);
 
     // Check for auto-compact threshold (like mistral-vibe)
@@ -163,7 +163,7 @@ export class ContextManagerV2 {
   /**
    * Apply compression strategies in order of priority
    */
-  private applyStrategies(messages: GrokMessage[]): GrokMessage[] {
+  private applyStrategies(messages: CodeBuddyMessage[]): CodeBuddyMessage[] {
     let result = [...messages];
     let currentTokens = this.countTokens(result);
 
@@ -196,7 +196,7 @@ export class ContextManagerV2 {
   /**
    * Strategy 1: Sliding Window - Keep N most recent messages
    */
-  private applySlidingWindow(messages: GrokMessage[]): GrokMessage[] {
+  private applySlidingWindow(messages: CodeBuddyMessage[]): CodeBuddyMessage[] {
     const keepCount = this.config.recentMessagesCount;
 
     if (messages.length <= keepCount) {
@@ -208,7 +208,7 @@ export class ContextManagerV2 {
 
     // Create a summary marker for removed messages
     const removedCount = messages.length - keepCount;
-    const summaryMarker: GrokMessage = {
+    const summaryMarker: CodeBuddyMessage = {
       role: 'system',
       content: `[Previous ${removedCount} messages summarized due to context limits]`,
     };
@@ -219,7 +219,7 @@ export class ContextManagerV2 {
   /**
    * Strategy 2: Truncate verbose tool results
    */
-  private truncateToolResults(messages: GrokMessage[]): GrokMessage[] {
+  private truncateToolResults(messages: CodeBuddyMessage[]): CodeBuddyMessage[] {
     const MAX_TOOL_RESULT_LENGTH = 500;
 
     return messages.map(msg => {
@@ -240,7 +240,7 @@ export class ContextManagerV2 {
    * Strategy 3: Summarize older messages
    * Based on Recursive Summarization (arxiv:2308.15022)
    */
-  private applySummarization(messages: GrokMessage[]): GrokMessage[] {
+  private applySummarization(messages: CodeBuddyMessage[]): CodeBuddyMessage[] {
     const keepRecent = Math.min(this.config.recentMessagesCount, messages.length);
 
     if (messages.length <= keepRecent) {
@@ -255,7 +255,7 @@ export class ContextManagerV2 {
     const summary = this.createSummary(oldMessages);
 
     // Create summary message
-    const summaryMessage: GrokMessage = {
+    const summaryMessage: CodeBuddyMessage = {
       role: 'system',
       content: `[Conversation Summary]\n${summary}`,
     };
@@ -267,7 +267,7 @@ export class ContextManagerV2 {
    * Create a condensed summary of messages
    * This is a simple extractive summary - for production, use LLM-based summarization
    */
-  private createSummary(messages: GrokMessage[]): string {
+  private createSummary(messages: CodeBuddyMessage[]): string {
     const summaryParts: string[] = [];
 
     for (const msg of messages) {
@@ -290,7 +290,7 @@ export class ContextManagerV2 {
   /**
    * Strategy 4: Hard truncation as last resort
    */
-  private hardTruncate(messages: GrokMessage[]): GrokMessage[] {
+  private hardTruncate(messages: CodeBuddyMessage[]): CodeBuddyMessage[] {
     let result = [...messages];
     let currentTokens = this.countTokens(result);
 
@@ -321,7 +321,7 @@ export class ContextManagerV2 {
    * Check if context is approaching limits and emit warning
    * Implements multi-threshold warnings with deduplication (like mistral-vibe's ContextWarningMiddleware)
    */
-  shouldWarn(messages: GrokMessage[]): { warn: boolean; message: string; threshold?: number } {
+  shouldWarn(messages: CodeBuddyMessage[]): { warn: boolean; message: string; threshold?: number } {
     if (!this.config.enableWarnings) {
       return { warn: false, message: '' };
     }
@@ -367,7 +367,7 @@ export class ContextManagerV2 {
    * Check if auto-compact should be triggered
    * Returns true if token count exceeds autoCompactThreshold
    */
-  shouldAutoCompact(messages: GrokMessage[]): boolean {
+  shouldAutoCompact(messages: CodeBuddyMessage[]): boolean {
     const stats = this.getStats(messages);
     return stats.totalTokens >= this.config.autoCompactThreshold;
   }

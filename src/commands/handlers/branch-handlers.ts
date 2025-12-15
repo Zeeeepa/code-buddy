@@ -1,4 +1,4 @@
-import { ChatEntry } from "../../agent/grok-agent.js";
+import { ChatEntry } from "../../agent/codebuddy-agent.js";
 import { getBranchManager } from "../../persistence/conversation-branches.js";
 
 export interface CommandHandlerResult {

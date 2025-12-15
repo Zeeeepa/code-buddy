@@ -280,7 +280,7 @@ export class IDEExtensionsServer extends EventEmitter {
   } {
     const packageJson = {
       name: 'grok-vscode',
-      displayName: 'Grok AI Assistant',
+      displayName: 'CodeBuddy AI Assistant',
       description: 'AI-powered coding assistant powered by Grok',
       version: '1.0.0',
       publisher: 'code-buddy',
@@ -341,7 +341,7 @@ let requestId = 0;
 const pendingRequests = new Map<string, { resolve: Function; reject: Function }>();
 
 export function activate(context: vscode.ExtensionContext) {
-  const config = vscode.workspace.getConfiguration('grok');
+  const config = vscode.workspace.getConfiguration('codebuddy');
   const port = config.get<number>('serverPort', ${this.config.port});
 
   if (config.get<boolean>('autoConnect', true)) {
@@ -451,7 +451,7 @@ function sendRequest(method: string, params: any): Promise<any> {
 
 async function askQuestion() {
   const input = await vscode.window.showInputBox({
-    prompt: 'Ask Grok AI',
+    prompt: 'Ask CodeBuddy AI',
     placeHolder: 'Type your question...',
   });
 
@@ -460,7 +460,7 @@ async function askQuestion() {
   try {
     const result = await sendRequest('ask', { question: input });
     const panel = vscode.window.createWebviewPanel(
-      'grokResponse',
+      'codebuddyResponse',
       'Grok Response',
       vscode.ViewColumn.Beside,
       {}
@@ -587,7 +587,7 @@ export function deactivate() {
    */
   generateNeovimPlugin(): string {
     return `
--- Grok AI integration for Neovim
+-- CodeBuddy AI integration for Neovim
 -- Add to your init.lua or lazy.nvim config
 
 local M = {}
@@ -757,22 +757,22 @@ function M.setup(opts)
   M.config = vim.tbl_deep_extend('force', M.config, opts or {})
 
   -- Commands
-  vim.api.nvim_create_user_command('GrokAsk', function(args)
+  vim.api.nvim_create_user_command('CodeBuddyAsk', function(args)
     M.ask(args.args)
   end, { nargs = '+' })
 
-  vim.api.nvim_create_user_command('GrokExplain', function()
+  vim.api.nvim_create_user_command('CodeBuddyExplain', function()
     M.explain()
   end, { range = true })
 
-  vim.api.nvim_create_user_command('GrokRefactor', function(args)
+  vim.api.nvim_create_user_command('CodeBuddyRefactor', function(args)
     M.refactor(args.args)
   end, { range = true, nargs = '+' })
 
   -- Keymaps
-  vim.keymap.set('n', '<leader>ga', ':GrokAsk ', { desc = 'Grok: Ask AI' })
-  vim.keymap.set('v', '<leader>ge', ':GrokExplain<CR>', { desc = 'Grok: Explain' })
-  vim.keymap.set('v', '<leader>gr', ':GrokRefactor ', { desc = 'Grok: Refactor' })
+  vim.keymap.set('n', '<leader>ga', ':CodeBuddyAsk ', { desc = 'Grok: Ask AI' })
+  vim.keymap.set('v', '<leader>ge', ':CodeBuddyExplain<CR>', { desc = 'Grok: Explain' })
+  vim.keymap.set('v', '<leader>gr', ':CodeBuddyRefactor ', { desc = 'Grok: Refactor' })
 
   -- Auto-connect
   if M.config.auto_connect then

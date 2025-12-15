@@ -119,7 +119,7 @@ export class ImageTool {
       timeout: 30000,
       maxContentLength: this.maxFileSizeMB * 1024 * 1024,
       headers: {
-        'User-Agent': 'GrokCLI/1.0'
+        'User-Agent': 'CodeBuddyCLI/1.0'
       }
     });
 
@@ -198,7 +198,7 @@ export class ImageTool {
   }
 
   /**
-   * Format image for Grok API message content
+   * Format image for CodeBuddy API message content
    */
   formatForApi(processed: ProcessedImage): object {
     return {

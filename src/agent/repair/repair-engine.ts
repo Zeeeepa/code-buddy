@@ -14,7 +14,7 @@
 
 import { EventEmitter } from "events";
 import { getErrorMessage } from "../../types/index.js";
-import { GrokClient, GrokMessage } from "../../grok/client.js";
+import { CodeBuddyClient, CodeBuddyMessage } from "../../codebuddy/client.js";
 import {
   Fault,
   RepairConfig,
@@ -85,7 +85,7 @@ Please analyze the bug and provide a fix.`;
  */
 export class RepairEngine extends EventEmitter {
   private config: RepairConfig;
-  private client: GrokClient | null = null;
+  private client: CodeBuddyClient | null = null;
   private faultLocalizer: FaultLocalizer;
   private templateEngine: TemplateRepairEngine;
   private sessions: RepairSession[] = [];
@@ -106,7 +106,7 @@ export class RepairEngine extends EventEmitter {
     this.config = { ...DEFAULT_REPAIR_CONFIG, ...config };
 
     if (apiKey) {
-      this.client = new GrokClient(apiKey, "grok-3-latest", baseURL);
+      this.client = new CodeBuddyClient(apiKey, "grok-3-latest", baseURL);
     }
 
     this.faultLocalizer = createFaultLocalizer(
@@ -353,7 +353,7 @@ export class RepairEngine extends EventEmitter {
         .replace("{code_context}", codeContext)
         .replace("{stack_trace}", fault.stackTrace || "N/A");
 
-      const messages: GrokMessage[] = [
+      const messages: CodeBuddyMessage[] = [
         { role: "system", content: REPAIR_SYSTEM_PROMPT },
         { role: "user", content: userPrompt + (contextHint ? `\n\nAdditional context: ${contextHint}` : "") },
       ];
@@ -458,7 +458,7 @@ export class RepairEngine extends EventEmitter {
       .map((p, i) => `Attempt ${i + 1}:\n${p.changes[0]?.newCode}\nResult: ${p.testResults?.failingTests.join(", ") || "Unknown"}`)
       .join("\n\n");
 
-    const messages: GrokMessage[] = [
+    const messages: CodeBuddyMessage[] = [
       { role: "system", content: REPAIR_SYSTEM_PROMPT },
       {
         role: "user",

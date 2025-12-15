@@ -68,7 +68,7 @@ const DEFAULT_CONFIG: CacheConfig = {
   ttlMs: 30 * 60 * 1000, // 30 minutes
   similarityThreshold: 0.85,
   persistToDisk: true,
-  cachePath: '.grok/cache/semantic-cache.json',
+  cachePath: '.codebuddy/cache/semantic-cache.json',
   ngramSize: 3,
   embeddingDim: 128,
 };

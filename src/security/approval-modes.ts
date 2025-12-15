@@ -167,7 +167,7 @@ export class ApprovalModeManager extends EventEmitter {
 
   constructor(configPath?: string) {
     super();
-    this.configPath = configPath || '.grok/approval-mode.json';
+    this.configPath = configPath || '.codebuddy/approval-mode.json';
     this.loadConfig();
   }
 

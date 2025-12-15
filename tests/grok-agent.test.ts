@@ -1,11 +1,11 @@
 /**
- * Tests for GrokAgent
+ * Tests for CodeBuddyAgent
  */
-import { GrokAgent, ChatEntry, StreamingChunk } from '../src/agent/grok-agent';
+import { CodeBuddyAgent, ChatEntry, StreamingChunk } from '../src/agent/codebuddy-agent';
 import { AgentMode } from '../src/agent/agent-mode';
 
 // Mock dependencies
-jest.mock('../src/grok/client');
+jest.mock('../src/codebuddy/client');
 jest.mock('../src/utils/settings-manager', () => ({
   getSettingsManager: () => ({
     getCurrentModel: () => 'grok-code-fast-1',
@@ -19,13 +19,13 @@ jest.mock('../src/mcp/config', () => ({
   loadMCPConfig: () => ({ servers: [] }),
 }));
 
-describe('GrokAgent', () => {
-  let agent: GrokAgent;
+describe('CodeBuddyAgent', () => {
+  let agent: CodeBuddyAgent;
   const mockApiKey = 'test-api-key';
 
   beforeEach(() => {
     jest.clearAllMocks();
-    agent = new GrokAgent(mockApiKey);
+    agent = new CodeBuddyAgent(mockApiKey);
   });
 
   afterEach(() => {
@@ -39,19 +39,19 @@ describe('GrokAgent', () => {
     });
 
     it('should accept custom model', () => {
-      const customAgent = new GrokAgent(mockApiKey, undefined, 'grok-beta');
+      const customAgent = new CodeBuddyAgent(mockApiKey, undefined, 'grok-beta');
       expect(customAgent).toBeDefined();
-      // Model is set through mocked GrokClient, so we just verify agent was created
+      // Model is set through mocked CodeBuddyClient, so we just verify agent was created
     });
 
     it('should accept custom baseURL', () => {
-      const customAgent = new GrokAgent(mockApiKey, 'https://custom.api.com');
+      const customAgent = new CodeBuddyAgent(mockApiKey, 'https://custom.api.com');
       expect(customAgent).toBeDefined();
       customAgent.dispose();
     });
 
     it('should accept custom maxToolRounds', () => {
-      const customAgent = new GrokAgent(mockApiKey, undefined, undefined, 50);
+      const customAgent = new CodeBuddyAgent(mockApiKey, undefined, undefined, 50);
       expect(customAgent).toBeDefined();
       customAgent.dispose();
     });
@@ -205,7 +205,7 @@ describe('GrokAgent', () => {
       // Just verify dispose doesn't throw
       expect(() => agent.dispose()).not.toThrow();
       // Set agent to null to prevent afterEach from calling dispose again
-      agent = null as unknown as GrokAgent;
+      agent = null as unknown as CodeBuddyAgent;
     });
   });
 });

@@ -11,7 +11,7 @@
 import fs from 'fs';
 import path from 'path';
 import readline from 'readline';
-import { getGrokHome, ensureGrokHome } from './grok-home.js';
+import { getCodeBuddyHome, ensureCodeBuddyHome } from './codebuddy-home.js';
 
 // ============================================================================
 // Types
@@ -114,8 +114,8 @@ export async function runSetup(): Promise<SetupConfig> {
   // Step 1: API Key
   console.log('Step 1/4: API Key Configuration');
   console.log('--------------------------------');
-  console.log('You need a Grok API key from https://x.ai');
-  console.log('The key will be stored in ~/.grok/user-settings.json\n');
+  console.log('You need a CodeBuddy API key from https://x.ai');
+  console.log('The key will be stored in ~/.codebuddy/user-settings.json\n');
 
   const existingKey = process.env.GROK_API_KEY || loadExistingApiKey();
   if (existingKey) {
@@ -129,13 +129,13 @@ export async function runSetup(): Promise<SetupConfig> {
 
   if (!config.apiKey) {
     rl.close();
-    config.apiKey = await questionHidden('Enter your Grok API key: ');
+    config.apiKey = await questionHidden('Enter your CodeBuddy API key: ');
     const rl2 = createInterface();
 
     if (!config.apiKey) {
       console.log('No API key provided. You can set it later with:');
       console.log('  export GROK_API_KEY=your-key');
-      console.log('  or in ~/.grok/user-settings.json\n');
+      console.log('  or in ~/.codebuddy/user-settings.json\n');
     }
 
     rl2.close();
@@ -176,7 +176,7 @@ export async function runSetup(): Promise<SetupConfig> {
       config.model = 'grok-4-latest';
       break;
     case '3':
-      config.model = 'grok-code-fast-1';
+      config.model = 'grok-3-fast';
       break;
     case '4':
       config.model = await question(rl3, 'Enter custom model name: ');
@@ -231,7 +231,7 @@ export async function runSetup(): Promise<SetupConfig> {
   await saveConfig(config);
 
   console.log('\nSetup complete! Your settings have been saved to:');
-  console.log(`  ${path.join(getGrokHome(), 'user-settings.json')}\n`);
+  console.log(`  ${path.join(getCodeBuddyHome(), 'user-settings.json')}\n`);
 
   console.log('You can now run grok to start using the CLI.\n');
   console.log('Quick start:');
@@ -247,7 +247,7 @@ export async function runSetup(): Promise<SetupConfig> {
  */
 function loadExistingApiKey(): string | undefined {
   try {
-    const settingsPath = path.join(getGrokHome(), 'user-settings.json');
+    const settingsPath = path.join(getCodeBuddyHome(), 'user-settings.json');
     if (fs.existsSync(settingsPath)) {
       const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
       return settings.apiKey;
@@ -263,8 +263,8 @@ function loadExistingApiKey(): string | undefined {
  */
 async function saveConfig(config: SetupConfig): Promise<void> {
   try {
-    ensureGrokHome();
-    const settingsPath = path.join(getGrokHome(), 'user-settings.json');
+    ensureCodeBuddyHome();
+    const settingsPath = path.join(getCodeBuddyHome(), 'user-settings.json');
 
     // Load existing settings
     let settings: Record<string, unknown> = {};
@@ -307,7 +307,7 @@ export function needsSetup(): boolean {
   }
 
   try {
-    const settingsPath = path.join(getGrokHome(), 'user-settings.json');
+    const settingsPath = path.join(getCodeBuddyHome(), 'user-settings.json');
     if (fs.existsSync(settingsPath)) {
       const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
       return !settings.apiKey;
@@ -323,7 +323,7 @@ export function needsSetup(): boolean {
  * Get log file path
  */
 export function getLogPath(): string {
-  return path.join(getGrokHome(), 'grok.log');
+  return path.join(getCodeBuddyHome(), 'grok.log');
 }
 
 /**

@@ -4,7 +4,7 @@
  * This file exports all agent-related modules for easy importing.
  * The agent has been refactored into smaller, focused modules:
  *
- * - GrokAgent: Main orchestrator (grok-agent.ts)
+ * - CodeBuddyAgent: Main orchestrator (codebuddy-agent.ts)
  * - ToolExecutor: Tool execution logic (tool-executor.ts)
  * - MessageProcessor: Message handling and history (message-processor.ts)
  * - AgentState: State management (agent-state.ts)
@@ -40,7 +40,7 @@ import { ToolResult, AgentState as LegacyAgentState } from '../types/index.js';
 
 /**
  * Legacy Agent class - kept for backwards compatibility
- * @deprecated Use GrokAgent for full agent functionality
+ * @deprecated Use CodeBuddyAgent for full agent functionality
  */
 export class Agent {
   private textEditor: TextEditorTool;

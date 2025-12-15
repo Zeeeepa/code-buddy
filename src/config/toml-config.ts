@@ -121,7 +121,7 @@ export interface AgentBehaviorConfig {
 /**
  * Full configuration structure
  */
-export interface GrokConfig {
+export interface CodeBuddyConfig {
   /** Active model name (key from models section) */
   active_model: string;
   /** Provider configurations */
@@ -142,7 +142,7 @@ export interface GrokConfig {
 // Default Configuration
 // ============================================================================
 
-export const DEFAULT_CONFIG: GrokConfig = {
+export const DEFAULT_CONFIG: CodeBuddyConfig = {
   active_model: 'grok-code-fast',
 
   providers: {
@@ -398,7 +398,7 @@ export function parseTOML(content: string): Record<string, unknown> {
 /**
  * Serialize config to TOML format
  */
-export function serializeTOML(config: GrokConfig): string {
+export function serializeTOML(config: CodeBuddyConfig): string {
   const lines: string[] = [
     '# Grok CLI Configuration',
     '# See https://github.com/phuetz/code-buddy for documentation',
@@ -481,15 +481,15 @@ export function serializeTOML(config: GrokConfig): string {
 // Configuration Manager
 // ============================================================================
 
-const CONFIG_DIR = join(homedir(), '.grok');
+const CONFIG_DIR = join(homedir(), '.codebuddy');
 const CONFIG_FILE = join(CONFIG_DIR, 'config.toml');
-const PROJECT_CONFIG_FILE = '.grok/config.toml';
+const PROJECT_CONFIG_FILE = '.codebuddy/config.toml';
 
 /**
  * Configuration manager singleton
  */
 class ConfigManager {
-  private config: GrokConfig;
+  private config: CodeBuddyConfig;
   private loaded = false;
 
   constructor() {
@@ -500,7 +500,7 @@ class ConfigManager {
    * Load configuration from files
    * Priority: project > user > defaults
    */
-  load(): GrokConfig {
+  load(): CodeBuddyConfig {
     if (this.loaded) return this.config;
 
     // Start with defaults
@@ -510,7 +510,7 @@ class ConfigManager {
     if (existsSync(CONFIG_FILE)) {
       try {
         const content = readFileSync(CONFIG_FILE, 'utf-8');
-        const userConfig = parseTOML(content) as Partial<GrokConfig>;
+        const userConfig = parseTOML(content) as Partial<CodeBuddyConfig>;
         this.mergeConfig(userConfig);
       } catch (error) {
         console.warn(`Warning: Failed to parse user config: ${error}`);
@@ -521,7 +521,7 @@ class ConfigManager {
     if (existsSync(PROJECT_CONFIG_FILE)) {
       try {
         const content = readFileSync(PROJECT_CONFIG_FILE, 'utf-8');
-        const projectConfig = parseTOML(content) as Partial<GrokConfig>;
+        const projectConfig = parseTOML(content) as Partial<CodeBuddyConfig>;
         this.mergeConfig(projectConfig);
       } catch (error) {
         console.warn(`Warning: Failed to parse project config: ${error}`);
@@ -535,7 +535,7 @@ class ConfigManager {
   /**
    * Deep merge config
    */
-  private mergeConfig(partial: Partial<GrokConfig>): void {
+  private mergeConfig(partial: Partial<CodeBuddyConfig>): void {
     if (partial.active_model) {
       this.config.active_model = partial.active_model;
     }
@@ -567,7 +567,7 @@ class ConfigManager {
   /**
    * Get current config
    */
-  getConfig(): Readonly<GrokConfig> {
+  getConfig(): Readonly<CodeBuddyConfig> {
     if (!this.loaded) this.load();
     return this.config;
   }
@@ -670,7 +670,7 @@ class ConfigManager {
   /**
    * Reload configuration
    */
-  reload(): GrokConfig {
+  reload(): CodeBuddyConfig {
     this.loaded = false;
     return this.load();
   }

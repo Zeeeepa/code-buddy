@@ -1,4 +1,4 @@
-import { ChatEntry } from "../../agent/grok-agent.js";
+import { ChatEntry } from "../../agent/codebuddy-agent.js";
 import { getAutonomyManager, AutonomyLevel } from "../../utils/autonomy-manager.js";
 import { getSlashCommandManager } from "../slash-commands.js";
 import { getSkillManager } from "../../skills/skill-manager.js";

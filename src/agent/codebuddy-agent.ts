@@ -1,13 +1,13 @@
-import { GrokClient, GrokMessage, GrokToolCall } from "../grok/client.js";
+import { CodeBuddyClient, CodeBuddyMessage, CodeBuddyToolCall } from "../codebuddy/client.js";
 import {
-  getAllGrokTools,
+  getAllCodeBuddyTools,
   getRelevantTools,
   getMCPManager,
   initializeMCPServers,
   classifyQuery,
   ToolSelectionResult,
   getToolSelector,
-} from "../grok/tools.js";
+} from "../codebuddy/tools.js";
 import { recordToolRequest, formatToolSelectionMetrics } from "../tools/tool-selector.js";
 import { loadMCPConfig } from "../mcp/config.js";
 import {
@@ -42,11 +42,11 @@ export { ChatEntry, StreamingChunk } from "./types.js";
 import type { ChatEntry, StreamingChunk } from "./types.js";
 
 /**
- * Main agent class that orchestrates conversation with Grok AI and tool execution
+ * Main agent class that orchestrates conversation with CodeBuddy AI and tool execution
  *
  * @example
  * ```typescript
- * const agent = new GrokAgent(apiKey, baseURL, model);
+ * const agent = new CodeBuddyAgent(apiKey, baseURL, model);
  *
  * // Process a message with streaming
  * for await (const chunk of agent.processUserMessageStream("Show me package.json")) {
@@ -59,8 +59,8 @@ import type { ChatEntry, StreamingChunk } from "./types.js";
  * agent.dispose();
  * ```
  */
-export class GrokAgent extends EventEmitter {
-  private grokClient: GrokClient;
+export class CodeBuddyAgent extends EventEmitter {
+  private codebuddyClient: CodeBuddyClient;
   // Lazy-loaded tool instances (improves startup time)
   private _textEditor: TextEditorTool | null = null;
   private _morphEditor: MorphEditorTool | null | undefined = undefined; // undefined = not checked yet
@@ -120,12 +120,12 @@ export class GrokAgent extends EventEmitter {
     }
     return this._imageTool;
   }
-  private messages: GrokMessage[] = [];
+  private messages: CodeBuddyMessage[] = [];
   private tokenCounter: TokenCounter;
   // Maximum history entries to prevent memory bloat (keep last N entries)
   private static readonly MAX_HISTORY_SIZE = 1000;
   // Cached tools from first round of tool selection
-  private cachedSelectedTools: import("../grok/client.js").GrokTool[] | null = null;
+  private cachedSelectedTools: import("../codebuddy/client.js").CodeBuddyTool[] | null = null;
   private abortController: AbortController | null = null;
   private checkpointManager: CheckpointManager;
   private sessionStore: SessionStore;
@@ -145,7 +145,7 @@ export class GrokAgent extends EventEmitter {
   private contextManager: ContextManagerV2;
 
   /**
-   * Create a new GrokAgent instance
+   * Create a new CodeBuddyAgent instance
    *
    * @param apiKey - API key for authentication
    * @param baseURL - Optional base URL for the API endpoint
@@ -200,13 +200,13 @@ export class GrokAgent extends EventEmitter {
 
     this.costTracker = getCostTracker();
     this.useRAGToolSelection = useRAGToolSelection;
-    this.grokClient = new GrokClient(apiKey, modelToUse, baseURL);
+    this.codebuddyClient = new CodeBuddyClient(apiKey, modelToUse, baseURL);
     // Tools are now lazy-loaded via getters (see lazy tool getters above)
     this.tokenCounter = createTokenCounter(modelToUse);
 
     // Initialize context manager with model-specific limits
     // Detect max tokens from environment or use model default
-    const envMaxContext = Number(process.env.GROK_MAX_CONTEXT);
+    const envMaxContext = Number(process.env.CODEBUDDY_MAX_CONTEXT);
     const maxContextTokens = Number.isFinite(envMaxContext) && envMaxContext > 0
       ? envMaxContext
       : undefined;
@@ -324,8 +324,8 @@ export class GrokAgent extends EventEmitter {
   }
 
   private isGrokModel(): boolean {
-    const currentModel = this.grokClient.getCurrentModel();
-    return currentModel.toLowerCase().includes("grok");
+    const currentModel = this.codebuddyClient.getCurrentModel();
+    return currentModel.toLowerCase().includes("codebuddy");
   }
 
   // Heuristic: enable web search only when likely needed
@@ -362,7 +362,7 @@ export class GrokAgent extends EventEmitter {
    * Tools that modify the same files or have side effects should not be parallelized.
    * Read-only operations (view_file, search, web_search) are safe to parallelize.
    */
-  private canParallelizeToolCalls(toolCalls: GrokToolCall[]): boolean {
+  private canParallelizeToolCalls(toolCalls: CodeBuddyToolCall[]): boolean {
     if (!this.parallelToolExecution || toolCalls.length <= 1) {
       return false;
     }
@@ -432,7 +432,7 @@ export class GrokAgent extends EventEmitter {
    * Execute multiple tool calls, potentially in parallel
    */
   private async _executeToolCallsParallel(
-    toolCalls: GrokToolCall[]
+    toolCalls: CodeBuddyToolCall[]
   ): Promise<Map<string, ToolResult>> {
     const results = new Map<string, ToolResult>();
 
@@ -473,7 +473,7 @@ export class GrokAgent extends EventEmitter {
    * Get tools for a query using RAG selection if enabled
    */
   private async getToolsForQuery(query: string): Promise<{
-    tools: import("../grok/client.js").GrokTool[];
+    tools: import("../codebuddy/client.js").CodeBuddyTool[];
     selection: ToolSelectionResult | null;
   }> {
     this.lastQueryForToolSelection = query;
@@ -488,7 +488,7 @@ export class GrokAgent extends EventEmitter {
       this.lastSelectedToolNames = selection.selectedTools.map(t => t.function.name);
       return { tools: selection.selectedTools, selection };
     } else {
-      const tools = await getAllGrokTools();
+      const tools = await getAllCodeBuddyTools();
       this.lastSelectedToolNames = tools.map(t => t.function.name);
       return { tools, selection: null };
     }
@@ -544,7 +544,7 @@ export class GrokAgent extends EventEmitter {
         logger.warn(contextWarning.message);
       }
 
-      let currentResponse = await this.grokClient.chat(
+      let currentResponse = await this.codebuddyClient.chat(
         preparedMessages,
         tools,
         undefined,
@@ -650,7 +650,7 @@ export class GrokAgent extends EventEmitter {
           // Get next response - this might contain more tool calls
           // Apply context management again for long tool chains
           const nextPreparedMessages = this.contextManager.prepareMessages(this.messages);
-          currentResponse = await this.grokClient.chat(
+          currentResponse = await this.codebuddyClient.chat(
             nextPreparedMessages,
             tools,
             undefined,
@@ -833,14 +833,14 @@ export class GrokAgent extends EventEmitter {
         // Stream response and accumulate
         // Use RAG-based tool selection on first round, then cache and reuse tools for consistency
         // This saves ~9000 tokens on multi-round queries
-        let tools: import("../grok/client.js").GrokTool[];
+        let tools: import("../codebuddy/client.js").CodeBuddyTool[];
         if (toolRounds === 0) {
           const selection = await this.getToolsForQuery(message);
           tools = selection.tools;
           this.cachedSelectedTools = tools; // Cache for subsequent rounds
         } else {
           // Use cached tools from first round instead of ALL tools
-          tools = this.cachedSelectedTools || await getAllGrokTools();
+          tools = this.cachedSelectedTools || await getAllCodeBuddyTools();
         }
 
         // Apply context management - compress messages if approaching token limits
@@ -855,7 +855,7 @@ export class GrokAgent extends EventEmitter {
           };
         }
 
-        const stream = this.grokClient.chatStream(
+        const stream = this.codebuddyClient.chatStream(
           preparedMessages,
           tools,
           undefined,
@@ -893,7 +893,7 @@ export class GrokAgent extends EventEmitter {
             if (hasCompleteTool) {
               yield {
                 type: "tool_calls",
-                toolCalls: toolCalls as GrokToolCall[],
+                toolCalls: toolCalls as CodeBuddyToolCall[],
               };
               toolCallsYielded = true;
             }
@@ -975,7 +975,7 @@ export class GrokAgent extends EventEmitter {
 
         // Add assistant entry to history
         const content = typeof accumulatedMessage.content === 'string' ? accumulatedMessage.content : "Using tools to help you...";
-        const toolCalls = Array.isArray(accumulatedMessage.tool_calls) ? accumulatedMessage.tool_calls as GrokToolCall[] : undefined;
+        const toolCalls = Array.isArray(accumulatedMessage.tool_calls) ? accumulatedMessage.tool_calls as CodeBuddyToolCall[] : undefined;
 
         const assistantEntry: ChatEntry = {
           type: "assistant",
@@ -1115,7 +1115,7 @@ export class GrokAgent extends EventEmitter {
     }
   }
 
-  private async executeTool(toolCall: GrokToolCall): Promise<ToolResult> {
+  private async executeTool(toolCall: CodeBuddyToolCall): Promise<ToolResult> {
     // Record this tool request for metrics tracking
     this.recordToolRequestMetric(toolCall.function.name);
 
@@ -1229,7 +1229,7 @@ export class GrokAgent extends EventEmitter {
     }
   }
 
-  private async executeMCPTool(toolCall: GrokToolCall): Promise<ToolResult> {
+  private async executeMCPTool(toolCall: CodeBuddyToolCall): Promise<ToolResult> {
     try {
       const args = JSON.parse(toolCall.function.arguments);
       const mcpManager = getMCPManager();
@@ -1281,15 +1281,15 @@ export class GrokAgent extends EventEmitter {
   }
 
   getCurrentModel(): string {
-    return this.grokClient.getCurrentModel();
+    return this.codebuddyClient.getCurrentModel();
   }
 
-  getClient(): GrokClient {
-    return this.grokClient;
+  getClient(): CodeBuddyClient {
+    return this.codebuddyClient;
   }
 
   setModel(model: string): void {
-    this.grokClient.setModel(model);
+    this.codebuddyClient.setModel(model);
     // Update token counter for new model
     this.tokenCounter.dispose();
     this.tokenCounter = createTokenCounter(model);
@@ -1302,7 +1302,7 @@ export class GrokAgent extends EventEmitter {
    * Makes a quick test request with a simple tool
    */
   async probeToolSupport(): Promise<boolean> {
-    return this.grokClient.probeToolSupport();
+    return this.codebuddyClient.probeToolSupport();
   }
 
   /**
@@ -1436,16 +1436,16 @@ export class GrokAgent extends EventEmitter {
    * Keeps the most recent entries up to MAX_HISTORY_SIZE
    */
   private trimHistory(): void {
-    if (this.chatHistory.length > GrokAgent.MAX_HISTORY_SIZE) {
+    if (this.chatHistory.length > CodeBuddyAgent.MAX_HISTORY_SIZE) {
       // Keep the last MAX_HISTORY_SIZE entries
-      this.chatHistory = this.chatHistory.slice(-GrokAgent.MAX_HISTORY_SIZE);
+      this.chatHistory = this.chatHistory.slice(-CodeBuddyAgent.MAX_HISTORY_SIZE);
     }
 
     // Also trim messages, keeping system message (first) and last N messages
-    const maxMessages = GrokAgent.MAX_HISTORY_SIZE + 1; // +1 for system message
+    const maxMessages = CodeBuddyAgent.MAX_HISTORY_SIZE + 1; // +1 for system message
     if (this.messages.length > maxMessages) {
       const systemMessage = this.messages[0];
-      const recentMessages = this.messages.slice(-GrokAgent.MAX_HISTORY_SIZE);
+      const recentMessages = this.messages.slice(-CodeBuddyAgent.MAX_HISTORY_SIZE);
       this.messages = [systemMessage, ...recentMessages];
     }
   }
@@ -1716,7 +1716,7 @@ export class GrokAgent extends EventEmitter {
    * @param outputTokens - Number of output tokens
    */
   private recordSessionCost(inputTokens: number, outputTokens: number): void {
-    const model = this.grokClient.getCurrentModel();
+    const model = this.codebuddyClient.getCurrentModel();
     const cost = this.costTracker.calculateCost(inputTokens, outputTokens, model);
     this.sessionCost += cost;
     this.costTracker.recordUsage(inputTokens, outputTokens, model);

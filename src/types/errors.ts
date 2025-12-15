@@ -8,7 +8,7 @@
 /**
  * Base error class for all Grok CLI errors
  */
-export class GrokError extends Error {
+export class CodeBuddyError extends Error {
   public readonly code: string;
   public readonly isOperational: boolean;
   public readonly timestamp: Date;
@@ -24,7 +24,7 @@ export class GrokError extends Error {
     } = {}
   ) {
     super(message);
-    this.name = 'GrokError';
+    this.name = 'CodeBuddyError';
     this.code = code;
     this.isOperational = options.isOperational ?? true;
     this.timestamp = new Date();
@@ -57,7 +57,7 @@ export class GrokError extends Error {
 /**
  * Error during tool execution
  */
-export class ToolExecutionError extends GrokError {
+export class ToolExecutionError extends CodeBuddyError {
   public readonly toolName: string;
   public readonly args?: Record<string, unknown>;
 
@@ -80,7 +80,7 @@ export class ToolExecutionError extends GrokError {
 /**
  * Tool validation failed
  */
-export class ToolValidationError extends GrokError {
+export class ToolValidationError extends CodeBuddyError {
   public readonly toolName: string;
   public readonly validationErrors: string[];
 
@@ -103,7 +103,7 @@ export class ToolValidationError extends GrokError {
 /**
  * Tool not found
  */
-export class ToolNotFoundError extends GrokError {
+export class ToolNotFoundError extends CodeBuddyError {
   public readonly toolName: string;
 
   constructor(toolName: string) {
@@ -120,7 +120,7 @@ export class ToolNotFoundError extends GrokError {
 /**
  * User denied confirmation for an operation
  */
-export class ConfirmationDeniedError extends GrokError {
+export class ConfirmationDeniedError extends CodeBuddyError {
   public readonly operation: string;
   public readonly target?: string;
 
@@ -138,7 +138,7 @@ export class ConfirmationDeniedError extends GrokError {
 /**
  * Operation blocked by security sandbox
  */
-export class SandboxViolationError extends GrokError {
+export class SandboxViolationError extends CodeBuddyError {
   public readonly operation: string;
   public readonly reason: string;
 
@@ -153,7 +153,7 @@ export class SandboxViolationError extends GrokError {
 /**
  * Path traversal attempt detected
  */
-export class PathTraversalError extends GrokError {
+export class PathTraversalError extends CodeBuddyError {
   public readonly attemptedPath: string;
   public readonly basePath: string;
 
@@ -171,7 +171,7 @@ export class PathTraversalError extends GrokError {
 /**
  * Command injection attempt detected
  */
-export class CommandInjectionError extends GrokError {
+export class CommandInjectionError extends CodeBuddyError {
   public readonly command: string;
   public readonly pattern: string;
 
@@ -193,7 +193,7 @@ export class CommandInjectionError extends GrokError {
 /**
  * Context token limit exceeded
  */
-export class ContextLimitExceededError extends GrokError {
+export class ContextLimitExceededError extends CodeBuddyError {
   public readonly currentTokens: number;
   public readonly maxTokens: number;
   public readonly overflow: number;
@@ -213,7 +213,7 @@ export class ContextLimitExceededError extends GrokError {
 /**
  * File too large to process
  */
-export class FileTooLargeError extends GrokError {
+export class FileTooLargeError extends CodeBuddyError {
   public readonly filePath: string;
   public readonly fileSize: number;
   public readonly maxSize: number;
@@ -237,7 +237,7 @@ export class FileTooLargeError extends GrokError {
 /**
  * API request failed
  */
-export class ApiError extends GrokError {
+export class ApiError extends CodeBuddyError {
   public readonly statusCode?: number;
   public readonly endpoint?: string;
 
@@ -290,7 +290,7 @@ export class AuthenticationError extends ApiError {
 /**
  * Configuration validation failed
  */
-export class ConfigurationError extends GrokError {
+export class ConfigurationError extends CodeBuddyError {
   public readonly configKey?: string;
   public readonly expectedType?: string;
   public readonly receivedValue?: unknown;
@@ -329,7 +329,7 @@ export class MissingConfigError extends ConfigurationError {
 /**
  * Plugin loading failed
  */
-export class PluginLoadError extends GrokError {
+export class PluginLoadError extends CodeBuddyError {
   public readonly pluginName: string;
   public readonly pluginPath?: string;
 
@@ -348,7 +348,7 @@ export class PluginLoadError extends GrokError {
 /**
  * Plugin permission denied
  */
-export class PluginPermissionError extends GrokError {
+export class PluginPermissionError extends CodeBuddyError {
   public readonly pluginName: string;
   public readonly permission: string;
 
@@ -370,7 +370,7 @@ export class PluginPermissionError extends GrokError {
 /**
  * MCP server connection failed
  */
-export class MCPConnectionError extends GrokError {
+export class MCPConnectionError extends CodeBuddyError {
   public readonly serverName: string;
   public readonly serverCommand?: string;
 
@@ -389,7 +389,7 @@ export class MCPConnectionError extends GrokError {
 /**
  * MCP protocol error
  */
-export class MCPProtocolError extends GrokError {
+export class MCPProtocolError extends CodeBuddyError {
   public readonly serverName: string;
   public readonly method?: string;
 
@@ -412,7 +412,7 @@ export class MCPProtocolError extends GrokError {
 /**
  * Operation timed out
  */
-export class TimeoutError extends GrokError {
+export class TimeoutError extends CodeBuddyError {
   public readonly operation: string;
   public readonly timeoutMs: number;
 
@@ -439,34 +439,34 @@ export function getErrorMessage(error: unknown): string {
 }
 
 /**
- * Check if error is a GrokError
+ * Check if error is a CodeBuddyError
  */
-export function isGrokError(error: unknown): error is GrokError {
-  return error instanceof GrokError;
+export function isCodeBuddyError(error: unknown): error is CodeBuddyError {
+  return error instanceof CodeBuddyError;
 }
 
 /**
  * Check if error is operational (expected, can be handled gracefully)
  */
 export function isOperationalError(error: unknown): boolean {
-  if (error instanceof GrokError) {
+  if (error instanceof CodeBuddyError) {
     return error.isOperational;
   }
   return false;
 }
 
 /**
- * Wrap unknown error in GrokError
+ * Wrap unknown error in CodeBuddyError
  */
-export function wrapError(error: unknown, code: string = 'UNKNOWN_ERROR'): GrokError {
-  if (error instanceof GrokError) {
+export function wrapError(error: unknown, code: string = 'UNKNOWN_ERROR'): CodeBuddyError {
+  if (error instanceof CodeBuddyError) {
     return error;
   }
 
   const message = getErrorMessage(error);
   const cause = error instanceof Error ? error : undefined;
 
-  return new GrokError(code, message, { cause, isOperational: false });
+  return new CodeBuddyError(code, message, { cause, isOperational: false });
 }
 
 /**
@@ -493,7 +493,7 @@ export function createApiError(
 /**
  * JSON parse error with context
  */
-export class JSONParseError extends GrokError {
+export class JSONParseError extends CodeBuddyError {
   public readonly source?: string;
   public readonly position?: number;
 

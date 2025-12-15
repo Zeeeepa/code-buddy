@@ -1,4 +1,4 @@
-import { ChatEntry } from "../../agent/grok-agent.js";
+import { ChatEntry } from "../../agent/codebuddy-agent.js";
 import { getCostTracker } from "../../utils/cost-tracker.js";
 import { getPerformanceManager } from "../../performance/index.js";
 import { getResponseCache } from "../../utils/response-cache.js";

@@ -21,7 +21,7 @@ export interface InitResult {
  * Initialize .grok directory with templates and configurations
  * Similar to Claude Code's project initialization
  */
-export function initGrokProject(
+export function initCodeBuddyProject(
   workingDirectory: string = process.cwd(),
   options: InitOptions = {}
 ): InitResult {
@@ -32,18 +32,18 @@ export function initGrokProject(
     errors: []
   };
 
-  const grokDir = path.join(workingDirectory, '.grok');
+  const codebuddyDir = path.join(workingDirectory, '.codebuddy');
 
   // Create .grok directory
-  if (!fs.existsSync(grokDir)) {
-    fs.mkdirSync(grokDir, { recursive: true });
-    result.created.push('.grok/');
+  if (!fs.existsSync(codebuddyDir)) {
+    fs.mkdirSync(codebuddyDir, { recursive: true });
+    result.created.push('.codebuddy/');
   }
 
   // Create GROK.md (custom instructions)
-  const grokMdPath = path.join(grokDir, 'GROK.md');
-  if (!fs.existsSync(grokMdPath) || options.force) {
-    const grokMdContent = `# Custom Instructions for Grok CLI
+  const codebuddyMdPath = path.join(codebuddyDir, 'GROK.md');
+  if (!fs.existsSync(codebuddyMdPath) || options.force) {
+    const codebuddyMdContent = `# Custom Instructions for Grok CLI
 
 ## About This Project
 <!-- Describe your project here -->
@@ -80,15 +80,15 @@ This project is...
 - Never expose API keys
 - Never delete production data
 `;
-    fs.writeFileSync(grokMdPath, grokMdContent);
-    result.created.push('.grok/GROK.md');
+    fs.writeFileSync(codebuddyMdPath, codebuddyMdContent);
+    result.created.push('.codebuddy/GROK.md');
   } else {
-    result.skipped.push('.grok/GROK.md (already exists)');
+    result.skipped.push('.codebuddy/GROK.md (already exists)');
   }
 
   // Create hooks.json
   if (options.includeHooks !== false) {
-    const hooksPath = path.join(grokDir, 'hooks.json');
+    const hooksPath = path.join(codebuddyDir, 'hooks.json');
     if (!fs.existsSync(hooksPath) || options.force) {
       const hooksContent = {
         enabled: true,
@@ -121,15 +121,15 @@ This project is...
         ]
       };
       fs.writeFileSync(hooksPath, JSON.stringify(hooksContent, null, 2));
-      result.created.push('.grok/hooks.json');
+      result.created.push('.codebuddy/hooks.json');
     } else {
-      result.skipped.push('.grok/hooks.json (already exists)');
+      result.skipped.push('.codebuddy/hooks.json (already exists)');
     }
   }
 
   // Create mcp.json
   if (options.includeMcp !== false) {
-    const mcpPath = path.join(grokDir, 'mcp.json');
+    const mcpPath = path.join(codebuddyDir, 'mcp.json');
     if (!fs.existsSync(mcpPath) || options.force) {
       const mcpContent = {
         $schema: 'https://json-schema.org/draft/2020-12/schema',
@@ -158,15 +158,15 @@ This project is...
         }
       };
       fs.writeFileSync(mcpPath, JSON.stringify(mcpContent, null, 2));
-      result.created.push('.grok/mcp.json');
+      result.created.push('.codebuddy/mcp.json');
     } else {
-      result.skipped.push('.grok/mcp.json (already exists)');
+      result.skipped.push('.codebuddy/mcp.json (already exists)');
     }
   }
 
   // Create security.json
   if (options.includeSecurity !== false) {
-    const securityPath = path.join(grokDir, 'security.json');
+    const securityPath = path.join(codebuddyDir, 'security.json');
     if (!fs.existsSync(securityPath) || options.force) {
       const securityContent = {
         mode: 'suggest',
@@ -175,18 +175,18 @@ This project is...
         blockedPaths: []
       };
       fs.writeFileSync(securityPath, JSON.stringify(securityContent, null, 2));
-      result.created.push('.grok/security.json');
+      result.created.push('.codebuddy/security.json');
     } else {
-      result.skipped.push('.grok/security.json (already exists)');
+      result.skipped.push('.codebuddy/security.json (already exists)');
     }
   }
 
   // Create commands directory with example
   if (options.includeCommands !== false) {
-    const commandsDir = path.join(grokDir, 'commands');
+    const commandsDir = path.join(codebuddyDir, 'commands');
     if (!fs.existsSync(commandsDir)) {
       fs.mkdirSync(commandsDir, { recursive: true });
-      result.created.push('.grok/commands/');
+      result.created.push('.codebuddy/commands/');
     }
 
     // Create example command
@@ -209,7 +209,7 @@ You can use placeholders:
 Example: Analyze the file $1 and suggest improvements.
 `;
       fs.writeFileSync(exampleCommandPath, exampleCommandContent);
-      result.created.push('.grok/commands/example.md');
+      result.created.push('.codebuddy/commands/example.md');
     }
 
     // Create deploy command template
@@ -237,50 +237,50 @@ Safety checks:
 - Confirm before proceeding
 `;
       fs.writeFileSync(deployCommandPath, deployCommandContent);
-      result.created.push('.grok/commands/deploy.md');
+      result.created.push('.codebuddy/commands/deploy.md');
     }
   }
 
   // Create settings.json
-  const settingsPath = path.join(grokDir, 'settings.json');
+  const settingsPath = path.join(codebuddyDir, 'settings.json');
   if (!fs.existsSync(settingsPath) || options.force) {
     const settingsContent = {
-      model: 'grok-code-fast-1',
+      model: 'grok-3-fast',
       maxToolRounds: 400,
       theme: 'default'
     };
     fs.writeFileSync(settingsPath, JSON.stringify(settingsContent, null, 2));
-    result.created.push('.grok/settings.json');
+    result.created.push('.codebuddy/settings.json');
   } else {
-    result.skipped.push('.grok/settings.json (already exists)');
+    result.skipped.push('.codebuddy/settings.json (already exists)');
   }
 
   // Update .gitignore if it exists
   if (options.includeGitignore !== false) {
     const gitignorePath = path.join(workingDirectory, '.gitignore');
-    const grokIgnoreEntries = `
+    const codebuddyIgnoreEntries = `
 # Grok CLI
-.grok/sessions/
-.grok/history/
-.grok/user-settings.json
+.codebuddy/sessions/
+.codebuddy/history/
+.codebuddy/user-settings.json
 `;
 
     if (fs.existsSync(gitignorePath)) {
       const currentContent = fs.readFileSync(gitignorePath, 'utf-8');
       if (!currentContent.includes('# Grok CLI')) {
-        fs.appendFileSync(gitignorePath, grokIgnoreEntries);
+        fs.appendFileSync(gitignorePath, codebuddyIgnoreEntries);
         result.created.push('.gitignore (updated with Grok entries)');
       } else {
         result.skipped.push('.gitignore (already has Grok entries)');
       }
     } else {
-      fs.writeFileSync(gitignorePath, grokIgnoreEntries.trim());
+      fs.writeFileSync(gitignorePath, codebuddyIgnoreEntries.trim());
       result.created.push('.gitignore');
     }
   }
 
   // Create README for .grok directory
-  const readmePath = path.join(grokDir, 'README.md');
+  const readmePath = path.join(codebuddyDir, 'README.md');
   if (!fs.existsSync(readmePath) || options.force) {
     const readmeContent = `# .grok Directory
 
@@ -336,7 +336,7 @@ Configure security modes in \`security.json\`:
 See the [Grok CLI documentation](https://github.com/phuetz/code-buddy) for more details.
 `;
     fs.writeFileSync(readmePath, readmeContent);
-    result.created.push('.grok/README.md');
+    result.created.push('.codebuddy/README.md');
   }
 
   return result;
@@ -373,8 +373,8 @@ export function formatInitResult(result: InitResult): string {
   }
 
   output += '─'.repeat(50) + '\n';
-  output += '💡 Edit .grok/GROK.md to customize Grok for this project\n';
-  output += '📚 See .grok/README.md for documentation';
+  output += '💡 Edit .codebuddy/GROK.md to customize Grok for this project\n';
+  output += '📚 See .codebuddy/README.md for documentation';
 
   return output;
 }

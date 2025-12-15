@@ -230,7 +230,7 @@ export class AdvancedParallelExecutor extends EventEmitter {
     tokensUsed?: number;
     filesModified?: string[];
   }> {
-    // This should integrate with the actual GrokAgent
+    // This should integrate with the actual CodeBuddyAgent
     // For now, we simulate the execution
 
     return new Promise((resolve) => {
@@ -245,7 +245,7 @@ export class AdvancedParallelExecutor extends EventEmitter {
       }, timeout);
 
       // Simulate agent execution
-      // In real implementation, this would call the GrokAgent
+      // In real implementation, this would call the CodeBuddyAgent
       setTimeout(() => {
         clearTimeout(timer);
         resolve({

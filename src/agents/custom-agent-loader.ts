@@ -1,5 +1,5 @@
 /**
- * CustomAgentLoader - Load custom agents from ~/.grok/agents/
+ * CustomAgentLoader - Load custom agents from ~/.codebuddy/agents/
  *
  * Allows users to define custom AI agents with specific:
  * - System prompts
@@ -13,7 +13,7 @@
 import fs from 'fs';
 import path from 'path';
 import TOML from '@iarna/toml';
-import { getAgentsDir } from '../utils/grok-home.js';
+import { getAgentsDir } from '../utils/codebuddy-home.js';
 
 // ============================================================================
 // Types
@@ -71,7 +71,7 @@ export interface CustomAgentFile {
 const AGENTS_DIR = getAgentsDir();
 
 const EXAMPLE_AGENT_TOML = `# Example Custom Agent Configuration
-# Place this file in ~/.grok/agents/
+# Place this file in ~/.codebuddy/agents/
 
 # Basic Info
 name = "Code Reviewer"

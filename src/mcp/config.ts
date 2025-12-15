@@ -10,14 +10,14 @@ export interface MCPConfig {
 
 /**
  * Load MCP configuration from multiple sources (inspired by Claude Code)
- * Priority: Project .grok/mcp.json > .grok/settings.json > ~/.grok/mcp.json
+ * Priority: Project .codebuddy/mcp.json > .codebuddy/settings.json > ~/.codebuddy/mcp.json
  */
 export function loadMCPConfig(): MCPConfig {
   const servers: MCPServerConfig[] = [];
   const seenServers = new Set<string>();
 
-  // 1. First, try project-level .grok/mcp.json (highest priority, committable)
-  const projectMCPPath = path.join(process.cwd(), '.grok', 'mcp.json');
+  // 1. First, try project-level .codebuddy/mcp.json (highest priority, committable)
+  const projectMCPPath = path.join(process.cwd(), '.codebuddy', 'mcp.json');
   if (fs.existsSync(projectMCPPath)) {
     try {
       const projectMCP = JSON.parse(fs.readFileSync(projectMCPPath, 'utf-8'));
@@ -34,7 +34,7 @@ export function loadMCPConfig(): MCPConfig {
     }
   }
 
-  // 2. Then, try project settings (.grok/settings.json)
+  // 2. Then, try project settings (.codebuddy/settings.json)
   const manager = getSettingsManager();
   const projectSettings = manager.loadProjectSettings();
   if (projectSettings.mcpServers) {
@@ -46,8 +46,8 @@ export function loadMCPConfig(): MCPConfig {
     }
   }
 
-  // 3. Finally, try user-level ~/.grok/mcp.json (lowest priority)
-  const userMCPPath = path.join(os.homedir(), '.grok', 'mcp.json');
+  // 3. Finally, try user-level ~/.codebuddy/mcp.json (lowest priority)
+  const userMCPPath = path.join(os.homedir(), '.codebuddy', 'mcp.json');
   if (fs.existsSync(userMCPPath)) {
     try {
       const userMCP = JSON.parse(fs.readFileSync(userMCPPath, 'utf-8'));
@@ -109,10 +109,10 @@ export function getMCPServer(serverName: string): MCPServerConfig | undefined {
 export const PREDEFINED_SERVERS: Record<string, MCPServerConfig> = {};
 
 /**
- * Save MCP configuration to project-level .grok/mcp.json (committable)
+ * Save MCP configuration to project-level .codebuddy/mcp.json (committable)
  */
 export function saveProjectMCPConfig(servers: Record<string, MCPServerConfig>): string {
-  const projectMCPPath = path.join(process.cwd(), '.grok', 'mcp.json');
+  const projectMCPPath = path.join(process.cwd(), '.codebuddy', 'mcp.json');
   const projectDir = path.dirname(projectMCPPath);
 
   if (!fs.existsSync(projectDir)) {
@@ -131,7 +131,7 @@ export function saveProjectMCPConfig(servers: Record<string, MCPServerConfig>): 
  * Create default MCP configuration template
  */
 export function createMCPConfigTemplate(): string {
-  const projectMCPPath = path.join(process.cwd(), '.grok', 'mcp.json');
+  const projectMCPPath = path.join(process.cwd(), '.codebuddy', 'mcp.json');
   const projectDir = path.dirname(projectMCPPath);
 
   if (!fs.existsSync(projectDir)) {
@@ -167,7 +167,7 @@ export function createMCPConfigTemplate(): string {
  * Check if project has MCP configuration
  */
 export function hasProjectMCPConfig(): boolean {
-  const projectMCPPath = path.join(process.cwd(), '.grok', 'mcp.json');
+  const projectMCPPath = path.join(process.cwd(), '.codebuddy', 'mcp.json');
   return fs.existsSync(projectMCPPath);
 }
 
@@ -176,7 +176,7 @@ export function hasProjectMCPConfig(): boolean {
  */
 export function getMCPConfigPaths(): { project: string; user: string } {
   return {
-    project: path.join(process.cwd(), '.grok', 'mcp.json'),
-    user: path.join(os.homedir(), '.grok', 'mcp.json')
+    project: path.join(process.cwd(), '.codebuddy', 'mcp.json'),
+    user: path.join(os.homedir(), '.codebuddy', 'mcp.json')
   };
 }

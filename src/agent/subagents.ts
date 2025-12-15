@@ -1,4 +1,4 @@
-import { GrokClient, GrokMessage, GrokToolCall } from "../grok/client.js";
+import { CodeBuddyClient, CodeBuddyMessage, CodeBuddyToolCall } from "../codebuddy/client.js";
 import { EventEmitter } from "events";
 import { ToolResult, getErrorMessage } from "../types/index.js";
 
@@ -136,7 +136,7 @@ Write in clear, concise language accessible to developers of all levels.`,
 };
 
 export class Subagent extends EventEmitter {
-  private client: GrokClient;
+  private client: CodeBuddyClient;
   private config: SubagentConfig;
   private isRunning: boolean = false;
   private startTime: number = 0;
@@ -152,7 +152,7 @@ export class Subagent extends EventEmitter {
       timeout: 300000,  // 5 minutes default
       ...config,
     };
-    this.client = new GrokClient(
+    this.client = new CodeBuddyClient(
       apiKey,
       config.model || "grok-code-fast-1",
       baseURL
@@ -162,8 +162,8 @@ export class Subagent extends EventEmitter {
   async run(
     task: string,
     context?: string,
-    tools?: import("../grok/client.js").GrokTool[],
-    executeTool?: (toolCall: GrokToolCall) => Promise<ToolResult>
+    tools?: import("../codebuddy/client.js").CodeBuddyTool[],
+    executeTool?: (toolCall: CodeBuddyToolCall) => Promise<ToolResult>
   ): Promise<SubagentResult> {
     this.isRunning = true;
     this.startTime = Date.now();
@@ -183,7 +183,7 @@ export class Subagent extends EventEmitter {
       );
     }
 
-    const messages: GrokMessage[] = [
+    const messages: CodeBuddyMessage[] = [
       { role: "system", content: this.config.systemPrompt },
       {
         role: "user",
@@ -342,8 +342,8 @@ export class SubagentManager {
     task: string,
     options: {
       context?: string;
-      tools?: import("../grok/client.js").GrokTool[];
-      executeTool?: (toolCall: GrokToolCall) => Promise<ToolResult>;
+      tools?: import("../codebuddy/client.js").CodeBuddyTool[];
+      executeTool?: (toolCall: CodeBuddyToolCall) => Promise<ToolResult>;
     } = {}
   ): Promise<SubagentResult> {
     const agent = this.createSubagent(name);
@@ -442,8 +442,8 @@ export class ParallelSubagentRunner extends EventEmitter {
     tasks: ParallelTask[],
     options: ParallelExecutionOptions = {},
     sharedOptions: {
-      tools?: import("../grok/client.js").GrokTool[];
-      executeTool?: (toolCall: GrokToolCall) => Promise<ToolResult>;
+      tools?: import("../codebuddy/client.js").CodeBuddyTool[];
+      executeTool?: (toolCall: CodeBuddyToolCall) => Promise<ToolResult>;
     } = {}
   ): Promise<ParallelExecutionResult> {
     const startTime = Date.now();
@@ -567,8 +567,8 @@ export class ParallelSubagentRunner extends EventEmitter {
     agentTypes: string[],
     options: ParallelExecutionOptions = {},
     sharedOptions: {
-      tools?: import("../grok/client.js").GrokTool[];
-      executeTool?: (toolCall: GrokToolCall) => Promise<ToolResult>;
+      tools?: import("../codebuddy/client.js").CodeBuddyTool[];
+      executeTool?: (toolCall: CodeBuddyToolCall) => Promise<ToolResult>;
     } = {}
   ): Promise<ParallelExecutionResult> {
     const tasks: ParallelTask[] = agentTypes.map((agentType, index) => ({

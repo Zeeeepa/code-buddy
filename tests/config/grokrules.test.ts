@@ -1,33 +1,33 @@
 /**
- * Tests for .grokrules Support
+ * Tests for .codebuddyrules Support
  */
 
 import {
-  GrokRulesManager,
-  getGrokRulesManager,
-  initializeGrokRules,
-  resetGrokRulesManager,
-  GrokRules,
-} from "../../src/config/grokrules";
+  CodeBuddyRulesManager,
+  getCodeBuddyRulesManager,
+  initializeCodeBuddyRules,
+  resetCodeBuddyRulesManager,
+  CodeBuddyRules,
+} from "../../src/config/codebuddyrules";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 
-describe("GrokRulesManager", () => {
-  let manager: GrokRulesManager;
+describe("CodeBuddyRulesManager", () => {
+  let manager: CodeBuddyRulesManager;
   let tempDir: string;
 
   beforeEach(() => {
-    resetGrokRulesManager();
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "grokrules-test-"));
-    manager = new GrokRulesManager({
+    resetCodeBuddyRulesManager();
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "codebuddyrules-test-"));
+    manager = new CodeBuddyRulesManager({
       enableGlobalRules: false,
       inheritFromParent: false,
     });
   });
 
   afterEach(() => {
-    resetGrokRulesManager();
+    resetCodeBuddyRulesManager();
     try {
       fs.rmSync(tempDir, { recursive: true, force: true });
     } catch {
@@ -55,7 +55,7 @@ describe("GrokRulesManager", () => {
   });
 
   describe("Loading Rules Files", () => {
-    it("should load .grokrules YAML file", async () => {
+    it("should load .codebuddyrules YAML file", async () => {
       const rulesContent = `
 description: Test Project
 languages:
@@ -63,7 +63,7 @@ languages:
 instructions:
   - Use strict mode
 `;
-      fs.writeFileSync(path.join(tempDir, ".grokrules"), rulesContent);
+      fs.writeFileSync(path.join(tempDir, ".codebuddyrules"), rulesContent);
 
       await manager.initialize(tempDir);
       const rules = manager.getRules();
@@ -73,13 +73,13 @@ instructions:
       expect(rules.instructions).toContain("Use strict mode");
     });
 
-    it("should load .grokrules.json file", async () => {
-      const rulesContent: GrokRules = {
+    it("should load .codebuddyrules.json file", async () => {
+      const rulesContent: CodeBuddyRules = {
         description: "JSON Project",
         frameworks: ["react", "next"],
       };
       fs.writeFileSync(
-        path.join(tempDir, ".grokrules.json"),
+        path.join(tempDir, ".codebuddyrules.json"),
         JSON.stringify(rulesContent)
       );
 
@@ -92,7 +92,7 @@ instructions:
 
     it("should track loaded files", async () => {
       fs.writeFileSync(
-        path.join(tempDir, ".grokrules"),
+        path.join(tempDir, ".codebuddyrules"),
         "description: Test"
       );
 
@@ -100,7 +100,7 @@ instructions:
       const files = manager.getLoadedFiles();
 
       expect(files.length).toBe(1);
-      expect(files[0]).toContain(".grokrules");
+      expect(files[0]).toContain(".codebuddyrules");
     });
   });
 
@@ -113,7 +113,7 @@ style:
   quotes: double
   semicolons: false
 `;
-      fs.writeFileSync(path.join(tempDir, ".grokrules"), rulesContent);
+      fs.writeFileSync(path.join(tempDir, ".codebuddyrules"), rulesContent);
 
       await manager.initialize(tempDir);
       const rules = manager.getRules();
@@ -134,7 +134,7 @@ naming:
   classes: PascalCase
   files: kebab-case
 `;
-      fs.writeFileSync(path.join(tempDir, ".grokrules"), rulesContent);
+      fs.writeFileSync(path.join(tempDir, ".codebuddyrules"), rulesContent);
 
       await manager.initialize(tempDir);
       const rules = manager.getRules();
@@ -155,7 +155,7 @@ security:
   blockedCommands:
     - rm -rf /
 `;
-      fs.writeFileSync(path.join(tempDir, ".grokrules"), rulesContent);
+      fs.writeFileSync(path.join(tempDir, ".codebuddyrules"), rulesContent);
 
       await manager.initialize(tempDir);
 
@@ -170,7 +170,7 @@ security:
     - /etc
     - /usr
 `;
-      fs.writeFileSync(path.join(tempDir, ".grokrules"), rulesContent);
+      fs.writeFileSync(path.join(tempDir, ".codebuddyrules"), rulesContent);
 
       await manager.initialize(tempDir);
 
@@ -189,7 +189,7 @@ ignore:
 exclude:
   - coverage/**
 `;
-      fs.writeFileSync(path.join(tempDir, ".grokrules"), rulesContent);
+      fs.writeFileSync(path.join(tempDir, ".codebuddyrules"), rulesContent);
 
       await manager.initialize(tempDir);
       const patterns = manager.getIgnorePatterns();
@@ -204,7 +204,7 @@ include:
   - src/**/*.ts
   - README.md
 `;
-      fs.writeFileSync(path.join(tempDir, ".grokrules"), rulesContent);
+      fs.writeFileSync(path.join(tempDir, ".codebuddyrules"), rulesContent);
 
       await manager.initialize(tempDir);
       const patterns = manager.getIncludePatterns();
@@ -229,7 +229,7 @@ instructions:
 style:
   quotes: single
 `;
-      fs.writeFileSync(path.join(tempDir, ".grokrules"), rulesContent);
+      fs.writeFileSync(path.join(tempDir, ".codebuddyrules"), rulesContent);
 
       await manager.initialize(tempDir);
       const prompt = manager.getSystemPromptAdditions();
@@ -249,7 +249,7 @@ persona:
     - backend
     - databases
 `;
-      fs.writeFileSync(path.join(tempDir, ".grokrules"), rulesContent);
+      fs.writeFileSync(path.join(tempDir, ".codebuddyrules"), rulesContent);
 
       await manager.initialize(tempDir);
       const prompt = manager.getSystemPromptAdditions();
@@ -266,7 +266,7 @@ prompts:
   review: "Review this code for best practices"
   debug: "Help me debug this issue"
 `;
-      fs.writeFileSync(path.join(tempDir, ".grokrules"), rulesContent);
+      fs.writeFileSync(path.join(tempDir, ".codebuddyrules"), rulesContent);
 
       await manager.initialize(tempDir);
 
@@ -295,7 +295,7 @@ prompts:
 
   describe("Rule Inheritance", () => {
     it("should inherit rules from parent directories", async () => {
-      const inheritManager = new GrokRulesManager({
+      const inheritManager = new CodeBuddyRulesManager({
         enableGlobalRules: false,
         inheritFromParent: true,
       });
@@ -306,13 +306,13 @@ prompts:
 
       // Parent rules
       fs.writeFileSync(
-        path.join(parentDir, ".grokrules"),
+        path.join(parentDir, ".codebuddyrules"),
         "description: Parent\nlanguages:\n  - javascript"
       );
 
       // Child rules
       fs.writeFileSync(
-        path.join(childDir, ".grokrules"),
+        path.join(childDir, ".codebuddyrules"),
         "frameworks:\n  - react"
       );
 
@@ -334,7 +334,7 @@ instructions:
   - Test 1
   - Test 2
 `;
-      fs.writeFileSync(path.join(tempDir, ".grokrules"), rulesContent);
+      fs.writeFileSync(path.join(tempDir, ".codebuddyrules"), rulesContent);
 
       await manager.initialize(tempDir);
       const summary = manager.formatSummary();
@@ -348,25 +348,25 @@ instructions:
       await manager.initialize(tempDir);
       const summary = manager.formatSummary();
 
-      expect(summary).toContain("No .grokrules file found");
+      expect(summary).toContain("No .codebuddyrules file found");
     });
   });
 
   describe("Singleton Pattern", () => {
     it("should return same instance", () => {
-      const instance1 = getGrokRulesManager();
-      const instance2 = getGrokRulesManager();
+      const instance1 = getCodeBuddyRulesManager();
+      const instance2 = getCodeBuddyRulesManager();
 
       expect(instance1).toBe(instance2);
     });
 
     it("should initialize via helper function", async () => {
       fs.writeFileSync(
-        path.join(tempDir, ".grokrules"),
+        path.join(tempDir, ".codebuddyrules"),
         "description: Init Test"
       );
 
-      const initialized = await initializeGrokRules(tempDir);
+      const initialized = await initializeCodeBuddyRules(tempDir);
 
       expect(initialized.isInitialized()).toBe(true);
     });
@@ -387,7 +387,7 @@ instructions:
       manager.on("rules:loaded", handler);
 
       fs.writeFileSync(
-        path.join(tempDir, ".grokrules"),
+        path.join(tempDir, ".codebuddyrules"),
         "description: Event Test"
       );
 
@@ -395,7 +395,7 @@ instructions:
 
       expect(handler).toHaveBeenCalledWith(
         expect.objectContaining({
-          path: expect.stringContaining(".grokrules"),
+          path: expect.stringContaining(".codebuddyrules"),
         })
       );
     });

@@ -54,7 +54,7 @@ const DEFAULT_CONFIG: BrowserConfig = {
   headless: true,
   viewport: { width: 1280, height: 720 },
   timeout: 30000,
-  screenshotDir: path.join(os.tmpdir(), 'grok-screenshots'),
+  screenshotDir: path.join(os.tmpdir(), 'codebuddy-screenshots'),
   renderMode: 'text',
 };
 
@@ -130,7 +130,7 @@ export class EmbeddedBrowser extends EventEmitter {
       const curl = spawn('curl', [
         '-s',
         '-L',
-        '-A', this.config.userAgent || 'Mozilla/5.0 (compatible; GrokCLI/1.0)',
+        '-A', this.config.userAgent || 'Mozilla/5.0 (compatible; CodeBuddyCLI/1.0)',
         '--max-time', String(this.config.timeout / 1000),
         url,
       ]);

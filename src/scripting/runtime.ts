@@ -8,11 +8,11 @@ import {
   ProgramNode,
   StatementNode,
   ExpressionNode,
-  GrokValue,
+  CodeBuddyValue,
   RuntimeContext,
-  GrokScriptConfig,
+  CodeBuddyScriptConfig,
   DEFAULT_SCRIPT_CONFIG,
-  GrokFunction,
+  CodeBuddyFunction,
   VariableDeclaration,
   FunctionDeclaration,
   BlockStatement,
@@ -41,19 +41,19 @@ import { createBuiltins } from './builtins.js';
 
 // Special return value for control flow
 class ReturnValue {
-  constructor(public value: GrokValue) {}
+  constructor(public value: CodeBuddyValue) {}
 }
 
 class BreakSignal {}
 class ContinueSignal {}
 
 export class Runtime {
-  private config: GrokScriptConfig;
+  private config: CodeBuddyScriptConfig;
   private globalContext: RuntimeContext;
   private output: string[] = [];
   private startTime: number = 0;
 
-  constructor(config: Partial<GrokScriptConfig> = {}) {
+  constructor(config: Partial<CodeBuddyScriptConfig> = {}) {
     this.config = { ...DEFAULT_SCRIPT_CONFIG, ...config };
     this.globalContext = {
       variables: new Map(),
@@ -70,7 +70,7 @@ export class Runtime {
     });
 
     for (const [name, fn] of Object.entries(builtins)) {
-      this.globalContext.functions.set(name, fn as GrokFunction);
+      this.globalContext.functions.set(name, fn as CodeBuddyFunction);
     }
 
     // Inject user variables
@@ -81,11 +81,11 @@ export class Runtime {
     }
   }
 
-  async execute(program: ProgramNode): Promise<{ output: string[]; returnValue: GrokValue; duration: number }> {
+  async execute(program: ProgramNode): Promise<{ output: string[]; returnValue: CodeBuddyValue; duration: number }> {
     this.startTime = Date.now();
     this.output = [];
 
-    let returnValue: GrokValue = null;
+    let returnValue: CodeBuddyValue = null;
 
     try {
       for (const statement of program.body) {
@@ -110,7 +110,7 @@ export class Runtime {
     };
   }
 
-  private async executeStatement(stmt: StatementNode, ctx: RuntimeContext): Promise<GrokValue | ReturnValue | BreakSignal | ContinueSignal> {
+  private async executeStatement(stmt: StatementNode, ctx: RuntimeContext): Promise<CodeBuddyValue | ReturnValue | BreakSignal | ContinueSignal> {
     // Check timeout
     if (Date.now() - this.startTime > this.config.timeout) {
       throw new Error(`Script timeout after ${this.config.timeout}ms`);
@@ -172,7 +172,7 @@ export class Runtime {
   }
 
   private async executeFunctionDeclaration(stmt: FunctionDeclaration, ctx: RuntimeContext): Promise<null> {
-    const fn: GrokFunction = async (...args: GrokValue[]) => {
+    const fn: CodeBuddyFunction = async (...args: CodeBuddyValue[]) => {
       const localCtx: RuntimeContext = {
         variables: new Map(),
         functions: new Map(ctx.functions),
@@ -205,7 +205,7 @@ export class Runtime {
     return null;
   }
 
-  private async executeIfStatement(stmt: IfStatement, ctx: RuntimeContext): Promise<GrokValue | ReturnValue | BreakSignal | ContinueSignal> {
+  private async executeIfStatement(stmt: IfStatement, ctx: RuntimeContext): Promise<CodeBuddyValue | ReturnValue | BreakSignal | ContinueSignal> {
     const condition = await this.evaluateExpression(stmt.condition, ctx);
 
     if (this.isTruthy(condition)) {
@@ -221,7 +221,7 @@ export class Runtime {
     return null;
   }
 
-  private async executeWhileStatement(stmt: WhileStatement, ctx: RuntimeContext): Promise<GrokValue | ReturnValue> {
+  private async executeWhileStatement(stmt: WhileStatement, ctx: RuntimeContext): Promise<CodeBuddyValue | ReturnValue> {
     while (this.isTruthy(await this.evaluateExpression(stmt.condition, ctx))) {
       const result = await this.executeBlock(stmt.body, ctx);
       if (result instanceof ReturnValue) return result;
@@ -231,7 +231,7 @@ export class Runtime {
     return null;
   }
 
-  private async executeForStatement(stmt: ForStatement, ctx: RuntimeContext): Promise<GrokValue | ReturnValue> {
+  private async executeForStatement(stmt: ForStatement, ctx: RuntimeContext): Promise<CodeBuddyValue | ReturnValue> {
     // Create local context for loop-scoped variables (like the init var)
     // Use empty map - only loop variables go here, parent lookup for outer vars
     const localCtx: RuntimeContext = {
@@ -271,14 +271,14 @@ export class Runtime {
     return null;
   }
 
-  private async executeForInStatement(stmt: ForInStatement, ctx: RuntimeContext): Promise<GrokValue | ReturnValue> {
+  private async executeForInStatement(stmt: ForInStatement, ctx: RuntimeContext): Promise<CodeBuddyValue | ReturnValue> {
     const iterable = await this.evaluateExpression(stmt.iterable, ctx);
 
     if (!Array.isArray(iterable) && typeof iterable !== 'object') {
       throw new Error('for-in requires an iterable (array or object)');
     }
 
-    const items = Array.isArray(iterable) ? iterable : Object.entries(iterable as Record<string, GrokValue>);
+    const items = Array.isArray(iterable) ? iterable : Object.entries(iterable as Record<string, CodeBuddyValue>);
 
     // Create local context with only the loop variable - parent lookup for outer vars
     const localCtx: RuntimeContext = {
@@ -304,7 +304,7 @@ export class Runtime {
     return new ReturnValue(value);
   }
 
-  private async executeTryStatement(stmt: TryStatement, ctx: RuntimeContext): Promise<GrokValue | ReturnValue> {
+  private async executeTryStatement(stmt: TryStatement, ctx: RuntimeContext): Promise<CodeBuddyValue | ReturnValue> {
     try {
       return await this.executeBlock(stmt.block, ctx);
     } catch (error) {
@@ -320,7 +320,7 @@ export class Runtime {
           stack: error.stack,
         } : error;
 
-        localCtx.variables.set(stmt.handler.param, errorValue as GrokValue);
+        localCtx.variables.set(stmt.handler.param, errorValue as CodeBuddyValue);
         return this.executeBlock(stmt.handler.body, localCtx);
       }
       throw error;
@@ -335,7 +335,7 @@ export class Runtime {
     throw value;
   }
 
-  private async executeBlock(block: BlockStatement, ctx: RuntimeContext): Promise<GrokValue | ReturnValue | BreakSignal | ContinueSignal> {
+  private async executeBlock(block: BlockStatement, ctx: RuntimeContext): Promise<CodeBuddyValue | ReturnValue | BreakSignal | ContinueSignal> {
     // Use the same context - don't create a new scope for blocks
     // New variables declared inside will still be added to this context
     // but assignments to existing variables will propagate up via setVariable
@@ -353,7 +353,7 @@ export class Runtime {
   // Expression Evaluation
   // ============================================
 
-  private async evaluateExpression(expr: ExpressionNode, ctx: RuntimeContext): Promise<GrokValue> {
+  private async evaluateExpression(expr: ExpressionNode, ctx: RuntimeContext): Promise<CodeBuddyValue> {
     switch (expr.type) {
       case 'Literal':
         return (expr as Literal).value;
@@ -399,12 +399,12 @@ export class Runtime {
     }
   }
 
-  private lookupVariable(name: string, ctx: RuntimeContext): GrokValue {
+  private lookupVariable(name: string, ctx: RuntimeContext): CodeBuddyValue {
     if (ctx.variables.has(name)) {
       return ctx.variables.get(name)!;
     }
     if (ctx.functions.has(name)) {
-      return ctx.functions.get(name)! as GrokValue;
+      return ctx.functions.get(name)! as CodeBuddyValue;
     }
     if (ctx.parent) {
       return this.lookupVariable(name, ctx.parent);
@@ -412,7 +412,7 @@ export class Runtime {
     throw new Error(`Undefined variable: ${name}`);
   }
 
-  private async evaluateBinaryExpression(expr: BinaryExpression, ctx: RuntimeContext): Promise<GrokValue> {
+  private async evaluateBinaryExpression(expr: BinaryExpression, ctx: RuntimeContext): Promise<CodeBuddyValue> {
     const left = await this.evaluateExpression(expr.left, ctx);
     const right = await this.evaluateExpression(expr.right, ctx);
 
@@ -445,7 +445,7 @@ export class Runtime {
     }
   }
 
-  private async evaluateUnaryExpression(expr: UnaryExpression, ctx: RuntimeContext): Promise<GrokValue> {
+  private async evaluateUnaryExpression(expr: UnaryExpression, ctx: RuntimeContext): Promise<CodeBuddyValue> {
     const argument = await this.evaluateExpression(expr.argument, ctx);
 
     switch (expr.operator) {
@@ -456,7 +456,7 @@ export class Runtime {
     }
   }
 
-  private async evaluateLogicalExpression(expr: LogicalExpression, ctx: RuntimeContext): Promise<GrokValue> {
+  private async evaluateLogicalExpression(expr: LogicalExpression, ctx: RuntimeContext): Promise<CodeBuddyValue> {
     const left = await this.evaluateExpression(expr.left, ctx);
 
     if (expr.operator === '&&') {
@@ -468,7 +468,7 @@ export class Runtime {
     }
   }
 
-  private async evaluateAssignmentExpression(expr: AssignmentExpression, ctx: RuntimeContext): Promise<GrokValue> {
+  private async evaluateAssignmentExpression(expr: AssignmentExpression, ctx: RuntimeContext): Promise<CodeBuddyValue> {
     let value = await this.evaluateExpression(expr.right, ctx);
 
     if (expr.operator === '+=') {
@@ -492,13 +492,13 @@ export class Runtime {
         ? await this.evaluateExpression(member.property, ctx)
         : (member.property as Identifier).name;
 
-      (object as Record<string, GrokValue>)[property as string] = value;
+      (object as Record<string, CodeBuddyValue>)[property as string] = value;
     }
 
     return value;
   }
 
-  private setVariable(name: string, value: GrokValue, ctx: RuntimeContext): void {
+  private setVariable(name: string, value: CodeBuddyValue, ctx: RuntimeContext): void {
     // Find where the variable is defined
     let current: RuntimeContext | undefined = ctx;
     while (current) {
@@ -512,14 +512,14 @@ export class Runtime {
     ctx.variables.set(name, value);
   }
 
-  private async evaluateCallExpression(expr: CallExpression, ctx: RuntimeContext): Promise<GrokValue> {
+  private async evaluateCallExpression(expr: CallExpression, ctx: RuntimeContext): Promise<CodeBuddyValue> {
     const callee = await this.evaluateExpression(expr.callee, ctx);
 
     if (typeof callee !== 'function') {
       throw new Error(`${JSON.stringify(callee)} is not a function`);
     }
 
-    const args: GrokValue[] = [];
+    const args: CodeBuddyValue[] = [];
     for (const arg of expr.arguments) {
       args.push(await this.evaluateExpression(arg, ctx));
     }
@@ -527,7 +527,7 @@ export class Runtime {
     return callee(...args);
   }
 
-  private async evaluateMemberExpression(expr: MemberExpression, ctx: RuntimeContext): Promise<GrokValue> {
+  private async evaluateMemberExpression(expr: MemberExpression, ctx: RuntimeContext): Promise<CodeBuddyValue> {
     const object = await this.evaluateExpression(expr.object, ctx);
 
     if (object === null || object === undefined) {
@@ -538,7 +538,7 @@ export class Runtime {
       ? await this.evaluateExpression(expr.property, ctx)
       : (expr.property as Identifier).name;
 
-    const obj = object as Record<string, GrokValue>;
+    const obj = object as Record<string, CodeBuddyValue>;
     const value = obj[property as string];
 
     // Bind methods
@@ -549,16 +549,16 @@ export class Runtime {
     return value;
   }
 
-  private async evaluateArrayExpression(expr: ArrayExpression, ctx: RuntimeContext): Promise<GrokValue[]> {
-    const elements: GrokValue[] = [];
+  private async evaluateArrayExpression(expr: ArrayExpression, ctx: RuntimeContext): Promise<CodeBuddyValue[]> {
+    const elements: CodeBuddyValue[] = [];
     for (const element of expr.elements) {
       elements.push(await this.evaluateExpression(element, ctx));
     }
     return elements;
   }
 
-  private async evaluateObjectExpression(expr: ObjectExpression, ctx: RuntimeContext): Promise<Record<string, GrokValue>> {
-    const obj: Record<string, GrokValue> = {};
+  private async evaluateObjectExpression(expr: ObjectExpression, ctx: RuntimeContext): Promise<Record<string, CodeBuddyValue>> {
+    const obj: Record<string, CodeBuddyValue> = {};
     for (const prop of expr.properties) {
       const key = typeof prop.key === 'string'
         ? prop.key
@@ -568,7 +568,7 @@ export class Runtime {
     return obj;
   }
 
-  private async evaluateConditionalExpression(expr: ConditionalExpression, ctx: RuntimeContext): Promise<GrokValue> {
+  private async evaluateConditionalExpression(expr: ConditionalExpression, ctx: RuntimeContext): Promise<CodeBuddyValue> {
     const test = await this.evaluateExpression(expr.test, ctx);
     if (this.isTruthy(test)) {
       return this.evaluateExpression(expr.consequent, ctx);
@@ -576,10 +576,10 @@ export class Runtime {
     return this.evaluateExpression(expr.alternate, ctx);
   }
 
-  private createArrowFunction(expr: ExpressionNode, ctx: RuntimeContext): GrokFunction {
+  private createArrowFunction(expr: ExpressionNode, ctx: RuntimeContext): CodeBuddyFunction {
     const arrow = expr as import('./types.js').ArrowFunction;
 
-    return async (...args: GrokValue[]): Promise<GrokValue> => {
+    return async (...args: CodeBuddyValue[]): Promise<CodeBuddyValue> => {
       const localCtx: RuntimeContext = {
         variables: new Map(ctx.variables),
         functions: ctx.functions,
@@ -602,7 +602,7 @@ export class Runtime {
     };
   }
 
-  private isTruthy(value: GrokValue): boolean {
+  private isTruthy(value: CodeBuddyValue): boolean {
     if (value === null || value === undefined || value === false || value === 0 || value === '') {
       return false;
     }

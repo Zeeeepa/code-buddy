@@ -292,7 +292,7 @@ export class ExecPolicy extends EventEmitter {
       await this.loadRulesFromFile(this.config.rulesPath);
     } else {
       // Try default location
-      const defaultPath = path.join(os.homedir(), '.grok', 'execpolicy.json');
+      const defaultPath = path.join(os.homedir(), '.codebuddy', 'execpolicy.json');
       if (fs.existsSync(defaultPath)) {
         await this.loadRulesFromFile(defaultPath);
       }
@@ -493,7 +493,7 @@ export class ExecPolicy extends EventEmitter {
    * Save rules to file
    */
   async saveRules(filePath?: string): Promise<void> {
-    const savePath = filePath || this.config.rulesPath || path.join(os.homedir(), '.grok', 'execpolicy.json');
+    const savePath = filePath || this.config.rulesPath || path.join(os.homedir(), '.codebuddy', 'execpolicy.json');
 
     // Ensure directory exists
     const dir = path.dirname(savePath);

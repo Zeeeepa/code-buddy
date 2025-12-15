@@ -4,7 +4,7 @@
  * Inspired by Claude Code's /permissions command for managing tool allowlists.
  */
 
-import { ChatEntry } from "../../agent/grok-agent.js";
+import { ChatEntry } from "../../agent/codebuddy-agent.js";
 import { getToolFilter, setToolFilter, createToolFilter, resetToolFilter } from "../../utils/tool-filter.js";
 import * as fs from 'fs';
 import * as path from 'path';
@@ -222,8 +222,8 @@ function savePermissions(): string {
   const filter = getToolFilter();
 
   try {
-    // Save to .grok/settings.json for project-specific settings
-    const projectSettingsPath = path.join(process.cwd(), '.grok', 'settings.json');
+    // Save to .codebuddy/settings.json for project-specific settings
+    const projectSettingsPath = path.join(process.cwd(), '.codebuddy', 'settings.json');
     if (fs.existsSync(path.dirname(projectSettingsPath))) {
       let projectSettings: Record<string, unknown> = {};
       if (fs.existsSync(projectSettingsPath)) {
@@ -238,7 +238,7 @@ function savePermissions(): string {
       return `💾 Permissions saved to settings
 
 Saved to:
-  • .grok/settings.json (project)
+  • .codebuddy/settings.json (project)
 
 Allowed: ${filter.enabledPatterns.length > 0 ? filter.enabledPatterns.join(', ') : '(all)'}
 Blocked: ${filter.disabledPatterns.length > 0 ? filter.disabledPatterns.join(', ') : '(none)'}`;

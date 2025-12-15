@@ -202,7 +202,7 @@ export class PermissionManager extends EventEmitter {
 
   constructor(configPath?: string) {
     super();
-    this.configPath = configPath || '.grok/permissions.json';
+    this.configPath = configPath || '.codebuddy/permissions.json';
     this.config = this.loadConfig();
   }
 

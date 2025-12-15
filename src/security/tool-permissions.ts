@@ -156,7 +156,7 @@ export class ToolPermissionManager {
   private configPath: string;
 
   constructor(configPath?: string) {
-    this.configPath = configPath || path.join(os.homedir(), '.grok', 'tool-permissions.json');
+    this.configPath = configPath || path.join(os.homedir(), '.codebuddy', 'tool-permissions.json');
     this.config = this.loadConfig();
   }
 

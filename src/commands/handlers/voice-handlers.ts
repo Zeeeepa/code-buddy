@@ -1,4 +1,4 @@
-import { ChatEntry } from "../../agent/grok-agent.js";
+import { ChatEntry } from "../../agent/codebuddy-agent.js";
 import { getVoiceInputManager } from "../../input/voice-input-enhanced.js";
 import { getTTSManager } from "../../input/text-to-speech.js";
 
@@ -86,7 +86,7 @@ Auto-send: ${config.autoSend ? 'Yes' : 'No'}
 Silence Threshold: ${config.silenceThreshold}
 Silence Duration: ${config.silenceDuration}ms
 
-Configuration file: ~/.grok/voice-config.json`;
+Configuration file: ~/.codebuddy/voice-config.json`;
       break;
 
     case "status":

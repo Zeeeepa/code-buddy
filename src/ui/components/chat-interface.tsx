@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
-import { GrokAgent, ChatEntry } from "../../agent/grok-agent.js";
+import { CodeBuddyAgent, ChatEntry } from "../../agent/codebuddy-agent.js";
 import { useInputHandler } from "../../hooks/use-input-handler.js";
 import { LoadingSpinner } from "./loading-spinner.js";
 import { CommandSuggestions } from "./command-suggestions.js";
@@ -27,7 +27,7 @@ import {
 } from "../utils/accessibility.js";
 
 interface ChatInterfaceProps {
-  agent?: GrokAgent;
+  agent?: CodeBuddyAgent;
   initialMessage?: string;
 }
 
@@ -36,7 +36,7 @@ function ChatInterfaceWithAgent({
   agent,
   initialMessage,
 }: {
-  agent: GrokAgent;
+  agent: CodeBuddyAgent;
   initialMessage?: string;
 }) {
   const { colors, theme } = useTheme();
@@ -482,11 +482,11 @@ function ChatInterfaceInner({
   agent,
   initialMessage,
 }: ChatInterfaceProps) {
-  const [currentAgent, setCurrentAgent] = useState<GrokAgent | null>(
+  const [currentAgent, setCurrentAgent] = useState<CodeBuddyAgent | null>(
     agent || null
   );
 
-  const handleApiKeySet = (newAgent: GrokAgent) => {
+  const handleApiKeySet = (newAgent: CodeBuddyAgent) => {
     setCurrentAgent(newAgent);
   };
 

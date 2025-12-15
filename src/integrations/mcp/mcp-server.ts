@@ -371,8 +371,8 @@ export class McpServer {
   private registerBuiltInTools(): void {
     // AI Ask Tool
     this.registerTool(
-      'grok_ask',
-      'Ask Grok AI a question and get a response',
+      'codebuddy_ask',
+      'Ask CodeBuddy AI a question and get a response',
       {
         type: 'object',
         properties: {
@@ -382,9 +382,9 @@ export class McpServer {
         required: ['prompt'],
       },
       async (args) => {
-        const { GrokClient } = await import('../../grok/index.js');
+        const { CodeBuddyClient } = await import('../../codebuddy/index.js');
         const apiKey = process.env.GROK_API_KEY || '';
-        const client = new GrokClient(apiKey);
+        const client = new CodeBuddyClient(apiKey);
 
         const userPrompt = args.context
           ? `Context:\n${args.context}\n\nQuestion: ${args.prompt}`
@@ -398,7 +398,7 @@ export class McpServer {
 
     // Code Completion Tool
     this.registerTool(
-      'grok_complete_code',
+      'codebuddy_complete_code',
       'Get AI code completion suggestions',
       {
         type: 'object',
@@ -410,9 +410,9 @@ export class McpServer {
         required: ['code', 'language'],
       },
       async (args) => {
-        const { GrokClient } = await import('../../grok/index.js');
+        const { CodeBuddyClient } = await import('../../codebuddy/index.js');
         const apiKey = process.env.GROK_API_KEY || '';
-        const client = new GrokClient(apiKey);
+        const client = new CodeBuddyClient(apiKey);
 
         const prompt = `Complete or modify this ${args.language} code${args.instruction ? ` (${args.instruction})` : ''}:
 

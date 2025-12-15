@@ -5,7 +5,7 @@
  * Tools are now organized in modular files under tool-definitions/.
  */
 
-import type { GrokTool, JsonSchemaProperty } from "./client.js";
+import type { CodeBuddyTool, JsonSchemaProperty } from "./client.js";
 import { MCPManager, MCPTool } from "../mcp/client.js";
 import { loadMCPConfig } from "../mcp/config.js";
 import {
@@ -30,7 +30,7 @@ import {
 } from "./tool-definitions/index.js";
 
 // Re-export types and individual tools for backwards compatibility
-export type { GrokTool, JsonSchemaProperty };
+export type { CodeBuddyTool, JsonSchemaProperty };
 export * from "./tool-definitions/index.js";
 
 // ============================================================================
@@ -40,7 +40,7 @@ export * from "./tool-definitions/index.js";
 /**
  * Build the complete tools array with all enabled tools
  */
-function buildGrokTools(): GrokTool[] {
+function buildCodeBuddyTools(): CodeBuddyTool[] {
   // Start with core tools
   const tools = [...CORE_TOOLS];
 
@@ -70,7 +70,7 @@ function buildGrokTools(): GrokTool[] {
 /**
  * Export dynamic tools array
  */
-export const GROK_TOOLS: GrokTool[] = buildGrokTools();
+export const CODEBUDDY_TOOLS: CodeBuddyTool[] = buildCodeBuddyTools();
 
 // ============================================================================
 // MCP Integration
@@ -138,7 +138,7 @@ export async function initializeMCPServers(): Promise<void> {
   }
 }
 
-export function convertMCPToolToGrokTool(mcpTool: MCPTool): GrokTool {
+export function convertMCPToolToCodeBuddyTool(mcpTool: MCPTool): CodeBuddyTool {
   return {
     type: "function",
     function: {
@@ -153,18 +153,18 @@ export function convertMCPToolToGrokTool(mcpTool: MCPTool): GrokTool {
   };
 }
 
-export function addMCPToolsToGrokTools(baseTools: GrokTool[]): GrokTool[] {
+export function addMCPToolsToCodeBuddyTools(baseTools: CodeBuddyTool[]): CodeBuddyTool[] {
   if (!mcpManager) {
     return baseTools;
   }
 
   const mcpTools = mcpManager.getTools();
-  const grokMCPTools = mcpTools.map(convertMCPToolToGrokTool);
+  const codebuddyMCPTools = mcpTools.map(convertMCPToolToCodeBuddyTool);
 
-  return [...baseTools, ...grokMCPTools];
+  return [...baseTools, ...codebuddyMCPTools];
 }
 
-export async function getAllGrokTools(): Promise<GrokTool[]> {
+export async function getAllCodeBuddyTools(): Promise<CodeBuddyTool[]> {
   const manager = getMCPManager();
   // Try to initialize servers if not already done, but don't block
   manager.ensureServersInitialized().catch((err) => {
@@ -174,7 +174,7 @@ export async function getAllGrokTools(): Promise<GrokTool[]> {
     }
   });
 
-  const allTools = addMCPToolsToGrokTools(GROK_TOOLS);
+  const allTools = addMCPToolsToCodeBuddyTools(CODEBUDDY_TOOLS);
 
   // Register MCP tools in the tool selector for better RAG matching
   const selector = getToolSelector();
@@ -214,7 +214,7 @@ export async function getRelevantTools(
 ): Promise<ToolSelectionResult> {
   const { useRAG = true, maxTools = 15 } = options;
 
-  const allTools = await getAllGrokTools();
+  const allTools = await getAllCodeBuddyTools();
 
   // If RAG is disabled, return all tools
   if (!useRAG) {

@@ -191,7 +191,7 @@ export class PluginMarketplace extends EventEmitter {
   constructor(config: Partial<MarketplaceConfig> = {}) {
     super();
     this.config = { ...DEFAULT_CONFIG, ...config };
-    this.pluginsDir = path.join(os.homedir(), '.grok', 'plugins');
+    this.pluginsDir = path.join(os.homedir(), '.codebuddy', 'plugins');
     this.initialize();
   }
 

@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { ChatEntry } from '../agent/grok-agent.js';
+import { ChatEntry } from '../agent/codebuddy-agent.js';
 
 export interface ExportOptions {
   format?: 'markdown' | 'json' | 'text';
@@ -24,7 +24,7 @@ export class ConversationExporter {
   private outputDir: string;
 
   constructor(outputDir?: string) {
-    this.outputDir = outputDir || path.join(os.homedir(), '.grok', 'conversations');
+    this.outputDir = outputDir || path.join(os.homedir(), '.codebuddy', 'conversations');
     this.ensureOutputDir();
   }
 

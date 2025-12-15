@@ -1,6 +1,6 @@
 import { EventEmitter } from "events";
 import { SubagentManager, SubagentResult, getSubagentManager } from "./subagents.js";
-import { GrokToolCall } from "../grok/client.js";
+import { CodeBuddyToolCall } from "../codebuddy/client.js";
 import { ToolResult, getErrorMessage } from "../types/index.js";
 
 export interface PipelineStage {
@@ -231,8 +231,8 @@ export class PipelineRunner extends EventEmitter {
     pipelineName: string,
     task: string,
     options: {
-      tools?: import("../grok/client.js").GrokTool[];
-      executeTool?: (toolCall: GrokToolCall) => Promise<ToolResult>;
+      tools?: import("../codebuddy/client.js").CodeBuddyTool[];
+      executeTool?: (toolCall: CodeBuddyToolCall) => Promise<ToolResult>;
       initialVariables?: Record<string, string>;
     } = {}
   ): Promise<PipelineResult> {

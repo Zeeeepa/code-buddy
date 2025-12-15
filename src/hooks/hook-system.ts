@@ -67,8 +67,8 @@ export class HookSystem extends EventEmitter {
     super();
     this.workingDirectory = workingDirectory;
     this.configPaths = [
-      path.join(workingDirectory, '.grok', 'hooks.json'),
-      path.join(os.homedir(), '.grok', 'hooks.json')
+      path.join(workingDirectory, '.codebuddy', 'hooks.json'),
+      path.join(os.homedir(), '.codebuddy', 'hooks.json')
     ];
 
     this.loadHooks();
@@ -323,7 +323,7 @@ export class HookSystem extends EventEmitter {
    * Save current hooks to project configuration
    */
   saveHooks(): void {
-    const configPath = path.join(this.workingDirectory, '.grok', 'hooks.json');
+    const configPath = path.join(this.workingDirectory, '.codebuddy', 'hooks.json');
     const configDir = path.dirname(configPath);
 
     if (!fs.existsSync(configDir)) {
@@ -348,7 +348,7 @@ export class HookSystem extends EventEmitter {
    * Create default hooks configuration template
    */
   createDefaultConfig(): string {
-    const configPath = path.join(this.workingDirectory, '.grok', 'hooks.json');
+    const configPath = path.join(this.workingDirectory, '.codebuddy', 'hooks.json');
     const configDir = path.dirname(configPath);
 
     if (!fs.existsSync(configDir)) {
@@ -453,7 +453,7 @@ export class HookSystem extends EventEmitter {
 
     if (!hasHooks) {
       output += 'No hooks configured.\n';
-      output += '\n💡 Create hooks in .grok/hooks.json or use /init to create a template.';
+      output += '\n💡 Create hooks in .codebuddy/hooks.json or use /init to create a template.';
     }
 
     return output;

@@ -225,7 +225,7 @@ describe('SessionExporter', () => {
         messageCount: 3,
         toolCallCount: 1,
         tags: ['test'],
-        provider: 'grok',
+        provider: 'codebuddy',
         model: 'grok-3-latest',
       },
       messages: [

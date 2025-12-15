@@ -20,7 +20,7 @@ export { FCSRuntime, createRuntime } from './runtime.js';
 export { createFCSBuiltins } from './builtins.js';
 
 // Grok-CLI Bindings
-export { createGrokBindings, setGrokClient, setMCPManager } from './grok-bindings.js';
+export { createGrokBindings, setCodeBuddyClient, setMCPManager } from './codebuddy-bindings.js';
 
 // Convenience function to run FCS code
 import { tokenize } from './lexer.js';

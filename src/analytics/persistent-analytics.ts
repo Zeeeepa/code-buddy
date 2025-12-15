@@ -70,7 +70,7 @@ const DEFAULT_BUDGET: CostBudget = {
 
 // Model costs per 1M tokens (input/output)
 const MODEL_COSTS: Record<string, { input: number; output: number }> = {
-  'grok-beta': { input: 5, output: 15 },
+  'codebuddy': { input: 5, output: 15 },
   'grok-2': { input: 10, output: 30 },
   'grok-2-mini': { input: 2, output: 6 },
   'gpt-4-turbo': { input: 10, output: 30 },
@@ -158,7 +158,7 @@ export class PersistentAnalytics extends EventEmitter {
    * Calculate cost for tokens
    */
   calculateCost(model: string, tokensIn: number, tokensOut: number): number {
-    const costs = MODEL_COSTS[model] || MODEL_COSTS['grok-beta'];
+    const costs = MODEL_COSTS[model] || MODEL_COSTS['codebuddy'];
     return (tokensIn * costs.input + tokensOut * costs.output) / 1_000_000;
   }
 

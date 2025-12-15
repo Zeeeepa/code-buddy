@@ -97,7 +97,7 @@ export class ToolCache extends EventEmitter {
       ttlMs: this.config.ttlMs,
       similarityThreshold: this.config.similarityThreshold,
       persistToDisk: true,
-      cachePath: '.grok/cache/tool-cache.json',
+      cachePath: '.codebuddy/cache/tool-cache.json',
     });
     this.stats = {
       hits: 0,

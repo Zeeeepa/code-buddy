@@ -121,7 +121,7 @@ export const FCS_KEYWORDS = new Set([
   'editor', 'file', 'panel', 'command', 'test', 'assert', 'expect',
   'select', 'cursor', 'view', 'window', 'dialog',
 
-  // Note: 'grok', 'ai', 'bash', 'shell', 'git', 'mcp', 'tool', 'context',
+  // Note: 'codebuddy', 'ai', 'bash', 'shell', 'git', 'mcp', 'tool', 'context',
   // 'agent', 'session' are NOT keywords - they are builtin namespace objects
   // and should be tokenized as identifiers
 ]);

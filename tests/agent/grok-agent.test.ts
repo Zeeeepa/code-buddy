@@ -1,12 +1,12 @@
 /**
- * Tests for GrokAgent - Core agent orchestration
+ * Tests for CodeBuddyAgent - Core agent orchestration
  */
 
-import { GrokAgent } from "../../src/agent/grok-agent";
+import { CodeBuddyAgent } from "../../src/agent/codebuddy-agent";
 
 // Mock all dependencies
-jest.mock("../../src/grok/client.js", () => ({
-  GrokClient: jest.fn().mockImplementation(() => ({
+jest.mock("../../src/codebuddy/client.js", () => ({
+  CodeBuddyClient: jest.fn().mockImplementation(() => ({
     chat: jest.fn().mockResolvedValue({
       choices: [{ message: { content: "Test response", tool_calls: null } }],
       usage: { prompt_tokens: 100, completion_tokens: 50 },
@@ -21,8 +21,8 @@ jest.mock("../../src/grok/client.js", () => ({
   })),
 }));
 
-jest.mock("../../src/grok/tools.js", () => ({
-  getAllGrokTools: jest.fn().mockReturnValue([
+jest.mock("../../src/codebuddy/tools.js", () => ({
+  getAllCodeBuddyTools: jest.fn().mockReturnValue([
     { type: "function", function: { name: "test_tool", description: "Test", parameters: {} } },
   ]),
   getRelevantTools: jest.fn().mockReturnValue({
@@ -195,8 +195,8 @@ jest.mock("../../src/types/errors.js", () => ({
   getErrorMessage: jest.fn().mockImplementation((err) => err?.message || String(err)),
 }));
 
-describe("GrokAgent", () => {
-  let agent: GrokAgent;
+describe("CodeBuddyAgent", () => {
+  let agent: CodeBuddyAgent;
   const originalEnv = process.env;
 
   beforeEach(() => {
@@ -216,52 +216,52 @@ describe("GrokAgent", () => {
 
   describe("Constructor", () => {
     it("should create agent with API key", () => {
-      agent = new GrokAgent("test-api-key");
-      expect(agent).toBeInstanceOf(GrokAgent);
+      agent = new CodeBuddyAgent("test-api-key");
+      expect(agent).toBeInstanceOf(CodeBuddyAgent);
     });
 
     it("should create agent with custom model", () => {
-      agent = new GrokAgent("test-api-key", undefined, "grok-2");
-      expect(agent).toBeInstanceOf(GrokAgent);
+      agent = new CodeBuddyAgent("test-api-key", undefined, "grok-2");
+      expect(agent).toBeInstanceOf(CodeBuddyAgent);
     });
 
     it("should create agent with custom base URL", () => {
-      agent = new GrokAgent("test-api-key", "https://custom.api.com");
-      expect(agent).toBeInstanceOf(GrokAgent);
+      agent = new CodeBuddyAgent("test-api-key", "https://custom.api.com");
+      expect(agent).toBeInstanceOf(CodeBuddyAgent);
     });
 
     it("should set default max tool rounds to 50", () => {
-      agent = new GrokAgent("test-api-key");
+      agent = new CodeBuddyAgent("test-api-key");
       // Access private property for testing
       expect((agent as any).maxToolRounds).toBe(50);
     });
 
     it("should set custom max tool rounds", () => {
-      agent = new GrokAgent("test-api-key", undefined, undefined, 100);
+      agent = new CodeBuddyAgent("test-api-key", undefined, undefined, 100);
       expect((agent as any).maxToolRounds).toBe(100);
     });
 
     it("should set default session cost limit to $10", () => {
-      agent = new GrokAgent("test-api-key");
+      agent = new CodeBuddyAgent("test-api-key");
       expect((agent as any).sessionCostLimit).toBe(10);
     });
 
     it("should use MAX_COST env var for session limit", () => {
       process.env.MAX_COST = "25";
-      agent = new GrokAgent("test-api-key");
+      agent = new CodeBuddyAgent("test-api-key");
       expect((agent as any).sessionCostLimit).toBe(25);
     });
   });
 
   describe("YOLO Mode", () => {
     it("should not enable YOLO mode by default", () => {
-      agent = new GrokAgent("test-api-key");
+      agent = new CodeBuddyAgent("test-api-key");
       expect((agent as any).yoloMode).toBe(false);
     });
 
     it("should not enable YOLO mode with env var alone", () => {
       process.env.YOLO_MODE = "true";
-      agent = new GrokAgent("test-api-key");
+      agent = new CodeBuddyAgent("test-api-key");
       // YOLO mode requires explicit config, not just env var
       expect((agent as any).yoloMode).toBe(false);
     });
@@ -269,14 +269,14 @@ describe("GrokAgent", () => {
 
   describe("Events", () => {
     it("should be an EventEmitter", () => {
-      agent = new GrokAgent("test-api-key");
+      agent = new CodeBuddyAgent("test-api-key");
       expect(agent.on).toBeDefined();
       expect(agent.emit).toBeDefined();
       expect(agent.off).toBeDefined();
     });
 
     it("should emit events during processing", (done) => {
-      agent = new GrokAgent("test-api-key");
+      agent = new CodeBuddyAgent("test-api-key");
       const events: string[] = [];
 
       agent.on("thinking", () => events.push("thinking"));
@@ -294,12 +294,12 @@ describe("GrokAgent", () => {
 
   describe("History Management", () => {
     it("should start with empty chat history", () => {
-      agent = new GrokAgent("test-api-key");
+      agent = new CodeBuddyAgent("test-api-key");
       expect(agent.getChatHistory()).toEqual([]);
     });
 
     it("should provide getChatHistory method", () => {
-      agent = new GrokAgent("test-api-key");
+      agent = new CodeBuddyAgent("test-api-key");
       const history = agent.getChatHistory();
       expect(Array.isArray(history)).toBe(true);
     });
@@ -307,12 +307,12 @@ describe("GrokAgent", () => {
 
   describe("Abort Control", () => {
     it("should support abortCurrentOperation method", () => {
-      agent = new GrokAgent("test-api-key");
+      agent = new CodeBuddyAgent("test-api-key");
       expect(agent.abortCurrentOperation).toBeDefined();
     });
 
     it("should abort ongoing operations", () => {
-      agent = new GrokAgent("test-api-key");
+      agent = new CodeBuddyAgent("test-api-key");
       // Start a mock operation
       const controller = new AbortController();
       (agent as any).abortController = controller;
@@ -326,13 +326,13 @@ describe("GrokAgent", () => {
 
   describe("Model Management", () => {
     it("should get current model", () => {
-      agent = new GrokAgent("test-api-key");
+      agent = new CodeBuddyAgent("test-api-key");
       const model = agent.getCurrentModel();
       expect(model).toBeDefined();
     });
 
     it("should set new model", () => {
-      agent = new GrokAgent("test-api-key");
+      agent = new CodeBuddyAgent("test-api-key");
       agent.setModel("grok-2");
       // Model change is handled by the client
     });
@@ -340,12 +340,12 @@ describe("GrokAgent", () => {
 
   describe("Dispose", () => {
     it("should clean up resources on dispose", () => {
-      agent = new GrokAgent("test-api-key");
+      agent = new CodeBuddyAgent("test-api-key");
       expect(() => agent.dispose()).not.toThrow();
     });
 
     it("should be safe to call dispose multiple times", () => {
-      agent = new GrokAgent("test-api-key");
+      agent = new CodeBuddyAgent("test-api-key");
       agent.dispose();
       expect(() => agent.dispose()).not.toThrow();
     });
@@ -353,19 +353,19 @@ describe("GrokAgent", () => {
 
   describe("Tool Selection", () => {
     it("should enable RAG tool selection by default", () => {
-      agent = new GrokAgent("test-api-key");
+      agent = new CodeBuddyAgent("test-api-key");
       expect((agent as any).useRAGToolSelection).toBe(true);
     });
 
     it("should allow disabling RAG tool selection", () => {
-      agent = new GrokAgent("test-api-key", undefined, undefined, undefined, false);
+      agent = new CodeBuddyAgent("test-api-key", undefined, undefined, undefined, false);
       expect((agent as any).useRAGToolSelection).toBe(false);
     });
   });
 
   describe("Status Formatting", () => {
     it("should format cost status", () => {
-      agent = new GrokAgent("test-api-key");
+      agent = new CodeBuddyAgent("test-api-key");
       const status = agent.formatCostStatus();
       expect(status).toBeDefined();
       expect(typeof status).toBe("string");
@@ -374,14 +374,14 @@ describe("GrokAgent", () => {
 
   describe("Static Properties", () => {
     it("should have MAX_HISTORY_SIZE constant", () => {
-      expect((GrokAgent as any).MAX_HISTORY_SIZE).toBe(1000);
+      expect((CodeBuddyAgent as any).MAX_HISTORY_SIZE).toBe(1000);
     });
   });
 });
 
-describe("GrokAgent Integration", () => {
+describe("CodeBuddyAgent Integration", () => {
   it("should process simple message flow", async () => {
-    const agent = new GrokAgent("test-api-key");
+    const agent = new CodeBuddyAgent("test-api-key");
 
     // Check that history starts empty
     const history = agent.getChatHistory();
@@ -392,7 +392,7 @@ describe("GrokAgent Integration", () => {
   });
 
   it("should have all core methods available", () => {
-    const agent = new GrokAgent("test-api-key");
+    const agent = new CodeBuddyAgent("test-api-key");
 
     // Core methods should exist
     expect(agent.getChatHistory).toBeDefined();

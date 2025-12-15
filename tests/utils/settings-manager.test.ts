@@ -124,7 +124,7 @@ describe('SettingsManager', () => {
 
     it('should get a specific project setting', () => {
       (fs.existsSync as jest.Mock).mockImplementation((p: string) => {
-        return p.includes('.grok');
+        return p.includes('.codebuddy');
       });
       (fs.readFileSync as jest.Mock).mockReturnValue(
         JSON.stringify({ model: 'test-model' })

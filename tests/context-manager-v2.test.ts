@@ -14,7 +14,7 @@ import {
   createContextManager,
   getContextManager,
 } from '../src/context/context-manager-v2';
-import type { GrokMessage } from '../src/grok/client';
+import type { CodeBuddyMessage } from '../src/codebuddy/client';
 
 describe('ContextManagerV2', () => {
   let manager: ContextManagerV2;
@@ -50,7 +50,7 @@ describe('ContextManagerV2', () => {
     });
 
     it('should count tokens in messages', () => {
-      const messages: GrokMessage[] = [
+      const messages: CodeBuddyMessage[] = [
         { role: 'user', content: 'Hello, how are you?' },
       ];
 
@@ -60,7 +60,7 @@ describe('ContextManagerV2', () => {
     });
 
     it('should get context stats', () => {
-      const messages: GrokMessage[] = [
+      const messages: CodeBuddyMessage[] = [
         { role: 'system', content: 'You are a helpful assistant.' },
         { role: 'user', content: 'Hello!' },
         { role: 'assistant', content: 'Hi there! How can I help you?' },
@@ -79,7 +79,7 @@ describe('ContextManagerV2', () => {
 
   describe('prepareMessages', () => {
     it('should return messages unchanged when within limits', () => {
-      const messages: GrokMessage[] = [
+      const messages: CodeBuddyMessage[] = [
         { role: 'user', content: 'Short message' },
         { role: 'assistant', content: 'Short response' },
       ];
@@ -90,7 +90,7 @@ describe('ContextManagerV2', () => {
 
     it('should preserve system message after compression', () => {
       const longContent = 'A'.repeat(100);
-      const messages: GrokMessage[] = [
+      const messages: CodeBuddyMessage[] = [
         { role: 'system', content: 'Important system prompt' },
         ...Array.from({ length: 20 }, (_, i) => ({
           role: (i % 2 === 0 ? 'user' : 'assistant') as 'user' | 'assistant',
@@ -117,7 +117,7 @@ describe('ContextManagerV2', () => {
       });
 
       // Create messages with longer content to exceed limit
-      const messages: GrokMessage[] = Array.from({ length: 10 }, (_, i) => ({
+      const messages: CodeBuddyMessage[] = Array.from({ length: 10 }, (_, i) => ({
         role: (i % 2 === 0 ? 'user' : 'assistant') as 'user' | 'assistant',
         content: `Message number ${i} with some extra content to make it longer`,
       }));
@@ -135,13 +135,13 @@ describe('ContextManagerV2', () => {
   describe('Tool Result Truncation', () => {
     it('should truncate long tool results when over limit', () => {
       const longToolResult = 'X'.repeat(2000);
-      const messages: GrokMessage[] = [
+      const messages: CodeBuddyMessage[] = [
         { role: 'user', content: 'Run a command' },
         {
           role: 'tool',
           content: longToolResult,
           tool_call_id: 'call_123',
-        } as GrokMessage,
+        } as CodeBuddyMessage,
       ];
 
       // Create manager with very small limit to force truncation
@@ -168,13 +168,13 @@ describe('ContextManagerV2', () => {
 
     it('should not truncate short tool results', () => {
       const shortToolResult = 'Success!';
-      const messages: GrokMessage[] = [
+      const messages: CodeBuddyMessage[] = [
         { role: 'user', content: 'Run a command' },
         {
           role: 'tool',
           content: shortToolResult,
           tool_call_id: 'call_123',
-        } as GrokMessage,
+        } as CodeBuddyMessage,
       ];
 
       const prepared = manager.prepareMessages(messages);
@@ -196,7 +196,7 @@ describe('ContextManagerV2', () => {
       });
 
       // Create enough content to exceed 75% of limit
-      const messages: GrokMessage[] = Array.from({ length: 20 }, (_, i) => ({
+      const messages: CodeBuddyMessage[] = Array.from({ length: 20 }, (_, i) => ({
         role: (i % 2 === 0 ? 'user' : 'assistant') as 'user' | 'assistant',
         content: 'A'.repeat(20),
       }));
@@ -211,7 +211,7 @@ describe('ContextManagerV2', () => {
     });
 
     it('should not warn when well within limits', () => {
-      const messages: GrokMessage[] = [
+      const messages: CodeBuddyMessage[] = [
         { role: 'user', content: 'Hello' },
         { role: 'assistant', content: 'Hi' },
       ];
@@ -278,7 +278,7 @@ describe('ContextManagerV2', () => {
       });
 
       // Create many messages with content to exceed limit
-      const messages: GrokMessage[] = Array.from({ length: 15 }, (_, i) => ({
+      const messages: CodeBuddyMessage[] = Array.from({ length: 15 }, (_, i) => ({
         role: (i % 2 === 0 ? 'user' : 'assistant') as 'user' | 'assistant',
         content: `This is message number ${i} with some content that adds tokens`,
       }));
@@ -314,7 +314,7 @@ describe('ContextManagerV2', () => {
     });
 
     it('should handle messages with null content', () => {
-      const messages: GrokMessage[] = [
+      const messages: CodeBuddyMessage[] = [
         { role: 'assistant', content: null },
       ];
 
@@ -324,7 +324,7 @@ describe('ContextManagerV2', () => {
 
     it('should handle very long single message', () => {
       const veryLongContent = 'A'.repeat(10000);
-      const messages: GrokMessage[] = [
+      const messages: CodeBuddyMessage[] = [
         { role: 'user', content: veryLongContent },
       ];
 

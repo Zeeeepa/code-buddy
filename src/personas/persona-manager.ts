@@ -342,7 +342,7 @@ export class PersonaManager extends EventEmitter {
       activePersonaId: config.activePersonaId || 'default',
       autoSwitch: config.autoSwitch ?? true,
       customPersonasDir: config.customPersonasDir ||
-        path.join(os.homedir(), '.grok', 'personas'),
+        path.join(os.homedir(), '.codebuddy', 'personas'),
     };
     this.dataDir = this.config.customPersonasDir;
     this.initialize();

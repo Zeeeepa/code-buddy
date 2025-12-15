@@ -6,7 +6,7 @@
  */
 
 import { EventEmitter } from "events";
-import { GrokClient, GrokMessage, GrokTool } from "../../grok/client.js";
+import { CodeBuddyClient, CodeBuddyMessage, CodeBuddyTool } from "../../codebuddy/client.js";
 import { getErrorMessage } from "../../types/index.js";
 import {
   AgentRole,
@@ -25,8 +25,8 @@ import {
  */
 export abstract class BaseAgent extends EventEmitter {
   protected config: AgentConfig;
-  protected client: GrokClient;
-  protected messages: GrokMessage[] = [];
+  protected client: CodeBuddyClient;
+  protected messages: CodeBuddyMessage[] = [];
   protected isRunning: boolean = false;
   protected currentTask: AgentTask | null = null;
   protected artifacts: TaskArtifact[] = [];
@@ -46,7 +46,7 @@ export abstract class BaseAgent extends EventEmitter {
       temperature: 0.7,
       ...config,
     };
-    this.client = new GrokClient(
+    this.client = new CodeBuddyClient(
       apiKey,
       config.model || "grok-3-latest",
       baseURL
@@ -107,7 +107,7 @@ Current working directory: ${process.cwd()}`;
   async execute(
     task: AgentTask,
     context: SharedContext,
-    tools: GrokTool[],
+    tools: CodeBuddyTool[],
     executeTool: ToolExecutor
   ): Promise<AgentExecutionResult> {
     this.isRunning = true;
@@ -215,7 +215,7 @@ ${context.decisions.slice(-5).map(d => `- ${d.description} (by ${d.madeBy})`).jo
   /**
    * Filter tools based on agent's allowed tools
    */
-  protected filterTools(tools: GrokTool[]): GrokTool[] {
+  protected filterTools(tools: CodeBuddyTool[]): CodeBuddyTool[] {
     if (!this.config.allowedTools || this.config.allowedTools.length === 0) {
       return tools;
     }
@@ -229,7 +229,7 @@ ${context.decisions.slice(-5).map(d => `- ${d.description} (by ${d.madeBy})`).jo
    * Run the main agent loop
    */
   protected async runAgentLoop(
-    tools: GrokTool[],
+    tools: CodeBuddyTool[],
     executeTool: ToolExecutor
   ): Promise<string> {
     const maxRounds = this.config.maxRounds || 30;

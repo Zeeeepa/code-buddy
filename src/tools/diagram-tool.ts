@@ -27,7 +27,7 @@ export interface DiagramResult {
  * Supports Mermaid syntax for rich diagrams and ASCII art for terminal display
  */
 export class DiagramTool {
-  private readonly outputDir = path.join(process.cwd(), '.grok', 'diagrams');
+  private readonly outputDir = path.join(process.cwd(), '.codebuddy', 'diagrams');
 
   /**
    * Generate a diagram from Mermaid code

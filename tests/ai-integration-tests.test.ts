@@ -12,9 +12,9 @@ import {
   type AITestOptions,
 } from '../src/testing/ai-integration-tests.js';
 
-// Mock GrokClient for testing
+// Mock CodeBuddyClient for testing
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const mockGrokClient: any = {
+const mockCodeBuddyClient: any = {
   getCurrentModel: () => 'grok-3-latest',
   chat: jest.fn(),
   chatStream: jest.fn(),
@@ -23,7 +23,7 @@ const mockGrokClient: any = {
 describe('AITestRunner', () => {
   describe('Initialization', () => {
     it('should create test runner with default options', () => {
-      const runner = new AITestRunner(mockGrokClient);
+      const runner = new AITestRunner(mockCodeBuddyClient);
       expect(runner).toBeDefined();
       expect(runner).toBeInstanceOf(AITestRunner);
     });
@@ -37,19 +37,19 @@ describe('AITestRunner', () => {
         testStreaming: false,
       };
 
-      const runner = new AITestRunner(mockGrokClient, options);
+      const runner = new AITestRunner(mockCodeBuddyClient, options);
       expect(runner).toBeDefined();
     });
   });
 
   describe('Factory Function', () => {
     it('should create runner with factory', () => {
-      const runner = createAITestRunner(mockGrokClient);
+      const runner = createAITestRunner(mockCodeBuddyClient);
       expect(runner).toBeInstanceOf(AITestRunner);
     });
 
     it('should pass options through factory', () => {
-      const runner = createAITestRunner(mockGrokClient, {
+      const runner = createAITestRunner(mockCodeBuddyClient, {
         skipExpensive: true,
       });
       expect(runner).toBeDefined();
@@ -58,28 +58,28 @@ describe('AITestRunner', () => {
 
   describe('Events', () => {
     it('should emit test:start events', () => {
-      const runner = new AITestRunner(mockGrokClient);
+      const runner = new AITestRunner(mockCodeBuddyClient);
       const handler = jest.fn();
       runner.on('test:start', handler);
       expect(runner.listenerCount('test:start')).toBe(1);
     });
 
     it('should emit test:complete events', () => {
-      const runner = new AITestRunner(mockGrokClient);
+      const runner = new AITestRunner(mockCodeBuddyClient);
       const handler = jest.fn();
       runner.on('test:complete', handler);
       expect(runner.listenerCount('test:complete')).toBe(1);
     });
 
     it('should emit test:skipped events', () => {
-      const runner = new AITestRunner(mockGrokClient);
+      const runner = new AITestRunner(mockCodeBuddyClient);
       const handler = jest.fn();
       runner.on('test:skipped', handler);
       expect(runner.listenerCount('test:skipped')).toBe(1);
     });
 
     it('should emit suite:complete events', () => {
-      const runner = new AITestRunner(mockGrokClient);
+      const runner = new AITestRunner(mockCodeBuddyClient);
       const handler = jest.fn();
       runner.on('suite:complete', handler);
       expect(runner.listenerCount('suite:complete')).toBe(1);
@@ -89,7 +89,7 @@ describe('AITestRunner', () => {
   describe('Result Formatting', () => {
     it('should format results correctly', () => {
       const suite: AITestSuite = {
-        provider: 'grok',
+        provider: 'codebuddy',
         model: 'grok-3-latest',
         timestamp: Date.now(),
         duration: 5000,
@@ -111,7 +111,7 @@ describe('AITestRunner', () => {
       const output = AITestRunner.formatResults(suite);
 
       expect(output).toContain('AI INTEGRATION TEST RESULTS');
-      expect(output).toContain('grok');
+      expect(output).toContain('codebuddy');
       expect(output).toContain('grok-3-latest');
       expect(output).toContain('Test 1');
       expect(output).toContain('Test 2');
@@ -120,7 +120,7 @@ describe('AITestRunner', () => {
 
     it('should include error details in output', () => {
       const suite: AITestSuite = {
-        provider: 'grok',
+        provider: 'codebuddy',
         model: 'test',
         timestamp: Date.now(),
         duration: 1000,
@@ -144,7 +144,7 @@ describe('AITestRunner', () => {
 
     it('should show token and cost summary', () => {
       const suite: AITestSuite = {
-        provider: 'grok',
+        provider: 'codebuddy',
         model: 'test',
         timestamp: Date.now(),
         duration: 1000,

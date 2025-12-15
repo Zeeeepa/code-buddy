@@ -1,5 +1,5 @@
-import { ChatEntry } from "../../agent/grok-agent.js";
-import { GrokClient } from "../../grok/client.js";
+import { ChatEntry } from "../../agent/codebuddy-agent.js";
+import { CodeBuddyClient } from "../../codebuddy/client.js";
 import { AITestRunner, createAITestRunner } from "../../testing/ai-integration-tests.js";
 import stringWidth from "string-width";
 
@@ -57,7 +57,7 @@ This will:
  */
 export async function handleAITest(
   args: string[],
-  grokClient: GrokClient | null
+  codebuddyClient: CodeBuddyClient | null
 ): Promise<CommandHandlerResult> {
   const option = args[0]?.toLowerCase();
 
@@ -78,12 +78,12 @@ Set your API key to run integration tests.`,
   }
 
   // Use current client if available, otherwise create new one from env
-  let client = grokClient;
+  let client = codebuddyClient;
   if (!client) {
     // Fallback: create client from environment variables
     const model = process.env.GROK_MODEL || process.env.OPENAI_MODEL;
     const baseURL = process.env.GROK_BASE_URL || process.env.OPENAI_BASE_URL;
-    client = new GrokClient(apiKey, model, baseURL);
+    client = new CodeBuddyClient(apiKey, model, baseURL);
   }
 
   const currentModel = client.getCurrentModel();

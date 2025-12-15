@@ -226,7 +226,7 @@ export class VoiceControl extends EventEmitter {
    * Load configuration from file
    */
   private loadConfig(): void {
-    const configPath = path.join(os.homedir(), '.grok', 'voice-control.json');
+    const configPath = path.join(os.homedir(), '.codebuddy', 'voice-control.json');
 
     if (fs.existsSync(configPath)) {
       try {
@@ -242,7 +242,7 @@ export class VoiceControl extends EventEmitter {
    * Save configuration
    */
   saveConfig(): void {
-    const configDir = path.join(os.homedir(), '.grok');
+    const configDir = path.join(os.homedir(), '.codebuddy');
     const configPath = path.join(configDir, 'voice-control.json');
 
     fs.ensureDirSync(configDir);

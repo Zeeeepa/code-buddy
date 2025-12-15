@@ -178,7 +178,7 @@ export class TeamSessionManager extends EventEmitter {
   constructor(config: Partial<TeamSessionConfig> = {}) {
     super();
     this.config = { ...DEFAULT_CONFIG, ...config };
-    this.sessionsDir = path.join(os.homedir(), '.grok', 'sessions');
+    this.sessionsDir = path.join(os.homedir(), '.codebuddy', 'sessions');
     this.initialize();
   }
 
@@ -194,7 +194,7 @@ export class TeamSessionManager extends EventEmitter {
    * Load member profile from disk
    */
   private loadMemberProfile(): void {
-    const profilePath = path.join(os.homedir(), '.grok', 'profile.json');
+    const profilePath = path.join(os.homedir(), '.codebuddy', 'profile.json');
 
     if (fs.existsSync(profilePath)) {
       try {

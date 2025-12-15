@@ -1,4 +1,4 @@
-import { GrokClient, GrokMessage, GrokTool } from "../grok/client.js";
+import { CodeBuddyClient, CodeBuddyMessage, CodeBuddyTool } from "../codebuddy/client.js";
 import { EventEmitter } from "events";
 import { getErrorMessage } from "../types/index.js";
 
@@ -70,8 +70,8 @@ For each step:
 Do not deviate from the plan. If you encounter an issue, report it clearly.`;
 
 export class ArchitectMode extends EventEmitter {
-  private architectClient: GrokClient;
-  private editorClient: GrokClient;
+  private architectClient: CodeBuddyClient;
+  private editorClient: CodeBuddyClient;
   private config: ArchitectConfig;
   private currentProposal: ArchitectProposal | null = null;
   private isActive: boolean = false;
@@ -90,12 +90,12 @@ export class ArchitectMode extends EventEmitter {
       ...config,
     };
 
-    this.architectClient = new GrokClient(
+    this.architectClient = new CodeBuddyClient(
       apiKey,
       this.config.architectModel!,
       baseURL
     );
-    this.editorClient = new GrokClient(
+    this.editorClient = new CodeBuddyClient(
       apiKey,
       this.config.editorModel!,
       baseURL
@@ -105,7 +105,7 @@ export class ArchitectMode extends EventEmitter {
   async analyze(request: string, context?: string): Promise<ArchitectProposal> {
     this.emit("architect:start", { request });
 
-    const messages: GrokMessage[] = [
+    const messages: CodeBuddyMessage[] = [
       { role: "system", content: ARCHITECT_SYSTEM_PROMPT },
       {
         role: "user",
@@ -149,7 +149,7 @@ export class ArchitectMode extends EventEmitter {
 
   async implement(
     proposal?: ArchitectProposal,
-    tools?: GrokTool[],
+    tools?: CodeBuddyTool[],
     onStepComplete?: (step: ArchitectStep, result: StepResult) => void
   ): Promise<{ success: boolean; results: StepResult[] }> {
     const targetProposal = proposal || this.currentProposal;
@@ -174,7 +174,7 @@ export class ArchitectMode extends EventEmitter {
 
         const stepPrompt = this.buildStepPrompt(step, targetProposal);
 
-        const messages: GrokMessage[] = [
+        const messages: CodeBuddyMessage[] = [
           { role: "system", content: EDITOR_SYSTEM_PROMPT },
           { role: "user", content: stepPrompt },
         ];
@@ -228,7 +228,7 @@ export class ArchitectMode extends EventEmitter {
   async analyzeAndImplement(
     request: string,
     context?: string,
-    tools?: GrokTool[],
+    tools?: CodeBuddyTool[],
     onApproval?: (proposal: ArchitectProposal) => Promise<boolean>
   ): Promise<{ proposal: ArchitectProposal; results: StepResult[] }> {
     // Phase 1: Architect designs the solution

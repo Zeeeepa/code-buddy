@@ -61,10 +61,10 @@ export class HookManager {
   private enabled: boolean = true;
 
   constructor() {
-    this.configPath = path.join(process.cwd(), ".grok", "hooks.json");
+    this.configPath = path.join(process.cwd(), ".codebuddy", "hooks.json");
     this.globalConfigPath = path.join(
       process.env.HOME || process.env.USERPROFILE || "",
-      ".grok",
+      ".codebuddy",
       "hooks.json"
     );
     this.loadHooks();

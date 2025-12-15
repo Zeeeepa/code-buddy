@@ -7,7 +7,7 @@
 
 // Core utilities - errors provides base error classes
 export {
-  GrokError,
+  CodeBuddyError,
   APIKeyError,
   APIError,
   NetworkError,
@@ -17,14 +17,14 @@ export {
   ToolExecutionError,
   InvalidCommandError,
   CommandExecutionError,
-  ValidationError as GrokValidationError,
+  ValidationError as CodeBuddyValidationError,
   ConfigurationError,
   MCPError,
   SearchError,
   ParserError,
   PathTraversalError,
   JSONParseError,
-  isGrokError,
+  isCodeBuddyError,
   getErrorMessage,
   withTimeout,
   withRetry,

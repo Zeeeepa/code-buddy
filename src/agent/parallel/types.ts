@@ -16,7 +16,7 @@
 export interface ModelConfig {
   id: string;
   name: string;
-  provider: "grok" | "openai" | "anthropic" | "local" | "custom";
+  provider: "codebuddy" | "openai" | "anthropic" | "local" | "custom";
   model: string;
   apiKey?: string;
   baseURL?: string;

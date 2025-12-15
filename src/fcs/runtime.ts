@@ -43,7 +43,7 @@ import {
   AssertStmt,
 } from './types.js';
 import { createFCSBuiltins } from './builtins.js';
-import { createGrokBindings } from './grok-bindings.js';
+import { createGrokBindings } from './codebuddy-bindings.js';
 
 // Control flow signals
 class ReturnSignal {
@@ -88,9 +88,9 @@ export class FCSRuntime {
     }
 
     // Load code-buddy bindings (grok, tool, context, agent, mcp, git, session)
-    const grokBindings = createGrokBindings(this.config, printFn);
+    const codebuddyBindings = createGrokBindings(this.config, printFn);
 
-    for (const [name, value] of Object.entries(grokBindings)) {
+    for (const [name, value] of Object.entries(codebuddyBindings)) {
       this.globalContext.variables.set(name, value as FCSValue);
       if (typeof value === 'function') {
         this.globalContext.functions.set(name, value as FCSFunction);

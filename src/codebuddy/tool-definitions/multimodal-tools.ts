@@ -15,10 +15,10 @@
  * - Archives
  */
 
-import type { GrokTool } from './types.js';
+import type { CodeBuddyTool } from './types.js';
 
 // PDF Tool - Read and extract content from PDF files
-export const PDF_TOOL: GrokTool = {
+export const PDF_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "pdf",
@@ -51,7 +51,7 @@ export const PDF_TOOL: GrokTool = {
 };
 
 // Audio Tool - Process and transcribe audio files
-export const AUDIO_TOOL: GrokTool = {
+export const AUDIO_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "audio",
@@ -83,7 +83,7 @@ export const AUDIO_TOOL: GrokTool = {
 };
 
 // Video Tool - Process video files and extract frames
-export const VIDEO_TOOL: GrokTool = {
+export const VIDEO_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "video",
@@ -124,7 +124,7 @@ export const VIDEO_TOOL: GrokTool = {
 };
 
 // Screenshot Tool - Capture screenshots
-export const SCREENSHOT_TOOL: GrokTool = {
+export const SCREENSHOT_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "screenshot",
@@ -171,7 +171,7 @@ export const SCREENSHOT_TOOL: GrokTool = {
 };
 
 // Clipboard Tool - System clipboard operations
-export const CLIPBOARD_TOOL: GrokTool = {
+export const CLIPBOARD_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "clipboard",
@@ -199,7 +199,7 @@ export const CLIPBOARD_TOOL: GrokTool = {
 };
 
 // Document Tool - Read Office documents
-export const DOCUMENT_TOOL: GrokTool = {
+export const DOCUMENT_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "document",
@@ -223,7 +223,7 @@ export const DOCUMENT_TOOL: GrokTool = {
 };
 
 // OCR Tool - Extract text from images
-export const OCR_TOOL: GrokTool = {
+export const OCR_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "ocr",
@@ -266,7 +266,7 @@ export const OCR_TOOL: GrokTool = {
 };
 
 // Diagram Tool - Generate diagrams
-export const DIAGRAM_TOOL: GrokTool = {
+export const DIAGRAM_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "diagram",
@@ -332,7 +332,7 @@ export const DIAGRAM_TOOL: GrokTool = {
 };
 
 // Export Tool - Export conversations and data
-export const EXPORT_TOOL: GrokTool = {
+export const EXPORT_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "export",
@@ -386,7 +386,7 @@ export const EXPORT_TOOL: GrokTool = {
 };
 
 // QR Tool - Generate and read QR codes
-export const QR_TOOL: GrokTool = {
+export const QR_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "qr",
@@ -440,7 +440,7 @@ export const QR_TOOL: GrokTool = {
 };
 
 // Archive Tool - Work with compressed archives
-export const ARCHIVE_TOOL: GrokTool = {
+export const ARCHIVE_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "archive",
@@ -497,7 +497,7 @@ export const ARCHIVE_TOOL: GrokTool = {
 /**
  * All multimodal tools as an array
  */
-export const MULTIMODAL_TOOLS: GrokTool[] = [
+export const MULTIMODAL_TOOLS: CodeBuddyTool[] = [
   PDF_TOOL,
   AUDIO_TOOL,
   VIDEO_TOOL,

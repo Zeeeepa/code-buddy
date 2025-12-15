@@ -114,7 +114,7 @@ describe("SkillManager", () => {
 
     it("should load skills from SKILL.md files", async () => {
       // Create a custom skill directory
-      const skillDir = path.join(tempDir, ".grok", "skills", "my-skill");
+      const skillDir = path.join(tempDir, ".codebuddy", "skills", "my-skill");
       await fs.ensureDir(skillDir);
 
       const skillContent = `---

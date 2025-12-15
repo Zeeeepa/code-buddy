@@ -3,7 +3,7 @@ import type { ChatCompletionMessageParam, ChatCompletionChunk } from "openai/res
 import { validateModel, getModelInfo } from "../utils/model-utils.js";
 import { logger } from "../utils/logger.js";
 
-export type GrokMessage = ChatCompletionMessageParam;
+export type CodeBuddyMessage = ChatCompletionMessageParam;
 
 /** JSON Schema property definition */
 export interface JsonSchemaProperty {
@@ -16,7 +16,7 @@ export interface JsonSchemaProperty {
   default?: unknown;
 }
 
-export interface GrokTool {
+export interface CodeBuddyTool {
   type: "function";
   function: {
     name: string;
@@ -32,8 +32,8 @@ export interface GrokTool {
 /** Chat completion request payload */
 interface ChatRequestPayload {
   model: string;
-  messages: GrokMessage[];
-  tools: GrokTool[];
+  messages: CodeBuddyMessage[];
+  tools: CodeBuddyTool[];
   tool_choice?: "auto" | "none" | "required";
   temperature: number;
   max_tokens: number;
@@ -41,7 +41,7 @@ interface ChatRequestPayload {
   search_parameters?: SearchParameters;
 }
 
-export interface GrokToolCall {
+export interface CodeBuddyToolCall {
   id: string;
   type: "function";
   function: {
@@ -51,15 +51,15 @@ export interface GrokToolCall {
 }
 
 /** Message with tool calls (assistant message that requested tool use) */
-export interface GrokMessageWithToolCalls {
+export interface CodeBuddyMessageWithToolCalls {
   role: 'assistant';
   content: string | null;
-  tool_calls: GrokToolCall[];
+  tool_calls: CodeBuddyToolCall[];
 }
 
 /** Type guard for messages with tool calls */
-export function hasToolCalls(msg: GrokMessage): msg is GrokMessageWithToolCalls {
-  return msg.role === 'assistant' && 'tool_calls' in msg && Array.isArray((msg as GrokMessageWithToolCalls).tool_calls);
+export function hasToolCalls(msg: CodeBuddyMessage): msg is CodeBuddyMessageWithToolCalls {
+  return msg.role === 'assistant' && 'tool_calls' in msg && Array.isArray((msg as CodeBuddyMessageWithToolCalls).tool_calls);
 }
 
 export interface SearchParameters {
@@ -77,12 +77,12 @@ export interface ChatOptions {
   searchOptions?: SearchOptions;
 }
 
-export interface GrokResponse {
+export interface CodeBuddyResponse {
   choices: Array<{
     message: {
       role: string;
       content: string | null;
-      tool_calls?: GrokToolCall[];
+      tool_calls?: CodeBuddyToolCall[];
     };
     finish_reason: string;
   }>;
@@ -93,7 +93,7 @@ export interface GrokResponse {
   };
 }
 
-export class GrokClient {
+export class CodeBuddyClient {
   private client: OpenAI;
   private currentModel: string = "grok-code-fast-1";
   private defaultMaxTokens: number;
@@ -109,7 +109,7 @@ export class GrokClient {
       baseURL: this.baseURL,
       timeout: 360000,
     });
-    const envMax = Number(process.env.GROK_MAX_TOKENS);
+    const envMax = Number(process.env.CODEBUDDY_MAX_TOKENS);
     this.defaultMaxTokens = Number.isFinite(envMax) && envMax > 0 ? envMax : 1536;
     if (model) {
       // Validate model (non-strict to allow custom models)
@@ -174,7 +174,7 @@ export class GrokClient {
    */
   private async performToolProbe(): Promise<boolean> {
     try {
-      const testTool: GrokTool = {
+      const testTool: CodeBuddyTool = {
         type: "function",
         function: {
           name: "get_current_time",
@@ -253,7 +253,7 @@ export class GrokClient {
    */
   private modelSupportsFunctionCalling(): boolean {
     const modelLower = this.currentModel.toLowerCase();
-    return GrokClient.FUNCTION_CALLING_MODELS.some(pattern =>
+    return CodeBuddyClient.FUNCTION_CALLING_MODELS.some(pattern =>
       modelLower.includes(pattern)
     );
   }
@@ -315,11 +315,11 @@ export class GrokClient {
   }
 
   async chat(
-    messages: GrokMessage[],
-    tools?: GrokTool[],
+    messages: CodeBuddyMessage[],
+    tools?: CodeBuddyTool[],
     options?: string | ChatOptions,
     searchOptions?: SearchOptions
-  ): Promise<GrokResponse> {
+  ): Promise<CodeBuddyResponse> {
     try {
       // Support both old signature (model as string) and new signature (options object)
       const opts: ChatOptions = typeof options === "string"
@@ -347,10 +347,10 @@ export class GrokClient {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const response = await this.client.chat.completions.create(requestPayload as any);
 
-      return response as GrokResponse;
+      return response as CodeBuddyResponse;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`Grok API error: ${message}`);
+      throw new Error(`CodeBuddy API error: ${message}`);
     }
   }
 
@@ -358,9 +358,9 @@ export class GrokClient {
    * Convert tool messages to user messages for models that don't support the tool role
    * LM Studio and some local models require this transformation
    */
-  private convertToolMessagesForLocalModels(messages: GrokMessage[]): GrokMessage[] {
+  private convertToolMessagesForLocalModels(messages: CodeBuddyMessage[]): CodeBuddyMessage[] {
     // Check if we need conversion (has tool role messages and is using a local model)
-    const hasToolMessages = messages.some((m: GrokMessage) => m.role === 'tool');
+    const hasToolMessages = messages.some((m: CodeBuddyMessage) => m.role === 'tool');
     if (!hasToolMessages) return messages;
 
     // Check if model uses local inference that might not support tool role
@@ -369,7 +369,7 @@ export class GrokClient {
                             process.env.GROK_CONVERT_TOOL_MESSAGES === 'true';
     if (!needsConversion) return messages;
 
-    return messages.map((msg: GrokMessage) => {
+    return messages.map((msg: CodeBuddyMessage) => {
       if (msg.role === 'tool') {
         // Convert tool result to user message format
         return {
@@ -379,7 +379,7 @@ export class GrokClient {
       }
       // Remove tool_calls from assistant messages for local models that don't support them in history
       if (hasToolCalls(msg)) {
-        const toolCallsDesc = msg.tool_calls.map((tc: GrokToolCall) =>
+        const toolCallsDesc = msg.tool_calls.map((tc: CodeBuddyToolCall) =>
           `Called ${tc.function.name}(${tc.function.arguments})`
         ).join('\n');
         return {
@@ -392,8 +392,8 @@ export class GrokClient {
   }
 
   async *chatStream(
-    messages: GrokMessage[],
-    tools?: GrokTool[],
+    messages: CodeBuddyMessage[],
+    tools?: CodeBuddyTool[],
     options?: string | ChatOptions,
     searchOptions?: SearchOptions
   ): AsyncGenerator<ChatCompletionChunk, void, unknown> {
@@ -436,15 +436,15 @@ export class GrokClient {
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`Grok API error: ${message}`);
+      throw new Error(`CodeBuddy API error: ${message}`);
     }
   }
 
   async search(
     query: string,
     searchParameters?: SearchParameters
-  ): Promise<GrokResponse> {
-    const searchMessage: GrokMessage = {
+  ): Promise<CodeBuddyResponse> {
+    const searchMessage: CodeBuddyMessage = {
       role: "user",
       content: query,
     };

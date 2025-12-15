@@ -40,7 +40,7 @@ export class HistoryManager {
 
   static readonly DEFAULT_CONFIG: HistoryManagerConfig = {
     maxEntries: 100,
-    historyFile: path.join(os.homedir(), '.grok', 'history.json'),
+    historyFile: path.join(os.homedir(), '.codebuddy', 'history.json'),
     excludePrefixes: ['/'], // Don't save slash commands by default
   };
 

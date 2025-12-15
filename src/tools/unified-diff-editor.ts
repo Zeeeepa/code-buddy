@@ -62,7 +62,7 @@ export class UnifiedDiffEditor {
     enableBackups?: boolean;
     fuzzyMatchThreshold?: number;
   } = {}) {
-    this.backupDir = options.backupDir || '.grok/backups';
+    this.backupDir = options.backupDir || '.codebuddy/backups';
     this.enableBackups = options.enableBackups ?? true;
     this.fuzzyMatchThreshold = options.fuzzyMatchThreshold ?? 0.8;
   }

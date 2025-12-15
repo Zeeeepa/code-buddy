@@ -1,4 +1,4 @@
-import { GrokClient, GrokMessage } from '../grok/client.js';
+import { CodeBuddyClient, CodeBuddyMessage } from '../codebuddy/client.js';
 import { ToolResult } from '../types/index.js';
 
 export interface SelfHealingOptions {
@@ -170,7 +170,7 @@ const ERROR_PATTERNS: Array<{
  */
 export class SelfHealingEngine {
   private options: SelfHealingOptions;
-  private grokClient: GrokClient | null = null;
+  private codebuddyClient: CodeBuddyClient | null = null;
   private history: SelfHealingResult[] = [];
 
   constructor(options: Partial<SelfHealingOptions> = {}) {
@@ -180,8 +180,8 @@ export class SelfHealingEngine {
   /**
    * Set the Grok client for AI-powered fixes
    */
-  setGrokClient(client: GrokClient): void {
-    this.grokClient = client;
+  setCodeBuddyClient(client: CodeBuddyClient): void {
+    this.codebuddyClient = client;
   }
 
   /**
@@ -213,7 +213,7 @@ export class SelfHealingEngine {
     error: string,
     context?: string
   ): Promise<string | null> {
-    if (!this.grokClient) {
+    if (!this.codebuddyClient) {
       return this.generateSimpleFix(originalCommand, error);
     }
 
@@ -232,12 +232,12 @@ Respond with ONLY the corrected command or a series of commands to fix the issue
 If you need to run multiple commands, separate them with &&.
 If the error cannot be fixed with commands, respond with "MANUAL_FIX_REQUIRED".`;
 
-      const messages: GrokMessage[] = [
+      const messages: CodeBuddyMessage[] = [
         { role: 'system', content: 'You are a command-line expert. You fix errors concisely.' },
         { role: 'user', content: prompt },
       ];
 
-      const response = await this.grokClient.chat(messages, []);
+      const response = await this.codebuddyClient.chat(messages, []);
       const fix = response.choices[0]?.message?.content?.trim();
 
       if (fix && !fix.includes('MANUAL_FIX_REQUIRED')) {

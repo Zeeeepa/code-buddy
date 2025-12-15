@@ -549,13 +549,13 @@ describe('MCP Integration Scenarios', () => {
       const config = {
         mcpServers: {
           'code-buddy': {
-            command: 'grok',
+            command: 'codebuddy',
             args: ['--mcp-server'],
           },
         },
       };
 
-      expect(config.mcpServers['code-buddy'].command).toBe('grok');
+      expect(config.mcpServers['code-buddy'].command).toBe('codebuddy');
       expect(config.mcpServers['code-buddy'].args).toContain('--mcp-server');
     });
   });

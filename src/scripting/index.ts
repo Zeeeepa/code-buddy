@@ -15,7 +15,7 @@ import { tokenize } from './lexer.js';
 import { parse } from './parser.js';
 import { Runtime } from './runtime.js';
 import {
-  GrokScriptConfig,
+  CodeBuddyScriptConfig,
   DEFAULT_SCRIPT_CONFIG,
   ScriptResult,
   ProgramNode,
@@ -32,7 +32,7 @@ export { createBuiltins } from './builtins.js';
  */
 export async function executeScript(
   source: string,
-  config: Partial<GrokScriptConfig> = {}
+  config: Partial<CodeBuddyScriptConfig> = {}
 ): Promise<ScriptResult> {
   const startTime = Date.now();
 
@@ -68,7 +68,7 @@ export async function executeScript(
  */
 export async function executeScriptFile(
   filePath: string,
-  config: Partial<GrokScriptConfig> = {}
+  config: Partial<CodeBuddyScriptConfig> = {}
 ): Promise<ScriptResult> {
   const fullPath = path.isAbsolute(filePath)
     ? filePath
@@ -184,13 +184,13 @@ export function getScriptExtension(): string {
  */
 export function isGrokScript(filePath: string): boolean {
   const ext = path.extname(filePath).toLowerCase();
-  return ext === '.gs' || ext === '.grok' || ext === '.grokscript';
+  return ext === '.gs' || ext === '.codebuddy' || ext === '.codebuddyscript';
 }
 
 /**
  * Script Manager - singleton for managing scripts
  */
-class GrokScriptManager {
+class CodeBuddyScriptManager {
   private scripts: Map<string, ProgramNode> = new Map();
   private history: Array<{ script: string; result: ScriptResult; timestamp: Date }> = [];
 
@@ -217,7 +217,7 @@ class GrokScriptManager {
    */
   async execute(
     filePath: string,
-    config: Partial<GrokScriptConfig> = {}
+    config: Partial<CodeBuddyScriptConfig> = {}
   ): Promise<ScriptResult> {
     const result = await executeScriptFile(filePath, config);
 
@@ -262,11 +262,11 @@ class GrokScriptManager {
 }
 
 // Singleton instance
-let scriptManager: GrokScriptManager | null = null;
+let scriptManager: CodeBuddyScriptManager | null = null;
 
-export function getScriptManager(): GrokScriptManager {
+export function getScriptManager(): CodeBuddyScriptManager {
   if (!scriptManager) {
-    scriptManager = new GrokScriptManager();
+    scriptManager = new CodeBuddyScriptManager();
   }
   return scriptManager;
 }

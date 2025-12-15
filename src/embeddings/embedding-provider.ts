@@ -17,7 +17,7 @@ import * as os from 'os';
 // Types
 // ============================================================================
 
-export type EmbeddingProviderType = 'local' | 'openai' | 'grok' | 'mock';
+export type EmbeddingProviderType = 'local' | 'openai' | 'codebuddy' | 'mock';
 
 export interface EmbeddingConfig {
   provider: EmbeddingProviderType;
@@ -49,7 +49,7 @@ export interface BatchEmbeddingResult {
 const DEFAULT_CONFIG: EmbeddingConfig = {
   provider: 'local',
   modelName: 'Xenova/all-MiniLM-L6-v2',
-  cacheDir: path.join(os.homedir(), '.grok', 'models'),
+  cacheDir: path.join(os.homedir(), '.codebuddy', 'models'),
   batchSize: 32,
 };
 
@@ -151,7 +151,7 @@ export class EmbeddingProvider extends EventEmitter {
         return this.embedLocal(text);
       case 'openai':
         return this.embedOpenAI(text);
-      case 'grok':
+      case 'codebuddy':
         return this.embedGrok(text);
       case 'mock':
         return this.embedMock(text);
@@ -179,7 +179,7 @@ export class EmbeddingProvider extends EventEmitter {
         return this.embedBatchLocal(texts);
       case 'openai':
         return this.embedBatchOpenAI(texts);
-      case 'grok':
+      case 'codebuddy':
         return this.embedBatchGrok(texts);
       case 'mock':
         return this.embedBatchMock(texts);
@@ -327,7 +327,7 @@ export class EmbeddingProvider extends EventEmitter {
   }
 
   // ============================================================================
-  // Grok API Methods (uses OpenAI-compatible endpoint)
+  // CodeBuddy API Methods (uses OpenAI-compatible endpoint)
   // ============================================================================
 
   private async embedGrok(text: string): Promise<EmbeddingResult> {
@@ -335,14 +335,14 @@ export class EmbeddingProvider extends EventEmitter {
     return {
       embedding: result.embeddings[0],
       dimensions: result.dimensions,
-      provider: 'grok',
+      provider: 'codebuddy',
     };
   }
 
   private async embedBatchGrok(texts: string[]): Promise<BatchEmbeddingResult> {
     const apiKey = this.config.apiKey || process.env.GROK_API_KEY;
     if (!apiKey) {
-      throw new Error('Grok API key required for embeddings');
+      throw new Error('CodeBuddy API key required for embeddings');
     }
 
     const endpoint = this.config.apiEndpoint || 'https://api.x.ai/v1/embeddings';
@@ -374,7 +374,7 @@ export class EmbeddingProvider extends EventEmitter {
     return {
       embeddings: sorted.map(d => new Float32Array(d.embedding)),
       dimensions: sorted[0]?.embedding.length || this.getDimensions(),
-      provider: 'grok',
+      provider: 'codebuddy',
       totalTokens: data.usage?.total_tokens,
     };
   }

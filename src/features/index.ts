@@ -141,7 +141,7 @@ export type {
 
 // Project Initialization
 export {
-  initGrokProject,
+  initCodeBuddyProject,
   formatInitResult,
   type InitOptions,
   type InitResult
@@ -215,7 +215,7 @@ export function getFeatureStatusSummary(): string {
 
   output += '📚 Slash Commands\n';
   output += `   • ${slashCommands.getCommands().length} commands available\n`;
-  output += `   • Built-in + custom from .grok/commands/\n\n`;
+  output += `   • Built-in + custom from .codebuddy/commands/\n\n`;
 
   output += '🪝 Hook System\n';
   output += `   • Status: ${hooks.isEnabled() ? '✅ Enabled' : '❌ Disabled'}\n`;

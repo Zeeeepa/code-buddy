@@ -3,7 +3,7 @@ import { useInput } from "ink";
 import fs from "fs";
 import path from "path";
 import * as yaml from 'js-yaml';
-import { GrokAgent, ChatEntry } from "../agent/grok-agent.js";
+import { CodeBuddyAgent, ChatEntry } from "../agent/codebuddy-agent.js";
 import { ConfirmationService } from "../utils/confirmation-service.js";
 import { useEnhancedInput, Key } from "./use-enhanced-input.js";
 import { getErrorMessage } from "../types/index.js";
@@ -16,7 +16,7 @@ import { getSlashCommandManager } from "../commands/slash-commands.js";
 import { getPersistentCheckpointManager } from "../checkpoints/persistent-checkpoint-manager.js";
 import { getHookSystem } from "../hooks/hook-system.js";
 import { getSecurityModeManager, SecurityMode } from "../security/security-modes.js";
-import { initGrokProject, formatInitResult } from "../utils/init-project.js";
+import { initCodeBuddyProject, formatInitResult } from "../utils/init-project.js";
 import { getBackgroundTaskManager } from "../tasks/background-tasks.js";
 import { getEnhancedCommandHandler } from "../commands/enhanced-command-handler.js";
 import { getTTSManager } from "../input/text-to-speech.js";
@@ -25,7 +25,7 @@ import { getTTSManager } from "../input/text-to-speech.js";
 import { extractFileReference, getFileSuggestions, FileSuggestion } from "../ui/components/file-autocomplete.js";
 
 interface UseInputHandlerProps {
-  agent: GrokAgent;
+  agent: CodeBuddyAgent;
   chatHistory: ChatEntry[];
   setChatHistory: React.Dispatch<React.SetStateAction<ChatEntry[]>>;
   setIsProcessing: (processing: boolean) => void;
@@ -78,17 +78,17 @@ export function useInputHandler({
   const DOUBLE_ESCAPE_THRESHOLD = 500; // ms
 
   /**
-   * Save instruction to .grokrules file (Claude Code-style # capture)
+   * Save instruction to .codebuddyrules file (Claude Code-style # capture)
    */
-  const saveInstructionToGrokRules = (instruction: string): string => {
-    const grokrulesPath = path.join(process.cwd(), '.grokrules');
+  const saveInstructionToCodeBuddyRules = (instruction: string): string => {
+    const codebuddyrulesPath = path.join(process.cwd(), '.codebuddyrules');
 
     try {
       let rules: { instructions?: string[] } = {};
 
       // Load existing rules if file exists
-      if (fs.existsSync(grokrulesPath)) {
-        const content = fs.readFileSync(grokrulesPath, 'utf-8');
+      if (fs.existsSync(codebuddyrulesPath)) {
+        const content = fs.readFileSync(codebuddyrulesPath, 'utf-8');
         try {
           rules = yaml.load(content) as { instructions?: string[] } || {};
         } catch {
@@ -108,9 +108,9 @@ export function useInputHandler({
       }
 
       // Write back to file
-      fs.writeFileSync(grokrulesPath, yaml.dump(rules, { lineWidth: -1 }));
+      fs.writeFileSync(codebuddyrulesPath, yaml.dump(rules, { lineWidth: -1 }));
 
-      return `Instruction saved to .grokrules:\n  "${instruction}"`;
+      return `Instruction saved to .codebuddyrules:\n  "${instruction}"`;
     } catch (error) {
       return `Failed to save instruction: ${getErrorMessage(error)}`;
     }
@@ -344,11 +344,11 @@ export function useInputHandler({
     }
 
     if (userInput.trim()) {
-      // Handle # instruction capture - save to .grokrules (Claude Code-style)
+      // Handle # instruction capture - save to .codebuddyrules (Claude Code-style)
       if (userInput.startsWith("#")) {
         const instruction = userInput.slice(1).trim();
         if (instruction) {
-          const result = saveInstructionToGrokRules(instruction);
+          const result = saveInstructionToCodeBuddyRules(instruction);
           const entry: ChatEntry = {
             type: "assistant",
             content: result,
@@ -358,7 +358,7 @@ export function useInputHandler({
         } else {
           const helpEntry: ChatEntry = {
             type: "assistant",
-            content: `# Instruction Capture\n\nUsage: #<instruction>\n\nSave a project-specific instruction to .grokrules.\n\nExamples:\n  # Always use TypeScript strict mode\n  # Prefer functional components over class components\n  # Use conventional commits format`,
+            content: `# Instruction Capture\n\nUsage: #<instruction>\n\nSave a project-specific instruction to .codebuddyrules.\n\nExamples:\n  # Always use TypeScript strict mode\n  # Prefer functional components over class components\n  # Use conventional commits format`,
             timestamp: new Date(),
           };
           setChatHistory((prev) => [...prev, helpEntry]);
@@ -668,7 +668,7 @@ export function useInputHandler({
         }
 
         if (result.prompt === "__INIT_GROK__") {
-          const initResult = initGrokProject();
+          const initResult = initCodeBuddyProject();
           const entry: ChatEntry = {
             type: "assistant",
             content: formatInitResult(initResult),
@@ -695,7 +695,7 @@ export function useInputHandler({
         if (result.prompt.startsWith("__") && result.prompt.endsWith("__")) {
           const enhancedHandler = getEnhancedCommandHandler();
           enhancedHandler.setConversationHistory(chatHistory);
-          enhancedHandler.setGrokClient(agent.getClient());
+          enhancedHandler.setCodeBuddyClient(agent.getClient());
 
           const args = trimmedInput.split(" ").slice(1);
           const handlerResult = await enhancedHandler.handleCommand(

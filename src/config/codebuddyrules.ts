@@ -1,5 +1,5 @@
 /**
- * .grokrules File Support
+ * .codebuddyrules File Support
  *
  * Project-specific AI behavior configuration:
  * - Custom instructions per project
@@ -21,7 +21,7 @@ import * as yaml from 'js-yaml';
 // Types
 // ============================================================================
 
-export interface GrokRules {
+export interface CodeBuddyRules {
   /** Version of the rules format */
   version?: string;
 
@@ -148,7 +148,7 @@ export interface GrokRules {
   raw?: string;
 }
 
-export interface GrokRulesConfig {
+export interface CodeBuddyRulesConfig {
   /** Search paths for rules files */
   searchPaths: string[];
   /** File names to search for */
@@ -163,26 +163,26 @@ export interface GrokRulesConfig {
 // Default Configuration
 // ============================================================================
 
-const DEFAULT_CONFIG: GrokRulesConfig = {
-  searchPaths: ['.', '.grok', '.config'],
+const DEFAULT_CONFIG: CodeBuddyRulesConfig = {
+  searchPaths: ['.', '.codebuddy', '.config'],
   fileNames: [
-    '.grokrules',
-    '.grokrules.yaml',
-    '.grokrules.yml',
-    '.grokrules.json',
-    'grokrules.md',
+    '.codebuddyrules',
+    '.codebuddyrules.yaml',
+    '.codebuddyrules.yml',
+    '.codebuddyrules.json',
+    'codebuddyrules.md',
     // Local files (git-ignored, personal overrides) - Claude Code style
-    '.grokrules.local',
-    '.grokrules.local.yaml',
-    '.grokrules.local.yml',
-    '.grokrules.local.json',
-    '.grokrules.local.md',
+    '.codebuddyrules.local',
+    '.codebuddyrules.local.yaml',
+    '.codebuddyrules.local.yml',
+    '.codebuddyrules.local.json',
+    '.codebuddyrules.local.md',
   ],
   inheritFromParent: true,
   enableGlobalRules: true,
 };
 
-const DEFAULT_RULES: GrokRules = {
+const DEFAULT_RULES: CodeBuddyRules = {
   version: '1.0',
   style: {
     indentation: 'spaces',
@@ -209,16 +209,16 @@ const DEFAULT_RULES: GrokRules = {
 };
 
 // ============================================================================
-// GrokRules Manager
+// CodeBuddyRules Manager
 // ============================================================================
 
-export class GrokRulesManager extends EventEmitter {
-  private config: GrokRulesConfig;
-  private rules: GrokRules = {};
+export class CodeBuddyRulesManager extends EventEmitter {
+  private config: CodeBuddyRulesConfig;
+  private rules: CodeBuddyRules = {};
   private loadedFiles: string[] = [];
   private initialized = false;
 
-  constructor(config: Partial<GrokRulesConfig> = {}) {
+  constructor(config: Partial<CodeBuddyRulesConfig> = {}) {
     super();
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
@@ -261,7 +261,7 @@ export class GrokRulesManager extends EventEmitter {
   /**
    * Get current rules
    */
-  getRules(): GrokRules {
+  getRules(): CodeBuddyRules {
     return { ...this.rules };
   }
 
@@ -453,7 +453,7 @@ export class GrokRulesManager extends EventEmitter {
    * Create default rules file
    */
   async createDefaultRules(targetDir: string): Promise<string> {
-    const rulesPath = path.join(targetDir, '.grokrules');
+    const rulesPath = path.join(targetDir, '.codebuddyrules');
 
     const defaultContent = `# Grok Rules
 # Project-specific AI behavior configuration
@@ -532,7 +532,7 @@ ignore:
     ];
 
     if (this.loadedFiles.length === 0) {
-      lines.push('No .grokrules file found.');
+      lines.push('No .codebuddyrules file found.');
       lines.push('');
       lines.push('Create one with: /rules init');
     } else {
@@ -571,12 +571,12 @@ ignore:
   // Private Methods
   // ============================================================================
 
-  private async loadGlobalRules(): Promise<GrokRules | null> {
+  private async loadGlobalRules(): Promise<CodeBuddyRules | null> {
     const homeDir = os.homedir();
     const globalPaths = [
-      path.join(homeDir, '.grokrules'),
-      path.join(homeDir, '.config', 'grok', 'rules.yaml'),
-      path.join(homeDir, '.grok', 'rules.yaml'),
+      path.join(homeDir, '.codebuddyrules'),
+      path.join(homeDir, '.config', 'codebuddy', 'rules.yaml'),
+      path.join(homeDir, '.codebuddy', 'rules.yaml'),
     ];
 
     for (const globalPath of globalPaths) {
@@ -589,7 +589,7 @@ ignore:
     return null;
   }
 
-  private async loadRulesFromDirectory(dir: string): Promise<GrokRules | null> {
+  private async loadRulesFromDirectory(dir: string): Promise<CodeBuddyRules | null> {
     for (const searchPath of this.config.searchPaths) {
       for (const fileName of this.config.fileNames) {
         const filePath = path.join(dir, searchPath, fileName);
@@ -602,14 +602,14 @@ ignore:
     return null;
   }
 
-  private async loadRulesFile(filePath: string): Promise<GrokRules | null> {
+  private async loadRulesFile(filePath: string): Promise<CodeBuddyRules | null> {
     try {
       if (!fs.existsSync(filePath)) {
         return null;
       }
 
       const content = fs.readFileSync(filePath, 'utf-8');
-      let rules: GrokRules;
+      let rules: CodeBuddyRules;
 
       const ext = path.extname(filePath).toLowerCase();
 
@@ -620,7 +620,7 @@ ignore:
         rules = this.parseMarkdownRules(content);
       } else {
         // YAML format (default)
-        rules = yaml.load(content) as GrokRules;
+        rules = yaml.load(content) as CodeBuddyRules;
       }
 
       this.loadedFiles.push(filePath);
@@ -633,17 +633,17 @@ ignore:
     }
   }
 
-  private parseMarkdownRules(content: string): GrokRules {
+  private parseMarkdownRules(content: string): CodeBuddyRules {
     // Try YAML frontmatter
     const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
     if (frontmatterMatch) {
-      return yaml.load(frontmatterMatch[1]) as GrokRules;
+      return yaml.load(frontmatterMatch[1]) as CodeBuddyRules;
     }
 
     // Try YAML code block
     const codeBlockMatch = content.match(/```ya?ml\n([\s\S]*?)\n```/);
     if (codeBlockMatch) {
-      return yaml.load(codeBlockMatch[1]) as GrokRules;
+      return yaml.load(codeBlockMatch[1]) as CodeBuddyRules;
     }
 
     // Treat entire content as raw instructions
@@ -665,8 +665,8 @@ ignore:
     return hierarchy;
   }
 
-  private mergeRules(base: GrokRules, override: GrokRules): GrokRules {
-    const merged: GrokRules = { ...base };
+  private mergeRules(base: CodeBuddyRules, override: CodeBuddyRules): CodeBuddyRules {
+    const merged: CodeBuddyRules = { ...base };
 
     // Simple properties
     if (override.version) merged.version = override.version;
@@ -700,21 +700,21 @@ ignore:
 // Singleton
 // ============================================================================
 
-let managerInstance: GrokRulesManager | null = null;
+let managerInstance: CodeBuddyRulesManager | null = null;
 
-export function getGrokRulesManager(config?: Partial<GrokRulesConfig>): GrokRulesManager {
+export function getCodeBuddyRulesManager(config?: Partial<CodeBuddyRulesConfig>): CodeBuddyRulesManager {
   if (!managerInstance) {
-    managerInstance = new GrokRulesManager(config);
+    managerInstance = new CodeBuddyRulesManager(config);
   }
   return managerInstance;
 }
 
-export async function initializeGrokRules(workingDir?: string): Promise<GrokRulesManager> {
-  const manager = getGrokRulesManager();
+export async function initializeCodeBuddyRules(workingDir?: string): Promise<CodeBuddyRulesManager> {
+  const manager = getCodeBuddyRulesManager();
   await manager.initialize(workingDir);
   return manager;
 }
 
-export function resetGrokRulesManager(): void {
+export function resetCodeBuddyRulesManager(): void {
   managerInstance = null;
 }

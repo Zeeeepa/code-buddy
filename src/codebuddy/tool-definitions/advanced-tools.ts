@@ -8,10 +8,10 @@
  * - Subagent spawning
  */
 
-import type { GrokTool } from './types.js';
+import type { CodeBuddyTool } from './types.js';
 
 // Multi-edit tool for atomic multi-file changes
-export const MULTI_EDIT_TOOL: GrokTool = {
+export const MULTI_EDIT_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "multi_edit",
@@ -52,7 +52,7 @@ export const MULTI_EDIT_TOOL: GrokTool = {
 };
 
 // Git tool for version control operations
-export const GIT_TOOL: GrokTool = {
+export const GIT_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "git",
@@ -99,7 +99,7 @@ export const GIT_TOOL: GrokTool = {
 };
 
 // Codebase map tool for understanding project structure
-export const CODEBASE_MAP_TOOL: GrokTool = {
+export const CODEBASE_MAP_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "codebase_map",
@@ -127,7 +127,7 @@ export const CODEBASE_MAP_TOOL: GrokTool = {
 };
 
 // Subagent tool for spawning specialized agents
-export const SUBAGENT_TOOL: GrokTool = {
+export const SUBAGENT_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "spawn_subagent",
@@ -157,7 +157,7 @@ export const SUBAGENT_TOOL: GrokTool = {
 /**
  * All advanced tools as an array
  */
-export const ADVANCED_TOOLS: GrokTool[] = [
+export const ADVANCED_TOOLS: CodeBuddyTool[] = [
   MULTI_EDIT_TOOL,
   GIT_TOOL,
   CODEBASE_MAP_TOOL,

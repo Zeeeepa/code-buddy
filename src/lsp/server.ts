@@ -33,7 +33,7 @@ import {
 } from 'vscode-languageserver/node';
 
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { GrokClient, GrokMessage } from '../grok/client.js';
+import { CodeBuddyClient, CodeBuddyMessage } from '../codebuddy/client.js';
 
 // Create connection
 const connection = createConnection(ProposedFeatures.all);
@@ -42,10 +42,10 @@ const connection = createConnection(ProposedFeatures.all);
 const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
 
 // Grok client
-let grokClient: GrokClient | null = null;
+let codebuddyClient: CodeBuddyClient | null = null;
 
 // Settings
-interface GrokLSPSettings {
+interface CodeBuddyLSPSettings {
   apiKey: string;
   model: string;
   enableDiagnostics: boolean;
@@ -53,7 +53,7 @@ interface GrokLSPSettings {
   maxTokens: number;
 }
 
-const defaultSettings: GrokLSPSettings = {
+const defaultSettings: CodeBuddyLSPSettings = {
   apiKey: '',
   model: 'grok-3-latest',
   enableDiagnostics: true,
@@ -61,7 +61,7 @@ const defaultSettings: GrokLSPSettings = {
   maxTokens: 2048,
 };
 
-let globalSettings: GrokLSPSettings = defaultSettings;
+let globalSettings: CodeBuddyLSPSettings = defaultSettings;
 
 // Cache for completions
 const completionCache = new Map<string, CompletionItem[]>();
@@ -101,7 +101,7 @@ connection.onInitialized(() => {
   // Initialize Grok client with API key
   const apiKey = process.env.GROK_API_KEY || globalSettings.apiKey;
   if (apiKey) {
-    grokClient = new GrokClient(apiKey, globalSettings.model);
+    codebuddyClient = new CodeBuddyClient(apiKey, globalSettings.model);
     connection.console.log('Grok client initialized');
   } else {
     connection.console.warn('No API key configured');
@@ -118,7 +118,7 @@ connection.onDidChangeConfiguration((change) => {
   // Reinitialize client
   const apiKey = process.env.GROK_API_KEY || globalSettings.apiKey;
   if (apiKey) {
-    grokClient = new GrokClient(apiKey, globalSettings.model);
+    codebuddyClient = new CodeBuddyClient(apiKey, globalSettings.model);
   }
 
   // Revalidate all documents
@@ -127,7 +127,7 @@ connection.onDidChangeConfiguration((change) => {
 
 // Document validation (diagnostics)
 async function validateTextDocument(textDocument: TextDocument): Promise<void> {
-  if (!grokClient || !globalSettings.enableDiagnostics) {
+  if (!codebuddyClient || !globalSettings.enableDiagnostics) {
     return;
   }
 
@@ -140,7 +140,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
   }
 
   try {
-    const messages: GrokMessage[] = [
+    const messages: CodeBuddyMessage[] = [
       {
         role: 'system',
         content: `You are a code reviewer. Analyze the ${languageId} code for issues. Return a JSON array of issues.`,
@@ -157,7 +157,7 @@ Return [] if no issues.`,
       },
     ];
 
-    const response = await grokClient.chat(messages, []);
+    const response = await codebuddyClient.chat(messages, []);
     const content = response.choices[0]?.message?.content || '[]';
 
     const jsonMatch = content.match(/\[[\s\S]*\]/);
@@ -208,7 +208,7 @@ function mapSeverity(severity: string): DiagnosticSeverity {
 // Completions
 connection.onCompletion(
   async (params: TextDocumentPositionParams): Promise<CompletionItem[]> => {
-    if (!grokClient || !globalSettings.enableCompletions) {
+    if (!codebuddyClient || !globalSettings.enableCompletions) {
       return [];
     }
 
@@ -230,7 +230,7 @@ connection.onCompletion(
     }
 
     try {
-      const messages: GrokMessage[] = [
+      const messages: CodeBuddyMessage[] = [
         {
           role: 'system',
           content: `You are a ${languageId} code completion engine. Suggest completions.`,
@@ -246,7 +246,7 @@ Return JSON: [{"label": "<completion>", "detail": "<description>", "kind": "func
         },
       ];
 
-      const response = await grokClient.chat(messages, []);
+      const response = await codebuddyClient.chat(messages, []);
       const content = response.choices[0]?.message?.content || '[]';
 
       const jsonMatch = content.match(/\[[\s\S]*\]/);
@@ -358,7 +358,7 @@ connection.onCodeAction(
 // Hover
 connection.onHover(
   async (params: TextDocumentPositionParams): Promise<Hover | null> => {
-    if (!grokClient) {
+    if (!codebuddyClient) {
       return null;
     }
 
@@ -392,7 +392,7 @@ connection.onHover(
     const context = text.slice(Math.max(0, offset - 200), Math.min(text.length, offset + 200));
 
     try {
-      const messages: GrokMessage[] = [
+      const messages: CodeBuddyMessage[] = [
         {
           role: 'system',
           content: 'You are a helpful coding assistant. Provide brief, accurate hover information.',
@@ -406,7 +406,7 @@ ${context}`,
         },
       ];
 
-      const response = await grokClient.chat(messages, []);
+      const response = await codebuddyClient.chat(messages, []);
       const content = response.choices[0]?.message?.content || '';
 
       if (content) {
@@ -428,7 +428,7 @@ ${context}`,
 // Signature help
 connection.onSignatureHelp(
   async (params: TextDocumentPositionParams): Promise<SignatureHelp | null> => {
-    if (!grokClient) {
+    if (!codebuddyClient) {
       return null;
     }
 
@@ -474,7 +474,7 @@ connection.onSignatureHelp(
     const context = text.slice(Math.max(0, nameStart - 200), Math.min(text.length, offset + 50));
 
     try {
-      const messages: GrokMessage[] = [
+      const messages: CodeBuddyMessage[] = [
         {
           role: 'system',
           content: 'You are a helpful coding assistant. Provide function signature information.',
@@ -488,7 +488,7 @@ ${context}`,
         },
       ];
 
-      const response = await grokClient.chat(messages, []);
+      const response = await codebuddyClient.chat(messages, []);
       const content = response.choices[0]?.message?.content || '';
 
       if (content) {

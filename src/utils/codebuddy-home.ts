@@ -4,7 +4,7 @@
  * Supports the GROK_HOME environment variable to customize the location
  * of Grok CLI configuration files and data (like VIBE_HOME in Mistral Vibe).
  *
- * Default: ~/.grok/
+ * Default: ~/.codebuddy/
  *
  * Usage:
  *   export GROK_HOME="/path/to/custom/home"
@@ -15,7 +15,7 @@
  *   ├── config.toml          # Configuration file
  *   ├── user-settings.json   # User settings
  *   ├── .env                 # API keys
- *   ├── grok.db              # SQLite database
+ *   ├── codebuddy.db              # SQLite database
  *   ├── agents/              # Custom agents
  *   ├── prompts/             # Custom system prompts
  *   ├── commands/            # Custom slash commands
@@ -39,10 +39,10 @@ import fs from 'fs';
  *
  * Priority:
  * 1. GROK_HOME environment variable
- * 2. ~/.grok/ (default)
+ * 2. ~/.codebuddy/ (default)
  */
-export function getGrokHome(): string {
-  return process.env.GROK_HOME || path.join(os.homedir(), '.grok');
+export function getCodeBuddyHome(): string {
+  return process.env.GROK_HOME || path.join(os.homedir(), '.codebuddy');
 }
 
 /**
@@ -52,7 +52,7 @@ export function getGrokHome(): string {
  * @returns Absolute path
  */
 export function getGrokPath(...relativePath: string[]): string {
-  return path.join(getGrokHome(), ...relativePath);
+  return path.join(getCodeBuddyHome(), ...relativePath);
 }
 
 /**
@@ -87,7 +87,7 @@ export function getThemesDir(): string {
  * Get the database path
  */
 export function getDatabasePath(): string {
-  return getGrokPath('grok.db');
+  return getGrokPath('codebuddy.db');
 }
 
 /**
@@ -156,10 +156,10 @@ export function getOfflineDir(): string {
 /**
  * Ensure GROK_HOME directory exists
  */
-export function ensureGrokHome(): void {
-  const grokHome = getGrokHome();
-  if (!fs.existsSync(grokHome)) {
-    fs.mkdirSync(grokHome, { recursive: true });
+export function ensureCodeBuddyHome(): void {
+  const codebuddyHome = getCodeBuddyHome();
+  if (!fs.existsSync(codebuddyHome)) {
+    fs.mkdirSync(codebuddyHome, { recursive: true });
   }
 }
 
@@ -177,16 +177,16 @@ export function ensureGrokDir(...relativePath: string[]): string {
 /**
  * Check if custom GROK_HOME is set
  */
-export function isCustomGrokHome(): boolean {
+export function isCustomCodeBuddyHome(): boolean {
   return !!process.env.GROK_HOME;
 }
 
 /**
  * Format GROK_HOME info for display
  */
-export function formatGrokHomeInfo(): string {
-  const grokHome = getGrokHome();
-  const isCustom = isCustomGrokHome();
+export function formatCodeBuddyHomeInfo(): string {
+  const codebuddyHome = getCodeBuddyHome();
+  const isCustom = isCustomCodeBuddyHome();
 
-  return `GROK_HOME: ${grokHome}${isCustom ? ' (custom)' : ' (default)'}`;
+  return `GROK_HOME: ${codebuddyHome}${isCustom ? ' (custom)' : ' (default)'}`;
 }

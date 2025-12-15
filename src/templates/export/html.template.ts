@@ -378,7 +378,7 @@ export function htmlTemplate(data: SessionData, options: ExportOptions): string 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="generator" content="Grok CLI">
+  <meta name="generator" content="CodeBuddy CLI">
   <title>${escapeHTML(title)}</title>
   <style>${css}</style>
 </head>

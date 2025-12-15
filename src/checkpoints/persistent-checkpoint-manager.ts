@@ -36,7 +36,7 @@ export interface PersistentCheckpointManagerOptions {
 
 /**
  * Persistent Checkpoint Manager - Inspired by Gemini CLI
- * Stores checkpoints in ~/.grok/history/<project_hash>/ for cross-session persistence
+ * Stores checkpoints in ~/.codebuddy/history/<project_hash>/ for cross-session persistence
  */
 export class PersistentCheckpointManager extends EventEmitter {
   private maxCheckpoints: number;
@@ -53,7 +53,7 @@ export class PersistentCheckpointManager extends EventEmitter {
     this.maxCheckpoints = options.maxCheckpoints || 100;
     this.autoCheckpoint = options.autoCheckpoint ?? true;
     this.workingDirectory = process.cwd();
-    this.historyDir = options.historyDir || path.join(os.homedir(), '.grok', 'history');
+    this.historyDir = options.historyDir || path.join(os.homedir(), '.codebuddy', 'history');
     this.projectHash = this.generateProjectHash(this.workingDirectory);
     this.projectHistoryDir = path.join(this.historyDir, this.projectHash);
     this.indexPath = path.join(this.projectHistoryDir, 'index.json');

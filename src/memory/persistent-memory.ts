@@ -22,16 +22,16 @@ export type MemoryCategory =
   | "custom";      // User-defined
 
 export interface MemoryConfig {
-  projectMemoryPath: string;   // .grok/GROK_MEMORY.md
-  userMemoryPath: string;      // ~/.grok/memory.md
+  projectMemoryPath: string;   // .codebuddy/GROK_MEMORY.md
+  userMemoryPath: string;      // ~/.codebuddy/memory.md
   autoCapture: boolean;        // Auto-capture important context
   maxMemories: number;         // Max memories per scope
   relevanceThreshold: number;  // For semantic matching (0-1)
 }
 
 const DEFAULT_CONFIG: MemoryConfig = {
-  projectMemoryPath: ".grok/GROK_MEMORY.md",
-  userMemoryPath: path.join(os.homedir(), ".grok", "memory.md"),
+  projectMemoryPath: ".codebuddy/GROK_MEMORY.md",
+  userMemoryPath: path.join(os.homedir(), ".codebuddy", "memory.md"),
   autoCapture: true,
   maxMemories: 100,
   relevanceThreshold: 0.5,

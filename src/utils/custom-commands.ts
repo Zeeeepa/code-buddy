@@ -10,8 +10,8 @@ export interface CustomCommand {
   filePath: string;
 }
 
-const PROJECT_COMMANDS_DIR = '.grok/commands';
-const USER_COMMANDS_DIR = path.join(os.homedir(), '.grok', 'commands');
+const PROJECT_COMMANDS_DIR = '.codebuddy/commands';
+const USER_COMMANDS_DIR = path.join(os.homedir(), '.codebuddy', 'commands');
 
 /**
  * Parse a command file to extract description and prompt

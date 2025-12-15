@@ -1,4 +1,4 @@
-import { ChatEntry } from "../../agent/grok-agent.js";
+import { ChatEntry } from "../../agent/codebuddy-agent.js";
 import { getMemoryManager } from "../../memory/persistent-memory.js";
 import { getCommentWatcher } from "../../tools/comment-watcher.js";
 

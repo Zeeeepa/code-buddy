@@ -2,9 +2,9 @@
  * Context Files - Automatic Project Context (Gemini CLI inspired)
  *
  * Automatically loads context from special files:
- * - .grok/CONTEXT.md - Project-specific context
+ * - .codebuddy/CONTEXT.md - Project-specific context
  * - GROK.md - Alternative location (project root)
- * - ~/.grok/CONTEXT.md - Global user context
+ * - ~/.codebuddy/CONTEXT.md - Global user context
  *
  * These files are read at startup and injected into the system prompt.
  */
@@ -30,14 +30,14 @@ export interface LoadedContext {
  * Context file locations in order of priority
  */
 const CONTEXT_FILE_LOCATIONS = [
-  { pattern: '.grok/CONTEXT.md', source: 'project' as const, priority: 1 },
+  { pattern: '.codebuddy/CONTEXT.md', source: 'project' as const, priority: 1 },
   { pattern: 'GROK.md', source: 'project' as const, priority: 2 },
-  { pattern: '.grok/context.md', source: 'project' as const, priority: 3 },
+  { pattern: '.codebuddy/context.md', source: 'project' as const, priority: 3 },
   { pattern: 'CLAUDE.md', source: 'project' as const, priority: 4 }, // Compatibility
 ];
 
 const GLOBAL_CONTEXT_FILE = {
-  pattern: path.join(os.homedir(), '.grok', 'CONTEXT.md'),
+  pattern: path.join(os.homedir(), '.codebuddy', 'CONTEXT.md'),
   source: 'global' as const,
   priority: 10,
 };
@@ -138,7 +138,7 @@ ${context.combinedContent}
 export async function initContextFile(
   projectDir: string = process.cwd()
 ): Promise<string> {
-  const contextDir = path.join(projectDir, '.grok');
+  const contextDir = path.join(projectDir, '.codebuddy');
   const contextFile = path.join(contextDir, 'CONTEXT.md');
 
   await fs.ensureDir(contextDir);

@@ -98,7 +98,7 @@ export class ModelRouter extends EventEmitter {
 
   constructor(projectRoot: string = process.cwd()) {
     super();
-    this.configPath = path.join(projectRoot, ".grok", "model-router.json");
+    this.configPath = path.join(projectRoot, ".codebuddy", "model-router.json");
     this.config = this.loadConfig();
     this.currentModel = this.config.defaultModel;
   }

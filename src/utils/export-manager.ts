@@ -618,7 +618,7 @@ export class ExportManager extends EventEmitter {
   constructor(options: Partial<ExportOptions> = {}, outputDir?: string) {
     super();
     this.defaultOptions = { ...DEFAULT_OPTIONS, ...options };
-    this.outputDir = outputDir || path.join(os.homedir(), '.grok', 'exports');
+    this.outputDir = outputDir || path.join(os.homedir(), '.codebuddy', 'exports');
   }
 
   /**

@@ -16,10 +16,10 @@ export class CustomCommandLoader {
   private scanInterval: number = 5000;  // Re-scan every 5 seconds
 
   constructor() {
-    this.projectCommandsDir = path.join(process.cwd(), ".grok", "commands");
+    this.projectCommandsDir = path.join(process.cwd(), ".codebuddy", "commands");
     this.globalCommandsDir = path.join(
       process.env.HOME || process.env.USERPROFILE || "",
-      ".grok",
+      ".codebuddy",
       "commands"
     );
   }
@@ -218,7 +218,7 @@ export class CustomCommandLoader {
 
   formatCommandList(): string {
     if (this.commandCache.size === 0) {
-      return "No custom commands found.\n\nCreate commands in:\n  Project: .grok/commands/<name>.md\n  Global: ~/.grok/commands/<name>.md";
+      return "No custom commands found.\n\nCreate commands in:\n  Project: .codebuddy/commands/<name>.md\n  Global: ~/.codebuddy/commands/<name>.md";
     }
 
     let output = "Custom Commands:\n\n";
@@ -245,8 +245,8 @@ Custom Commands System
 Create reusable prompts as markdown files:
 
 Location:
-  Project-level: .grok/commands/<name>.md
-  Global:        ~/.grok/commands/<name>.md
+  Project-level: .codebuddy/commands/<name>.md
+  Global:        ~/.codebuddy/commands/<name>.md
 
 File Format:
   ---
@@ -258,7 +258,7 @@ File Format:
   Use $1, $2, etc. for specific arguments.
   Use $CWD, $USER, $DATE for special values.
 
-Example (.grok/commands/review.md):
+Example (.codebuddy/commands/review.md):
   ---
   description: Review code changes
   ---

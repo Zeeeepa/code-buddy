@@ -15,7 +15,7 @@ export {
   MCPTool,
 } from "./client.js";
 
-// Legacy manual client (used by grok-agent)
+// Legacy manual client (used by codebuddy-agent)
 export {
   MCPClient,
   MCPServerConfig as LegacyMCPServerConfig,

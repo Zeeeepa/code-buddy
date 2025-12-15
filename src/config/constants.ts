@@ -69,7 +69,7 @@ export const UI_CONFIG = {
 } as const;
 
 export const API_CONFIG = {
-  /** Default base URL for Grok API */
+  /** Default base URL for CodeBuddy API */
   DEFAULT_BASE_URL: 'https://api.x.ai/v1',
   /** Default model */
   DEFAULT_MODEL: 'grok-beta',
@@ -87,7 +87,7 @@ export const API_CONFIG = {
 
 export const PATHS = {
   /** User settings directory */
-  SETTINGS_DIR: '.grok',
+  SETTINGS_DIR: '.codebuddy',
   /** User settings file name */
   SETTINGS_FILE: 'user-settings.json',
   /** Custom instructions file name */
@@ -97,7 +97,7 @@ export const PATHS = {
 } as const;
 
 export const SUPPORTED_MODELS = {
-  // Grok models
+  // Grok models (xAI API model identifiers - don't rename these)
   'grok-beta': { maxTokens: 131072, provider: 'xai' },
   'grok-2-1212': { maxTokens: 32768, provider: 'xai' },
   'grok-vision-beta': { maxTokens: 8192, provider: 'xai' },

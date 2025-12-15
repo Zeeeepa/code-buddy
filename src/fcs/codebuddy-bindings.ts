@@ -2,7 +2,7 @@
  * Grok-CLI Bindings for FCS
  *
  * Provides full integration with code-buddy features:
- * - AI/Grok API calls
+ * - AI/CodeBuddy API calls
  * - Tool execution (read, edit, search, grep)
  * - Context management
  * - Agent control
@@ -15,10 +15,10 @@ import { execSync } from 'child_process';
 import { FCSConfig, FCSValue, FCSFunction } from './types.js';
 
 // Lazy imports to avoid circular dependencies
-let grokClientInstance: GrokClientInterface | null = null;
+let codebuddyClientInstance: CodeBuddyClientInterface | null = null;
 let mcpManagerInstance: MCPManagerInterface | null = null;
 
-interface GrokClientInterface {
+interface CodeBuddyClientInterface {
   chat(messages: Array<{ role: string; content: string }>): Promise<string>;
   complete(prompt: string): Promise<string>;
 }
@@ -29,8 +29,8 @@ interface MCPManagerInterface {
   listTools(server: string): string[];
 }
 
-interface GrokBindingsConfig extends FCSConfig {
-  grokClient?: GrokClientInterface;
+interface CodeBuddyBindingsConfig extends FCSConfig {
+  codebuddyClient?: CodeBuddyClientInterface;
   mcpManager?: MCPManagerInterface;
   conversationHistory?: Array<{ role: string; content: string }>;
   contextFiles?: Set<string>;
@@ -40,13 +40,13 @@ interface GrokBindingsConfig extends FCSConfig {
  * Create code-buddy bindings for FCS
  */
 export function createGrokBindings(
-  config: GrokBindingsConfig,
+  config: CodeBuddyBindingsConfig,
   print: (msg: string) => void
 ): Record<string, FCSValue> {
   const bindings: Record<string, FCSValue> = {};
 
   // Store references
-  grokClientInstance = config.grokClient || null;
+  codebuddyClientInstance = config.codebuddyClient || null;
   mcpManagerInstance = config.mcpManager || null;
 
   // Conversation history for chat
@@ -66,16 +66,16 @@ export function createGrokBindings(
    * Ask Grok a question (single prompt)
    */
   grok.ask = async (prompt: string): Promise<string> => {
-    if (!grokClientInstance) {
+    if (!codebuddyClientInstance) {
       print('[grok.ask] No Grok client available - returning mock response');
       return `[Mock AI Response to: ${prompt}]`;
     }
 
     try {
-      const response = await grokClientInstance.complete(prompt);
+      const response = await codebuddyClientInstance.complete(prompt);
       return response;
     } catch (error) {
-      throw new Error(`Grok API error: ${(error as Error).message}`);
+      throw new Error(`CodeBuddy API error: ${(error as Error).message}`);
     }
   };
 
@@ -85,14 +85,14 @@ export function createGrokBindings(
   grok.chat = async (message: string): Promise<string> => {
     conversationHistory.push({ role: 'user', content: message });
 
-    if (!grokClientInstance) {
+    if (!codebuddyClientInstance) {
       const mockResponse = `[Mock Chat Response to: ${message}]`;
       conversationHistory.push({ role: 'assistant', content: mockResponse });
       return mockResponse;
     }
 
     try {
-      const response = await grokClientInstance.chat(conversationHistory);
+      const response = await codebuddyClientInstance.chat(conversationHistory);
       conversationHistory.push({ role: 'assistant', content: response });
       return response;
     } catch (error) {
@@ -669,7 +669,7 @@ Think through the problem and execute the necessary steps.`;
       }
     };
 
-    const sessionsDir = path.join(config.workdir, '.grok', 'sessions');
+    const sessionsDir = path.join(config.workdir, '.codebuddy', 'sessions');
     if (!fs.existsSync(sessionsDir)) {
       fs.mkdirSync(sessionsDir, { recursive: true });
     }
@@ -684,7 +684,7 @@ Think through the problem and execute the necessary steps.`;
    * List saved sessions
    */
   session.list = (): string[] => {
-    const sessionsDir = path.join(config.workdir, '.grok', 'sessions');
+    const sessionsDir = path.join(config.workdir, '.codebuddy', 'sessions');
     if (!fs.existsSync(sessionsDir)) {
       return [];
     }
@@ -695,7 +695,7 @@ Think through the problem and execute the necessary steps.`;
    * Load a session
    */
   session.load = (name: string): boolean => {
-    const sessionsDir = path.join(config.workdir, '.grok', 'sessions');
+    const sessionsDir = path.join(config.workdir, '.codebuddy', 'sessions');
     const filePath = path.join(sessionsDir, name);
 
     if (!fs.existsSync(filePath)) {
@@ -726,8 +726,8 @@ Think through the problem and execute the necessary steps.`;
 /**
  * Set the Grok client instance (called from code-buddy initialization)
  */
-export function setGrokClient(client: GrokClientInterface): void {
-  grokClientInstance = client;
+export function setCodeBuddyClient(client: CodeBuddyClientInterface): void {
+  codebuddyClientInstance = client;
 }
 
 /**

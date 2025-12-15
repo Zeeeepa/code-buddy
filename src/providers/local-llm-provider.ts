@@ -92,7 +92,7 @@ export class NodeLlamaCppProvider extends EventEmitter implements LocalLLMProvid
 
   constructor() {
     super();
-    this.modelsDir = path.join(os.homedir(), '.grok', 'models');
+    this.modelsDir = path.join(os.homedir(), '.codebuddy', 'models');
   }
 
   async initialize(config: LocalProviderConfig): Promise<void> {
@@ -108,7 +108,7 @@ export class NodeLlamaCppProvider extends EventEmitter implements LocalLLMProvid
       throw new Error(
         `Model not found at ${modelPath}.\n` +
         `Download a GGUF model from https://huggingface.co/models?search=gguf\n` +
-        `Example: wget -P ~/.grok/models/ https://huggingface.co/lmstudio-community/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf`
+        `Example: wget -P ~/.codebuddy/models/ https://huggingface.co/lmstudio-community/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf`
       );
     }
 

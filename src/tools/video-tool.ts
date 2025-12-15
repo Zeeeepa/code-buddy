@@ -212,7 +212,7 @@ export class VideoTool {
         };
       }
 
-      const outputDir = options.outputDir || path.join(process.cwd(), '.grok', 'frames', path.basename(filePath, ext));
+      const outputDir = options.outputDir || path.join(process.cwd(), '.codebuddy', 'frames', path.basename(filePath, ext));
       fs.mkdirSync(outputDir, { recursive: true });
 
       const format = options.format || 'jpg';

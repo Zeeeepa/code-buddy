@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { Box, Text, Static } from "ink";
-import { ChatEntry } from "../../agent/grok-agent.js";
+import { ChatEntry } from "../../agent/codebuddy-agent.js";
 import { DiffRenderer } from "./diff-renderer.js";
 import { MarkdownRenderer } from "../utils/markdown-renderer.js";
 import { useTheme } from "../context/theme-context.js";

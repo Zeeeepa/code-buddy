@@ -300,7 +300,7 @@ describe('EmbeddingProvider', () => {
       const originalKey = process.env.GROK_API_KEY;
       delete process.env.GROK_API_KEY;
 
-      const provider = new EmbeddingProvider({ provider: 'grok' });
+      const provider = new EmbeddingProvider({ provider: 'codebuddy' });
 
       await expect(provider.embed('test')).rejects.toThrow('API key required');
 

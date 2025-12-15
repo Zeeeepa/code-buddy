@@ -180,7 +180,7 @@ Examples:
       Export as HTML without tool calls
 
 Export Directory:
-  ~/.grok/exports/
+  ~/.codebuddy/exports/
 
 All exports are saved with timestamps for easy organization.
   `.trim();

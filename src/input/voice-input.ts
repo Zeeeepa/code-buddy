@@ -29,7 +29,7 @@ export class VoiceInput extends EventEmitter {
     this.config = config;
     this.tempDir = path.join(
       process.env.HOME || process.env.USERPROFILE || "/tmp",
-      ".grok",
+      ".codebuddy",
       "voice"
     );
     fs.ensureDirSync(this.tempDir);

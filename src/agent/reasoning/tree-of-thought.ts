@@ -10,7 +10,7 @@
  */
 
 import { EventEmitter } from "events";
-import { GrokClient, GrokMessage } from "../../grok/client.js";
+import { CodeBuddyClient, CodeBuddyMessage } from "../../codebuddy/client.js";
 import { ToolResult, getErrorMessage } from "../../types/index.js";
 import {
   ThoughtNode,
@@ -48,7 +48,7 @@ const DEFAULT_TOT_CONFIG: ToTConfig = {
  * Tree-of-Thought Reasoner
  */
 export class TreeOfThoughtReasoner extends EventEmitter {
-  private client: GrokClient;
+  private client: CodeBuddyClient;
   private config: ToTConfig;
   private mctsConfig: MCTSConfig;
   private executeCommand?: (cmd: string) => Promise<ToolResult>;
@@ -65,7 +65,7 @@ export class TreeOfThoughtReasoner extends EventEmitter {
       ...DEFAULT_MCTS_CONFIG,
       ...THINKING_MODE_CONFIG[this.config.mode],
     };
-    this.client = new GrokClient(
+    this.client = new CodeBuddyClient(
       apiKey,
       config.model || "grok-3-latest",
       baseURL
@@ -125,7 +125,7 @@ ${problem.constraints?.length ? `Constraints:\n${problem.constraints.map(c => `-
 
 Think through this step by step:`;
 
-    const messages: GrokMessage[] = [
+    const messages: CodeBuddyMessage[] = [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ];
@@ -167,7 +167,7 @@ Approach 2:
 
 ...`;
 
-    const messages: GrokMessage[] = [
+    const messages: CodeBuddyMessage[] = [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ];
@@ -206,7 +206,7 @@ ${problem.successCriteria?.map(c => `- ${c}`).join("\n") || "Solve the problem c
 
 Rate this thought (0-1):`;
 
-    const messages: GrokMessage[] = [
+    const messages: CodeBuddyMessage[] = [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ];
@@ -269,7 +269,7 @@ ${feedback}
 
 Provide an improved version of this thought that addresses the feedback:`;
 
-    const messages: GrokMessage[] = [
+    const messages: CodeBuddyMessage[] = [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ];

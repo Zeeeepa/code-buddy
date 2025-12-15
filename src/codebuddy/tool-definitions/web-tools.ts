@@ -6,10 +6,10 @@
  * - URL fetching
  */
 
-import type { GrokTool } from './types.js';
+import type { CodeBuddyTool } from './types.js';
 
 // Web search tool
-export const WEB_SEARCH_TOOL: GrokTool = {
+export const WEB_SEARCH_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "web_search",
@@ -32,7 +32,7 @@ export const WEB_SEARCH_TOOL: GrokTool = {
 };
 
 // Web fetch tool
-export const WEB_FETCH_TOOL: GrokTool = {
+export const WEB_FETCH_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "web_fetch",
@@ -53,7 +53,7 @@ export const WEB_FETCH_TOOL: GrokTool = {
 /**
  * All web tools as an array
  */
-export const WEB_TOOLS: GrokTool[] = [
+export const WEB_TOOLS: CodeBuddyTool[] = [
   WEB_SEARCH_TOOL,
   WEB_FETCH_TOOL,
 ];

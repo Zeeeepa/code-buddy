@@ -6,7 +6,7 @@
  */
 
 // Types
-export type { GrokTool, JsonSchemaProperty } from './types.js';
+export type { CodeBuddyTool, JsonSchemaProperty } from './types.js';
 
 // Core tools
 export {
@@ -68,5 +68,5 @@ export {
   MULTIMODAL_TOOLS,
 } from './multimodal-tools.js';
 
-// Re-export GrokTool from client for convenience
-export type { GrokTool as Tool } from './types.js';
+// Re-export CodeBuddyTool from client for convenience
+export type { CodeBuddyTool as Tool } from './types.js';

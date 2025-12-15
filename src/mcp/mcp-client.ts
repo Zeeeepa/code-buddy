@@ -58,7 +58,7 @@ export class MCPClient extends EventEmitter {
 
   constructor() {
     super();
-    this.configPath = path.join(process.cwd(), '.grok', 'mcp-servers.json');
+    this.configPath = path.join(process.cwd(), '.codebuddy', 'mcp-servers.json');
   }
 
   /**
@@ -77,7 +77,7 @@ export class MCPClient extends EventEmitter {
     }
 
     // Check user-level config
-    const userConfigPath = path.join(os.homedir(), '.grok', 'mcp-servers.json');
+    const userConfigPath = path.join(os.homedir(), '.codebuddy', 'mcp-servers.json');
     if (fs.existsSync(userConfigPath)) {
       try {
         const content = fs.readFileSync(userConfigPath, 'utf-8');
@@ -236,7 +236,7 @@ export class MCPClient extends EventEmitter {
   formatStatus(): string {
     const servers = this.getConnectedServers();
     if (servers.length === 0) {
-      return 'No MCP servers connected.\nConfigure servers in .grok/mcp-servers.json';
+      return 'No MCP servers connected.\nConfigure servers in .codebuddy/mcp-servers.json';
     }
 
     return `Connected MCP Servers:\n${servers.map(s => `  • ${s}`).join('\n')}`;

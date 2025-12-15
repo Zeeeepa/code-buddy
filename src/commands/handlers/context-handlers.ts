@@ -1,4 +1,4 @@
-import { ChatEntry } from "../../agent/grok-agent.js";
+import { ChatEntry } from "../../agent/codebuddy-agent.js";
 import { getContextLoader, ContextLoader } from "../../context/context-loader.js";
 import { getWorkspaceDetector } from "../../utils/workspace-detector.js";
 

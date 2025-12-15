@@ -7,7 +7,7 @@
  * - DataAnalysisAgent: Data analysis and transformation
  * - SQLAgent: SQL queries on data files
  * - ArchiveAgent: Archive management (zip, tar, etc.)
- * - CodeGuardianAgent: Code analysis, review, and improvement (Grokinette)
+ * - CodeGuardianAgent: Code analysis, review, and improvement (CodeBuddynette)
  */
 
 export * from './types.js';

@@ -15,7 +15,7 @@
  * - LRU cache for repeated queries
  */
 
-import { GrokTool } from "../grok/client.js";
+import { CodeBuddyTool } from "../codebuddy/client.js";
 
 /**
  * Tool category for classification
@@ -59,7 +59,7 @@ export interface QueryClassification {
  * Tool selection result
  */
 export interface ToolSelectionResult {
-  selectedTools: GrokTool[];
+  selectedTools: CodeBuddyTool[];
   scores: Map<string, number>;
   classification: QueryClassification;
   reducedTokens: number;
@@ -593,7 +593,7 @@ export class ToolSelector {
    */
   selectTools(
     query: string,
-    allTools: GrokTool[],
+    allTools: CodeBuddyTool[],
     options: {
       maxTools?: number;
       minScore?: number;
@@ -621,8 +621,8 @@ export class ToolSelector {
     const queryTokens = this.tokenize(query);
     const scores = new Map<string, number>();
 
-    // Create a map of tool name to GrokTool for quick lookup
-    const toolMap = new Map<string, GrokTool>();
+    // Create a map of tool name to CodeBuddyTool for quick lookup
+    const toolMap = new Map<string, CodeBuddyTool>();
     for (const tool of allTools) {
       toolMap.set(tool.function.name, tool);
     }
@@ -713,7 +713,7 @@ export class ToolSelector {
     // Build selected tools array
     const selectedTools = selectedToolNames
       .map(name => toolMap.get(name))
-      .filter((t): t is GrokTool => t !== undefined);
+      .filter((t): t is CodeBuddyTool => t !== undefined);
 
     // Calculate token savings (rough estimate)
     const originalTokens = this.estimateTokens(allTools);
@@ -731,7 +731,7 @@ export class ToolSelector {
   /**
    * Estimate token count for tools (rough approximation)
    */
-  private estimateTokens(tools: GrokTool[]): number {
+  private estimateTokens(tools: CodeBuddyTool[]): number {
     let tokens = 0;
     for (const tool of tools) {
       // Rough estimate: name + description + parameters
@@ -786,7 +786,7 @@ export class ToolSelector {
   /**
    * Auto-register MCP tools by parsing their names and descriptions
    */
-  registerMCPTool(tool: GrokTool): void {
+  registerMCPTool(tool: CodeBuddyTool): void {
     const name = tool.function.name;
     const description = tool.function.description;
 
@@ -1014,7 +1014,7 @@ export function getToolSelector(): ToolSelector {
  */
 export function selectRelevantTools(
   query: string,
-  allTools: GrokTool[],
+  allTools: CodeBuddyTool[],
   maxTools: number = 10
 ): ToolSelectionResult {
   return getToolSelector().selectTools(query, allTools, { maxTools });

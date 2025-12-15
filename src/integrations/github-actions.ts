@@ -318,7 +318,7 @@ const WORKFLOW_TEMPLATES: Record<string, WorkflowConfig> = {
   },
 
   'grok-review': {
-    name: 'Grok AI Review',
+    name: 'CodeBuddy AI Review',
     on: {
       pull_request: { types: ['opened', 'synchronize'] },
     },

@@ -9,10 +9,10 @@
  * - Multi-pattern search
  */
 
-import type { GrokTool } from './types.js';
+import type { CodeBuddyTool } from './types.js';
 
 // Unified search tool
-export const SEARCH_TOOL: GrokTool = {
+export const SEARCH_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "search",
@@ -69,7 +69,7 @@ export const SEARCH_TOOL: GrokTool = {
 };
 
 // Find symbols tool
-export const FIND_SYMBOLS_TOOL: GrokTool = {
+export const FIND_SYMBOLS_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "find_symbols",
@@ -100,7 +100,7 @@ export const FIND_SYMBOLS_TOOL: GrokTool = {
 };
 
 // Find references tool
-export const FIND_REFERENCES_TOOL: GrokTool = {
+export const FIND_REFERENCES_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "find_references",
@@ -123,7 +123,7 @@ export const FIND_REFERENCES_TOOL: GrokTool = {
 };
 
 // Find definition tool
-export const FIND_DEFINITION_TOOL: GrokTool = {
+export const FIND_DEFINITION_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "find_definition",
@@ -142,7 +142,7 @@ export const FIND_DEFINITION_TOOL: GrokTool = {
 };
 
 // Multi-pattern search tool
-export const SEARCH_MULTI_TOOL: GrokTool = {
+export const SEARCH_MULTI_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "search_multi",
@@ -169,7 +169,7 @@ export const SEARCH_MULTI_TOOL: GrokTool = {
 /**
  * All search tools as an array
  */
-export const SEARCH_TOOLS: GrokTool[] = [
+export const SEARCH_TOOLS: CodeBuddyTool[] = [
   SEARCH_TOOL,
   FIND_SYMBOLS_TOOL,
   FIND_REFERENCES_TOOL,

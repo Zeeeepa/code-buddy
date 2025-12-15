@@ -49,7 +49,7 @@ export class BackgroundTaskManager extends EventEmitter {
   constructor(maxConcurrent: number = 3) {
     super();
     this.maxConcurrent = maxConcurrent;
-    this.tasksDir = path.join(os.homedir(), '.grok', 'tasks');
+    this.tasksDir = path.join(os.homedir(), '.codebuddy', 'tasks');
     this.ensureTasksDir();
     this.loadTasks();
   }
@@ -203,9 +203,9 @@ export class BackgroundTaskManager extends EventEmitter {
     }
 
     // Find grok executable
-    const grokPath = process.argv[1]; // Current script path
+    const codebuddyPath = process.argv[1]; // Current script path
 
-    const child = spawn('node', [grokPath, ...args], {
+    const child = spawn('node', [codebuddyPath, ...args], {
       cwd: task.workingDirectory,
       env: process.env,
       stdio: ['pipe', 'pipe', 'pipe']

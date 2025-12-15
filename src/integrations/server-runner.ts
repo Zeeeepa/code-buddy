@@ -147,7 +147,7 @@ JSON-RPC Mode:
 
   Example client (Node.js):
     const { spawn } = require('child_process');
-    const grok = spawn('grok', ['--json-rpc']);
+    const grok = spawn('codebuddy', ['--json-rpc']);
 
     grok.stdin.write(JSON.stringify({
       jsonrpc: '2.0',
@@ -164,15 +164,15 @@ MCP Mode:
     {
       "mcpServers": {
         "code-buddy": {
-          "command": "grok",
+          "command": "codebuddy",
           "args": ["--mcp-server"]
         }
       }
     }
 
   Tools exposed:
-    - grok_ask: Ask Grok AI a question
-    - grok_complete_code: Get code completions
+    - codebuddy_ask: Ask CodeBuddy AI a question
+    - codebuddy_complete_code: Get code completions
     - fcs_execute: Run FCS scripts
     - read_file, write_file, list_directory
     - search_content, git_status, execute_shell

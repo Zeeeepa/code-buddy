@@ -583,7 +583,7 @@ export class WebSearchManager extends EventEmitter {
         path: urlObj.pathname + urlObj.search,
         method: 'GET',
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; GrokCLI/1.0)',
+          'User-Agent': 'Mozilla/5.0 (compatible; CodeBuddyCLI/1.0)',
           'Accept': 'text/html,application/json',
           ...headers,
         },

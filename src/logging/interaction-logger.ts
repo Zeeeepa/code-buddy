@@ -96,7 +96,7 @@ export interface SessionData {
 // Interaction Logger
 // ============================================================================
 
-const LOG_DIR = join(homedir(), '.grok', 'logs');
+const LOG_DIR = join(homedir(), '.codebuddy', 'logs');
 const LOG_VERSION = '1.0.0';
 
 /**

@@ -41,7 +41,7 @@ export interface CreateOptions {
  */
 export class ArchiveTool {
   private readonly supportedFormats = ['.zip', '.tar', '.tar.gz', '.tgz', '.tar.bz2', '.tbz2', '.tar.xz', '.txz', '.7z', '.rar', '.gz', '.bz2', '.xz'];
-  private readonly outputDir = path.join(process.cwd(), '.grok', 'extracted');
+  private readonly outputDir = path.join(process.cwd(), '.codebuddy', 'extracted');
 
   /**
    * List contents of an archive

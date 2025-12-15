@@ -7,7 +7,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync, spawn } from 'child_process';
-import { GrokScriptConfig, GrokValue, GrokFunction } from './types.js';
+import { CodeBuddyScriptConfig, CodeBuddyValue, CodeBuddyFunction } from './types.js';
 
 type PrintFn = (msg: string) => void;
 
@@ -17,48 +17,48 @@ export type BuiltinFunctions = Record<string, any>;
 /**
  * Create all built-in functions for the Grok Script runtime
  */
-export function createBuiltins(config: GrokScriptConfig, print: PrintFn): BuiltinFunctions {
+export function createBuiltins(config: CodeBuddyScriptConfig, print: PrintFn): BuiltinFunctions {
   const builtins: BuiltinFunctions = {};
 
   // ============================================
   // Core Functions
   // ============================================
 
-  builtins.print = (...args: GrokValue[]) => {
+  builtins.print = (...args: CodeBuddyValue[]) => {
     const message = args.map(a => stringify(a)).join(' ');
     print(message);
     return null;
   };
 
-  builtins.println = (...args: GrokValue[]) => {
+  builtins.println = (...args: CodeBuddyValue[]) => {
     builtins.print(...args);
     return null;
   };
 
-  builtins.typeof = (value: GrokValue) => {
+  builtins.typeof = (value: CodeBuddyValue) => {
     if (value === null) return 'null';
     if (Array.isArray(value)) return 'array';
     return typeof value;
   };
 
-  builtins.len = (value: GrokValue) => {
+  builtins.len = (value: CodeBuddyValue) => {
     if (typeof value === 'string') return value.length;
     if (Array.isArray(value)) return value.length;
     if (typeof value === 'object' && value !== null) return Object.keys(value).length;
     return 0;
   };
 
-  builtins.str = (value: GrokValue) => stringify(value);
-  builtins.num = (value: GrokValue) => Number(value);
-  builtins.bool = (value: GrokValue) => Boolean(value);
-  builtins.int = (value: GrokValue) => Math.floor(Number(value));
-  builtins.float = (value: GrokValue) => Number(value);
+  builtins.str = (value: CodeBuddyValue) => stringify(value);
+  builtins.num = (value: CodeBuddyValue) => Number(value);
+  builtins.bool = (value: CodeBuddyValue) => Boolean(value);
+  builtins.int = (value: CodeBuddyValue) => Math.floor(Number(value));
+  builtins.float = (value: CodeBuddyValue) => Number(value);
 
   // ============================================
   // Array/Object Functions
   // ============================================
 
-  builtins.range = (start: GrokValue, end?: GrokValue, step?: GrokValue) => {
+  builtins.range = (start: CodeBuddyValue, end?: CodeBuddyValue, step?: CodeBuddyValue) => {
     const s = Number(start);
     const e = end !== undefined ? Number(end) : s;
     const st = step !== undefined ? Number(step) : 1;
@@ -73,28 +73,28 @@ export function createBuiltins(config: GrokScriptConfig, print: PrintFn): Builti
     return result;
   };
 
-  builtins.keys = (obj: GrokValue) => {
+  builtins.keys = (obj: CodeBuddyValue) => {
     if (typeof obj === 'object' && obj !== null) {
       return Object.keys(obj);
     }
     return [];
   };
 
-  builtins.values = (obj: GrokValue) => {
+  builtins.values = (obj: CodeBuddyValue) => {
     if (typeof obj === 'object' && obj !== null) {
       return Object.values(obj);
     }
     return [];
   };
 
-  builtins.entries = (obj: GrokValue) => {
+  builtins.entries = (obj: CodeBuddyValue) => {
     if (typeof obj === 'object' && obj !== null) {
       return Object.entries(obj);
     }
     return [];
   };
 
-  builtins.push = (arr: GrokValue, ...items: GrokValue[]) => {
+  builtins.push = (arr: CodeBuddyValue, ...items: CodeBuddyValue[]) => {
     if (Array.isArray(arr)) {
       arr.push(...items);
       return arr; // Return array for chaining
@@ -102,25 +102,25 @@ export function createBuiltins(config: GrokScriptConfig, print: PrintFn): Builti
     throw new Error('push requires an array');
   };
 
-  builtins.pop = (arr: GrokValue) => {
+  builtins.pop = (arr: CodeBuddyValue) => {
     if (Array.isArray(arr)) {
       return arr.pop();
     }
     throw new Error('pop requires an array');
   };
 
-  builtins.join = (arr: GrokValue, separator?: GrokValue) => {
+  builtins.join = (arr: CodeBuddyValue, separator?: CodeBuddyValue) => {
     if (Array.isArray(arr)) {
       return arr.map(stringify).join(separator !== undefined ? String(separator) : ',');
     }
     throw new Error('join requires an array');
   };
 
-  builtins.split = (str: GrokValue, separator?: GrokValue) => {
+  builtins.split = (str: CodeBuddyValue, separator?: CodeBuddyValue) => {
     return String(str).split(separator !== undefined ? String(separator) : '');
   };
 
-  builtins.slice = (arr: GrokValue, start?: GrokValue, end?: GrokValue) => {
+  builtins.slice = (arr: CodeBuddyValue, start?: CodeBuddyValue, end?: CodeBuddyValue) => {
     if (Array.isArray(arr) || typeof arr === 'string') {
       return arr.slice(
         start !== undefined ? Number(start) : undefined,
@@ -130,43 +130,43 @@ export function createBuiltins(config: GrokScriptConfig, print: PrintFn): Builti
     throw new Error('slice requires an array or string');
   };
 
-  builtins.map = async (arr: GrokValue, fn: GrokValue) => {
+  builtins.map = async (arr: CodeBuddyValue, fn: CodeBuddyValue) => {
     if (!Array.isArray(arr)) throw new Error('map requires an array');
     if (typeof fn !== 'function') throw new Error('map requires a function');
 
-    const results: GrokValue[] = [];
+    const results: CodeBuddyValue[] = [];
     for (let i = 0; i < arr.length; i++) {
-      results.push(await (fn as GrokFunction)(arr[i], i));
+      results.push(await (fn as CodeBuddyFunction)(arr[i], i));
     }
     return results;
   };
 
-  builtins.filter = async (arr: GrokValue, fn: GrokValue) => {
+  builtins.filter = async (arr: CodeBuddyValue, fn: CodeBuddyValue) => {
     if (!Array.isArray(arr)) throw new Error('filter requires an array');
     if (typeof fn !== 'function') throw new Error('filter requires a function');
 
-    const results: GrokValue[] = [];
+    const results: CodeBuddyValue[] = [];
     for (let i = 0; i < arr.length; i++) {
-      if (await (fn as GrokFunction)(arr[i], i)) {
+      if (await (fn as CodeBuddyFunction)(arr[i], i)) {
         results.push(arr[i]);
       }
     }
     return results;
   };
 
-  builtins.find = async (arr: GrokValue, fn: GrokValue) => {
+  builtins.find = async (arr: CodeBuddyValue, fn: CodeBuddyValue) => {
     if (!Array.isArray(arr)) throw new Error('find requires an array');
     if (typeof fn !== 'function') throw new Error('find requires a function');
 
     for (let i = 0; i < arr.length; i++) {
-      if (await (fn as GrokFunction)(arr[i], i)) {
+      if (await (fn as CodeBuddyFunction)(arr[i], i)) {
         return arr[i];
       }
     }
     return null;
   };
 
-  builtins.includes = (arr: GrokValue, item: GrokValue) => {
+  builtins.includes = (arr: CodeBuddyValue, item: CodeBuddyValue) => {
     if (Array.isArray(arr)) return arr.includes(item);
     if (typeof arr === 'string') return arr.includes(String(item));
     return false;
@@ -176,19 +176,19 @@ export function createBuiltins(config: GrokScriptConfig, print: PrintFn): Builti
   // String Functions
   // ============================================
 
-  builtins.trim = (str: GrokValue) => String(str).trim();
-  builtins.lower = (str: GrokValue) => String(str).toLowerCase();
-  builtins.upper = (str: GrokValue) => String(str).toUpperCase();
-  builtins.replace = (str: GrokValue, search: GrokValue, replacement: GrokValue) => {
+  builtins.trim = (str: CodeBuddyValue) => String(str).trim();
+  builtins.lower = (str: CodeBuddyValue) => String(str).toLowerCase();
+  builtins.upper = (str: CodeBuddyValue) => String(str).toUpperCase();
+  builtins.replace = (str: CodeBuddyValue, search: CodeBuddyValue, replacement: CodeBuddyValue) => {
     return String(str).replace(String(search), String(replacement));
   };
-  builtins.replaceAll = (str: GrokValue, search: GrokValue, replacement: GrokValue) => {
+  builtins.replaceAll = (str: CodeBuddyValue, search: CodeBuddyValue, replacement: CodeBuddyValue) => {
     return String(str).replaceAll(String(search), String(replacement));
   };
-  builtins.startsWith = (str: GrokValue, prefix: GrokValue) => String(str).startsWith(String(prefix));
-  builtins.endsWith = (str: GrokValue, suffix: GrokValue) => String(str).endsWith(String(suffix));
-  builtins.contains = (str: GrokValue, search: GrokValue) => String(str).includes(String(search));
-  builtins.match = (str: GrokValue, pattern: GrokValue) => {
+  builtins.startsWith = (str: CodeBuddyValue, prefix: CodeBuddyValue) => String(str).startsWith(String(prefix));
+  builtins.endsWith = (str: CodeBuddyValue, suffix: CodeBuddyValue) => String(str).endsWith(String(suffix));
+  builtins.contains = (str: CodeBuddyValue, search: CodeBuddyValue) => String(str).includes(String(search));
+  builtins.match = (str: CodeBuddyValue, pattern: CodeBuddyValue) => {
     const match = String(str).match(new RegExp(String(pattern)));
     return match ? Array.from(match) : null;
   };
@@ -197,23 +197,23 @@ export function createBuiltins(config: GrokScriptConfig, print: PrintFn): Builti
   // Math Functions
   // ============================================
 
-  builtins.min = (...args: GrokValue[]) => {
+  builtins.min = (...args: CodeBuddyValue[]) => {
     const nums = args.flat().map(Number);
     return Math.min(...nums);
   };
 
-  builtins.max = (...args: GrokValue[]) => {
+  builtins.max = (...args: CodeBuddyValue[]) => {
     const nums = args.flat().map(Number);
     return Math.max(...nums);
   };
 
-  builtins.abs = (n: GrokValue) => Math.abs(Number(n));
-  builtins.floor = (n: GrokValue) => Math.floor(Number(n));
-  builtins.ceil = (n: GrokValue) => Math.ceil(Number(n));
-  builtins.round = (n: GrokValue) => Math.round(Number(n));
-  builtins.sqrt = (n: GrokValue) => Math.sqrt(Number(n));
-  builtins.pow = (base: GrokValue, exp: GrokValue) => Math.pow(Number(base), Number(exp));
-  builtins.random = (max?: GrokValue) => {
+  builtins.abs = (n: CodeBuddyValue) => Math.abs(Number(n));
+  builtins.floor = (n: CodeBuddyValue) => Math.floor(Number(n));
+  builtins.ceil = (n: CodeBuddyValue) => Math.ceil(Number(n));
+  builtins.round = (n: CodeBuddyValue) => Math.round(Number(n));
+  builtins.sqrt = (n: CodeBuddyValue) => Math.sqrt(Number(n));
+  builtins.pow = (base: CodeBuddyValue, exp: CodeBuddyValue) => Math.pow(Number(base), Number(exp));
+  builtins.random = (max?: CodeBuddyValue) => {
     if (max !== undefined) {
       return Math.floor(Math.random() * Number(max));
     }
@@ -226,7 +226,7 @@ export function createBuiltins(config: GrokScriptConfig, print: PrintFn): Builti
 
   builtins.time = () => Date.now();
   builtins.now = () => new Date().toISOString();
-  builtins.sleep = async (ms: GrokValue) => {
+  builtins.sleep = async (ms: CodeBuddyValue) => {
     await new Promise(resolve => setTimeout(resolve, Number(ms)));
     return null;
   };
@@ -236,7 +236,7 @@ export function createBuiltins(config: GrokScriptConfig, print: PrintFn): Builti
   // ============================================
 
   const file = {
-    read: (filePath: GrokValue) => {
+    read: (filePath: CodeBuddyValue) => {
       if (!config.enableFileOps) throw new Error('File operations disabled');
       const fullPath = resolvePath(String(filePath), config.workdir);
       if (config.dryRun) {
@@ -246,7 +246,7 @@ export function createBuiltins(config: GrokScriptConfig, print: PrintFn): Builti
       return fs.readFileSync(fullPath, 'utf-8');
     },
 
-    write: (filePath: GrokValue, content: GrokValue) => {
+    write: (filePath: CodeBuddyValue, content: CodeBuddyValue) => {
       if (!config.enableFileOps) throw new Error('File operations disabled');
       const fullPath = resolvePath(String(filePath), config.workdir);
       if (config.dryRun) {
@@ -257,7 +257,7 @@ export function createBuiltins(config: GrokScriptConfig, print: PrintFn): Builti
       return true;
     },
 
-    append: (filePath: GrokValue, content: GrokValue) => {
+    append: (filePath: CodeBuddyValue, content: CodeBuddyValue) => {
       if (!config.enableFileOps) throw new Error('File operations disabled');
       const fullPath = resolvePath(String(filePath), config.workdir);
       if (config.dryRun) {
@@ -268,12 +268,12 @@ export function createBuiltins(config: GrokScriptConfig, print: PrintFn): Builti
       return true;
     },
 
-    exists: (filePath: GrokValue) => {
+    exists: (filePath: CodeBuddyValue) => {
       const fullPath = resolvePath(String(filePath), config.workdir);
       return fs.existsSync(fullPath);
     },
 
-    delete: (filePath: GrokValue) => {
+    delete: (filePath: CodeBuddyValue) => {
       if (!config.enableFileOps) throw new Error('File operations disabled');
       const fullPath = resolvePath(String(filePath), config.workdir);
       if (config.dryRun) {
@@ -284,7 +284,7 @@ export function createBuiltins(config: GrokScriptConfig, print: PrintFn): Builti
       return true;
     },
 
-    copy: (src: GrokValue, dest: GrokValue) => {
+    copy: (src: CodeBuddyValue, dest: CodeBuddyValue) => {
       if (!config.enableFileOps) throw new Error('File operations disabled');
       const srcPath = resolvePath(String(src), config.workdir);
       const destPath = resolvePath(String(dest), config.workdir);
@@ -296,7 +296,7 @@ export function createBuiltins(config: GrokScriptConfig, print: PrintFn): Builti
       return true;
     },
 
-    move: (src: GrokValue, dest: GrokValue) => {
+    move: (src: CodeBuddyValue, dest: CodeBuddyValue) => {
       if (!config.enableFileOps) throw new Error('File operations disabled');
       const srcPath = resolvePath(String(src), config.workdir);
       const destPath = resolvePath(String(dest), config.workdir);
@@ -308,12 +308,12 @@ export function createBuiltins(config: GrokScriptConfig, print: PrintFn): Builti
       return true;
     },
 
-    list: (dirPath: GrokValue) => {
+    list: (dirPath: CodeBuddyValue) => {
       const fullPath = resolvePath(String(dirPath), config.workdir);
       return fs.readdirSync(fullPath);
     },
 
-    mkdir: (dirPath: GrokValue) => {
+    mkdir: (dirPath: CodeBuddyValue) => {
       if (!config.enableFileOps) throw new Error('File operations disabled');
       const fullPath = resolvePath(String(dirPath), config.workdir);
       if (config.dryRun) {
@@ -324,7 +324,7 @@ export function createBuiltins(config: GrokScriptConfig, print: PrintFn): Builti
       return true;
     },
 
-    stat: (filePath: GrokValue) => {
+    stat: (filePath: CodeBuddyValue) => {
       const fullPath = resolvePath(String(filePath), config.workdir);
       const stats = fs.statSync(fullPath);
       return {
@@ -336,7 +336,7 @@ export function createBuiltins(config: GrokScriptConfig, print: PrintFn): Builti
       };
     },
 
-    glob: (pattern: GrokValue) => {
+    glob: (pattern: CodeBuddyValue) => {
       // Simple glob implementation
       const fullPath = resolvePath(String(pattern), config.workdir);
       const dir = path.dirname(fullPath);
@@ -357,9 +357,9 @@ export function createBuiltins(config: GrokScriptConfig, print: PrintFn): Builti
   // ============================================
 
   const bash = {
-    run: (command: GrokValue, options?: GrokValue) => {
+    run: (command: CodeBuddyValue, options?: CodeBuddyValue) => {
       if (!config.enableBash) throw new Error('Bash commands disabled');
-      const opts = (options as Record<string, GrokValue>) || {};
+      const opts = (options as Record<string, CodeBuddyValue>) || {};
 
       if (config.dryRun) {
         print(`[DRY RUN] bash: ${command}`);
@@ -389,7 +389,7 @@ export function createBuiltins(config: GrokScriptConfig, print: PrintFn): Builti
       }
     },
 
-    exec: (command: GrokValue) => {
+    exec: (command: CodeBuddyValue) => {
       const result = bash.run(command) as { stdout: string; code: number };
       if (result.code !== 0) {
         throw new Error(`Command failed with code ${result.code}`);
@@ -397,7 +397,7 @@ export function createBuiltins(config: GrokScriptConfig, print: PrintFn): Builti
       return result.stdout;
     },
 
-    spawn: async (command: GrokValue, args?: GrokValue) => {
+    spawn: async (command: CodeBuddyValue, args?: CodeBuddyValue) => {
       if (!config.enableBash) throw new Error('Bash commands disabled');
 
       const argList = Array.isArray(args) ? args.map(String) : [];
@@ -432,39 +432,39 @@ export function createBuiltins(config: GrokScriptConfig, print: PrintFn): Builti
   builtins.bash = bash;
 
   // ============================================
-  // AI Operations (placeholder - will integrate with GrokAgent)
+  // AI Operations (placeholder - will integrate with CodeBuddyAgent)
   // ============================================
 
   const ai = {
-    ask: async (prompt: GrokValue) => {
+    ask: async (prompt: CodeBuddyValue) => {
       if (!config.enableAI) throw new Error('AI operations disabled');
       if (config.dryRun) {
         print(`[DRY RUN] ai.ask: ${prompt}`);
         return '[AI Response Placeholder]';
       }
-      // TODO: Integrate with actual GrokAgent
+      // TODO: Integrate with actual CodeBuddyAgent
       print(`[AI] Prompt: ${prompt}`);
       return '[AI integration pending]';
     },
 
-    chat: async (message: GrokValue) => {
+    chat: async (message: CodeBuddyValue) => {
       if (!config.enableAI) throw new Error('AI operations disabled');
       if (config.dryRun) {
         print(`[DRY RUN] ai.chat: ${message}`);
         return '[AI Response Placeholder]';
       }
-      // TODO: Integrate with actual GrokAgent
+      // TODO: Integrate with actual CodeBuddyAgent
       print(`[AI] Message: ${message}`);
       return '[AI integration pending]';
     },
 
-    complete: async (prompt: GrokValue, _options?: GrokValue) => {
+    complete: async (prompt: CodeBuddyValue, _options?: CodeBuddyValue) => {
       if (!config.enableAI) throw new Error('AI operations disabled');
       if (config.dryRun) {
         print(`[DRY RUN] ai.complete: ${prompt}`);
         return '[AI Response Placeholder]';
       }
-      // TODO: Integrate with actual GrokAgent
+      // TODO: Integrate with actual CodeBuddyAgent
       return '[AI integration pending]';
     },
   };
@@ -476,8 +476,8 @@ export function createBuiltins(config: GrokScriptConfig, print: PrintFn): Builti
   // ============================================
 
   const env = {
-    get: (name: GrokValue) => process.env[String(name)] || null,
-    set: (name: GrokValue, value: GrokValue) => {
+    get: (name: CodeBuddyValue) => process.env[String(name)] || null,
+    set: (name: CodeBuddyValue, value: CodeBuddyValue) => {
       process.env[String(name)] = String(value);
       return true;
     },
@@ -500,8 +500,8 @@ export function createBuiltins(config: GrokScriptConfig, print: PrintFn): Builti
   // ============================================
 
   const json = {
-    parse: (str: GrokValue) => JSON.parse(String(str)),
-    stringify: (value: GrokValue, indent?: GrokValue) => {
+    parse: (str: CodeBuddyValue) => JSON.parse(String(str)),
+    stringify: (value: CodeBuddyValue, indent?: CodeBuddyValue) => {
       return JSON.stringify(value, null, indent ? Number(indent) : undefined);
     },
   };
@@ -516,11 +516,11 @@ export function createBuiltins(config: GrokScriptConfig, print: PrintFn): Builti
   const console = {
     log: builtins.print,
     info: builtins.print,
-    warn: (...args: GrokValue[]) => {
+    warn: (...args: CodeBuddyValue[]) => {
       print('[WARN] ' + args.map(stringify).join(' '));
       return null;
     },
-    error: (...args: GrokValue[]) => {
+    error: (...args: CodeBuddyValue[]) => {
       print('[ERROR] ' + args.map(stringify).join(' '));
       return null;
     },
@@ -548,7 +548,7 @@ export function createBuiltins(config: GrokScriptConfig, print: PrintFn): Builti
 
   builtins.Date = {
     now: () => Date.now(),
-    parse: (str: GrokValue) => Date.parse(String(str)),
+    parse: (str: CodeBuddyValue) => Date.parse(String(str)),
   };
 
   return builtins;
@@ -558,7 +558,7 @@ export function createBuiltins(config: GrokScriptConfig, print: PrintFn): Builti
 // Utility Functions
 // ============================================
 
-function stringify(value: GrokValue): string {
+function stringify(value: CodeBuddyValue): string {
   if (value === null) return 'null';
   if (value === undefined) return 'undefined';
   if (typeof value === 'object') return JSON.stringify(value);

@@ -81,7 +81,7 @@ export class VoiceInputManager extends EventEmitter {
    * Load voice config from settings
    */
   private loadConfig(): void {
-    const configPath = path.join(os.homedir(), '.grok', 'voice-config.json');
+    const configPath = path.join(os.homedir(), '.codebuddy', 'voice-config.json');
 
     if (fs.existsSync(configPath)) {
       try {
@@ -97,7 +97,7 @@ export class VoiceInputManager extends EventEmitter {
    * Save voice config
    */
   saveConfig(): void {
-    const configDir = path.join(os.homedir(), '.grok');
+    const configDir = path.join(os.homedir(), '.codebuddy');
     const configPath = path.join(configDir, 'voice-config.json');
 
     if (!fs.existsSync(configDir)) {

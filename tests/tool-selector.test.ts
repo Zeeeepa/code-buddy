@@ -13,10 +13,10 @@ import {
   selectRelevantTools,
   ToolCategory
 } from '../src/tools/tool-selector';
-import { GrokTool } from '../src/grok/client';
+import { CodeBuddyTool } from '../src/codebuddy/client';
 
 // Mock tools for testing
-const mockTools: GrokTool[] = [
+const mockTools: CodeBuddyTool[] = [
   {
     type: 'function',
     function: {
@@ -325,7 +325,7 @@ describe('ToolSelector', () => {
 
   describe('registerMCPTool', () => {
     it('should register MCP tools for better matching', () => {
-      const mcpTool: GrokTool = {
+      const mcpTool: CodeBuddyTool = {
         type: 'function',
         function: {
           name: 'mcp__database__query',
@@ -467,7 +467,7 @@ describe('Tool Selection Performance', () => {
 
   it('should handle large tool sets efficiently', () => {
     // Create a large set of tools
-    const largeToolSet: GrokTool[] = [];
+    const largeToolSet: CodeBuddyTool[] = [];
     for (let i = 0; i < 100; i++) {
       largeToolSet.push({
         type: 'function',

@@ -130,7 +130,7 @@ export class CheckpointManager extends EventEmitter {
     super();
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.workingDirectory = workingDirectory;
-    this.dataDir = path.join(os.homedir(), '.grok', 'checkpoints');
+    this.dataDir = path.join(os.homedir(), '.codebuddy', 'checkpoints');
     this.checkpointsDir = path.join(
       this.dataDir,
       this.hashPath(workingDirectory)

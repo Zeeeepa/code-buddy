@@ -5,7 +5,7 @@
  * Allows users to customize system prompts without modifying code.
  *
  * Features:
- * - Load prompts from ~/.grok/prompts/*.md
+ * - Load prompts from ~/.codebuddy/prompts/*.md
  * - Fall back to built-in prompts
  * - Compose prompts dynamically with optional sections
  * - Auto-select prompt complexity based on model alignment
@@ -28,7 +28,7 @@ function getBuiltinPromptsDir(): string {
     // npm global install (node_modules/@phuetz/code-buddy/prompts)
     path.join(process.execPath, '..', '..', 'lib', 'node_modules', '@phuetz', 'code-buddy', 'prompts'),
     // Fallback to home directory
-    path.join(os.homedir(), '.grok', 'builtin-prompts'),
+    path.join(os.homedir(), '.codebuddy', 'builtin-prompts'),
   ];
 
   for (const candidate of candidates) {
@@ -136,7 +136,7 @@ export class PromptManager {
   private cache: Map<string, string> = new Map();
 
   constructor() {
-    this.userPromptsDir = path.join(os.homedir(), '.grok', 'prompts');
+    this.userPromptsDir = path.join(os.homedir(), '.codebuddy', 'prompts');
     this.builtinPromptsDir = getBuiltinPromptsDir();
   }
 
@@ -475,7 +475,7 @@ This is an example custom prompt. Create your own by copying this file.
 
 ## Usage
 
-1. Create a new file in ~/.grok/prompts/ (e.g., my-prompt.md)
+1. Create a new file in ~/.codebuddy/prompts/ (e.g., my-prompt.md)
 2. Write your custom system prompt
 3. Use it with: grok --prompt my-prompt
 

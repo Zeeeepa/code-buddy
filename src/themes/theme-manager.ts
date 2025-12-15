@@ -31,10 +31,10 @@ export class ThemeManager {
   private preferencesPath: string;
 
   private constructor() {
-    // Themes directory: ~/.grok/themes/
-    this.themesDir = path.join(os.homedir(), '.grok', 'themes');
-    // Preferences path: ~/.grok/theme-preferences.json
-    this.preferencesPath = path.join(os.homedir(), '.grok', 'theme-preferences.json');
+    // Themes directory: ~/.codebuddy/themes/
+    this.themesDir = path.join(os.homedir(), '.codebuddy', 'themes');
+    // Preferences path: ~/.codebuddy/theme-preferences.json
+    this.preferencesPath = path.join(os.homedir(), '.codebuddy', 'theme-preferences.json');
 
     this.initializeThemes();
   }
@@ -75,7 +75,7 @@ export class ThemeManager {
   }
 
   /**
-   * Load custom themes from ~/.grok/themes/
+   * Load custom themes from ~/.codebuddy/themes/
    */
   private loadCustomThemes(): void {
     try {

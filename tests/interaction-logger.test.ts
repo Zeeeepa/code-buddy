@@ -26,7 +26,7 @@ jest.mock('os', () => ({
 beforeEach(() => {
   // Create test directories
   const mockHome = join(tmpdir(), 'grok-test-home');
-  const logsDir = join(mockHome, '.grok', 'logs');
+  const logsDir = join(mockHome, '.codebuddy', 'logs');
   if (!existsSync(logsDir)) {
     mkdirSync(logsDir, { recursive: true });
   }

@@ -77,11 +77,11 @@ export class OCRTool {
         return await this.runTesseract(resolvedPath, options);
       } else {
         // Try alternative: use online OCR API if available
-        const grokKey = process.env.GROK_API_KEY;
+        const codebuddyKey = process.env.GROK_API_KEY;
         const openaiKey = process.env.OPENAI_API_KEY;
 
-        if (grokKey || openaiKey) {
-          return await this.runVisionOCR(resolvedPath, (openaiKey || grokKey) as string);
+        if (codebuddyKey || openaiKey) {
+          return await this.runVisionOCR(resolvedPath, (openaiKey || codebuddyKey) as string);
         }
 
         return {
@@ -391,7 +391,7 @@ export class OCRTool {
       };
     }
 
-    const tempPath = path.join(process.cwd(), '.grok', 'temp', `ocr_region_${Date.now()}.png`);
+    const tempPath = path.join(process.cwd(), '.codebuddy', 'temp', `ocr_region_${Date.now()}.png`);
     fs.mkdirSync(path.dirname(tempPath), { recursive: true });
 
     try {

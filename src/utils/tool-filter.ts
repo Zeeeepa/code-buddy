@@ -11,7 +11,7 @@
  * - Negation with `!`: `*,!bash` (all except bash)
  */
 
-import type { GrokTool } from '../grok/client.js';
+import type { CodeBuddyTool } from '../codebuddy/client.js';
 
 // ============================================================================
 // Types
@@ -26,7 +26,7 @@ export interface ToolFilterConfig {
 
 export interface ToolFilterResult {
   /** Filtered tools */
-  tools: GrokTool[];
+  tools: CodeBuddyTool[];
   /** Tools that were filtered out */
   filtered: string[];
   /** Total original tools */
@@ -116,12 +116,12 @@ export function parsePatterns(patternString: string): string[] {
  * Filter tools based on configuration
  */
 export function filterTools(
-  tools: GrokTool[],
+  tools: CodeBuddyTool[],
   config: ToolFilterConfig
 ): ToolFilterResult {
   const { enabledPatterns, disabledPatterns } = config;
   const filtered: string[] = [];
-  const result: GrokTool[] = [];
+  const result: CodeBuddyTool[] = [];
 
   for (const tool of tools) {
     const toolName = tool.function.name;
@@ -219,7 +219,7 @@ export function resetToolFilter(): void {
 /**
  * Apply the current filter to tools
  */
-export function applyToolFilter(tools: GrokTool[]): GrokTool[] {
+export function applyToolFilter(tools: CodeBuddyTool[]): CodeBuddyTool[] {
   if (currentFilter.enabledPatterns.length === 0 &&
       currentFilter.disabledPatterns.length === 0) {
     return tools;

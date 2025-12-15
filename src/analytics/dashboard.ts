@@ -145,7 +145,7 @@ export class AnalyticsDashboard extends EventEmitter {
   constructor(config: Partial<DashboardConfig> = {}) {
     super();
     this.config = { ...DEFAULT_CONFIG, ...config };
-    this.dataDir = path.join(os.homedir(), '.grok', 'analytics');
+    this.dataDir = path.join(os.homedir(), '.codebuddy', 'analytics');
 
     // Initialize LRU caches with size limits
     this.sessions = new LRUCache<SessionMetrics>({

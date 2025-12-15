@@ -278,13 +278,13 @@ export function HelpSystem({
         </Text>
         <Box marginLeft={2} flexDirection="column">
           <Text>
-            <Text color="cyan">$</Text> grok "add error handling to server.ts"
+            <Text color="cyan">$</Text> codebuddy "add error handling to server.ts"
           </Text>
           <Text>
-            <Text color="cyan">$</Text> grok "find all TODO comments"
+            <Text color="cyan">$</Text> codebuddy "find all TODO comments"
           </Text>
           <Text>
-            <Text color="cyan">$</Text> grok "refactor UserService to async/await"
+            <Text color="cyan">$</Text> codebuddy "refactor UserService to async/await"
           </Text>
         </Box>
       </Box>
@@ -496,9 +496,9 @@ export function HelpSystem({
  * Default help configuration for Grok CLI
  */
 export const DEFAULT_HELP_CONFIG: HelpConfig = {
-  appName: "Grok CLI",
+  appName: "CodeBuddy CLI",
   version: "1.0.0",
-  description: "AI-powered terminal agent using Grok API",
+  description: "AI-powered terminal agent using CodeBuddy API",
   docUrl: "https://github.com/phuetz/code-buddy#readme",
   issuesUrl: "https://github.com/phuetz/code-buddy/issues",
   categories: [

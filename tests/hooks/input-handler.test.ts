@@ -1,6 +1,6 @@
 /**
  * Tests for input-handler features
- * - # instruction capture (save to .grokrules)
+ * - # instruction capture (save to .codebuddyrules)
  * - Double escape detection (edit previous prompt)
  */
 
@@ -25,13 +25,13 @@ describe('Input Handler Features', () => {
   });
 
   describe('# Instruction Capture', () => {
-    // Simulate the saveInstructionToGrokRules function from use-input-handler.ts
-    function saveInstructionToGrokRules(instruction: string, grokrulesPath: string): string {
+    // Simulate the saveInstructionToCodeBuddyRules function from use-input-handler.ts
+    function saveInstructionToCodeBuddyRules(instruction: string, codebuddyrulesPath: string): string {
       try {
         let rules: { instructions?: string[] } = {};
 
-        if (fs.existsSync(grokrulesPath)) {
-          const content = fs.readFileSync(grokrulesPath, 'utf-8');
+        if (fs.existsSync(codebuddyrulesPath)) {
+          const content = fs.readFileSync(codebuddyrulesPath, 'utf-8');
           try {
             rules = yaml.load(content) as { instructions?: string[] } || {};
           } catch {
@@ -47,40 +47,40 @@ describe('Input Handler Features', () => {
           rules.instructions.push(instruction);
         }
 
-        fs.writeFileSync(grokrulesPath, yaml.dump(rules, { lineWidth: -1 }));
-        return `Instruction saved to .grokrules:\n  "${instruction}"`;
+        fs.writeFileSync(codebuddyrulesPath, yaml.dump(rules, { lineWidth: -1 }));
+        return `Instruction saved to .codebuddyrules:\n  "${instruction}"`;
       } catch (error) {
         return `Failed to save instruction: ${error}`;
       }
     }
 
-    it('should create .grokrules file if not exists', () => {
-      const grokrulesPath = path.join(tempDir, '.grokrules');
+    it('should create .codebuddyrules file if not exists', () => {
+      const codebuddyrulesPath = path.join(tempDir, '.codebuddyrules');
 
-      saveInstructionToGrokRules('Always use TypeScript', grokrulesPath);
+      saveInstructionToCodeBuddyRules('Always use TypeScript', codebuddyrulesPath);
 
-      expect(fs.existsSync(grokrulesPath)).toBe(true);
+      expect(fs.existsSync(codebuddyrulesPath)).toBe(true);
     });
 
-    it('should save instruction to .grokrules', () => {
-      const grokrulesPath = path.join(tempDir, '.grokrules');
+    it('should save instruction to .codebuddyrules', () => {
+      const codebuddyrulesPath = path.join(tempDir, '.codebuddyrules');
 
-      saveInstructionToGrokRules('Use strict mode', grokrulesPath);
+      saveInstructionToCodeBuddyRules('Use strict mode', codebuddyrulesPath);
 
-      const content = fs.readFileSync(grokrulesPath, 'utf-8');
+      const content = fs.readFileSync(codebuddyrulesPath, 'utf-8');
       const parsed = yaml.load(content) as { instructions: string[] };
 
       expect(parsed.instructions).toContain('Use strict mode');
     });
 
     it('should append multiple instructions', () => {
-      const grokrulesPath = path.join(tempDir, '.grokrules');
+      const codebuddyrulesPath = path.join(tempDir, '.codebuddyrules');
 
-      saveInstructionToGrokRules('Instruction 1', grokrulesPath);
-      saveInstructionToGrokRules('Instruction 2', grokrulesPath);
-      saveInstructionToGrokRules('Instruction 3', grokrulesPath);
+      saveInstructionToCodeBuddyRules('Instruction 1', codebuddyrulesPath);
+      saveInstructionToCodeBuddyRules('Instruction 2', codebuddyrulesPath);
+      saveInstructionToCodeBuddyRules('Instruction 3', codebuddyrulesPath);
 
-      const content = fs.readFileSync(grokrulesPath, 'utf-8');
+      const content = fs.readFileSync(codebuddyrulesPath, 'utf-8');
       const parsed = yaml.load(content) as { instructions: string[] };
 
       expect(parsed.instructions).toHaveLength(3);
@@ -90,20 +90,20 @@ describe('Input Handler Features', () => {
     });
 
     it('should prevent duplicate instructions', () => {
-      const grokrulesPath = path.join(tempDir, '.grokrules');
+      const codebuddyrulesPath = path.join(tempDir, '.codebuddyrules');
 
-      saveInstructionToGrokRules('Same instruction', grokrulesPath);
-      saveInstructionToGrokRules('Same instruction', grokrulesPath);
-      saveInstructionToGrokRules('Same instruction', grokrulesPath);
+      saveInstructionToCodeBuddyRules('Same instruction', codebuddyrulesPath);
+      saveInstructionToCodeBuddyRules('Same instruction', codebuddyrulesPath);
+      saveInstructionToCodeBuddyRules('Same instruction', codebuddyrulesPath);
 
-      const content = fs.readFileSync(grokrulesPath, 'utf-8');
+      const content = fs.readFileSync(codebuddyrulesPath, 'utf-8');
       const parsed = yaml.load(content) as { instructions: string[] };
 
       expect(parsed.instructions).toHaveLength(1);
     });
 
     it('should preserve existing rules when adding instructions', () => {
-      const grokrulesPath = path.join(tempDir, '.grokrules');
+      const codebuddyrulesPath = path.join(tempDir, '.codebuddyrules');
 
       // Create existing rules
       const existingRules = {
@@ -111,11 +111,11 @@ describe('Input Handler Features', () => {
         languages: ['typescript'],
         instructions: ['Existing instruction'],
       };
-      fs.writeFileSync(grokrulesPath, yaml.dump(existingRules));
+      fs.writeFileSync(codebuddyrulesPath, yaml.dump(existingRules));
 
-      saveInstructionToGrokRules('New instruction', grokrulesPath);
+      saveInstructionToCodeBuddyRules('New instruction', codebuddyrulesPath);
 
-      const content = fs.readFileSync(grokrulesPath, 'utf-8');
+      const content = fs.readFileSync(codebuddyrulesPath, 'utf-8');
       const parsed = yaml.load(content) as { description: string; languages: string[]; instructions: string[] };
 
       expect(parsed.description).toBe('Test Project');
@@ -126,32 +126,32 @@ describe('Input Handler Features', () => {
     });
 
     it('should return success message', () => {
-      const grokrulesPath = path.join(tempDir, '.grokrules');
+      const codebuddyrulesPath = path.join(tempDir, '.codebuddyrules');
 
-      const result = saveInstructionToGrokRules('Test instruction', grokrulesPath);
+      const result = saveInstructionToCodeBuddyRules('Test instruction', codebuddyrulesPath);
 
       expect(result).toContain('Instruction saved');
       expect(result).toContain('Test instruction');
     });
 
     it('should handle special characters in instructions', () => {
-      const grokrulesPath = path.join(tempDir, '.grokrules');
+      const codebuddyrulesPath = path.join(tempDir, '.codebuddyrules');
 
       const specialInstruction = 'Use "double quotes" and \'single quotes\' and: colons';
-      saveInstructionToGrokRules(specialInstruction, grokrulesPath);
+      saveInstructionToCodeBuddyRules(specialInstruction, codebuddyrulesPath);
 
-      const content = fs.readFileSync(grokrulesPath, 'utf-8');
+      const content = fs.readFileSync(codebuddyrulesPath, 'utf-8');
       const parsed = yaml.load(content) as { instructions: string[] };
 
       expect(parsed.instructions).toContain(specialInstruction);
     });
 
     it('should handle empty instruction gracefully', () => {
-      const grokrulesPath = path.join(tempDir, '.grokrules');
+      const codebuddyrulesPath = path.join(tempDir, '.codebuddyrules');
 
-      saveInstructionToGrokRules('', grokrulesPath);
+      saveInstructionToCodeBuddyRules('', codebuddyrulesPath);
 
-      const content = fs.readFileSync(grokrulesPath, 'utf-8');
+      const content = fs.readFileSync(codebuddyrulesPath, 'utf-8');
       const parsed = yaml.load(content) as { instructions: string[] };
 
       // Empty string should still be added (validation is at caller level)
