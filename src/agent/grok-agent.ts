@@ -35,6 +35,7 @@ import { getAutonomyManager } from "../utils/autonomy-manager.js";
 import { ContextManagerV2, createContextManager } from "../context/context-manager-v2.js";
 import { sanitizeLLMOutput, extractCommentaryToolCalls } from "../utils/sanitize.js";
 import { getErrorMessage } from "../types/errors.js";
+import { logger } from "../utils/logger.js";
 
 // Re-export types for backwards compatibility
 export { ChatEntry, StreamingChunk } from "./types.js";
@@ -174,8 +175,7 @@ export class GrokAgent extends EventEmitter {
     // YOLO mode requires explicit enablement through autonomy manager
     // Env var alone only triggers a warning, doesn't enable YOLO
     if (envYoloMode && !configYoloMode) {
-      console.warn("⚠️  YOLO_MODE env var set but not enabled via /yolo command or config.");
-      console.warn("   Use '/yolo on' to explicitly enable YOLO mode.");
+      logger.warn("YOLO_MODE env var set but not enabled via /yolo command or config. Use '/yolo on' to explicitly enable YOLO mode.");
       this.yoloMode = false;
     } else {
       this.yoloMode = configYoloMode;
@@ -193,7 +193,7 @@ export class GrokAgent extends EventEmitter {
       this.sessionCostLimit = maxCostEnv !== null
         ? Math.min(maxCostEnv, YOLO_HARD_LIMIT * 10) // Allow up to $1000 if explicitly set
         : YOLO_HARD_LIMIT;
-      console.warn(`🚀 YOLO MODE ACTIVE - Cost limit: $${this.sessionCostLimit}, Max rounds: ${this.maxToolRounds}`);
+      logger.warn(`YOLO MODE ACTIVE - Cost limit: $${this.sessionCostLimit}, Max rounds: ${this.maxToolRounds}`);
     } else {
       this.sessionCostLimit = maxCostEnv !== null ? maxCostEnv : 10;
     }
@@ -254,7 +254,7 @@ export class GrokAgent extends EventEmitter {
           modelName,
           tools: ['view_file', 'str_replace_editor', 'create_file', 'search', 'bash', 'todo'],
         });
-        console.log(`📝 Using system prompt: ${systemPromptId}`);
+        logger.debug(`Using system prompt: ${systemPromptId}`);
       } else if (systemPromptId === 'auto') {
         // Auto-select based on model alignment
         const autoId = autoSelectPromptId(modelName);
@@ -267,7 +267,7 @@ export class GrokAgent extends EventEmitter {
           cwd: process.cwd(),
           modelName,
         });
-        console.log(`📝 Auto-selected prompt: ${autoId} (based on ${modelName})`);
+        logger.debug(`Auto-selected prompt: ${autoId} (based on ${modelName})`);
       } else {
         // Use legacy system (current behavior)
         const promptMode = this.yoloMode ? "yolo" : "default";
@@ -286,7 +286,7 @@ export class GrokAgent extends EventEmitter {
       });
     })().catch(error => {
       // Fallback to legacy prompt on error
-      console.warn("⚠️ Failed to load custom prompt, using default:", error);
+      logger.warn("Failed to load custom prompt, using default", { error: getErrorMessage(error) });
       const promptMode = this.yoloMode ? "yolo" : "default";
       const systemPrompt = getSystemPromptForMode(
         promptMode,
@@ -315,11 +315,11 @@ export class GrokAgent extends EventEmitter {
           await initializeMCPServers();
         }
       } catch (error) {
-        console.warn("MCP initialization failed:", error);
+        logger.warn("MCP initialization failed", { error: getErrorMessage(error) });
       }
     })().catch((error) => {
       // This catch handles any uncaught errors from the IIFE
-      console.warn("Uncaught error in MCP initialization:", error);
+      logger.warn("Uncaught error in MCP initialization", { error: getErrorMessage(error) });
     });
   }
 
@@ -541,7 +541,7 @@ export class GrokAgent extends EventEmitter {
       // Check for context warnings
       const contextWarning = this.contextManager.shouldWarn(preparedMessages);
       if (contextWarning.warn) {
-        console.warn(contextWarning.message);
+        logger.warn(contextWarning.message);
       }
 
       let currentResponse = await this.grokClient.chat(

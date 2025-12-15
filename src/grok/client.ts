@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import type { ChatCompletionMessageParam, ChatCompletionChunk } from "openai/resources/chat";
 import { validateModel, getModelInfo } from "../utils/model-utils.js";
+import { logger } from "../utils/logger.js";
 
 export type GrokMessage = ChatCompletionMessageParam;
 
@@ -118,8 +119,8 @@ export class GrokClient {
       // Log warning if model is not officially supported
       const modelInfo = getModelInfo(model);
       if (!modelInfo.isSupported) {
-        console.warn(
-          `Warning: Model '${model}' is not officially supported. Using default token limits.`
+        logger.warn(
+          `Model '${model}' is not officially supported. Using default token limits.`
         );
       }
     }
@@ -196,7 +197,7 @@ export class GrokClient {
 
       // Check if response has valid choices
       if (!response.choices || response.choices.length === 0) {
-        console.warn("Tool support probe returned empty choices array");
+        logger.warn("Tool support probe returned empty choices array");
         this.toolSupportProbed = true;
         this.toolSupportDetected = false;
         this.probePromise = null;
@@ -212,7 +213,7 @@ export class GrokClient {
       this.probePromise = null;
 
       if (hasToolCall) {
-        console.log("🔧 Tool support: DETECTED (model supports function calling)");
+        logger.debug("Tool support detected: model supports function calling");
       }
 
       return hasToolCall;
@@ -297,8 +298,8 @@ export class GrokClient {
 
     const modelInfo = getModelInfo(model);
     if (!modelInfo.isSupported) {
-      console.warn(
-        `Warning: Model '${model}' is not officially supported. Using default token limits.`
+      logger.warn(
+        `Model '${model}' is not officially supported. Using default token limits.`
       );
     }
 

@@ -8,6 +8,7 @@ import {
   QueryClassification,
   ToolCategory
 } from "../tools/tool-selector.js";
+import { logger } from "../utils/logger.js";
 
 // Multi-edit tool for atomic multi-file changes
 const MULTI_EDIT_TOOL: GrokTool = {
@@ -1119,7 +1120,7 @@ export async function initializeMCPServers(): Promise<void> {
       try {
         await manager.addServer(serverConfig);
       } catch (error) {
-        console.warn(`Failed to initialize MCP server ${serverConfig.name}:`, error);
+        logger.warn(`Failed to initialize MCP server ${serverConfig.name}: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
   } finally {
@@ -1160,7 +1161,7 @@ export async function getAllGrokTools(): Promise<GrokTool[]> {
   manager.ensureServersInitialized().catch((err) => {
     // Log but don't block - MCP servers are optional
     if (process.env.DEBUG) {
-      console.error(`MCP initialization warning: ${err.message || String(err)}`);
+      logger.warn(`MCP initialization warning: ${err.message || String(err)}`);
     }
   });
 

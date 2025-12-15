@@ -15,6 +15,7 @@
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
+import { logger } from '../utils/logger.js';
 
 // ============================================================================
 // Types
@@ -177,7 +178,7 @@ export class ToolPermissionManager {
         };
       }
     } catch (error) {
-      console.warn('Failed to load tool permissions config:', error);
+      logger.warn(`Failed to load tool permissions config: ${error instanceof Error ? error.message : String(error)}`);
     }
 
     return { ...DEFAULT_CONFIG };
@@ -192,7 +193,7 @@ export class ToolPermissionManager {
       fs.ensureDirSync(dir);
       fs.writeFileSync(this.configPath, JSON.stringify(this.config, null, 2));
     } catch (error) {
-      console.warn('Failed to save tool permissions config:', error);
+      logger.warn(`Failed to save tool permissions config: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

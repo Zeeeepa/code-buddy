@@ -20,6 +20,7 @@ import * as crypto from 'crypto';
 import { getMemoryRepository, MemoryRepository } from '../database/repositories/memory-repository.js';
 import type { Memory as DBMemory, MemoryType as DBMemoryType } from '../database/schema.js';
 import { getEmbeddingProvider, EmbeddingProvider } from '../embeddings/embedding-provider.js';
+import { logger } from '../utils/logger.js';
 
 export interface MemoryEntry {
   id: string;
@@ -187,7 +188,7 @@ export class EnhancedMemory extends EventEmitter {
         });
       } catch {
         // Disable embeddings if provider fails
-        console.warn('Failed to initialize embedding provider, disabling embeddings');
+        logger.warn('Failed to initialize embedding provider, disabling embeddings');
         this.config.embeddingEnabled = false;
       }
     }
@@ -471,7 +472,7 @@ export class EnhancedMemory extends EventEmitter {
         // Convert Float32Array to number[]
         return Array.from(result.embedding);
       } catch (error) {
-        console.warn('Embedding generation failed, using fallback:', error);
+        logger.warn(`Embedding generation failed, using fallback: ${error instanceof Error ? error.message : String(error)}`);
         // Fall through to hash-based fallback
       }
     }

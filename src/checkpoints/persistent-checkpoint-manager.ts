@@ -3,6 +3,7 @@ import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
 import { EventEmitter } from 'events';
+import { logger } from '../utils/logger.js';
 
 export interface FileSnapshot {
   path: string;
@@ -90,7 +91,7 @@ export class PersistentCheckpointManager extends EventEmitter {
         });
       }
     } catch (error) {
-      console.warn('Failed to create history directory:', error);
+      logger.warn(`Failed to create history directory: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -106,7 +107,7 @@ export class PersistentCheckpointManager extends EventEmitter {
         return index;
       }
     } catch (error) {
-      console.warn('Failed to load checkpoint index:', error);
+      logger.warn(`Failed to load checkpoint index: ${error instanceof Error ? error.message : String(error)}`);
     }
 
     return {
@@ -124,7 +125,7 @@ export class PersistentCheckpointManager extends EventEmitter {
     try {
       fs.writeFileSync(this.indexPath, JSON.stringify(index, null, 2));
     } catch (error) {
-      console.warn('Failed to save checkpoint index:', error);
+      logger.warn(`Failed to save checkpoint index: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -192,7 +193,7 @@ export class PersistentCheckpointManager extends EventEmitter {
       const checkpointPath = this.getCheckpointPath(checkpoint.id);
       fs.writeFileSync(checkpointPath, JSON.stringify(checkpoint, null, 2));
     } catch (error) {
-      console.warn('Failed to save checkpoint:', error);
+      logger.warn(`Failed to save checkpoint: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -215,7 +216,7 @@ export class PersistentCheckpointManager extends EventEmitter {
         return checkpoint;
       }
     } catch (error) {
-      console.warn('Failed to load checkpoint:', error);
+      logger.warn(`Failed to load checkpoint: ${error instanceof Error ? error.message : String(error)}`);
     }
 
     return null;
@@ -232,7 +233,7 @@ export class PersistentCheckpointManager extends EventEmitter {
       }
       this.checkpointCache.delete(checkpointId);
     } catch (error) {
-      console.warn('Failed to delete checkpoint file:', error);
+      logger.warn(`Failed to delete checkpoint file: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

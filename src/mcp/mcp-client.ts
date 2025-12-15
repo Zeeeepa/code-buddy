@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { getErrorMessage } from '../types/index.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * MCP (Model Context Protocol) Client
@@ -71,7 +72,7 @@ export class MCPClient extends EventEmitter {
         const config = JSON.parse(content);
         return config.servers || [];
       } catch (error) {
-        console.error('Failed to load MCP config:', error);
+        logger.error(`Failed to load MCP config: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
 
@@ -83,7 +84,7 @@ export class MCPClient extends EventEmitter {
         const config = JSON.parse(content);
         return config.servers || [];
       } catch (error) {
-        console.error('Failed to load user MCP config:', error);
+        logger.error(`Failed to load user MCP config: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
 
@@ -113,7 +114,7 @@ export class MCPClient extends EventEmitter {
         try {
           await this.connect(config);
         } catch (error: unknown) {
-          console.error(`Failed to connect to MCP server ${config.name}:`, getErrorMessage(error));
+          logger.error(`Failed to connect to MCP server ${config.name}: ${getErrorMessage(error)}`);
         }
       }
     }
@@ -166,7 +167,7 @@ export class MCPClient extends EventEmitter {
         const tools = await server.listTools();
         allTools.set(name, tools);
       } catch (error) {
-        console.error(`Failed to get tools from ${name}:`, error);
+        logger.error(`Failed to get tools from ${name}: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
 
@@ -184,7 +185,7 @@ export class MCPClient extends EventEmitter {
         const resources = await server.listResources();
         allResources.set(name, resources);
       } catch (error) {
-        console.error(`Failed to get resources from ${name}:`, error);
+        logger.error(`Failed to get resources from ${name}: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
 
@@ -271,7 +272,7 @@ class MCPServerConnection extends EventEmitter {
       });
 
       this.process.stderr?.on('data', (data) => {
-        console.error(`[${this.config.name}] stderr:`, data.toString());
+        logger.debug(`[MCP:${this.config.name}] ${data.toString().trim()}`);
       });
 
       this.process.on('error', (error) => {
@@ -325,7 +326,7 @@ class MCPServerConnection extends EventEmitter {
           const message = JSON.parse(line) as JSONRPCResponse;
           this.handleMessage(message);
         } catch (error) {
-          console.error('Failed to parse MCP message:', error);
+          logger.error(`Failed to parse MCP message: ${error instanceof Error ? error.message : String(error)}`);
         }
       }
     }

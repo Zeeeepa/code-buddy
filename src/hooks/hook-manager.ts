@@ -2,6 +2,7 @@ import * as fs from "fs-extra";
 import * as path from "path";
 import { spawn } from "child_process";
 import { getErrorMessage } from "../types/index.js";
+import { logger } from "../utils/logger.js";
 
 export type HookEvent =
   | "PreToolUse"
@@ -76,7 +77,7 @@ export class HookManager {
         const globalConfig = fs.readJsonSync(this.globalConfigPath) as HooksConfig;
         this.hooks = [...(globalConfig.hooks || [])];
       } catch (error) {
-        console.warn("Failed to load global hooks config:", error);
+        logger.warn(`Failed to load global hooks config: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
 
@@ -86,7 +87,7 @@ export class HookManager {
         const projectConfig = fs.readJsonSync(this.configPath) as HooksConfig;
         this.hooks = [...this.hooks, ...(projectConfig.hooks || [])];
       } catch (error) {
-        console.warn("Failed to load project hooks config:", error);
+        logger.warn(`Failed to load project hooks config: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
   }
@@ -134,7 +135,7 @@ export class HookManager {
       fs.ensureDirSync(dir);
       fs.writeJsonSync(this.configPath, { hooks: this.hooks }, { spaces: 2 });
     } catch (error) {
-      console.warn("Failed to save hooks config:", error);
+      logger.warn(`Failed to save hooks config: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -196,7 +197,7 @@ export class HookManager {
             : result.output;
         }
       } catch (error: unknown) {
-        console.warn(`Hook execution error: ${getErrorMessage(error)}`);
+        logger.warn(`Hook execution error: ${getErrorMessage(error)}`);
         // Continue with other hooks even if one fails
       }
     }
