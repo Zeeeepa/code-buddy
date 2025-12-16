@@ -38,6 +38,7 @@ import { getErrorMessage } from "../types/errors.js";
 import { logger } from "../utils/logger.js";
 import { getPromptCacheManager, PromptCacheManager } from "../optimization/prompt-cache.js";
 import { getHooksManager, HooksManager } from "../hooks/lifecycle-hooks.js";
+import { getModelRouter, ModelRouter, type RoutingDecision } from "../optimization/model-routing.js";
 
 // Re-export types for backwards compatibility
 export { ChatEntry, StreamingChunk } from "./types.js";
@@ -147,6 +148,9 @@ export class CodeBuddyAgent extends EventEmitter {
   private contextManager: ContextManagerV2;
   private promptCacheManager: PromptCacheManager;
   private hooksManager: HooksManager;
+  private modelRouter: ModelRouter;
+  private useModelRouting: boolean = false;
+  private lastRoutingDecision: RoutingDecision | null = null;
 
   /**
    * Create a new CodeBuddyAgent instance
@@ -223,6 +227,7 @@ export class CodeBuddyAgent extends EventEmitter {
     this.mcpClient = getMCPClient();
     this.promptCacheManager = getPromptCacheManager();
     this.hooksManager = getHooksManager(process.cwd());
+    this.modelRouter = getModelRouter();
 
     // Initialize MCP servers if configured
     this.initializeMCP();
@@ -820,6 +825,29 @@ export class CodeBuddyAgent extends EventEmitter {
     // Trim history to prevent memory bloat
     this.trimHistory();
 
+    // Model routing - select optimal model based on task complexity
+    let originalModel: string | null = null;
+    if (this.useModelRouting) {
+      const conversationContext = this.chatHistory
+        .slice(-5)
+        .map(e => e.content)
+        .filter((c): c is string => typeof c === 'string');
+
+      const routingDecision = this.modelRouter.route(
+        message,
+        conversationContext,
+        this.codebuddyClient.getCurrentModel()
+      );
+      this.lastRoutingDecision = routingDecision;
+
+      // Switch model if different from current
+      if (routingDecision.recommendedModel !== this.codebuddyClient.getCurrentModel()) {
+        originalModel = this.codebuddyClient.getCurrentModel();
+        this.codebuddyClient.setModel(routingDecision.recommendedModel);
+        logger.debug(`Model routing: ${originalModel} → ${routingDecision.recommendedModel} (${routingDecision.reason})`);
+      }
+    }
+
     // Calculate input tokens
     let inputTokens = this.tokenCounter.countMessageTokens(
       this.messages as Array<{ role: string; content: string | null; [key: string]: unknown }>
@@ -1127,6 +1155,21 @@ export class CodeBuddyAgent extends EventEmitter {
       };
       yield { type: "done" };
     } finally {
+      // Restore original model if it was changed by routing
+      if (originalModel) {
+        this.codebuddyClient.setModel(originalModel);
+        logger.debug(`Model routing: restored to ${originalModel}`);
+      }
+
+      // Record usage with model router for cost tracking
+      if (this.useModelRouting && this.lastRoutingDecision) {
+        this.modelRouter.recordUsage(
+          this.lastRoutingDecision.recommendedModel,
+          inputTokens + totalOutputTokens,
+          this.lastRoutingDecision.estimatedCost
+        );
+      }
+
       // Clean up abort controller
       this.abortController = null;
     }
@@ -1870,6 +1913,82 @@ export class CodeBuddyAgent extends EventEmitter {
    */
   getHooksStatus(): string {
     return this.hooksManager.formatStatus();
+  }
+
+  // Model Routing methods
+
+  /**
+   * Enable or disable automatic model routing
+   *
+   * When enabled, requests are routed to optimal models based on task complexity:
+   * - Simple tasks → mini model (cost-effective)
+   * - Complex tasks → standard model (balanced)
+   * - Reasoning tasks → reasoning model (deep analysis)
+   * - Vision tasks → vision model (image understanding)
+   *
+   * Research: FrugalGPT shows 30-70% cost reduction with routing
+   *
+   * @param enabled - Whether to enable model routing
+   */
+  setModelRouting(enabled: boolean): void {
+    this.useModelRouting = enabled;
+    logger.debug(`Model routing ${enabled ? 'enabled' : 'disabled'}`);
+  }
+
+  /**
+   * Check if model routing is enabled
+   */
+  isModelRoutingEnabled(): boolean {
+    return this.useModelRouting;
+  }
+
+  /**
+   * Get the model router instance
+   */
+  getModelRouter(): ModelRouter {
+    return this.modelRouter;
+  }
+
+  /**
+   * Get the last routing decision
+   */
+  getLastRoutingDecision(): RoutingDecision | null {
+    return this.lastRoutingDecision;
+  }
+
+  /**
+   * Get model routing statistics
+   */
+  getModelRoutingStats() {
+    return {
+      enabled: this.useModelRouting,
+      totalCost: this.modelRouter.getTotalCost(),
+      savings: this.modelRouter.getEstimatedSavings(),
+      usageByModel: Object.fromEntries(this.modelRouter.getUsageStats()),
+      lastDecision: this.lastRoutingDecision,
+    };
+  }
+
+  /**
+   * Format model routing stats for display
+   */
+  formatModelRoutingStats(): string {
+    const stats = this.getModelRoutingStats();
+    const lines = [
+      '🧭 Model Routing Statistics',
+      `├─ Enabled: ${stats.enabled ? '✅' : '❌'}`,
+      `├─ Total Cost: $${stats.totalCost.toFixed(4)}`,
+      `├─ Savings: $${stats.savings.saved.toFixed(4)} (${stats.savings.percentage.toFixed(1)}%)`,
+    ];
+
+    if (stats.lastDecision) {
+      lines.push(`├─ Last Model: ${stats.lastDecision.recommendedModel}`);
+      lines.push(`└─ Reason: ${stats.lastDecision.reason}`);
+    } else {
+      lines.push('└─ No routing decisions yet');
+    }
+
+    return lines.join('\n');
   }
 
   /**

@@ -806,6 +806,16 @@ Be systematic and thorough in your analysis.`,
         arguments: [
           { name: 'action', description: 'status, on, off, clear, warm', required: false }
         ]
+      },
+      {
+        name: 'model-router',
+        description: 'Manage model routing for cost optimization (30-70% savings)',
+        prompt: '__MODEL_ROUTER__',
+        filePath: '',
+        isBuiltin: true,
+        arguments: [
+          { name: 'action', description: 'status, on, off, models, compare [tokens], sensitivity <level>, stats', required: false }
+        ]
       }
     ];
 

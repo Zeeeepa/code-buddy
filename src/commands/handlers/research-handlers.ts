@@ -16,6 +16,7 @@ import { getTDDManager } from '../../testing/tdd-mode.js';
 import { getCICDManager } from '../../integrations/cicd-integration.js';
 import { getHooksManager } from '../../hooks/lifecycle-hooks.js';
 import { getPromptCacheManager } from '../../optimization/prompt-cache.js';
+import { getModelRouter, getCostComparison, GROK_MODELS } from '../../optimization/model-routing.js';
 
 /**
  * Helper to create a response entry
@@ -411,6 +412,135 @@ export function handlePromptCache(args: string[]): CommandHandlerResult {
   /prompt-cache warm     - Pre-warm cache with common prompts
 
 Prompt caching can reduce API costs by up to 90%.`),
+      };
+  }
+}
+
+/**
+ * Handle /model-router command - Model routing management
+ */
+export function handleModelRouter(args: string[]): CommandHandlerResult {
+  const action = args[0]?.toLowerCase();
+  const router = getModelRouter();
+
+  if (!action || action === 'status') {
+    const config = router.getConfig();
+    const savings = router.getEstimatedSavings();
+    const lines = [
+      '🧭 Model Router Status',
+      '',
+      `  Enabled: ${config.enabled ? '✅' : '❌'}`,
+      `  Default Model: ${config.defaultModel}`,
+      `  Cost Sensitivity: ${config.costSensitivity}`,
+      `  Min Confidence: ${(config.minConfidence * 100).toFixed(0)}%`,
+      '',
+      `  Total Cost: $${router.getTotalCost().toFixed(4)}`,
+      `  Estimated Savings: $${savings.saved.toFixed(4)} (${savings.percentage.toFixed(1)}%)`,
+    ];
+    return {
+      handled: true,
+      entry: createEntry(lines.join('\n')),
+    };
+  }
+
+  switch (action) {
+    case 'on': {
+      router.updateConfig({ enabled: true });
+      return {
+        handled: true,
+        entry: createEntry('✅ Model routing enabled. Requests will be routed to optimal models based on task complexity.'),
+      };
+    }
+
+    case 'off': {
+      router.updateConfig({ enabled: false });
+      return {
+        handled: true,
+        entry: createEntry('❌ Model routing disabled. All requests will use the default model.'),
+      };
+    }
+
+    case 'models': {
+      const lines = ['📋 Available Models:', ''];
+      for (const [id, config] of Object.entries(GROK_MODELS)) {
+        lines.push(`  ${config.tier.toUpperCase()}: ${id}`);
+        lines.push(`    Cost: $${config.costPerMillionTokens}/M tokens`);
+        lines.push(`    Max Tokens: ${config.maxTokens.toLocaleString()}`);
+        lines.push(`    Vision: ${config.supportsVision ? '✅' : '❌'}`);
+        lines.push('');
+      }
+      return {
+        handled: true,
+        entry: createEntry(lines.join('\n')),
+      };
+    }
+
+    case 'compare': {
+      const tokens = parseInt(args[1]) || 10000;
+      const comparison = getCostComparison(tokens);
+      const lines = [`💰 Cost Comparison for ${tokens.toLocaleString()} tokens:`, ''];
+      for (const item of comparison) {
+        lines.push(`  ${item.model}: $${item.cost.toFixed(4)} (${item.savings})`);
+      }
+      return {
+        handled: true,
+        entry: createEntry(lines.join('\n')),
+      };
+    }
+
+    case 'sensitivity': {
+      const level = args[1]?.toLowerCase() as 'low' | 'medium' | 'high';
+      if (!level || !['low', 'medium', 'high'].includes(level)) {
+        return {
+          handled: true,
+          entry: createEntry('❌ Please specify sensitivity level: /model-router sensitivity <low|medium|high>'),
+        };
+      }
+      router.updateConfig({ costSensitivity: level });
+      return {
+        handled: true,
+        entry: createEntry(`✅ Cost sensitivity set to ${level}. ${level === 'high' ? 'Will prefer cheaper models.' : level === 'low' ? 'Will prefer quality models.' : 'Balanced approach.'}`),
+      };
+    }
+
+    case 'stats': {
+      const usageStats = router.getUsageStats();
+      const savings = router.getEstimatedSavings();
+      const lines = ['📊 Model Router Statistics:', ''];
+
+      if (usageStats.size === 0) {
+        lines.push('  No usage recorded yet.');
+      } else {
+        for (const [model, stats] of usageStats) {
+          lines.push(`  ${model}:`);
+          lines.push(`    Calls: ${stats.calls}`);
+          lines.push(`    Tokens: ${stats.tokens.toLocaleString()}`);
+          lines.push(`    Cost: $${stats.cost.toFixed(4)}`);
+          lines.push('');
+        }
+        lines.push(`  Total Cost: $${router.getTotalCost().toFixed(4)}`);
+        lines.push(`  Estimated Savings: $${savings.saved.toFixed(4)} (${savings.percentage.toFixed(1)}%)`);
+      }
+
+      return {
+        handled: true,
+        entry: createEntry(lines.join('\n')),
+      };
+    }
+
+    default:
+      return {
+        handled: true,
+        entry: createEntry(`📚 Model Router Commands:
+  /model-router             - Show router status
+  /model-router on          - Enable model routing
+  /model-router off         - Disable model routing
+  /model-router models      - List available models
+  /model-router compare [n] - Compare costs for n tokens
+  /model-router sensitivity - Set cost sensitivity (low/medium/high)
+  /model-router stats       - Show usage statistics
+
+Model routing can reduce costs by 30-70% (FrugalGPT research).`),
       };
   }
 }
