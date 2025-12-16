@@ -33,6 +33,7 @@
 
 - **Backpropagation (MCTS)** — [Ch.05](05-mcts.md)
 - **Bash (outil)** — [Ch.10](10-tool-use.md)
+- **Benchmark Suite** — [Ch.19](19-infrastructure-llm-local.md)
 - **Beam search** — [Ch.04](04-tree-of-thought.md)
 - **BFS (Breadth-First Search)** — [Ch.04](04-tree-of-thought.md)
 - **BPE (Byte Pair Encoding)** — [Ch.01](01-comprendre-les-llms.md)
@@ -133,6 +134,8 @@
 ## K
 
 - **K-nearest neighbors** — [Ch.07](07-rag-moderne.md)
+- **KV-Cache** — [Ch.19](19-infrastructure-llm-local.md)
+- **KV-Cache Quantization** — [Ch.19](19-infrastructure-llm-local.md)
 
 ## L
 
@@ -216,6 +219,9 @@
 ## S
 
 - **Sandbox** — [Ch.03](03-anatomie-agent.md), [Ch.10](10-tool-use.md)
+- **Schema Validator** — [Ch.19](19-infrastructure-llm-local.md)
+- **Speculative Decoding** — [Ch.19](19-infrastructure-llm-local.md)
+- **Structured Output** — [Ch.10](10-tool-use.md), [Ch.19](19-infrastructure-llm-local.md)
 - **SBFL (Spectrum-Based Fault Localization)** — [Ch.06](06-repair-reflexion.md)
 - **Sécurité** — [Ch.03](03-anatomie-agent.md), [Ch.15](15-architecture-complete.md), [Ch.16](16-system-prompts-securite.md)
 - **Sécurité CLI** — [Ch.16](16-system-prompts-securite.md)
@@ -238,7 +244,10 @@
 - **Think (keyword)** — [Ch.04](04-tree-of-thought.md)
 - **Token** — [Ch.01](01-comprendre-les-llms.md)
 - **Tokenization** — [Ch.01](01-comprendre-les-llms.md)
+- **Token Counter** — [Ch.19](19-infrastructure-llm-local.md)
 - **Tool-use** — [Ch.10](10-tool-use.md)
+- **TPS (Tokens Per Second)** — [Ch.19](19-infrastructure-llm-local.md)
+- **TTFT (Time To First Token)** — [Ch.19](19-infrastructure-llm-local.md)
 - **Top-k** — [Ch.01](01-comprendre-les-llms.md)
 - **Top-p (nucleus)** — [Ch.01](01-comprendre-les-llms.md)
 - **ToT (Tree-of-Thought)** — [Ch.04](04-tree-of-thought.md)

@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 320">
+  <defs>
+    <linearGradient id="bgGradCost" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="cloudCostGrad" x1="0%" y1="0%" x2="0%">
+      <stop offset="0%" style="stop-color:#e74c3c;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#c0392b;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="localCostGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2ecc71;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#27ae60;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="320" fill="url(#bgGradCost)"/>
+
+  <!-- Title -->
+  <text x="400" y="35" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#ffffff" text-anchor="middle">Comparaison des Couts API</text>
+  <text x="400" y="55" font-family="Arial, sans-serif" font-size="12" fill="#888888" text-anchor="middle">Cloud vs Infrastructure Locale</text>
+
+  <!-- Cloud costs (left) -->
+  <rect x="50" y="80" width="320" height="200" rx="10" fill="#2d3436" stroke="#e74c3c" stroke-width="2"/>
+  <text x="210" y="110" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#e74c3c" text-anchor="middle">CLOUD (Avant)</text>
+
+  <!-- Cloud items -->
+  <text x="70" y="140" font-family="Arial, sans-serif" font-size="11" fill="#888888">OpenAI Embeddings</text>
+  <text x="320" y="140" font-family="Arial, sans-serif" font-size="11" fill="#ffffff" text-anchor="end">$342</text>
+  <rect x="70" y="148" width="280" height="1" fill="#3d3d3d"/>
+
+  <text x="70" y="165" font-family="Arial, sans-serif" font-size="11" fill="#888888">OpenAI Chat (GPT-4)</text>
+  <text x="320" y="165" font-family="Arial, sans-serif" font-size="11" fill="#ffffff" text-anchor="end">$1,247</text>
+  <rect x="70" y="173" width="280" height="1" fill="#3d3d3d"/>
+
+  <text x="70" y="190" font-family="Arial, sans-serif" font-size="11" fill="#888888">Anthropic Claude</text>
+  <text x="320" y="190" font-family="Arial, sans-serif" font-size="11" fill="#ffffff" text-anchor="end">$856</text>
+  <rect x="70" y="198" width="280" height="1" fill="#3d3d3d"/>
+
+  <text x="70" y="215" font-family="Arial, sans-serif" font-size="11" fill="#888888">Vector DB (Pinecone)</text>
+  <text x="320" y="215" font-family="Arial, sans-serif" font-size="11" fill="#ffffff" text-anchor="end">$89</text>
+  <rect x="70" y="223" width="280" height="1" fill="#3d3d3d"/>
+
+  <!-- Cloud total -->
+  <rect x="70" y="235" width="280" height="30" rx="5" fill="#c0392b"/>
+  <text x="90" y="255" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff">TOTAL</text>
+  <text x="320" y="255" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#ffffff" text-anchor="end">$2,534/mois</text>
+
+  <!-- Local costs (right) -->
+  <rect x="430" y="80" width="320" height="200" rx="10" fill="#2d3436" stroke="#2ecc71" stroke-width="2"/>
+  <text x="590" y="110" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#2ecc71" text-anchor="middle">LOCAL (Apres)</text>
+
+  <!-- Local items -->
+  <text x="450" y="140" font-family="Arial, sans-serif" font-size="11" fill="#888888">Embeddings (Ollama)</text>
+  <text x="700" y="140" font-family="Arial, sans-serif" font-size="11" fill="#2ecc71" text-anchor="end">$0</text>
+  <rect x="450" y="148" width="280" height="1" fill="#3d3d3d"/>
+
+  <text x="450" y="165" font-family="Arial, sans-serif" font-size="11" fill="#888888">Chat (modeles locaux)</text>
+  <text x="700" y="165" font-family="Arial, sans-serif" font-size="11" fill="#2ecc71" text-anchor="end">$0</text>
+  <rect x="450" y="173" width="280" height="1" fill="#3d3d3d"/>
+
+  <text x="450" y="190" font-family="Arial, sans-serif" font-size="11" fill="#888888">Claude (complexe)</text>
+  <text x="700" y="190" font-family="Arial, sans-serif" font-size="11" fill="#ffffff" text-anchor="end">$400</text>
+  <rect x="450" y="198" width="280" height="1" fill="#3d3d3d"/>
+
+  <text x="450" y="215" font-family="Arial, sans-serif" font-size="11" fill="#888888">Vector DB (HNSW local)</text>
+  <text x="700" y="215" font-family="Arial, sans-serif" font-size="11" fill="#2ecc71" text-anchor="end">$0</text>
+  <rect x="450" y="223" width="280" height="1" fill="#3d3d3d"/>
+
+  <!-- Local total -->
+  <rect x="450" y="235" width="280" height="30" rx="5" fill="#27ae60"/>
+  <text x="470" y="255" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff">TOTAL</text>
+  <text x="700" y="255" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#ffffff" text-anchor="end">$400/mois</text>
+
+  <!-- Savings arrow -->
+  <path d="M 380 180 L 420 180" stroke="#f39c12" stroke-width="3" fill="none"/>
+  <polygon points="420,175 430,180 420,185" fill="#f39c12"/>
+
+  <!-- Savings badge -->
+  <rect x="320" y="290" width="160" height="25" rx="12" fill="#f39c12"/>
+  <text x="400" y="308" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">-84% Economie</text>
+</svg>

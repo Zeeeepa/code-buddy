@@ -12,8 +12,12 @@
 | **Ollama Embeddings** | Embeddings locaux (gratuits) | -100% coût embeddings |
 | **HNSW Vector Store** | Recherche vectorielle pure TypeScript | Pas de base externe |
 | **Model Hub** | Téléchargement modèles HuggingFace | Gestion simplifiée |
+| **KV-Cache Config** | Optimisation mémoire inférence | +50% contexte |
+| **Speculative Decoding** | Accélération génération | 2-3x plus rapide |
+| **Benchmark Suite** | Mesure TTFT/TPS/p95 | Optimisation guidée |
+| **Schema Validator** | Structured output fiable | Tool calling robuste |
 
-**Résultat :** Un pipeline RAG entièrement local, zéro dépendance cloud.
+**Résultat :** Un pipeline RAG entièrement local + inférence optimisée.
 
 ---
 
@@ -83,19 +87,7 @@ if (recommendation.shouldOffload) {
 
 ### Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      GPUMonitor                              │
-├─────────────────────────────────────────────────────────────┤
-│  initialize()          │ Détection GPU (nvidia-smi, etc.)   │
-│  getStats()            │ VRAM totale/utilisée/libre         │
-│  calculateOffloadRecommendation() │ Layers GPU vs CPU      │
-│  getRecommendedLayers()│ Pour taille de modèle donnée       │
-│  formatStats()         │ Affichage formaté pour CLI         │
-├─────────────────────────────────────────────────────────────┤
-│  Events: stats, warning, critical                            │
-└─────────────────────────────────────────────────────────────┘
-```
+![GPUMonitor Architecture](images/gpu-monitor-architecture.svg)
 
 ### Détection Multi-Vendor
 
@@ -243,18 +235,7 @@ await store.load('./cache/vectors.hnsw');
 
 ### Comment Fonctionne HNSW
 
-```
-Niveau 3:  A ──────────────────── Z
-           │                      │
-Niveau 2:  A ─── D ─── M ─── R ── Z
-           │    │     │     │    │
-Niveau 1:  A─B─C─D─E─F─M─N─O─R─S─Z
-           │ │ │ │ │ │ │ │ │ │ │ │
-Niveau 0:  A B C D E F G H I ... Z (tous les vecteurs)
-
-Recherche : Commencer en haut, descendre en suivant
-            les voisins les plus proches
-```
+![HNSW Structure](images/hnsw-structure.svg)
 
 **Complexité** : O(log N) au lieu de O(N) pour recherche linéaire
 
@@ -352,23 +333,7 @@ console.log(`VRAM estimée: ${vram} MB`);
 
 ### Quantizations Expliquées
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    QUANTIZATION GUIDE                        │
-├──────────┬────────────┬──────────┬──────────────────────────┤
-│ Type     │ Bits/Poids │ Qualité  │ Usage                    │
-├──────────┼────────────┼──────────┼──────────────────────────┤
-│ Q4_K_M   │ 4.5        │ ⭐⭐⭐⭐   │ Meilleur rapport qualité │
-│ Q5_K_M   │ 5.5        │ ⭐⭐⭐⭐⭐  │ Haute qualité, +VRAM     │
-│ Q6_K     │ 6.5        │ ⭐⭐⭐⭐⭐  │ Près de FP16             │
-│ Q8_0     │ 8.0        │ ⭐⭐⭐⭐⭐  │ Quasi-lossless           │
-└──────────┴────────────┴──────────┴──────────────────────────┘
-
-Recommandation :
-├── GPU 4-6 GB  → Q4_K_M
-├── GPU 8-12 GB → Q5_K_M ou Q6_K
-└── GPU 16+ GB  → Q8_0 ou même FP16
-```
+![Guide des Quantizations GGUF](images/quantization-guide.svg)
 
 ---
 
@@ -434,25 +399,7 @@ async function createLocalRAGPipeline() {
 
 ### Workflow Type
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     RAG Pipeline Local                       │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  1. CHECK GPU        2. EMBED           3. STORE             │
-│  ┌──────────┐       ┌──────────┐       ┌──────────┐         │
-│  │GPUMonitor│──────▶│ Ollama   │──────▶│  HNSW    │         │
-│  │ VRAM: OK │       │Embeddings│       │VectorDB  │         │
-│  └──────────┘       └──────────┘       └────┬─────┘         │
-│                                              │               │
-│  4. QUERY           5. RETRIEVE         6. GENERATE         │
-│  ┌──────────┐       ┌──────────┐       ┌──────────┐         │
-│  │  User    │──────▶│ Top-K    │──────▶│  LLM     │         │
-│  │  Query   │       │ Results  │       │ (Local)  │         │
-│  └──────────┘       └──────────┘       └──────────┘         │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-```
+![RAG Pipeline Local](images/rag-pipeline-local.svg)
 
 ---
 
@@ -538,6 +485,366 @@ const newStore = new HNSWVectorStore({
 
 ---
 
+## 8. KV-Cache Configuration : Optimiser la Mémoire d'Inférence
+
+### Le Problème
+
+Avec llama.cpp ou LM Studio, les valeurs par défaut sont souvent sous-optimales :
+
+```bash
+# Contexte limité, pas de quantification KV
+llama-server --model qwen2.5-7b.gguf -c 4096
+# Utilise ~2GB pour le KV-cache en FP16
+```
+
+### La Solution
+
+```typescript
+import {
+  KVCacheManager,
+  getKVCacheManager,
+  MODEL_ARCHITECTURES
+} from './inference/kv-cache-config.js';
+
+// Initialisation avec détection d'architecture
+const kvManager = getKVCacheManager({
+  contextLength: 16384,
+  kvQuantization: 'q8_0',  // Réduit mémoire de 50%
+  flashAttention: true,
+});
+
+// Configurer pour un modèle spécifique
+kvManager.setArchitecture('qwen2.5-7b-instruct');
+
+// Estimation mémoire
+const estimate = kvManager.estimateMemory();
+console.log(`KV-Cache: ${estimate.gpuMemoryMB} MB`);
+console.log(`Fits in VRAM: ${estimate.fitsInVRAM ? '✅' : '❌'}`);
+console.log(`Recommendation: ${estimate.recommendation}`);
+
+// Générer les arguments llama.cpp
+const args = kvManager.generateLlamaCppArgs();
+// ['-c', '16384', '-b', '512', '--cache-type-k', 'q8_0', '--cache-type-v', 'q8_0', '-fa']
+```
+
+### Architectures Supportées
+
+| Modèle | Layers | Embed | Heads | KV-Heads | GQA |
+|--------|--------|-------|-------|----------|-----|
+| `qwen2.5-7b` | 28 | 3584 | 28 | 4 | ✅ |
+| `qwen2.5-14b` | 40 | 5120 | 40 | 8 | ✅ |
+| `llama-3.1-8b` | 32 | 4096 | 32 | 8 | ✅ |
+| `devstral-7b` | 32 | 4096 | 32 | 8 | ✅ |
+| `deepseek-coder-6.7b` | 32 | 4096 | 32 | 32 | MHA |
+
+### Types de Quantification KV
+
+![KV-Cache et Quantization](images/kv-cache-quantization.svg)
+
+### Optimisation Automatique par VRAM
+
+```typescript
+// Optimisation automatique selon VRAM disponible
+const optimized = kvManager.optimizeForVRAM(8000, 4000); // 8GB VRAM, 4GB modèle
+
+// Résultat pour 4GB disponibles :
+// {
+//   contextLength: 8192,
+//   kvQuantization: 'q8_0',
+//   offloadMode: 'full_gpu',
+//   flashAttention: true
+// }
+```
+
+---
+
+## 9. Speculative Decoding : Accélérer la Génération
+
+### Le Problème
+
+La génération auto-régressive est lente : 1 token = 1 forward pass.
+
+```
+Standard: Token1 → Token2 → Token3 → Token4 → Token5
+          100ms    100ms    100ms    100ms    100ms = 500ms
+```
+
+### La Solution : Draft & Verify
+
+```typescript
+import {
+  SpeculativeDecoder,
+  getSpeculativeDecoder,
+  RECOMMENDED_PAIRS
+} from './inference/speculative-decoding.js';
+
+// Créer un décodeur avec modèle draft rapide
+const decoder = getSpeculativeDecoder({
+  draftModel: 'qwen2.5-0.5b',       // Petit modèle rapide
+  targetModel: 'qwen2.5-7b',        // Grand modèle de vérification
+  speculationLength: 4,             // Tokens à spéculer
+  acceptanceThreshold: 0.8,
+});
+
+// Génération accélérée
+const result = await decoder.generate(
+  'Explain quantum computing',
+  async (prompt) => callDraftModel(prompt),
+  async (prompt, tokens) => verifyWithTarget(prompt, tokens)
+);
+
+// Stats de performance
+const stats = decoder.getStats();
+console.log(`Acceptance rate: ${(stats.acceptanceRate * 100).toFixed(1)}%`);
+console.log(`Speedup: ${stats.speedup.toFixed(2)}x`);
+```
+
+### Comment Ça Marche
+
+![Speculative Decoding](images/speculative-decoding.svg)
+
+### Paires Draft/Target Recommandées
+
+| Target Model | Draft Model | Speedup Typique |
+|-------------|-------------|-----------------|
+| `qwen2.5-7b` | `qwen2.5-0.5b` | 2-3x |
+| `qwen2.5-14b` | `qwen2.5-1.5b` | 2-2.5x |
+| `llama-3.1-8b` | `llama-3.2-1b` | 2-3x |
+| `devstral-7b` | `qwen2.5-0.5b` | 2-2.5x |
+
+### Speculation Adaptative
+
+```typescript
+// Le décodeur ajuste automatiquement la longueur de spéculation
+decoder.on('adaptiveAdjust', (event) => {
+  console.log(`Adjusted speculation: ${event.oldLength} → ${event.newLength}`);
+  console.log(`Reason: ${event.reason}`);
+});
+
+// Si acceptanceRate < 50% → réduit speculation
+// Si acceptanceRate > 90% → augmente speculation
+```
+
+---
+
+## 10. Benchmark Suite : Mesurer les Performances
+
+### Le Problème
+
+Sans métriques, impossible d'optimiser :
+
+```
+"Mon modèle semble rapide..." → Non mesurable
+"Mon modèle génère 45 tok/s avec TTFT 180ms" → Actionnable
+```
+
+### La Solution
+
+```typescript
+import {
+  BenchmarkSuite,
+  getBenchmarkSuite,
+  DEFAULT_PROMPTS
+} from './performance/benchmark-suite.js';
+
+// Créer une suite de benchmarks
+const suite = getBenchmarkSuite({
+  warmupRuns: 2,      // Échauffement
+  runs: 10,           // Mesures
+  concurrency: 1,     // Séquentiel ou parallèle
+  timeout: 60000,     // Timeout par run
+});
+
+// Callback pour mesurer votre modèle
+const callback = async (prompt, onFirstToken) => {
+  const response = await myLLM.generate(prompt, {
+    onToken: (token, isFirst) => {
+      if (isFirst && onFirstToken) onFirstToken();
+    }
+  });
+  return {
+    content: response.text,
+    inputTokens: response.usage.input,
+    outputTokens: response.usage.output,
+  };
+};
+
+// Exécuter les benchmarks
+suite.on('run', (event) => {
+  console.log(`Run ${event.runIndex}/${event.totalRuns}: ${event.latencyMs}ms`);
+});
+
+const results = await suite.run('qwen2.5-7b-Q4', callback);
+
+// Afficher les résultats formatés
+console.log(suite.formatResults(results));
+```
+
+### Métriques Clés
+
+![Benchmark Results](images/benchmark-results.svg)
+
+### Comparaison de Modèles
+
+```typescript
+// Benchmark du premier modèle
+const results1 = await suite.run('qwen2.5-7b-Q4', callback1);
+
+// Benchmark du second modèle
+const results2 = await suite.run('qwen2.5-7b-Q8', callback2);
+
+// Comparaison
+const comparison = suite.compare(results1, results2);
+console.log(`TTFT: ${comparison.ttft.improved ? '✅ Improved' : '❌ Degraded'}`);
+console.log(`  ${comparison.ttft.baseline}ms → ${comparison.ttft.current}ms`);
+console.log(`  ${comparison.ttft.percentChange > 0 ? '+' : ''}${comparison.ttft.percentChange.toFixed(1)}%`);
+```
+
+### Prompts de Test par Catégorie
+
+| Catégorie | Prompt | Mesure |
+|-----------|--------|--------|
+| `simple` | "What is 2+2?" | Latence minimale |
+| `code` | "Write a function to sort an array" | Génération code |
+| `reasoning` | "Explain quantum entanglement" | Raisonnement long |
+| `creative` | "Write a haiku about programming" | Créativité |
+
+---
+
+## 11. Schema Validator : Structured Output Fiable
+
+### Le Problème
+
+Les LLM génèrent du texte libre, mais vous avez besoin de JSON structuré :
+
+```typescript
+// ❌ Réponse non structurée
+"I would use the read_file tool with path /tmp/test.txt"
+
+// ✅ Réponse structurée
+{ "tool": "read_file", "arguments": { "path": "/tmp/test.txt" } }
+```
+
+### La Solution
+
+```typescript
+import {
+  SchemaValidator,
+  getSchemaValidator,
+  TOOL_CALL_SCHEMA,
+  ACTION_PLAN_SCHEMA
+} from './utils/schema-validator.js';
+
+// Créer un validateur avec coercion de types
+const validator = getSchemaValidator({
+  coerceTypes: true,      // "123" → 123
+  removeAdditional: true, // Supprimer propriétés inconnues
+  useDefaults: true,      // Appliquer les valeurs par défaut
+});
+
+// Définir un schema personnalisé
+const schema = {
+  type: 'object',
+  properties: {
+    action: { type: 'string', enum: ['read', 'write', 'delete'] },
+    path: { type: 'string', minLength: 1 },
+    content: { type: 'string' }
+  },
+  required: ['action', 'path']
+};
+
+// Valider une réponse LLM
+const llmResponse = `Here's what I'll do:
+\`\`\`json
+{"action": "read", "path": "/tmp/test.txt"}
+\`\`\``;
+
+const result = validator.validateResponse(llmResponse, schema);
+
+if (result.valid) {
+  console.log('Validated data:', result.data);
+  // { action: 'read', path: '/tmp/test.txt' }
+} else {
+  console.log('Validation errors:', result.errors);
+}
+```
+
+### Extraction JSON Intelligente
+
+```typescript
+// Le validateur extrait le JSON de n'importe quel format
+
+// ✅ JSON direct
+validator.extractJSON('{"name": "test"}');
+
+// ✅ Code block markdown
+validator.extractJSON('Here is the result:\n```json\n{"name": "test"}\n```');
+
+// ✅ JSON entouré de texte
+validator.extractJSON('The answer is {"name": "test"} as requested.');
+
+// ✅ Correction des trailing commas
+validator.extractJSON('{"name": "test",}'); // → {"name": "test"}
+```
+
+### Schemas Prédéfinis
+
+```typescript
+import {
+  TOOL_CALL_SCHEMA,     // Pour les appels d'outils
+  ACTION_PLAN_SCHEMA,   // Pour les plans d'action
+  CODE_EDIT_SCHEMA      // Pour les éditions de code
+} from './utils/schema-validator.js';
+
+// TOOL_CALL_SCHEMA
+// {
+//   tool: string (required),
+//   arguments: object (required),
+//   reasoning?: string
+// }
+
+// ACTION_PLAN_SCHEMA
+// {
+//   goal: string (required),
+//   steps: [{ action: string, description: string }] (required),
+//   estimatedSteps?: number
+// }
+
+// CODE_EDIT_SCHEMA
+// {
+//   file: string (required),
+//   operation: 'create' | 'replace' | 'delete' (required),
+//   oldContent?: string,
+//   newContent?: string
+// }
+```
+
+### Coercion de Types
+
+| Input | Schema Type | Output |
+|-------|-------------|--------|
+| `"123"` | `number` | `123` |
+| `"true"` | `boolean` | `true` |
+| `1` | `boolean` | `true` |
+| `123` | `string` | `"123"` |
+| `["a", 1]` | `array<string>` | `["a", "1"]` |
+
+### Génération de Prompts
+
+```typescript
+// Générer un prompt qui guide le LLM vers le bon format
+const prompt = validator.createSchemaPrompt(schema);
+// "Respond with valid JSON matching this schema:
+//  {
+//    action: string (one of: read, write, delete),
+//    path: string (minimum 1 character),
+//    content?: string
+//  }
+//  Required: action, path"
+```
+
+---
+
 ## Points Clés
 
 | Concept | À Retenir |
@@ -547,6 +854,10 @@ const newStore = new HNSWVectorStore({
 | **HNSW** | O(log N), pas de dépendances, persistance JSON |
 | **Quantization** | Q4_K_M = meilleur compromis qualité/taille |
 | **Pipeline** | GPU Check → Embed → Store → Search → Generate |
+| **KV-Cache** | Quantification q8_0 = -50% mémoire, qualité préservée |
+| **Speculative** | Draft + Target = 2-3x speedup génération |
+| **Benchmark** | TTFT, TPS, p95 = métriques essentielles |
+| **Schema** | Structured output = tool calling fiable |
 
 ---
 

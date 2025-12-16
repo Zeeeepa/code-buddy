@@ -63,14 +63,20 @@
 | 16 | [🔒 Sécurité & System Prompts](16-system-prompts-securite.md) | Defense in depth, sandboxing, approbations |
 | 17 | [🔮 Perspectives Futures](17-perspectives-futures.md) | Multimodal, multi-agents, éthique |
 
+### Partie VII — Infrastructure Avancée
+
+| # | Chapitre | Description |
+|:-:|----------|-------------|
+| 19 | [🏠 Infrastructure LLM Local](19-infrastructure-llm-local.md) | GPU Monitor, Ollama, HNSW, KV-Cache, Speculative Decoding |
+
 ---
 
 ## 📊 Statistiques du Livre
 
 | Métrique | Valeur |
 |----------|--------|
-| **Chapitres** | 17 |
-| **Pages estimées** | ~300 |
+| **Chapitres** | 18 |
+| **Pages estimées** | ~320 |
 | **Lignes de code** | ~20,000 |
 | **Diagrammes SVG** | 140+ |
 | **Tableaux** | 100+ |

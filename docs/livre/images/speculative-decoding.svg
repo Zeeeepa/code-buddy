@@ -1,0 +1,169 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450">
+  <defs>
+    <linearGradient id="bgGradS" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="draftGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#3498db;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2980b9;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="targetGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#9b59b6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8e44ad;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="acceptGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2ecc71;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#27ae60;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="rejectGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#e74c3c;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#c0392b;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="450" fill="url(#bgGradS)"/>
+
+  <!-- Title -->
+  <text x="400" y="35" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#ffffff" text-anchor="middle">Speculative Decoding</text>
+  <text x="400" y="55" font-family="Arial, sans-serif" font-size="12" fill="#888888" text-anchor="middle">Acceleration de generation 2-3x avec modele draft</text>
+
+  <!-- Standard generation (top) -->
+  <text x="100" y="90" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#e74c3c">Generation Standard (lente)</text>
+
+  <rect x="100" y="100" width="60" height="35" rx="5" fill="#34495e" stroke="#7f8c8d" stroke-width="1"/>
+  <text x="130" y="122" font-family="Arial, sans-serif" font-size="10" fill="#ffffff" text-anchor="middle">T1</text>
+  <text x="130" y="132" font-family="Arial, sans-serif" font-size="8" fill="#888888" text-anchor="middle">100ms</text>
+
+  <path d="M 160 117 L 175 117" stroke="#7f8c8d" stroke-width="2" fill="none"/>
+  <polygon points="175,112 185,117 175,122" fill="#7f8c8d"/>
+
+  <rect x="185" y="100" width="60" height="35" rx="5" fill="#34495e" stroke="#7f8c8d" stroke-width="1"/>
+  <text x="215" y="122" font-family="Arial, sans-serif" font-size="10" fill="#ffffff" text-anchor="middle">T2</text>
+  <text x="215" y="132" font-family="Arial, sans-serif" font-size="8" fill="#888888" text-anchor="middle">100ms</text>
+
+  <path d="M 245 117 L 260 117" stroke="#7f8c8d" stroke-width="2" fill="none"/>
+  <polygon points="260,112 270,117 260,122" fill="#7f8c8d"/>
+
+  <rect x="270" y="100" width="60" height="35" rx="5" fill="#34495e" stroke="#7f8c8d" stroke-width="1"/>
+  <text x="300" y="122" font-family="Arial, sans-serif" font-size="10" fill="#ffffff" text-anchor="middle">T3</text>
+  <text x="300" y="132" font-family="Arial, sans-serif" font-size="8" fill="#888888" text-anchor="middle">100ms</text>
+
+  <path d="M 330 117 L 345 117" stroke="#7f8c8d" stroke-width="2" fill="none"/>
+  <polygon points="345,112 355,117 345,122" fill="#7f8c8d"/>
+
+  <rect x="355" y="100" width="60" height="35" rx="5" fill="#34495e" stroke="#7f8c8d" stroke-width="1"/>
+  <text x="385" y="122" font-family="Arial, sans-serif" font-size="10" fill="#ffffff" text-anchor="middle">T4</text>
+  <text x="385" y="132" font-family="Arial, sans-serif" font-size="8" fill="#888888" text-anchor="middle">100ms</text>
+
+  <path d="M 415 117 L 430 117" stroke="#7f8c8d" stroke-width="2" fill="none"/>
+  <polygon points="430,112 440,117 430,122" fill="#7f8c8d"/>
+
+  <rect x="440" y="100" width="60" height="35" rx="5" fill="#34495e" stroke="#7f8c8d" stroke-width="1"/>
+  <text x="470" y="122" font-family="Arial, sans-serif" font-size="10" fill="#ffffff" text-anchor="middle">T5</text>
+  <text x="470" y="132" font-family="Arial, sans-serif" font-size="8" fill="#888888" text-anchor="middle">100ms</text>
+
+  <text x="550" y="122" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#e74c3c">= 500ms</text>
+
+  <!-- Speculative decoding (bottom) -->
+  <text x="100" y="175" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#2ecc71">Speculative Decoding (rapide)</text>
+
+  <!-- Step 1: Draft -->
+  <rect x="100" y="190" width="140" height="80" rx="8" fill="url(#draftGrad)" stroke="#5dade2" stroke-width="2"/>
+  <text x="170" y="215" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle">1. DRAFT</text>
+  <text x="170" y="233" font-family="Arial, sans-serif" font-size="10" fill="#d4e6f1" text-anchor="middle">Petit modele (0.5B)</text>
+
+  <rect x="115" y="245" width="25" height="18" rx="3" fill="#2d3436"/>
+  <text x="127" y="258" font-family="Arial, sans-serif" font-size="9" fill="#3498db" text-anchor="middle">T1</text>
+  <rect x="145" y="245" width="25" height="18" rx="3" fill="#2d3436"/>
+  <text x="157" y="258" font-family="Arial, sans-serif" font-size="9" fill="#3498db" text-anchor="middle">T2</text>
+  <rect x="175" y="245" width="25" height="18" rx="3" fill="#2d3436"/>
+  <text x="187" y="258" font-family="Arial, sans-serif" font-size="9" fill="#3498db" text-anchor="middle">T3</text>
+  <rect x="205" y="245" width="25" height="18" rx="3" fill="#2d3436"/>
+  <text x="217" y="258" font-family="Arial, sans-serif" font-size="9" fill="#3498db" text-anchor="middle">T4</text>
+
+  <text x="170" y="280" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#f39c12" text-anchor="middle">20ms</text>
+
+  <!-- Arrow -->
+  <path d="M 240 230 L 270 230" stroke="#5dade2" stroke-width="2" fill="none"/>
+  <polygon points="270,225 280,230 270,235" fill="#5dade2"/>
+
+  <!-- Step 2: Verify -->
+  <rect x="280" y="190" width="140" height="80" rx="8" fill="url(#targetGrad)" stroke="#bb8fce" stroke-width="2"/>
+  <text x="350" y="215" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle">2. VERIFY</text>
+  <text x="350" y="233" font-family="Arial, sans-serif" font-size="10" fill="#e8daef" text-anchor="middle">Grand modele (7B)</text>
+
+  <rect x="295" y="245" width="25" height="18" rx="3" fill="#2ecc71"/>
+  <text x="307" y="258" font-family="Arial, sans-serif" font-size="9" fill="#ffffff" text-anchor="middle">T1</text>
+  <rect x="325" y="245" width="25" height="18" rx="3" fill="#2ecc71"/>
+  <text x="337" y="258" font-family="Arial, sans-serif" font-size="9" fill="#ffffff" text-anchor="middle">T2</text>
+  <rect x="355" y="245" width="25" height="18" rx="3" fill="#2ecc71"/>
+  <text x="367" y="258" font-family="Arial, sans-serif" font-size="9" fill="#ffffff" text-anchor="middle">T3</text>
+  <rect x="385" y="245" width="25" height="18" rx="3" fill="#e74c3c"/>
+  <text x="397" y="258" font-family="Arial, sans-serif" font-size="9" fill="#ffffff" text-anchor="middle">T4</text>
+
+  <text x="350" y="280" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#f39c12" text-anchor="middle">100ms</text>
+
+  <!-- Arrow -->
+  <path d="M 420 230 L 450 230" stroke="#bb8fce" stroke-width="2" fill="none"/>
+  <polygon points="450,225 460,230 450,235" fill="#bb8fce"/>
+
+  <!-- Step 3: Result -->
+  <rect x="460" y="190" width="140" height="80" rx="8" fill="#2d3436" stroke="#636e72" stroke-width="2"/>
+  <text x="530" y="215" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle">3. RESULT</text>
+
+  <rect x="475" y="235" width="25" height="18" rx="3" fill="#2ecc71"/>
+  <text x="487" y="248" font-family="Arial, sans-serif" font-size="9" fill="#ffffff" text-anchor="middle">T1</text>
+  <rect x="505" y="235" width="25" height="18" rx="3" fill="#2ecc71"/>
+  <text x="517" y="248" font-family="Arial, sans-serif" font-size="9" fill="#ffffff" text-anchor="middle">T2</text>
+  <rect x="535" y="235" width="25" height="18" rx="3" fill="#2ecc71"/>
+  <text x="547" y="248" font-family="Arial, sans-serif" font-size="9" fill="#ffffff" text-anchor="middle">T3</text>
+  <rect x="565" y="235" width="25" height="18" rx="3" fill="#f39c12"/>
+  <text x="577" y="248" font-family="Arial, sans-serif" font-size="9" fill="#ffffff" text-anchor="middle">+T4'</text>
+
+  <text x="530" y="280" font-family="Arial, sans-serif" font-size="10" fill="#888888" text-anchor="middle">3 acceptes + 1 genere</text>
+
+  <!-- Total time -->
+  <rect x="620" y="200" width="100" height="60" rx="8" fill="#1e8449" stroke="#2ecc71" stroke-width="2"/>
+  <text x="670" y="225" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#ffffff" text-anchor="middle">Total</text>
+  <text x="670" y="245" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#2ecc71" text-anchor="middle">120ms</text>
+
+  <!-- Speedup calculation -->
+  <rect x="100" y="300" width="620" height="130" rx="10" fill="#2d3436" stroke="#636e72" stroke-width="1"/>
+
+  <text x="410" y="330" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">Calcul du Speedup</text>
+
+  <!-- Standard -->
+  <text x="150" y="360" font-family="Arial, sans-serif" font-size="11" fill="#e74c3c">Standard:</text>
+  <text x="250" y="360" font-family="Arial, sans-serif" font-size="11" fill="#ffffff">5 tokens x 100ms = 500ms</text>
+
+  <!-- Speculative -->
+  <text x="150" y="385" font-family="Arial, sans-serif" font-size="11" fill="#2ecc71">Speculative:</text>
+  <text x="250" y="385" font-family="Arial, sans-serif" font-size="11" fill="#ffffff">20ms (draft) + 100ms (verify) = 120ms</text>
+
+  <!-- Result -->
+  <text x="150" y="415" font-family="Arial, sans-serif" font-size="11" fill="#f39c12">Speedup:</text>
+  <text x="250" y="415" font-family="Arial, sans-serif" font-size="11" fill="#ffffff">500ms / 120ms = </text>
+  <text x="395" y="415" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#2ecc71">4.2x plus rapide!</text>
+
+  <!-- Recommended pairs -->
+  <rect x="500" y="340" width="210" height="80" rx="5" fill="#2d2d44"/>
+  <text x="605" y="360" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#ffffff" text-anchor="middle">Paires Recommandees</text>
+  <text x="520" y="380" font-family="monospace" font-size="9" fill="#3498db">qwen2.5-7b</text>
+  <text x="620" y="380" font-family="Arial, sans-serif" font-size="9" fill="#888888">+</text>
+  <text x="640" y="380" font-family="monospace" font-size="9" fill="#2ecc71">qwen2.5-0.5b</text>
+  <text x="520" y="400" font-family="monospace" font-size="9" fill="#3498db">llama-3.1-8b</text>
+  <text x="620" y="400" font-family="Arial, sans-serif" font-size="9" fill="#888888">+</text>
+  <text x="640" y="400" font-family="monospace" font-size="9" fill="#2ecc71">llama-3.2-1b</text>
+  <text x="520" y="420" font-family="monospace" font-size="9" fill="#3498db">devstral-7b</text>
+  <text x="620" y="420" font-family="Arial, sans-serif" font-size="9" fill="#888888">+</text>
+  <text x="640" y="420" font-family="monospace" font-size="9" fill="#2ecc71">qwen2.5-0.5b</text>
+
+  <!-- Legend -->
+  <rect x="740" y="100" width="50" height="80" rx="5" fill="#2d2d44"/>
+  <rect x="750" y="115" width="30" height="12" rx="2" fill="#2ecc71"/>
+  <text x="765" y="142" font-family="Arial, sans-serif" font-size="8" fill="#888888" text-anchor="middle">Accept</text>
+  <rect x="750" y="150" width="30" height="12" rx="2" fill="#e74c3c"/>
+  <text x="765" y="177" font-family="Arial, sans-serif" font-size="8" fill="#888888" text-anchor="middle">Reject</text>
+</svg>
