@@ -762,6 +762,50 @@ Be systematic and thorough in your analysis.`,
         arguments: [
           { name: 'action', description: 'run <file>, validate <file>, parse <code>, list, repl', required: false }
         ]
+      },
+      // ==========================================
+      // Research-Based Improvements (2024-2025)
+      // TDD, CI/CD, Hooks - Based on scientific publications
+      // ==========================================
+      {
+        name: 'tdd',
+        description: 'Enter TDD mode - test-first development (45% accuracy improvement)',
+        prompt: '__TDD_MODE__',
+        filePath: '',
+        isBuiltin: true,
+        arguments: [
+          { name: 'action', description: 'start <requirements>, status, approve, cancel', required: false }
+        ]
+      },
+      {
+        name: 'workflow',
+        description: 'Manage CI/CD workflows (GitHub Actions, GitLab CI)',
+        prompt: '__WORKFLOW__',
+        filePath: '',
+        isBuiltin: true,
+        arguments: [
+          { name: 'action', description: 'list, status, create <template>, run <name>, validate <file>', required: false }
+        ]
+      },
+      {
+        name: 'hooks',
+        description: 'Manage lifecycle hooks (pre/post edit, commit, etc.)',
+        prompt: '__HOOKS__',
+        filePath: '',
+        isBuiltin: true,
+        arguments: [
+          { name: 'action', description: 'list, enable <name>, disable <name>, add, status', required: false }
+        ]
+      },
+      {
+        name: 'prompt-cache',
+        description: 'Manage prompt caching (up to 90% cost reduction)',
+        prompt: '__PROMPT_CACHE__',
+        filePath: '',
+        isBuiltin: true,
+        arguments: [
+          { name: 'action', description: 'status, on, off, clear, warm', required: false }
+        ]
       }
     ];
 

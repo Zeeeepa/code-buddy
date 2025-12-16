@@ -62,3 +62,32 @@ export {
   getIDEExtensionsServer,
   resetIDEExtensionsServer,
 } from "./ide-extensions.js";
+
+// AI Code Review
+export {
+  CodeReviewManager,
+  getCodeReviewManager,
+  initializeCodeReview,
+  DEFAULT_REVIEW_CONFIG,
+  type ReviewIssue,
+  type FileDiff,
+  type DiffHunk,
+  type ReviewResult,
+  type CodeReviewConfig,
+  type IssueSeverity,
+  type IssueType,
+} from "./code-review.js";
+
+// CI/CD Integration
+export {
+  CICDManager,
+  getCICDManager,
+  initializeCICD,
+  WORKFLOW_TEMPLATES,
+  DEFAULT_CICD_CONFIG,
+  type CICDProvider,
+  type WorkflowStatus,
+  type WorkflowRun,
+  type WorkflowDefinition,
+  type CICDConfig,
+} from "./cicd-integration.js";

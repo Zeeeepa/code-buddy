@@ -68,6 +68,17 @@ export {
   type LatencyMeasurement,
 } from "./latency-optimizer.js";
 
+// Prompt Caching
+export {
+  PromptCacheManager,
+  getPromptCacheManager,
+  initializePromptCache,
+  DEFAULT_CACHE_CONFIG,
+  type CacheEntry,
+  type CacheStats,
+  type CacheConfig,
+} from "./prompt-cache.js";
+
 /**
  * Initialize all optimizations with default settings
  */
