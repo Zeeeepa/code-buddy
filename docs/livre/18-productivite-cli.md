@@ -946,7 +946,213 @@ export class OfflineManager {
 
 ---
 
-## 10. Récapitulatif des Commandes
+## 10. Nouvelles Fonctionnalités Basées sur la Recherche (2025)
+
+### 10.1 Mode TDD (Test-Driven Development)
+
+**Amélioration prouvée** : +45.97% de précision (ICSE 2024)
+
+Le mode TDD implémente un workflow test-first où l'IA génère d'abord les tests, puis le code.
+
+```typescript
+// src/testing/tdd-mode.ts
+
+export type TDDState =
+  | "idle"
+  | "requirements"
+  | "generating-tests"
+  | "reviewing-tests"
+  | "implementing"
+  | "running-tests"
+  | "iterating"
+  | "complete";
+
+export class TDDModeManager extends EventEmitter {
+  private state: TDDState = "idle";
+  private requirements: string = "";
+  private generatedTests: string = "";
+  private implementation: string = "";
+  private maxIterations: number = 5;
+
+  async startCycle(requirements: string): Promise<TDDCycleResult> {
+    this.state = "requirements";
+    this.requirements = requirements;
+    this.emit("state:change", this.state);
+
+    // 1. Générer les tests
+    this.state = "generating-tests";
+    this.generatedTests = await this.generateTests(requirements);
+
+    // 2. Review des tests (attend approbation)
+    this.state = "reviewing-tests";
+    this.emit("tests:generated", this.generatedTests);
+
+    // ... cycle continue après approbation
+  }
+}
+```
+
+**Commandes** :
+
+```bash
+/tdd              # Afficher l'état
+/tdd start        # Démarrer le mode TDD
+/tdd status       # Voir le cycle actuel
+/tdd tests        # Voir les tests générés
+/tdd approve      # Approuver les tests
+/tdd complete     # Terminer le cycle
+```
+
+### 10.2 Lifecycle Hooks
+
+Les hooks permettent d'exécuter des actions automatiquement avant/après les opérations.
+
+```typescript
+// src/hooks/lifecycle-hooks.ts
+
+export type HookType =
+  | "pre-edit"     // Avant modification de fichier
+  | "post-edit"    // Après modification de fichier
+  | "pre-bash"     // Avant exécution de commande
+  | "post-bash"    // Après exécution de commande
+  | "pre-commit"   // Avant commit (AI review!)
+  | "post-commit"  // Après commit
+  | "pre-prompt"   // Avant envoi au LLM
+  | "post-response"; // Après réponse du LLM
+
+export const BUILTIN_HOOKS: HookDefinition[] = [
+  {
+    name: "lint-on-edit",
+    type: "post-edit",
+    description: "Run linter after file edits",
+    command: "npm run lint --fix {file}",
+  },
+  {
+    name: "pre-commit-review",
+    type: "pre-commit",
+    description: "AI review before commits",
+    handler: async (ctx) => {
+      const review = await reviewStagedChanges();
+      return review.hasBlockingIssues
+        ? { abort: true, message: review.summary }
+        : { abort: false };
+    },
+  },
+];
+```
+
+**Commandes** :
+
+```bash
+/hooks list            # Lister les hooks disponibles
+/hooks enable <name>   # Activer un hook
+/hooks disable <name>  # Désactiver un hook
+/hooks status          # Voir l'état des hooks
+```
+
+### 10.3 Intégration CI/CD
+
+Générez et gérez vos workflows CI/CD directement depuis le CLI.
+
+```typescript
+// src/integrations/cicd-integration.ts
+
+export type CICDProvider = "github" | "gitlab" | "circleci";
+
+export const WORKFLOW_TEMPLATES: Record<CICDProvider, WorkflowDefinition> = {
+  github: {
+    path: ".github/workflows/ci.yml",
+    template: `
+name: CI
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+    `,
+  },
+  gitlab: {
+    path: ".gitlab-ci.yml",
+    template: `
+stages: [test, build]
+test:
+  script:
+    - npm ci
+    - npm test
+build:
+  script:
+    - npm run build
+    `,
+  },
+};
+```
+
+**Commandes** :
+
+```bash
+/workflow              # Afficher l'aide
+/workflow list         # Lister les workflows
+/workflow create       # Créer un workflow
+/workflow status       # Voir le statut CI
+```
+
+### 10.4 Prompt Caching
+
+Réduction des coûts jusqu'à 90% grâce au cache de prompts.
+
+```typescript
+// src/optimization/prompt-cache.ts
+
+export class PromptCacheManager {
+  private cache: Map<string, CacheEntry> = new Map();
+  private maxSize: number = 100;
+  private ttl: number = 3600000; // 1 heure
+
+  generateCacheKey(prompt: string, tools?: unknown): string {
+    const hash = crypto.createHash("sha256");
+    hash.update(prompt);
+    if (tools) hash.update(JSON.stringify(tools));
+    return hash.digest("hex").slice(0, 16);
+  }
+
+  get(key: string): CacheEntry | undefined {
+    const entry = this.cache.get(key);
+    if (!entry) return undefined;
+    if (Date.now() - entry.timestamp > this.ttl) {
+      this.cache.delete(key);
+      return undefined;
+    }
+    entry.hits++;
+    return entry;
+  }
+
+  getStats(): CacheStats {
+    return {
+      totalEntries: this.cache.size,
+      hitRate: this.hits / (this.hits + this.misses),
+      estimatedSavings: this.calculateSavings(),
+    };
+  }
+}
+```
+
+**Commandes** :
+
+```bash
+/prompt-cache          # Afficher l'aide
+/prompt-cache stats    # Statistiques du cache
+/prompt-cache clear    # Vider le cache
+/prompt-cache config   # Configurer le cache
+```
+
+---
+
+## 11. Récapitulatif des Commandes
 
 | Commande | Description | Exemple |
 |----------|-------------|---------|
@@ -957,6 +1163,10 @@ export class OfflineManager {
 | `/watch` | Activer watch mode | `/watch src/` |
 | `--image` | Ajouter image | `grok "Analyse" --image ui.png` |
 | `--voice` | Input vocal | `grok --voice` |
+| `/tdd` | Mode TDD (+45% accuracy) | `/tdd start` |
+| `/hooks` | Gérer lifecycle hooks | `/hooks enable pre-commit` |
+| `/workflow` | Gérer CI/CD | `/workflow create github` |
+| `/prompt-cache` | Gérer le cache prompts | `/prompt-cache stats` |
 
 ---
 
@@ -969,8 +1179,12 @@ export class OfflineManager {
 5. **Délégation** : Automatisation complète du workflow PR
 6. **Personas** : Personnalités adaptées aux tâches
 7. **Skills** : Activation contextuelle de capacités
+8. **Mode TDD** : +45.97% de précision avec test-first (ICSE 2024)
+9. **Lifecycle Hooks** : Automatisation pre/post opérations
+10. **CI/CD Integration** : GitHub Actions, GitLab CI, CircleCI
+11. **Prompt Caching** : Jusqu'à 90% de réduction des coûts
 
-Ces fonctionnalités transforment un simple CLI en un véritable environnement de développement assisté.
+Ces fonctionnalités transforment un simple CLI en un véritable environnement de développement assisté par IA, intégrant les dernières avancées de la recherche scientifique.
 
 ---
 

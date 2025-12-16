@@ -583,6 +583,124 @@ grok --model hermes-4-14b
 
 ---
 
+### 🧪 Mode TDD (Test-Driven Development)
+
+> *"Écrire les tests d'abord : +45.97% de précision (ICSE 2024)"*
+
+<table>
+<tr>
+<td width="50%">
+
+**🔄 Cycle TDD automatisé :**
+
+1. **📝 Requirements** — Décrivez la fonctionnalité
+2. **🧪 Generate Tests** — L'IA génère les tests
+3. **👁️ Review** — Validez les tests générés
+4. **💻 Implement** — L'IA implémente le code
+5. **✅ Verify** — Tests exécutés automatiquement
+6. **🔁 Iterate** — Boucle jusqu'au succès
+
+</td>
+<td width="50%">
+
+```bash
+# Démarrer le mode TDD
+/tdd start
+
+# Décrire la fonctionnalité
+"Une fonction qui valide les emails"
+
+# L'IA génère les tests, puis le code
+# Tests passent ? Terminé !
+
+# Voir le statut
+/tdd status
+```
+
+</td>
+</tr>
+</table>
+
+---
+
+### 🔗 Lifecycle Hooks
+
+> *"Automatisez vos workflows avec des hooks pre/post opération"*
+
+<table>
+<tr>
+<td>
+
+**🎯 Hooks disponibles :**
+
+| Hook | 📝 Déclencheur |
+|:-----|:---------------|
+| `pre-edit` | Avant modification de fichier |
+| `post-edit` | Après modification de fichier |
+| `pre-bash` | Avant exécution de commande |
+| `post-bash` | Après exécution de commande |
+| `pre-commit` | Avant commit (AI review) |
+| `post-commit` | Après commit |
+| `pre-prompt` | Avant envoi au LLM |
+| `post-response` | Après réponse du LLM |
+
+</td>
+<td>
+
+```bash
+# Gérer les hooks
+/hooks list
+/hooks enable pre-commit
+/hooks disable post-edit
+
+# Exemple: review automatique
+# avant chaque commit
+/hooks enable pre-commit
+
+# L'IA analyse les changements
+# et suggère des améliorations
+```
+
+</td>
+</tr>
+</table>
+
+---
+
+### 🚀 Intégration CI/CD
+
+> *"Générez et gérez vos workflows directement depuis le CLI"*
+
+<table>
+<tr>
+<td>
+
+**🛠️ Providers supportés :**
+
+- **GitHub Actions** — Workflows .github/workflows/
+- **GitLab CI** — .gitlab-ci.yml
+- **CircleCI** — .circleci/config.yml
+
+</td>
+<td>
+
+```bash
+# Gérer les workflows
+/workflow list
+/workflow create github
+/workflow status
+
+# Générer un workflow CI
+"Crée un workflow GitHub Actions
+pour build, test et deploy"
+```
+
+</td>
+</tr>
+</table>
+
+---
+
 ## 🔬 Fonctionnalités Basées sur la Recherche
 
 > *"Code Buddy intègre les dernières avancées de la recherche en IA pour le développement logiciel."*
@@ -637,7 +755,7 @@ grok --model hermes-4-14b
 </tr>
 
 <tr>
-<td rowspan="4"><b>Optimisation</b></td>
+<td rowspan="5"><b>Optimisation</b></td>
 <td>🎯 Model Routing</td>
 <td><code>src/optimization/model-routing.ts</code></td>
 <td><a href="https://arxiv.org/abs/2305.05176">FrugalGPT (Stanford)</a></td>
@@ -657,6 +775,11 @@ grok --model hermes-4-14b
 <td><code>src/optimization/latency-optimizer.ts</code></td>
 <td>Human-AI Flow Research</td>
 </tr>
+<tr>
+<td>💾 Prompt Caching</td>
+<td><code>src/optimization/prompt-cache.ts</code></td>
+<td>Anthropic / OpenAI (90% cost reduction)</td>
+</tr>
 
 <tr>
 <td rowspan="2"><b>Persistance</b></td>
@@ -669,6 +792,40 @@ grok --model hermes-4-14b
 <td><code>src/learning/persistent-learning.ts</code></td>
 <td>Apprentissage continu</td>
 </tr>
+
+<tr>
+<td rowspan="4"><b>Qualité (2025)</b></td>
+<td>🧪 TDD Mode</td>
+<td><code>src/testing/tdd-mode.ts</code></td>
+<td><a href="https://dl.acm.org/doi/10.1145/3597503.3639186">ICSE 2024 (+45% accuracy)</a></td>
+</tr>
+<tr>
+<td>🔍 AI Code Review</td>
+<td><code>src/integrations/code-review.ts</code></td>
+<td>73.8% review acceptance (industrial study)</td>
+</tr>
+<tr>
+<td>🧹 Auto-Lint</td>
+<td><code>src/testing/auto-lint.ts</code></td>
+<td>ESLint, Prettier, Ruff, Clippy, etc.</td>
+</tr>
+<tr>
+<td>✅ Auto-Test</td>
+<td><code>src/testing/auto-test.ts</code></td>
+<td>Jest, pytest, cargo test, go test</td>
+</tr>
+
+<tr>
+<td rowspan="2"><b>Intégrations (2025)</b></td>
+<td>🔗 Lifecycle Hooks</td>
+<td><code>src/hooks/lifecycle-hooks.ts</code></td>
+<td>Pre/post: edit, commit, bash, prompt</td>
+</tr>
+<tr>
+<td>🚀 CI/CD</td>
+<td><code>src/integrations/cicd-integration.ts</code></td>
+<td>GitHub Actions, GitLab CI, CircleCI</td>
+</tr>
 </table>
 
 ### 📊 Améliorations Mesurées
@@ -680,6 +837,9 @@ grok --model hermes-4-14b
 | Parallel Execution | **2.5-4.6x speedup** | LLMCompiler |
 | Tool Filtering | **70% réduction temps** | Less-is-More |
 | Semantic Caching | **68% réduction API** | Optimisation interne |
+| Prompt Caching | **90% réduction coûts** | Anthropic/OpenAI |
+| TDD Mode | **+45.97% Pass@1** | ICSE 2024 |
+| AI Code Review | **73.8% acceptance** | Industrial Study |
 
 ---
 
@@ -711,6 +871,33 @@ grok --model hermes-4-14b
 | `/review` | 🔍 Review du code |
 | `/test` | 🧪 Lancer les tests |
 | `/voice` | 🎤 Contrôle vocal |
+
+</td>
+</tr>
+</table>
+
+### 🆕 Nouvelles Commandes (2025)
+
+<table>
+<tr>
+<td>
+
+| Commande | 📝 Description |
+|:---------|:---------------|
+| `/tdd` | 🧪 Mode TDD (+45% accuracy) |
+| `/tdd start` | Démarrer le cycle TDD |
+| `/tdd status` | Voir l'état actuel |
+| `/tdd tests` | Voir les tests générés |
+
+</td>
+<td>
+
+| Commande | 📝 Description |
+|:---------|:---------------|
+| `/workflow` | 🚀 Gérer CI/CD |
+| `/hooks` | 🔗 Gérer les hooks lifecycle |
+| `/prompt-cache` | 💾 Gérer le cache prompts |
+| `/prompt-cache stats` | Statistiques du cache |
 
 </td>
 </tr>

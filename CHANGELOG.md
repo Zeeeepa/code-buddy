@@ -9,6 +9,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Research-Based Improvements (December 2025)
+
+Based on 2024-2025 scientific publications and GitHub best practices:
+
+- **TDD Mode** (`src/testing/tdd-mode.ts`)
+  - Test-first code generation workflow (ICSE 2024: +45.97% Pass@1 accuracy)
+  - State machine: idle → requirements → generating-tests → reviewing-tests → implementing → running-tests → iterating → complete
+  - New commands: `/tdd`, `/tdd start`, `/tdd status`, `/tdd tests`, `/tdd approve`
+
+- **Prompt Caching** (`src/optimization/prompt-cache.ts`)
+  - LRU cache with TTL for system prompts and tools
+  - Up to 90% cost reduction (Anthropic/OpenAI research)
+  - Cache key generation with SHA-256
+  - Statistics: hit rate, estimated savings, entry count
+  - New commands: `/prompt-cache`, `/prompt-cache stats`, `/prompt-cache clear`
+
+- **Auto-Lint Integration** (`src/testing/auto-lint.ts`)
+  - Multi-linter support: ESLint, Prettier, Ruff, Clippy, golangci-lint, RuboCop
+  - JSON output parsing for LLM context
+  - Auto-detection of project linter
+  - Fix suggestions with confidence levels
+
+- **Auto-Test Integration** (`src/testing/auto-test.ts`)
+  - Multi-framework support: Jest, Vitest, pytest, cargo test, go test, RSpec
+  - Test result parsing and formatting for LLM
+  - Coverage integration
+  - Watch mode support
+
+- **Lifecycle Hooks** (`src/hooks/lifecycle-hooks.ts`)
+  - Hook types: pre-edit, post-edit, pre-bash, post-bash, pre-commit, post-commit, pre-prompt, post-response
+  - Built-in hooks: lint-on-edit, format-on-save, test-on-edit, pre-commit-review
+  - Custom hook support with command or handler
+  - New commands: `/hooks`, `/hooks list`, `/hooks enable`, `/hooks disable`
+
+- **AI Code Review** (`src/integrations/code-review.ts`)
+  - Pre-commit AI review (73.8% acceptance rate - industrial study)
+  - Pattern detection: security issues, performance problems, code smells
+  - Severity levels: critical, major, minor, info
+  - Integration with git workflow
+
+- **CI/CD Integration** (`src/integrations/cicd-integration.ts`)
+  - Providers: GitHub Actions, GitLab CI, CircleCI
+  - Workflow templates for common use cases
+  - Workflow status monitoring
+  - New commands: `/workflow`, `/workflow list`, `/workflow create`, `/workflow status`
+
+- **New Slash Commands**
+  - `/tdd` - Enter TDD mode
+  - `/workflow` - Manage CI/CD workflows
+  - `/hooks` - Manage lifecycle hooks
+  - `/prompt-cache` - Manage prompt caching
+
 #### Phase 4: Enterprise Features (~7,900 lines)
 - **Team Collaboration** (`src/collaboration/team-session.ts`)
   - WebSocket-based real-time collaboration

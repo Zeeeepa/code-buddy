@@ -8,6 +8,7 @@
 
 - **Agent** — [Ch.02](02-role-des-agents.md), [Ch.03](03-anatomie-agent.md), [Ch.15](15-architecture-complete.md)
 - **AI! / AI? (commentaires)** — [Ch.18](18-productivite-cli.md)
+- **AI Code Review** — [Ch.06](06-repair-reflexion.md), [Ch.18](18-productivite-cli.md)
 - **Agent multi-agent** — [Ch.03](03-anatomie-agent.md), [Ch.15](15-architecture-complete.md)
 - **Agent spécialisé** — [Ch.15](15-architecture-complete.md)
 - **Agentic loop** — [Ch.03](03-anatomie-agent.md), [Ch.15](15-architecture-complete.md)
@@ -23,7 +24,9 @@
 - **AST (Abstract Syntax Tree)** — [Ch.07](07-rag-moderne.md), [Ch.08](08-dependency-aware-rag.md)
 - **Assistant** — [Ch.02](02-role-des-agents.md)
 - **Attention (mécanisme)** — [Ch.01](01-comprendre-les-llms.md)
+- **Auto-lint** — [Ch.06](06-repair-reflexion.md), [Ch.18](18-productivite-cli.md)
 - **Auto-repair** — [Ch.06](06-repair-reflexion.md)
+- **Auto-test** — [Ch.06](06-repair-reflexion.md), [Ch.18](18-productivite-cli.md)
 - **Autorégressif** — [Ch.01](01-comprendre-les-llms.md)
 
 ## B
@@ -39,6 +42,8 @@
 
 - **Cache sémantique** — [Ch.12](12-optimisations-cognitives.md)
 - **Cache d'outils** — [Ch.12](12-optimisations-cognitives.md)
+- **CI/CD Integration** — [Ch.13](13-optimisations-systeme.md), [Ch.18](18-productivite-cli.md)
+- **CircleCI** — [Ch.13](13-optimisations-systeme.md)
 - **Context files** — [Ch.18](18-productivite-cli.md)
 - **Compress (commande)** — [Ch.18](18-productivite-cli.md)
 - **Chain-of-Thought (CoT)** — [Ch.04](04-tree-of-thought.md)
@@ -49,6 +54,7 @@
 - **Chunking sémantique** — [Ch.07](07-rag-moderne.md)
 - **Claude** — [Ch.01](01-comprendre-les-llms.md), [Ch.11](11-plugins-mcp.md)
 - **Code intelligence** — [Ch.10](10-tool-use.md)
+- **Code Review (AI)** — [Ch.06](06-repair-reflexion.md), [Ch.18](18-productivite-cli.md)
 - **CodeRAG** — [Ch.08](08-dependency-aware-rag.md)
 - **Complétion de code** — [Ch.02](02-role-des-agents.md)
 - **Compression de contexte** — [Ch.09](09-context-compression.md)
@@ -90,6 +96,8 @@
 ## G
 
 - **Génération autorégressive** — [Ch.01](01-comprendre-les-llms.md)
+- **GitHub Actions** — [Ch.13](13-optimisations-systeme.md), [Ch.18](18-productivite-cli.md)
+- **GitLab CI** — [Ch.13](13-optimisations-systeme.md)
 - **Glob (outil)** — [Ch.10](10-tool-use.md)
 - **GPT** — [Ch.01](01-comprendre-les-llms.md)
 - **Graphe de dépendances** — [Ch.08](08-dependency-aware-rag.md)
@@ -102,6 +110,7 @@
 
 - **Hallucination** — [Ch.01](01-comprendre-les-llms.md), [Ch.07](07-rag-moderne.md)
 - **Hooks** — [Ch.11](11-plugins-mcp.md)
+- **Hooks lifecycle** — [Ch.11](11-plugins-mcp.md), [Ch.18](18-productivite-cli.md)
 - **Hybrid search** — [Ch.07](07-rag-moderne.md)
 
 ## I
@@ -170,6 +179,7 @@
 - **Positional encoding** — [Ch.01](01-comprendre-les-llms.md)
 - **Pre-training** — [Ch.01](01-comprendre-les-llms.md)
 - **Priorité (contexte)** — [Ch.09](09-context-compression.md)
+- **Prompt caching** — [Ch.12](12-optimisations-cognitives.md), [Ch.13](13-optimisations-systeme.md)
 - **Prompt engineering** — [Ch.01](01-comprendre-les-llms.md)
 - **Prompt externe (Markdown)** — [Ch.16](16-system-prompts-securite.md)
 - **Prompt hardening** — [Ch.16](16-system-prompts-securite.md)
@@ -214,6 +224,7 @@
 ## T
 
 - **Taxonomie des agents** — [Ch.02](02-role-des-agents.md)
+- **TDD (Test-Driven Development)** — [Ch.06](06-repair-reflexion.md), [Ch.18](18-productivite-cli.md)
 - **Temperature** — [Ch.01](01-comprendre-les-llms.md)
 - **Test feedback** — [Ch.06](06-repair-reflexion.md)
 - **Think (keyword)** — [Ch.04](04-tree-of-thought.md)
