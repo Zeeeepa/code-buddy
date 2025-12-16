@@ -429,6 +429,221 @@ User Response
 
 ---
 
+## 7. Infrastructure LLM Locale (Nouveau!)
+
+Code Buddy supporte maintenant les LLMs locaux via Ollama et LM Studio avec une infrastructure dédiée.
+
+### 7.1 GPU Monitor — Gestion VRAM
+
+```typescript
+class GPUMonitor extends EventEmitter {
+  // Détection automatique du GPU (NVIDIA, AMD, Apple, Intel)
+  async getStats(): Promise<VRAMStats> {
+    const vendor = await this.detectGPU();
+    return this.getVRAMStats(vendor);
+  }
+
+  // Recommandation d'offload GPU/CPU
+  calculateOffloadRecommendation(modelSizeMB: number): OffloadRecommendation {
+    const stats = this.lastStats;
+    const available = stats.totalVRAM - stats.usedVRAM;
+
+    if (available >= modelSizeMB) {
+      return { strategy: 'full_gpu', gpuLayers: -1, cpuThreads: 0 };
+    }
+
+    const gpuRatio = available / modelSizeMB;
+    return {
+      strategy: 'hybrid',
+      gpuLayers: Math.floor(32 * gpuRatio),
+      cpuThreads: Math.ceil(os.cpus().length * 0.75)
+    };
+  }
+}
+```
+
+**GPUs supportés** :
+- NVIDIA (nvidia-smi)
+- AMD (ROCm / rocm-smi)
+- Apple Silicon (Metal / ioreg)
+- Intel (intel_gpu_top)
+
+### 7.2 Ollama Embeddings — Embeddings Locaux
+
+```typescript
+class OllamaEmbeddingProvider extends EventEmitter {
+  private config: OllamaEmbeddingConfig;
+  private dimensions: number;
+
+  async initialize(): Promise<boolean> {
+    // Auto-pull du modèle si absent
+    const hasModel = await this.checkModel();
+    if (!hasModel) await this.pullModel();
+    return true;
+  }
+
+  async embed(text: string): Promise<number[]> {
+    const response = await fetch(`${this.config.baseUrl}/api/embeddings`, {
+      method: 'POST',
+      body: JSON.stringify({ model: this.config.model, prompt: text })
+    });
+    return (await response.json()).embedding;
+  }
+
+  // Similarité cosine
+  similarity(a: number[], b: number[]): number {
+    const dot = a.reduce((sum, ai, i) => sum + ai * b[i], 0);
+    const normA = Math.sqrt(a.reduce((sum, ai) => sum + ai * ai, 0));
+    const normB = Math.sqrt(b.reduce((sum, bi) => sum + bi * bi, 0));
+    return dot / (normA * normB);
+  }
+}
+```
+
+**Modèles d'embedding** :
+| Modèle | Dimensions | Usage |
+|--------|------------|-------|
+| nomic-embed-text | 768 | Meilleure qualité |
+| mxbai-embed-large | 1024 | Haute qualité |
+| all-minilm | 384 | Rapide |
+
+### 7.3 HNSW Vector Store — Recherche O(log n)
+
+```typescript
+class HNSWVectorStore {
+  private nodes: Map<string, HNSWNode>;
+  private entryPoint: string | null;
+  private config: HNSWConfig;
+
+  // Insertion avec construction du graphe
+  add(id: string, vector: number[], metadata?: Record<string, unknown>): void {
+    const newNode: HNSWNode = { id, vector, metadata, connections: [] };
+    this.nodes.set(id, newNode);
+
+    if (!this.entryPoint) {
+      this.entryPoint = id;
+      return;
+    }
+
+    this.connectToGraph(newNode);
+  }
+
+  // Recherche avec beam search
+  search(query: number[], k: number): Array<{ id: string; score: number }> {
+    if (!this.entryPoint) return [];
+
+    const candidates = new Map<string, number>();
+    const visited = new Set<string>();
+    const entryNode = this.nodes.get(this.entryPoint)!;
+
+    // Greedy search through layers
+    let currentBest = [{ id: this.entryPoint, score: this.similarity(query, entryNode.vector) }];
+
+    while (currentBest.length > 0) {
+      const best = currentBest[0];
+      const node = this.nodes.get(best.id)!;
+
+      for (const neighborId of node.connections) {
+        if (visited.has(neighborId)) continue;
+        visited.add(neighborId);
+
+        const neighbor = this.nodes.get(neighborId)!;
+        const score = this.similarity(query, neighbor.vector);
+        candidates.set(neighborId, score);
+      }
+
+      currentBest = Array.from(candidates.entries())
+        .map(([id, score]) => ({ id, score }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, this.config.efSearch);
+    }
+
+    return Array.from(candidates.entries())
+      .map(([id, score]) => ({ id, score }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, k);
+  }
+}
+```
+
+**Performance HNSW vs Brute Force** :
+| Vecteurs | Brute Force | HNSW |
+|----------|-------------|------|
+| 10K | 100ms | 2ms |
+| 100K | 1s | 5ms |
+| 1M | 10s | 10ms |
+
+### 7.4 Model Hub — Auto-téléchargement HuggingFace
+
+```typescript
+class ModelHub extends EventEmitter {
+  async downloadModel(modelId: string, quant: QuantizationType): Promise<DownloadedModel> {
+    const modelInfo = RECOMMENDED_MODELS[modelId];
+    const filename = `${modelId}-${quant}.gguf`;
+    const url = `https://huggingface.co/${modelInfo.huggingFaceRepo}/resolve/main/${filename}`;
+
+    const response = await fetch(url);
+    const total = parseInt(response.headers.get('content-length') || '0');
+    let downloaded = 0;
+
+    const writer = fs.createWriteStream(this.getModelPath(filename));
+    for await (const chunk of response.body) {
+      writer.write(chunk);
+      downloaded += chunk.length;
+      this.emit('progress', { downloaded, total, percent: downloaded / total * 100 });
+    }
+
+    return { id: modelId, path: this.getModelPath(filename), size: total };
+  }
+
+  getRecommendedModels(vramMB: number): ModelInfo[] {
+    return Object.values(RECOMMENDED_MODELS)
+      .filter(m => m.minVRAM <= vramMB)
+      .sort((a, b) => b.minVRAM - a.minVRAM);
+  }
+}
+```
+
+**Modèles recommandés** :
+| Modèle | VRAM | Spécialité |
+|--------|------|------------|
+| devstral-7b | 6GB | Code Mistral |
+| codellama-7b | 6GB | Code Meta |
+| qwen-coder-7b | 6GB | Code Alibaba |
+| llama-3.2-3b | 3GB | Général rapide |
+| granite-3b | 3GB | IBM efficace |
+
+### 7.5 Architecture Locale Complète
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Infrastructure Locale                   │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐  │
+│  │  GPUMonitor  │    │  ModelHub    │    │ OllamaEmbed  │  │
+│  │              │    │              │    │              │  │
+│  │ • VRAM stats │    │ • Download   │    │ • Embed text │  │
+│  │ • Offload    │    │ • Recommend  │    │ • Batch      │  │
+│  │ • Layers     │    │ • Quantize   │    │ • Similarity │  │
+│  └──────┬───────┘    └──────┬───────┘    └──────┬───────┘  │
+│         │                   │                   │           │
+│         └─────────────┬─────┴─────────────┬─────┘           │
+│                       │                   │                 │
+│                       ▼                   ▼                 │
+│              ┌──────────────┐    ┌──────────────┐          │
+│              │ HNSWStore    │    │ Ollama/LM    │          │
+│              │              │    │ Studio       │          │
+│              │ • O(log n)   │    │              │          │
+│              │ • Persist    │    │ • /api/embed │          │
+│              │ • 1M vecs    │    │ • /api/chat  │          │
+│              └──────────────┘    └──────────────┘          │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Ce Qui Vient Ensuite
 
 L'architecture est en place. Le **Chapitre 16** détaille la sécurité en profondeur : system prompts, injection, sandboxing, et audit.

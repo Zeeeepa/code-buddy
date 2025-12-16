@@ -507,6 +507,175 @@ grok --model hermes-4-14b
 
 ---
 
+### 🖥️ GPU & Gestion VRAM (Nouveau!)
+
+> *"Optimisation automatique selon votre matériel"*
+
+<table>
+<tr>
+<td width="50%">
+
+**🎮 GPUs supportés :**
+
+| Vendor | 🛠️ Méthode |
+|:-------|:-----------|
+| **NVIDIA** | nvidia-smi |
+| **AMD** | ROCm (rocm-smi) |
+| **Apple** | Metal (ioreg) |
+| **Intel** | intel_gpu_top |
+
+</td>
+<td width="50%">
+
+**⚡ Offload dynamique :**
+
+- Détection automatique de la VRAM
+- Recommandation du nombre de layers GPU
+- Ajustement selon la mémoire disponible
+- Monitoring en temps réel
+
+</td>
+</tr>
+</table>
+
+```typescript
+// Utilisation programmatique
+import { getGPUMonitor } from 'code-buddy';
+
+const gpu = getGPUMonitor();
+const stats = await gpu.getStats();
+console.log(`VRAM: ${stats.usedVRAM}/${stats.totalVRAM} MB`);
+
+const recommendation = gpu.calculateOffloadRecommendation(modelSize);
+console.log(`Layers GPU: ${recommendation.gpuLayers}`);
+```
+
+---
+
+### 🧬 Embeddings Ollama (Nouveau!)
+
+> *"Embeddings neuraux 100% locaux via Ollama"*
+
+<table>
+<tr>
+<td width="50%">
+
+**📐 Modèles disponibles :**
+
+| Modèle | Dimensions | 📝 Description |
+|:-------|:-----------|:---------------|
+| `nomic-embed-text` | 768 | Meilleure qualité |
+| `mxbai-embed-large` | 1024 | Haute qualité |
+| `all-minilm` | 384 | Rapide, léger |
+| `snowflake-arctic-embed` | 1024 | State-of-the-art |
+| `bge-m3` | 1024 | Multilingue |
+
+</td>
+<td width="50%">
+
+**✨ Avantages vs TF-IDF :**
+
+- Compréhension sémantique
+- Synonymes et concepts
+- Similarité de code améliorée
+- Compréhension cross-langage
+- Auto-download des modèles
+
+</td>
+</tr>
+</table>
+
+---
+
+### 🔍 HNSW Vector Search (Nouveau!)
+
+> *"Recherche O(log n) pour les gros codebases"*
+
+<table>
+<tr>
+<td>
+
+**📊 Performance :**
+
+| Taille | Brute Force | HNSW |
+|:-------|:------------|:-----|
+| 10K chunks | 100ms | 2ms |
+| 100K chunks | 1s | 5ms |
+| 1M chunks | 10s | 10ms |
+
+</td>
+<td>
+
+**⚙️ Configuration :**
+
+```typescript
+// Paramètres HNSW
+{
+  M: 16,              // Connexions par nœud
+  efConstruction: 200, // Qualité build
+  efSearch: 50,        // Qualité recherche
+  maxElements: 1000000 // Capacité max
+}
+```
+
+</td>
+</tr>
+</table>
+
+---
+
+### 📦 Model Hub HuggingFace (Nouveau!)
+
+> *"Auto-téléchargement intelligent des modèles GGUF"*
+
+<table>
+<tr>
+<td width="50%">
+
+**🎯 Modèles recommandés :**
+
+| Modèle | VRAM | 📝 Usage |
+|:-------|:-----|:---------|
+| `devstral-7b` | 6GB | Code spécialisé |
+| `codellama-7b` | 6GB | Code Meta |
+| `deepseek-coder-7b` | 6GB | Code chinois |
+| `qwen-coder-7b` | 6GB | Code Alibaba |
+| `llama-3.2-3b` | 3GB | Léger, rapide |
+| `granite-3b` | 3GB | IBM, efficace |
+
+</td>
+<td width="50%">
+
+**📐 Quantizations :**
+
+| Type | Qualité | Taille |
+|:-----|:--------|:-------|
+| `Q8_0` | Excellente | 100% |
+| `Q6_K` | Très bonne | 75% |
+| `Q5_K_M` | Bonne | 62% |
+| `Q4_K_M` | Acceptable | 50% |
+
+</td>
+</tr>
+</table>
+
+```typescript
+// Utilisation
+import { getModelHub } from 'code-buddy';
+
+const hub = getModelHub();
+await hub.initialize();
+
+// Télécharger un modèle recommandé
+const model = await hub.downloadModel('devstral-7b', 'Q4_K_M');
+console.log(`Modèle: ${model.path}`);
+
+// Recommandation basée sur la VRAM
+const recommended = hub.getRecommendedModels(8000); // 8GB VRAM
+```
+
+---
+
 ### 🎤 Contrôle Vocal
 
 > *"Parlez à votre code, il vous répond !"*

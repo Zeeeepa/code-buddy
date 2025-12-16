@@ -9,6 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Local LLM Infrastructure (December 2025)
+
+Optimizations for running local LLMs via Ollama and LM Studio:
+
+- **GPU VRAM Monitor** (`src/hardware/gpu-monitor.ts`)
+  - Real-time VRAM monitoring for NVIDIA, AMD, Apple, Intel GPUs
+  - Dynamic offload recommendations based on available memory
+  - Layer count calculation for optimal GPU/CPU split
+  - Memory pressure detection and alerts
+  - New methods: `getStats()`, `calculateOffloadRecommendation()`, `getRecommendedLayers()`
+
+- **Ollama Embeddings** (`src/context/codebase-rag/ollama-embeddings.ts`)
+  - Neural embeddings via Ollama /api/embeddings endpoint
+  - 100% local, no external API needed
+  - Models: nomic-embed-text (768d), mxbai-embed-large (1024d), all-minilm (384d)
+  - Auto-pulls models if not present
+  - Batch processing with retry logic
+  - Semantic code similarity vs TF-IDF keyword matching
+
+- **HNSW Vector Store** (`src/context/codebase-rag/hnsw-store.ts`)
+  - Hierarchical Navigable Small World algorithm for O(log n) search
+  - 50x faster than brute force at 100K vectors
+  - Configurable parameters: M (connections), efConstruction, efSearch
+  - Persistence to disk with save/load
+  - Incremental updates without full rebuild
+  - Up to 1M vectors supported
+
+- **Model Hub HuggingFace** (`src/models/model-hub.ts`)
+  - Auto-download GGUF models from HuggingFace
+  - VRAM-based model recommendations
+  - Quantization support: Q8_0, Q6_K, Q5_K_M, Q4_K_M, Q4_0
+  - Recommended models: devstral-7b, codellama-7b, deepseek-coder-7b, qwen-coder-7b, llama-3.2-3b, granite-3b
+  - Download progress tracking with resume support
+  - Model integrity verification
+
 #### Research-Based Improvements (December 2025)
 
 Based on 2024-2025 scientific publications and GitHub best practices:

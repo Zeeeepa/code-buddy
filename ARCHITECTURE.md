@@ -669,6 +669,171 @@ const LIMITS = {
 
 ---
 
+## Local LLM Infrastructure
+
+### Hardware Module (`src/hardware/`)
+
+**Purpose**: GPU monitoring and resource management for local LLM inference.
+
+**Components**:
+
+#### GPUMonitor (`src/hardware/gpu-monitor.ts`)
+
+```typescript
+class GPUMonitor extends EventEmitter {
+  getStats(): Promise<VRAMStats>
+  calculateOffloadRecommendation(modelSizeMB: number): OffloadRecommendation
+  getRecommendedLayers(modelSizeMB: number, totalLayers: number): number
+  formatStatus(): string
+}
+```
+
+**Supported GPUs**:
+- **NVIDIA**: nvidia-smi
+- **AMD**: ROCm (rocm-smi)
+- **Apple**: Metal (ioreg)
+- **Intel**: intel_gpu_top
+
+**Key Features**:
+- Real-time VRAM monitoring
+- Dynamic offload recommendations
+- Memory pressure detection
+- Vendor-agnostic abstraction
+
+---
+
+### Models Module (`src/models/`)
+
+**Purpose**: HuggingFace model management and auto-download.
+
+**Components**:
+
+#### ModelHub (`src/models/model-hub.ts`)
+
+```typescript
+class ModelHub extends EventEmitter {
+  initialize(): Promise<void>
+  downloadModel(modelId: string, quantization: QuantizationType): Promise<DownloadedModel>
+  getRecommendedModels(vramMB: number): ModelInfo[]
+  listDownloadedModels(): Promise<DownloadedModel[]>
+  deleteModel(modelPath: string): Promise<void>
+  formatStatus(): string
+}
+```
+
+**Recommended Models**:
+| Model | VRAM | Use Case |
+|-------|------|----------|
+| devstral-7b | 6GB | Code-specialized |
+| codellama-7b | 6GB | Meta code model |
+| deepseek-coder-7b | 6GB | Chinese code model |
+| qwen-coder-7b | 6GB | Alibaba code model |
+| llama-3.2-3b | 3GB | Lightweight, fast |
+| granite-3b | 3GB | IBM efficient model |
+
+**Quantization Types**: Q8_0, Q6_K, Q5_K_M, Q4_K_M, Q4_0
+
+---
+
+### Codebase RAG Enhancements (`src/context/codebase-rag/`)
+
+#### OllamaEmbeddingProvider (`ollama-embeddings.ts`)
+
+```typescript
+class OllamaEmbeddingProvider extends EventEmitter {
+  initialize(): Promise<boolean>
+  embed(text: string): Promise<number[]>
+  embedBatch(texts: string[]): Promise<number[][]>
+  embedChunk(chunk: CodeChunk): Promise<number[]>
+  similarity(a: number[], b: number[]): number
+  getDimensions(): number
+}
+```
+
+**Embedding Models**:
+| Model | Dimensions | Description |
+|-------|------------|-------------|
+| nomic-embed-text | 768 | Best quality for code |
+| mxbai-embed-large | 1024 | High quality, larger |
+| all-minilm | 384 | Fast, lightweight |
+| snowflake-arctic-embed | 1024 | State-of-the-art retrieval |
+| bge-m3 | 1024 | Multilingual |
+
+**Features**:
+- Auto-pulls models from Ollama
+- Batch processing with configurable batch size
+- Retry logic with exponential backoff
+- Graceful fallback to zero vectors
+
+#### HNSWVectorStore (`hnsw-store.ts`)
+
+```typescript
+class HNSWVectorStore {
+  add(id: string, vector: number[], metadata?: Record<string, unknown>): void
+  search(query: number[], k: number): Array<{ id: string; score: number }>
+  delete(id: string): boolean
+  save(filePath: string): Promise<void>
+  load(filePath: string): Promise<void>
+  getStats(): object
+}
+```
+
+**HNSW Parameters**:
+```typescript
+{
+  M: 16,              // Max connections per node
+  efConstruction: 200, // Build-time quality
+  efSearch: 50,        // Search-time quality
+  maxElements: 1000000 // Max capacity
+}
+```
+
+**Performance**:
+| Size | Brute Force | HNSW |
+|------|-------------|------|
+| 10K vectors | 100ms | 2ms |
+| 100K vectors | 1s | 5ms |
+| 1M vectors | 10s | 10ms |
+
+**Features**:
+- O(log n) search complexity
+- Persistence to disk
+- Incremental updates
+- Metadata filtering
+
+---
+
+### Architecture Diagram (Updated)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Local LLM Stack                         │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐  │
+│  │  GPUMonitor  │    │  ModelHub    │    │ OllamaEmbed  │  │
+│  │              │    │              │    │              │  │
+│  │ • VRAM stats │    │ • Download   │    │ • Embed text │  │
+│  │ • Offload    │    │ • Recommend  │    │ • Batch      │  │
+│  │ • Layers     │    │ • Quantize   │    │ • Similarity │  │
+│  └──────┬───────┘    └──────┬───────┘    └──────┬───────┘  │
+│         │                   │                   │           │
+│         └─────────────┬─────┴─────────────┬─────┘           │
+│                       │                   │                 │
+│                       ▼                   ▼                 │
+│              ┌──────────────┐    ┌──────────────┐          │
+│              │ HNSWStore    │    │ Ollama/LM    │          │
+│              │              │    │ Studio       │          │
+│              │ • Add vector │    │              │          │
+│              │ • Search     │    │ • /api/embed │          │
+│              │ • Persist    │    │ • /api/chat  │          │
+│              └──────────────┘    └──────────────┘          │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Future Architecture Considerations
 
 ### Planned Improvements
