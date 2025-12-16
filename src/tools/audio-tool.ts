@@ -275,6 +275,7 @@ export class AudioTool {
         data: result
       };
     } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- axios error response structure
       const errorMsg = (error as any).response?.data?.error?.message || getErrorMessage(error);
       return {
         success: false,

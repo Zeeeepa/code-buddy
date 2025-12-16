@@ -233,22 +233,26 @@ describe("CodeBuddyAgent", () => {
     it("should set default max tool rounds to 50", () => {
       agent = new CodeBuddyAgent("test-api-key");
       // Access private property for testing
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accessing private property for testing
       expect((agent as any).maxToolRounds).toBe(50);
     });
 
     it("should set custom max tool rounds", () => {
       agent = new CodeBuddyAgent("test-api-key", undefined, undefined, 100);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accessing private property for testing
       expect((agent as any).maxToolRounds).toBe(100);
     });
 
     it("should set default session cost limit to $10", () => {
       agent = new CodeBuddyAgent("test-api-key");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accessing private property for testing
       expect((agent as any).sessionCostLimit).toBe(10);
     });
 
     it("should use MAX_COST env var for session limit", () => {
       process.env.MAX_COST = "25";
       agent = new CodeBuddyAgent("test-api-key");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accessing private property for testing
       expect((agent as any).sessionCostLimit).toBe(25);
     });
   });
@@ -256,6 +260,7 @@ describe("CodeBuddyAgent", () => {
   describe("YOLO Mode", () => {
     it("should not enable YOLO mode by default", () => {
       agent = new CodeBuddyAgent("test-api-key");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accessing private property for testing
       expect((agent as any).yoloMode).toBe(false);
     });
 
@@ -263,6 +268,7 @@ describe("CodeBuddyAgent", () => {
       process.env.YOLO_MODE = "true";
       agent = new CodeBuddyAgent("test-api-key");
       // YOLO mode requires explicit config, not just env var
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accessing private property for testing
       expect((agent as any).yoloMode).toBe(false);
     });
   });
@@ -315,6 +321,7 @@ describe("CodeBuddyAgent", () => {
       agent = new CodeBuddyAgent("test-api-key");
       // Start a mock operation
       const controller = new AbortController();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accessing private property for testing
       (agent as any).abortController = controller;
       expect(controller.signal.aborted).toBe(false);
 
@@ -354,11 +361,13 @@ describe("CodeBuddyAgent", () => {
   describe("Tool Selection", () => {
     it("should enable RAG tool selection by default", () => {
       agent = new CodeBuddyAgent("test-api-key");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accessing private property for testing
       expect((agent as any).useRAGToolSelection).toBe(true);
     });
 
     it("should allow disabling RAG tool selection", () => {
       agent = new CodeBuddyAgent("test-api-key", undefined, undefined, undefined, false);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accessing private property for testing
       expect((agent as any).useRAGToolSelection).toBe(false);
     });
   });
@@ -374,6 +383,7 @@ describe("CodeBuddyAgent", () => {
 
   describe("Static Properties", () => {
     it("should have MAX_HISTORY_SIZE constant", () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accessing private static property for testing
       expect((CodeBuddyAgent as any).MAX_HISTORY_SIZE).toBe(1000);
     });
   });

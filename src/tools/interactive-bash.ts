@@ -71,8 +71,14 @@ export interface PTYOptions {
   env?: Record<string, string>;
 }
 
+/** Entry stored in sessions Map */
+interface SessionEntry {
+  shell: PTYShell;
+  session: InteractiveSession;
+}
+
 export class InteractiveBashTool extends EventEmitter {
-  private sessions: Map<string, any> = new Map();
+  private sessions: Map<string, SessionEntry> = new Map();
   private sessionCounter: number = 0;
   private isPTYAvailable: boolean;
 
@@ -224,7 +230,7 @@ export class InteractiveBashTool extends EventEmitter {
         stderr += data.toString();
       });
 
-      child.on("close", (code: number | null) => {
+      child.on("close", (_code: number | null) => {
         resolve({
           sessionId,
           output: stdout + (stderr ? `\nStderr:\n${stderr}` : ""),

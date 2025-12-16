@@ -346,6 +346,7 @@ describe('LSP Server', () => {
 
   describe('Cache Management', () => {
     it('should implement cache with timeout', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic cache for testing
       const cache = new Map<string, any>();
       const cacheKey = 'test_key';
       const value = { data: 'test' };

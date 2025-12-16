@@ -268,6 +268,7 @@ export class ThemeManager {
    * Set a single custom color
    */
   public setCustomColor(key: keyof ThemeColors, value: string): void {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic property assignment
     (this.customColors as any)[key] = value;
     this.savePreferences();
   }

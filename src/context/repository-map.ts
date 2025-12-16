@@ -478,7 +478,7 @@ export class RepositoryMap {
       return { ...file, score };
     });
 
-    return scored.sort((a, b) => (b as any).score - (a as any).score);
+    return scored.sort((a, b) => b.score - a.score);
   }
 
   private buildContext(files: FileInfo[], maxTokens: number): string {

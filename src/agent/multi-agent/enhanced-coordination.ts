@@ -499,6 +499,7 @@ export class EnhancedCoordinator extends EventEmitter {
     value: unknown,
     source: AgentRole
   ): void {
+    /* eslint-disable @typescript-eslint/no-explicit-any -- value is unknown, cast needed for type-specific Maps */
     switch (type) {
       case 'codeSnippets':
         this.resourcePool.codeSnippets.set(key, value as any);
@@ -513,6 +514,7 @@ export class EnhancedCoordinator extends EventEmitter {
         this.resourcePool.testResults.set(key, value as any);
         break;
     }
+    /* eslint-enable @typescript-eslint/no-explicit-any */
 
     this.emit('resource:shared', { type, key, source });
   }

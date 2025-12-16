@@ -162,6 +162,7 @@ export function Weather({
   units?: 'metric' | 'imperial';
   plain?: boolean;
 }): React.ReactElement {
+  /* eslint-disable @typescript-eslint/no-explicit-any -- weather condition type conversion */
   const data = {
     type: 'weather' as const,
     location,
@@ -173,6 +174,7 @@ export function Weather({
       ...f,
       condition: f.condition as any,
     })),
+    /* eslint-enable @typescript-eslint/no-explicit-any */
     units,
   };
 
@@ -219,11 +221,13 @@ export function CodeStructure({
     })),
     exports: (exports || []).map((e) => ({
       ...e,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- export kind type conversion
       kind: e.kind as any,
       line: undefined,
     })),
     variables: (variables || []).map((v) => ({
       ...v,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- variable kind type conversion
       kind: v.kind as any,
       type: undefined,
       line: undefined,

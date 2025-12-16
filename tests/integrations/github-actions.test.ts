@@ -184,6 +184,7 @@ describe("GitHubActionsManager", () => {
             steps: [{ run: "test" }],
           },
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- partial config for validation testing
       } as any;
 
       const result = manager.validateWorkflow(config);
@@ -202,6 +203,7 @@ describe("GitHubActionsManager", () => {
             steps: [{ run: "test" }],
           },
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- partial config for validation testing
       } as any;
 
       const result = manager.validateWorkflow(config);
@@ -219,6 +221,7 @@ describe("GitHubActionsManager", () => {
             steps: [{ run: "test" }],
           },
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- partial config for validation testing
       } as any;
 
       const result = manager.validateWorkflow(config);

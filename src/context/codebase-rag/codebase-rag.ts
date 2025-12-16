@@ -63,6 +63,7 @@ export class CodebaseRAG extends EventEmitter {
       indexSize: 0,
       lastUpdated: new Date(),
       languages: {},
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- empty stats object initialization
       chunkTypes: {} as any,
     };
   }
@@ -883,6 +884,7 @@ export class CodebaseRAG extends EventEmitter {
       indexSize: 0,
       lastUpdated: new Date(),
       languages: {},
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- empty stats object initialization
       chunkTypes: {} as any,
     };
   }

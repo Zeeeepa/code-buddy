@@ -25,6 +25,7 @@ describe('SecurityModeManager', () => {
     });
 
     it('should reject invalid modes', () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- testing invalid mode rejection
       expect(() => manager.setMode('invalid' as any)).toThrow('Invalid security mode');
     });
   });

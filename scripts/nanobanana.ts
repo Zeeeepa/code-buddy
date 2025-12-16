@@ -14,6 +14,7 @@ interface DiagramSpec {
   name: string;
   type: 'box' | 'tree' | 'timeline' | 'pyramid' | 'spectrum' | 'flow' | 'chart' | 'matrix';
   title: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Complex diagram data with varying shapes
   data: any;
 }
 
@@ -574,6 +575,7 @@ function generateSVG(spec: DiagramSpec): string {
     </style>
   `;
 
+  /* eslint-disable @typescript-eslint/no-explicit-any -- diagram data items have varying shapes */
   if (spec.type === 'pyramid') {
     const levels = spec.data.length;
     content = spec.data.map((item: any, i: number) => {
@@ -631,6 +633,7 @@ function generateSVG(spec: DiagramSpec): string {
          <text x="${node.x + node.w/2}" y="${node.y + node.h/2 + 5}" class="text label">${node.label}</text>
        `).join('')}
      `;
+  /* eslint-enable @typescript-eslint/no-explicit-any */
   } else if (spec.type === 'flow') {
     const stepWidth = spec.data.steps.length > 5 ? 80 : 120;
     const gap = 30;
@@ -697,7 +700,7 @@ function generateSVG(spec: DiagramSpec): string {
 
      content += `<line x1="50" y1="350" x2="750" y2="350" stroke="#666" stroke-width="2" />`;
   } else if (spec.type === 'matrix') {
-      const rows = spec.data.rows.length;
+      const _rows = spec.data.rows.length;
       const cols = spec.data.cols.length;
       const cellW = 120;
       const cellH = 40;

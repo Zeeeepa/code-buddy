@@ -346,6 +346,7 @@ export class WebLLMProvider extends EventEmitter implements LocalLLMProvider {
     try {
       // Check if WebGPU is available
       if (typeof navigator !== 'undefined' && 'gpu' in navigator) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- WebGPU API not fully typed
         const adapter = await (navigator as any).gpu.requestAdapter();
         return adapter !== null;
       }
@@ -365,6 +366,7 @@ export class WebLLMProvider extends EventEmitter implements LocalLLMProvider {
 
     const startTime = Date.now();
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- engine type varies by provider
     const response = await (this.engine as any).chat.completions.create({
       messages: messages.map(m => ({ role: m.role, content: m.content })),
       max_tokens: options?.maxTokens ?? this.config?.maxTokens ?? 2048,
@@ -391,6 +393,7 @@ export class WebLLMProvider extends EventEmitter implements LocalLLMProvider {
       throw new Error('Provider not initialized');
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- engine type varies by provider
     const response = await (this.engine as any).chat.completions.create({
       messages: messages.map(m => ({ role: m.role, content: m.content })),
       max_tokens: options?.maxTokens ?? this.config?.maxTokens ?? 2048,

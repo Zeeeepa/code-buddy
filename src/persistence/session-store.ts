@@ -13,6 +13,7 @@ export interface Session {
   messages: SessionMessage[];
   createdAt: Date;
   lastAccessedAt: Date;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- flexible metadata structure
   metadata?: Record<string, any>;
 }
 
@@ -206,6 +207,7 @@ export class SessionStore {
    */
   convertMessagesToChatEntries(messages: SessionMessage[]): ChatEntry[] {
     return messages.map(msg => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SessionMessage type maps to ChatEntry type
       type: msg.type as any,
       content: msg.content,
       timestamp: new Date(msg.timestamp),

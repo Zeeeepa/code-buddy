@@ -307,6 +307,7 @@ describe('RepairEngine', () => {
         duration: 500,
         appliedPatch: {
           id: 'patch-1',
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mock fault object for testing
           fault: {} as any,
           changes: [{
             file: 'test.ts',
@@ -324,6 +325,7 @@ describe('RepairEngine', () => {
         }
       };
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- partial mock result for testing
       const formatted = engine.formatResult(mockResult as any);
 
       expect(formatted).toContain('Fixed');

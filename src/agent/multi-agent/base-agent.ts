@@ -257,6 +257,7 @@ ${context.decisions.slice(-5).map(d => `- ${d.description} (by ${d.madeBy})`).jo
         role: "assistant",
         content: assistantMessage.content || "",
         tool_calls: assistantMessage.tool_calls,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- OpenAI tool_calls type compatibility
       } as any);
 
       // Accumulate output
@@ -396,6 +397,7 @@ ${context.decisions.slice(-5).map(d => `- ${d.description} (by ${d.madeBy})`).jo
    * Check if agent has a specific capability
    */
   hasCapability(capability: string): boolean {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- capability string comparison
     return this.config.capabilities.includes(capability as any);
   }
 

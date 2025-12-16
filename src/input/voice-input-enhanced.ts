@@ -368,6 +368,7 @@ export class VoiceInputManager extends EventEmitter {
       };
     } catch (error) {
       const errorMsg = error && typeof error === 'object' && 'response' in error
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- axios error response structure
         ? (error as any).response?.data?.error?.message || getErrorMessage(error)
         : getErrorMessage(error);
       return {

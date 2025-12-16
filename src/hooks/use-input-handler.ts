@@ -224,7 +224,7 @@ export function useInputHandler({
             selectedCommandIndex,
             filteredSuggestions.length - 1
           );
-          const selectedSuggestion = filteredSuggestions[safeIndex] as any;
+          const selectedSuggestion = filteredSuggestions[safeIndex] as { command: string; isArgument?: boolean };
 
           let newInput: string;
           if (selectedSuggestion.isArgument) {
@@ -596,6 +596,7 @@ export function useInputHandler({
 
         if (result.prompt === "__CHANGE_MODE__") {
           const args = trimmedInput.split(" ").slice(1);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mode string from user input
           const mode = args[0] as any;
           if (["plan", "code", "ask"].includes(mode)) {
             agent.setMode(mode);

@@ -206,6 +206,7 @@ export class DataAnalysisAgent extends SpecializedAgent {
     const firstRow = data[0] as Record<string, unknown>;
     const columns = Object.keys(firstRow);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic stats object
     const description: Record<string, any> = {};
 
     for (const col of columns) {
@@ -884,6 +885,7 @@ export class DataAnalysisAgent extends SpecializedAgent {
     return lines.join('\n');
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic description object
   private formatDescription(desc: Record<string, any>): string {
     const lines: string[] = ['Data Description:', '─'.repeat(50)];
     for (const [col, stats] of Object.entries(desc)) {

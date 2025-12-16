@@ -74,6 +74,7 @@ describe("ArchitectMode", () => {
 
     it("should use default config values", () => {
       architect = new ArchitectMode(apiKey);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accessing private property for testing
       const config = (architect as any).config;
 
       expect(config.architectModel).toBe("grok-3-latest");
@@ -91,6 +92,7 @@ describe("ArchitectMode", () => {
       };
 
       architect = new ArchitectMode(apiKey, undefined, customConfig);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accessing private property for testing
       const config = (architect as any).config;
 
       expect(config.architectModel).toBe("grok-2");
@@ -144,11 +146,13 @@ describe("ArchitectMode", () => {
   describe("State Management", () => {
     it("should start inactive", () => {
       architect = new ArchitectMode(apiKey);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accessing private property for testing
       expect((architect as any).isActive).toBe(false);
     });
 
     it("should have no proposal initially", () => {
       architect = new ArchitectMode(apiKey);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accessing private property for testing
       expect((architect as any).currentProposal).toBeNull();
     });
 
@@ -163,7 +167,9 @@ describe("ArchitectMode", () => {
         estimatedChanges: 0,
       };
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accessing private property for testing
       (architect as any).currentProposal = proposal;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accessing private property for testing
       expect((architect as any).currentProposal).toBe(proposal);
     });
   });
@@ -171,6 +177,7 @@ describe("ArchitectMode", () => {
   describe("Config Access", () => {
     it("should provide access to config", () => {
       architect = new ArchitectMode(apiKey);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accessing private property for testing
       expect((architect as any).config).toBeDefined();
     });
   });
@@ -309,6 +316,7 @@ describe("ArchitectMode Integration", () => {
   it("should handle design and execution flow", () => {
     const architect = new ArchitectMode("test-api-key");
 
+    /* eslint-disable @typescript-eslint/no-explicit-any -- accessing private properties for testing */
     // Simulate the flow
     expect((architect as any).isActive).toBe(false);
     expect((architect as any).currentProposal).toBeNull();
@@ -335,5 +343,6 @@ describe("ArchitectMode Integration", () => {
 
     expect((architect as any).isActive).toBe(false);
     expect((architect as any).currentProposal).toBeNull();
+    /* eslint-enable @typescript-eslint/no-explicit-any */
   });
 });

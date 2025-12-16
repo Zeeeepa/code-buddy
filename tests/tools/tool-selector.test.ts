@@ -10,12 +10,6 @@ import {
   getToolSelectionMetrics,
   formatToolSelectionMetrics,
 } from "../../src/tools/tool-selector";
-import type {
-  ToolCategory,
-  QueryClassification,
-  ToolSelectionResult,
-  ToolSelectionMetrics,
-} from "../../src/tools/tool-selector";
 import { CodeBuddyTool } from "../../src/codebuddy/client";
 
 // Mock tools for testing

@@ -262,6 +262,7 @@ describe('JSON-RPC Server Integration', () => {
 
       // Just verify the method names are valid strings
       methods.forEach(method => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- testing dynamic method names
         const request = createRequest(1, method as any, {});
         expect(request.method).toBe(method);
       });

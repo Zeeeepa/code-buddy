@@ -12,6 +12,7 @@ export interface ConversationBranch {
   messages: CodeBuddyMessage[];
   createdAt: Date;
   updatedAt: Date;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- flexible metadata structure
   metadata?: Record<string, any>;
 }
 
