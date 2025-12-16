@@ -197,7 +197,7 @@ What is this developer working on?`,
           currentTask: flowData.task || 'Unknown task',
           relevantFiles: flowData.relevantFiles || recentFiles,
           recentEdits: this.recentEdits.slice(-10),
-          suggestedActions: (flowData.suggestedActions || []).map((a: any, i: number) => ({
+          suggestedActions: (flowData.suggestedActions || []).map((a: { label?: string; description?: string; command?: string; priority?: number }, i: number) => ({
             id: `flow-action-${i}`,
             label: a.label,
             description: a.description,

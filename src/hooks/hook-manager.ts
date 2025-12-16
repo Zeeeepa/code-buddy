@@ -25,7 +25,7 @@ export interface Hook {
 export interface HookContext {
   event: HookEvent;
   toolName?: string;
-  toolArgs?: Record<string, any>;
+  toolArgs?: Record<string, unknown>;
   toolResult?: {
     success: boolean;
     output?: string;
@@ -42,7 +42,7 @@ export interface HookResult {
   output?: string;
   error?: string;
   blocked?: boolean;  // If true, the operation should be blocked
-  modifiedArgs?: Record<string, any>;  // Modified tool arguments
+  modifiedArgs?: Record<string, unknown>;  // Modified tool arguments
 }
 
 export interface HooksConfig {
