@@ -39,7 +39,7 @@ import { SupercompleteProvider } from './providers/supercomplete-provider';
 import { HistoryTreeProvider } from './providers/history-tree-provider';
 import { IssuesTreeProvider } from './providers/issues-tree-provider';
 import { HistoryManager } from './history-manager';
-import { logger, validateStartupConfig, showConfigurationWizard, getApiKey, getDefaultModel, getDefaultBaseUrl } from './utils';
+import { logger, validateStartupConfig, showConfigurationWizard, getApiKey, getDefaultModel } from './utils';
 
 let aiClient: AIClient;
 let chatViewProvider: CodeBuddyChatViewProvider;

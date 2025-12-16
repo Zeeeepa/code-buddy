@@ -310,7 +310,7 @@ Rules:
       name: 'search',
       description: 'Search the codebase for patterns or concepts',
       icon: '$(search)',
-      execute: async (args, ctx) => {
+      execute: async (args, _ctx) => {
         if (!args) {
           return 'Please provide a search query. Example: /search authentication logic';
         }

@@ -34,11 +34,17 @@ import {
   StreamingOptimizer,
   getLatencyOptimizer,
   getStreamingOptimizer,
+  resetOptimizers,
   measureLatency,
   precompute,
   LATENCY_THRESHOLDS,
   OPERATION_TARGETS,
 } from '../src/optimization/latency-optimizer.js';
+
+// Clean up singletons after all tests
+afterAll(() => {
+  resetOptimizers();
+});
 
 import type { ChatCompletionFunctionTool } from 'openai/resources/chat/completions';
 

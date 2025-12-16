@@ -254,7 +254,7 @@ Requirements:
   /**
    * Apply generated code to a target file
    */
-  private async applyGeneratedCode(targetPath?: string): Promise<void> {
+  private async applyGeneratedCode(_targetPath?: string): Promise<void> {
     if (!this.currentGeneration) return;
 
     const editor = vscode.window.activeTextEditor;

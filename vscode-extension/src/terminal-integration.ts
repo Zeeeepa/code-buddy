@@ -26,14 +26,14 @@ export class TerminalIntegration implements vscode.Disposable {
   private setupTerminalListeners(): void {
     // Listen for terminal creation
     this.disposables.push(
-      vscode.window.onDidOpenTerminal(terminal => {
+      vscode.window.onDidOpenTerminal(_terminal => {
         // Track terminal for context
       })
     );
 
     // Listen for terminal close
     this.disposables.push(
-      vscode.window.onDidCloseTerminal(terminal => {
+      vscode.window.onDidCloseTerminal(_terminal => {
         // Cleanup
       })
     );

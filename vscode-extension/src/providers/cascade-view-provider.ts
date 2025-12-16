@@ -335,7 +335,7 @@ If task is complete, use action "COMPLETE".`,
         case 'SEARCH_CODE': {
           const pattern = params.pattern as string;
           // Use grep-like search
-          const results = await vscode.commands.executeCommand(
+          await vscode.commands.executeCommand(
             'workbench.action.findInFiles',
             { query: pattern }
           );

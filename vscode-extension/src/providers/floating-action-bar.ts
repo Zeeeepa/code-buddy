@@ -273,12 +273,9 @@ export class FloatingActionBar implements vscode.Disposable {
 export class ActionBarPanel {
   private static panel: vscode.WebviewPanel | undefined;
 
-  static show(extensionUri: vscode.Uri, selection: vscode.Selection): void {
+  static show(extensionUri: vscode.Uri, _selection: vscode.Selection): void {
     const editor = vscode.window.activeTextEditor;
     if (!editor) return;
-
-    // Calculate position near selection
-    const position = editor.selection.active;
 
     if (ActionBarPanel.panel) {
       ActionBarPanel.panel.reveal(vscode.ViewColumn.Beside);

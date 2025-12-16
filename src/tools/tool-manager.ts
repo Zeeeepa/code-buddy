@@ -297,11 +297,17 @@ export class ToolManager extends EventEmitter {
     const startTime = Date.now();
 
     try {
+      // Create a cancellable timeout
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
+      const timeoutPromise = new Promise<ToolResult>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(`Tool execution timed out after ${timeout}ms`)), timeout);
+      });
+
       const result = await Promise.race([
-        tool.execute(args),
-        new Promise<ToolResult>((_, reject) =>
-          setTimeout(() => reject(new Error(`Tool execution timed out after ${timeout}ms`)), timeout)
-        ),
+        tool.execute(args).finally(() => {
+          if (timeoutId) clearTimeout(timeoutId);
+        }),
+        timeoutPromise,
       ]);
 
       const duration = Date.now() - startTime;

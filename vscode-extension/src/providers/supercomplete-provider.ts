@@ -220,7 +220,7 @@ Complete the code at <CURSOR>. Output ONLY the completion text, no explanations 
   /**
    * Detect the context of where we're completing
    */
-  private detectContext(prefix: string, language: string): string {
+  private detectContext(prefix: string, _language: string): string {
     const lines = prefix.split('\n');
     const lastLines = lines.slice(-10).join('\n');
 

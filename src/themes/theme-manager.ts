@@ -17,6 +17,7 @@ import {
 } from './theme.js';
 import { BUILTIN_THEMES, DEFAULT_THEME } from './default-themes.js';
 import { themeSchema, themePreferencesSchema } from './theme-schema.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Singleton manager for themes and avatars
@@ -98,13 +99,13 @@ export class ThemeManager {
               theme.isBuiltin = false;
               this.themes.set(theme.id, theme);
             } else {
-              console.warn(`Invalid theme in ${file}:`, validationResult.error.issues.map((e: { message: string; path: PropertyKey[] }) => e.message).join(', '));
+              logger.warn(`Invalid theme in ${file}: ${validationResult.error.issues.map((e: { message: string; path: PropertyKey[] }) => e.message).join(', ')}`, { source: 'ThemeManager' });
             }
           } catch (error) {
             if (error instanceof SyntaxError) {
-              console.warn(`Invalid JSON in theme file ${file}`);
+              logger.warn(`Invalid JSON in theme file ${file}`, { source: 'ThemeManager' });
             } else {
-              console.warn(`Failed to load theme from ${file}`);
+              logger.warn(`Failed to load theme from ${file}`, { source: 'ThemeManager' });
             }
           }
         }
@@ -129,7 +130,7 @@ export class ThemeManager {
       // Validate preferences structure with Zod
       const validationResult = themePreferencesSchema.safeParse(parsed);
       if (!validationResult.success) {
-        console.warn('Invalid theme preferences:', validationResult.error.issues.map((e: { message: string; path: PropertyKey[] }) => e.message).join(', '));
+        logger.warn(`Invalid theme preferences: ${validationResult.error.issues.map((e: { message: string; path: PropertyKey[] }) => e.message).join(', ')}`, { source: 'ThemeManager' });
         return;
       }
 
@@ -151,7 +152,7 @@ export class ThemeManager {
       }
     } catch (error) {
       if (error instanceof SyntaxError) {
-        console.warn('Invalid JSON in theme preferences file');
+        logger.warn('Invalid JSON in theme preferences file', { source: 'ThemeManager' });
       }
       // Silently ignore other errors, use defaults
     }
@@ -172,7 +173,7 @@ export class ThemeManager {
 
       fs.writeFileSync(this.preferencesPath, JSON.stringify(preferences, null, 2));
     } catch (_error) {
-      console.warn('Failed to save theme preferences');
+      logger.warn('Failed to save theme preferences', { source: 'ThemeManager' });
     }
   }
 
@@ -335,7 +336,7 @@ export class ThemeManager {
       const filePath = path.join(this.themesDir, `${theme.id}.json`);
       fs.writeFileSync(filePath, JSON.stringify(theme, null, 2));
     } catch (_error) {
-      console.warn(`Failed to save custom theme: ${theme.id}`);
+      logger.warn(`Failed to save custom theme: ${theme.id}`, { source: 'ThemeManager' });
     }
   }
 

@@ -3,6 +3,7 @@ import path from 'path';
 import os from 'os';
 import { spawn, SpawnOptions } from 'child_process';
 import { EventEmitter } from 'events';
+import { logger } from '../utils/logger.js';
 
 export type HookType =
   | 'pre-commit'
@@ -108,7 +109,7 @@ export class HookSystem extends EventEmitter {
           this.hooks.set(hook.type, existing);
         }
       } catch (error) {
-        console.warn(`Failed to load hooks from ${configPath}:`, error);
+        logger.warn(`Failed to load hooks from ${configPath}: ${error}`, { source: 'HookSystem' });
       }
     }
   }

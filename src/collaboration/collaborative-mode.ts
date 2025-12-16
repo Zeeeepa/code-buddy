@@ -680,6 +680,7 @@ export class CollaborationClient extends EventEmitter {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private pingInterval: ReturnType<typeof setInterval> | null = null;
+  private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor(name: string) {
     super();
@@ -717,6 +718,11 @@ export class CollaborationClient extends EventEmitter {
         });
 
         this.ws.on('error', (error) => {
+          // Close the websocket on error to prevent leaks
+          if (this.ws) {
+            this.ws.close();
+            this.ws = null;
+          }
           reject(error);
           this.emit('error', error);
         });
@@ -924,7 +930,8 @@ export class CollaborationClient extends EventEmitter {
     this.reconnectAttempts++;
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
 
-    setTimeout(() => {
+    this.reconnectTimeout = setTimeout(() => {
+      this.reconnectTimeout = null;
       this.emit('reconnecting', { attempt: this.reconnectAttempts });
       this.connect(url).catch((err) => {
         this.emit('reconnect:error', {
@@ -941,6 +948,10 @@ export class CollaborationClient extends EventEmitter {
    */
   disconnect(): void {
     this.stopPing();
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
     if (this.ws) {
       this.ws.close();
       this.ws = null;

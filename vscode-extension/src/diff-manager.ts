@@ -73,7 +73,6 @@ export class DiffManager implements vscode.Disposable {
     // Get the original text
     const originalText = document.getText(selection);
     const originalLines = originalText.split('\n');
-    const newLines = newContent.split('\n');
 
     // Create decorations for deleted lines (original)
     const deleteDecorations: vscode.DecorationOptions[] = [];

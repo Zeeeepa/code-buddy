@@ -267,7 +267,7 @@ export class SmartContextManager implements vscode.Disposable {
   /**
    * Resolve relative import path to absolute
    */
-  private resolveRelativePath(currentDir: string, importPath: string, workspaceRoot: string): string | null {
+  private resolveRelativePath(currentDir: string, importPath: string, _workspaceRoot: string): string | null {
     // Remove leading ./
     let resolved = importPath.replace(/^\.\//, '');
 
@@ -411,7 +411,7 @@ export class SmartContextManager implements vscode.Disposable {
 
     for (const pattern of testPatterns) {
       try {
-        const doc = await vscode.workspace.openTextDocument(pattern);
+        await vscode.workspace.openTextDocument(pattern);
         return await this.getFileContext(pattern, 'Test file', 0.7);
       } catch {
         // File doesn't exist

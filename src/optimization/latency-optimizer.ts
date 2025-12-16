@@ -509,6 +509,19 @@ export function getStreamingOptimizer(): StreamingOptimizer {
 }
 
 /**
+ * Reset all singleton instances (for testing)
+ */
+export function resetOptimizers(): void {
+  if (latencyOptimizer) {
+    latencyOptimizer.dispose();
+    latencyOptimizer = null;
+  }
+  if (streamingOptimizer) {
+    streamingOptimizer = null;
+  }
+}
+
+/**
  * Convenience function for measuring operations
  */
 export async function measureLatency<T>(
@@ -534,6 +547,7 @@ export default {
   StreamingOptimizer,
   getLatencyOptimizer,
   getStreamingOptimizer,
+  resetOptimizers,
   measureLatency,
   precompute,
   LATENCY_THRESHOLDS,
