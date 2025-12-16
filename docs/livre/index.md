@@ -96,10 +96,12 @@
 ## G
 
 - **Génération autorégressive** — [Ch.01](01-comprendre-les-llms.md)
+- **GGUF (format)** — [Ch.19](19-infrastructure-llm-local.md)
 - **GitHub Actions** — [Ch.13](13-optimisations-systeme.md), [Ch.18](18-productivite-cli.md)
 - **GitLab CI** — [Ch.13](13-optimisations-systeme.md)
 - **Glob (outil)** — [Ch.10](10-tool-use.md)
 - **GPT** — [Ch.01](01-comprendre-les-llms.md)
+- **GPU Monitor** — [Ch.19](19-infrastructure-llm-local.md)
 - **Graphe de dépendances** — [Ch.08](08-dependency-aware-rag.md)
 - **Grep (outil)** — [Ch.10](10-tool-use.md)
 - **Grok** — [Ch.01](01-comprendre-les-llms.md), [Ch.15](15-architecture-complete.md)
@@ -109,8 +111,10 @@
 ## H
 
 - **Hallucination** — [Ch.01](01-comprendre-les-llms.md), [Ch.07](07-rag-moderne.md)
+- **HNSW (Hierarchical Navigable Small World)** — [Ch.19](19-infrastructure-llm-local.md)
 - **Hooks** — [Ch.11](11-plugins-mcp.md)
 - **Hooks lifecycle** — [Ch.11](11-plugins-mcp.md), [Ch.18](18-productivite-cli.md)
+- **HuggingFace** — [Ch.19](19-infrastructure-llm-local.md)
 - **Hybrid search** — [Ch.07](07-rag-moderne.md)
 
 ## I
@@ -135,6 +139,7 @@
 - **Latence** — [Ch.13](13-optimisations-systeme.md)
 - **Lazy loading** — [Ch.13](13-optimisations-systeme.md)
 - **LLM (Large Language Model)** — [Ch.01](01-comprendre-les-llms.md)
+- **LLM local** — [Ch.19](19-infrastructure-llm-local.md)
 - **LLMCompiler** — [Ch.13](13-optimisations-systeme.md)
 - **Localisation de fautes** — [Ch.06](06-repair-reflexion.md)
 - **LRU Cache** — [Ch.12](12-optimisations-cognitives.md)
@@ -144,6 +149,7 @@
 - **MCP (Model Context Protocol)** — [Ch.11](11-plugins-mcp.md)
 - **MCTS (Monte-Carlo Tree Search)** — [Ch.05](05-mcts.md)
 - **Megathink** — [Ch.04](04-tree-of-thought.md)
+- **Model Hub** — [Ch.19](19-infrastructure-llm-local.md)
 - **Mémoire** — [Ch.03](03-anatomie-agent.md), [Ch.14](14-apprentissage-persistant.md)
 - **Mémoire épisodique** — [Ch.14](14-apprentissage-persistant.md)
 - **Mémoire procédurale** — [Ch.14](14-apprentissage-persistant.md)
@@ -163,6 +169,7 @@
 ## O
 
 - **Observation masking** — [Ch.09](09-context-compression.md)
+- **Ollama** — [Ch.19](19-infrastructure-llm-local.md)
 - **OpenAI** — [Ch.01](01-comprendre-les-llms.md), [Ch.10](10-tool-use.md)
 - **Optimisation** — [Ch.12](12-optimisations-cognitives.md), [Ch.13](13-optimisations-systeme.md)
 - **Orchestrateur** — [Ch.03](03-anatomie-agent.md), [Ch.15](15-architecture-complete.md)
@@ -187,6 +194,7 @@
 
 ## Q
 
+- **Quantization (Q4_K_M, Q5_K_M, etc.)** — [Ch.19](19-infrastructure-llm-local.md)
 - **Query expansion** — [Ch.07](07-rag-moderne.md)
 
 ## R
@@ -246,10 +254,12 @@
 ## V
 
 - **Validation (outils)** — [Ch.10](10-tool-use.md)
-- **Vector database** — [Ch.07](07-rag-moderne.md)
+- **Vector database** — [Ch.07](07-rag-moderne.md), [Ch.19](19-infrastructure-llm-local.md)
+- **Vector store (HNSW)** — [Ch.19](19-infrastructure-llm-local.md)
 - **Vision (image input)** — [Ch.10](10-tool-use.md), [Ch.18](18-productivite-cli.md)
 - **Vocabulaire (tokenizer)** — [Ch.01](01-comprendre-les-llms.md)
 - **Voice input** — [Ch.10](10-tool-use.md), [Ch.18](18-productivite-cli.md)
+- **VRAM (monitoring)** — [Ch.19](19-infrastructure-llm-local.md)
 
 ## W
 

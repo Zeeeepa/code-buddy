@@ -37,7 +37,8 @@ Ce livre existe en deux versions selon votre style d'apprentissage :
 | Cache sémantique (68% de réduction) | 12 | ~150 lignes |
 | Model routing FrugalGPT (-70% coûts) | 13 | ~100 lignes |
 | Productivité CLI (voice, images, watch) | 18 | ~500 lignes |
-| **Total** | 18 chapitres | ~26,000 lignes |
+| Infrastructure LLM local (GPU, embeddings) | 19 | ~800 lignes |
+| **Total** | 19 chapitres | ~27,000 lignes |
 
 ---
 
@@ -90,6 +91,7 @@ Ce livre existe en deux versions selon votre style d'apprentissage :
 | **16** | [Sécurité : Le Chapitre le Plus Important](16-system-prompts-securite.md) | Défense contre prompt injection |
 | **17** | [Ce Qui Arrive en 2025](17-perspectives-futures.md) | Préparez-vous |
 | **18** | [Productivité CLI Avancée](18-productivite-cli.md) | Watch mode, voice, images, /delegate |
+| **19** | [Infrastructure LLM Local](19-infrastructure-llm-local.md) | GPU Monitor, Ollama, HNSW, Model Hub |
 
 ### Annexes
 
@@ -163,10 +165,10 @@ code .
 
 | Métrique | Valeur |
 |----------|--------|
-| **Chapitres** | 18 + annexes |
-| **Mots** | ~50,000 |
-| **Pages imprimées** | ~170 |
-| **Diagrammes** | 140+ |
+| **Chapitres** | 19 + annexes |
+| **Mots** | ~55,000 |
+| **Pages imprimées** | ~190 |
+| **Diagrammes** | 150+ |
 | **Outils documentés** | 45+ |
 | **Code prêt-à-l'emploi** | Chaque chapitre |
 

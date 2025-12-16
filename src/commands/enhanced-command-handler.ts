@@ -276,9 +276,6 @@ export class EnhancedCommandHandler {
       case "__PROMPT_CACHE__":
         return handlePromptCache(args);
 
-      case "__MODEL_ROUTER__":
-        return handleModelRouterCommand(args);
-
       default:
         return { handled: false };
     }
