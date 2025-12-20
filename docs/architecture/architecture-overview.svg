@@ -1,0 +1,165 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600">
+  <defs>
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#6366f1"/>
+      <stop offset="100%" style="stop-color:#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="coreGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="toolGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981"/>
+      <stop offset="100%" style="stop-color:#059669"/>
+    </linearGradient>
+    <linearGradient id="llmGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f59e0b"/>
+      <stop offset="100%" style="stop-color:#d97706"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="600" fill="#0f172a"/>
+
+  <!-- Title -->
+  <text x="450" y="40" text-anchor="middle" fill="url(#headerGrad)" font-family="system-ui" font-size="24" font-weight="bold">
+    Code Buddy - Architecture Overview
+  </text>
+
+  <!-- User Input Layer -->
+  <g transform="translate(50, 70)">
+    <rect x="0" y="0" width="200" height="60" rx="8" fill="#1e293b" stroke="#475569" stroke-width="2" filter="url(#shadow)"/>
+    <text x="100" y="25" text-anchor="middle" fill="#94a3b8" font-family="system-ui" font-size="12">User Input</text>
+    <text x="100" y="45" text-anchor="middle" fill="#f1f5f9" font-family="system-ui" font-size="14" font-weight="bold">Terminal / CLI</text>
+  </g>
+
+  <g transform="translate(280, 70)">
+    <rect x="0" y="0" width="200" height="60" rx="8" fill="#1e293b" stroke="#475569" stroke-width="2" filter="url(#shadow)"/>
+    <text x="100" y="25" text-anchor="middle" fill="#94a3b8" font-family="system-ui" font-size="12">IDE Integration</text>
+    <text x="100" y="45" text-anchor="middle" fill="#f1f5f9" font-family="system-ui" font-size="14" font-weight="bold">VS Code / Neovim</text>
+  </g>
+
+  <g transform="translate(510, 70)">
+    <rect x="0" y="0" width="200" height="60" rx="8" fill="#1e293b" stroke="#475569" stroke-width="2" filter="url(#shadow)"/>
+    <text x="100" y="25" text-anchor="middle" fill="#94a3b8" font-family="system-ui" font-size="12">Web Interface</text>
+    <text x="100" y="45" text-anchor="middle" fill="#f1f5f9" font-family="system-ui" font-size="14" font-weight="bold">HTTP Server</text>
+  </g>
+
+  <g transform="translate(740, 70)">
+    <rect x="0" y="0" width="130" height="60" rx="8" fill="#1e293b" stroke="#475569" stroke-width="2" filter="url(#shadow)"/>
+    <text x="65" y="25" text-anchor="middle" fill="#94a3b8" font-family="system-ui" font-size="12">Protocol</text>
+    <text x="65" y="45" text-anchor="middle" fill="#f1f5f9" font-family="system-ui" font-size="14" font-weight="bold">MCP / LSP</text>
+  </g>
+
+  <!-- Arrows from inputs to core -->
+  <path d="M150,130 L150,160 L450,160 L450,180" stroke="#475569" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <path d="M380,130 L380,160 L450,160" stroke="#475569" stroke-width="2" fill="none"/>
+  <path d="M610,130 L610,160 L450,160" stroke="#475569" stroke-width="2" fill="none"/>
+  <path d="M805,130 L805,160 L450,160" stroke="#475569" stroke-width="2" fill="none"/>
+
+  <!-- Core Agent Layer -->
+  <g transform="translate(200, 180)">
+    <rect x="0" y="0" width="500" height="100" rx="12" fill="url(#coreGrad)" filter="url(#shadow)"/>
+    <text x="250" y="30" text-anchor="middle" fill="#dbeafe" font-family="system-ui" font-size="12">Core Engine</text>
+    <text x="250" y="55" text-anchor="middle" fill="#ffffff" font-family="system-ui" font-size="18" font-weight="bold">CodeBuddyAgent</text>
+    <text x="250" y="80" text-anchor="middle" fill="#bfdbfe" font-family="system-ui" font-size="12">Agentic Loop • Tool Orchestration • Context Management</text>
+  </g>
+
+  <!-- Middle Layer - Components -->
+  <g transform="translate(50, 310)">
+    <rect x="0" y="0" width="170" height="80" rx="8" fill="#1e293b" stroke="#6366f1" stroke-width="2" filter="url(#shadow)"/>
+    <text x="85" y="25" text-anchor="middle" fill="#a5b4fc" font-family="system-ui" font-size="11">Context Manager</text>
+    <text x="85" y="45" text-anchor="middle" fill="#f1f5f9" font-family="system-ui" font-size="13" font-weight="bold">ContextManagerV2</text>
+    <text x="85" y="65" text-anchor="middle" fill="#94a3b8" font-family="system-ui" font-size="10">Compression • History</text>
+  </g>
+
+  <g transform="translate(240, 310)">
+    <rect x="0" y="0" width="170" height="80" rx="8" fill="url(#toolGrad)" filter="url(#shadow)"/>
+    <text x="85" y="25" text-anchor="middle" fill="#d1fae5" font-family="system-ui" font-size="11">Tool System</text>
+    <text x="85" y="45" text-anchor="middle" fill="#ffffff" font-family="system-ui" font-size="13" font-weight="bold">45+ Tools</text>
+    <text x="85" y="65" text-anchor="middle" fill="#a7f3d0" font-family="system-ui" font-size="10">RAG Selection • Execution</text>
+  </g>
+
+  <g transform="translate(430, 310)">
+    <rect x="0" y="0" width="170" height="80" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="2" filter="url(#shadow)"/>
+    <text x="85" y="25" text-anchor="middle" fill="#fde68a" font-family="system-ui" font-size="11">Security Layer</text>
+    <text x="85" y="45" text-anchor="middle" fill="#f1f5f9" font-family="system-ui" font-size="13" font-weight="bold">ConfirmationService</text>
+    <text x="85" y="65" text-anchor="middle" fill="#94a3b8" font-family="system-ui" font-size="10">Permissions • Sandbox</text>
+  </g>
+
+  <g transform="translate(620, 310)">
+    <rect x="0" y="0" width="170" height="80" rx="8" fill="#1e293b" stroke="#ec4899" stroke-width="2" filter="url(#shadow)"/>
+    <text x="85" y="25" text-anchor="middle" fill="#f9a8d4" font-family="system-ui" font-size="11">Memory System</text>
+    <text x="85" y="45" text-anchor="middle" fill="#f1f5f9" font-family="system-ui" font-size="13" font-weight="bold">PersistentMemory</text>
+    <text x="85" y="65" text-anchor="middle" fill="#94a3b8" font-family="system-ui" font-size="10">Project • Session • User</text>
+  </g>
+
+  <!-- Arrows from Core to components -->
+  <path d="M350,280 L135,310" stroke="#475569" stroke-width="2" fill="none"/>
+  <path d="M400,280 L325,310" stroke="#475569" stroke-width="2" fill="none"/>
+  <path d="M500,280 L515,310" stroke="#475569" stroke-width="2" fill="none"/>
+  <path d="M550,280 L705,310" stroke="#475569" stroke-width="2" fill="none"/>
+
+  <!-- LLM Provider Layer -->
+  <g transform="translate(200, 420)">
+    <rect x="0" y="0" width="500" height="80" rx="12" fill="url(#llmGrad)" filter="url(#shadow)"/>
+    <text x="250" y="25" text-anchor="middle" fill="#fef3c7" font-family="system-ui" font-size="12">LLM Provider Layer</text>
+    <text x="250" y="50" text-anchor="middle" fill="#ffffff" font-family="system-ui" font-size="16" font-weight="bold">Multi-Provider Support</text>
+    <text x="250" y="70" text-anchor="middle" fill="#fde68a" font-family="system-ui" font-size="11">Grok (xAI) • OpenAI • Anthropic • Local (Ollama)</text>
+  </g>
+
+  <!-- Arrows from components to LLM -->
+  <path d="M325,390 L325,420" stroke="#475569" stroke-width="2" fill="none"/>
+  <path d="M515,390 L515,420" stroke="#475569" stroke-width="2" fill="none"/>
+
+  <!-- Storage Layer -->
+  <g transform="translate(50, 520)">
+    <rect x="0" y="0" width="120" height="50" rx="6" fill="#1e293b" stroke="#64748b" stroke-width="1" filter="url(#shadow)"/>
+    <text x="60" y="20" text-anchor="middle" fill="#94a3b8" font-family="system-ui" font-size="10">Database</text>
+    <text x="60" y="38" text-anchor="middle" fill="#f1f5f9" font-family="system-ui" font-size="11" font-weight="bold">SQLite</text>
+  </g>
+
+  <g transform="translate(190, 520)">
+    <rect x="0" y="0" width="120" height="50" rx="6" fill="#1e293b" stroke="#64748b" stroke-width="1" filter="url(#shadow)"/>
+    <text x="60" y="20" text-anchor="middle" fill="#94a3b8" font-family="system-ui" font-size="10">Embeddings</text>
+    <text x="60" y="38" text-anchor="middle" fill="#f1f5f9" font-family="system-ui" font-size="11" font-weight="bold">HNSW Store</text>
+  </g>
+
+  <g transform="translate(330, 520)">
+    <rect x="0" y="0" width="120" height="50" rx="6" fill="#1e293b" stroke="#64748b" stroke-width="1" filter="url(#shadow)"/>
+    <text x="60" y="20" text-anchor="middle" fill="#94a3b8" font-family="system-ui" font-size="10">Checkpoints</text>
+    <text x="60" y="38" text-anchor="middle" fill="#f1f5f9" font-family="system-ui" font-size="11" font-weight="bold">Undo System</text>
+  </g>
+
+  <g transform="translate(470, 520)">
+    <rect x="0" y="0" width="120" height="50" rx="6" fill="#1e293b" stroke="#64748b" stroke-width="1" filter="url(#shadow)"/>
+    <text x="60" y="20" text-anchor="middle" fill="#94a3b8" font-family="system-ui" font-size="10">Cache</text>
+    <text x="60" y="38" text-anchor="middle" fill="#f1f5f9" font-family="system-ui" font-size="11" font-weight="bold">Prompt Cache</text>
+  </g>
+
+  <g transform="translate(610, 520)">
+    <rect x="0" y="0" width="120" height="50" rx="6" fill="#1e293b" stroke="#64748b" stroke-width="1" filter="url(#shadow)"/>
+    <text x="60" y="20" text-anchor="middle" fill="#94a3b8" font-family="system-ui" font-size="10">Sessions</text>
+    <text x="60" y="38" text-anchor="middle" fill="#f1f5f9" font-family="system-ui" font-size="11" font-weight="bold">Session Store</text>
+  </g>
+
+  <g transform="translate(750, 520)">
+    <rect x="0" y="0" width="120" height="50" rx="6" fill="#1e293b" stroke="#64748b" stroke-width="1" filter="url(#shadow)"/>
+    <text x="60" y="20" text-anchor="middle" fill="#94a3b8" font-family="system-ui" font-size="10">Analytics</text>
+    <text x="60" y="38" text-anchor="middle" fill="#f1f5f9" font-family="system-ui" font-size="11" font-weight="bold">Cost Tracking</text>
+  </g>
+
+  <!-- Legend -->
+  <g transform="translate(750, 180)">
+    <text x="0" y="0" fill="#94a3b8" font-family="system-ui" font-size="10">Legend</text>
+    <rect x="0" y="10" width="12" height="12" fill="url(#coreGrad)"/>
+    <text x="18" y="20" fill="#94a3b8" font-family="system-ui" font-size="10">Core</text>
+    <rect x="0" y="30" width="12" height="12" fill="url(#toolGrad)"/>
+    <text x="18" y="40" fill="#94a3b8" font-family="system-ui" font-size="10">Tools</text>
+    <rect x="0" y="50" width="12" height="12" fill="url(#llmGrad)"/>
+    <text x="18" y="60" fill="#94a3b8" font-family="system-ui" font-size="10">LLM</text>
+  </g>
+</svg>

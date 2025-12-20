@@ -4,7 +4,7 @@ import { CodeBuddyAgent, ChatEntry } from '../../agent/codebuddy-agent.js';
 /**
  * HTTP Server for Web Interface
  *
- * A simple HTTP server that provides a web interface for Grok CLI.
+ * A simple HTTP server that provides a web interface for Code Buddy.
  * Uses Server-Sent Events (SSE) for real-time streaming.
  */
 
@@ -235,7 +235,7 @@ export class HttpServer {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Grok CLI - Browser Interface</title>
+  <title>Code Buddy - Browser Interface</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -345,7 +345,7 @@ export class HttpServer {
 </head>
 <body>
   <header>
-    <h1>🤖 Grok CLI</h1>
+    <h1>🤖 Code Buddy</h1>
     <select id="model-select">
       <option value="grok-4-latest">Grok 4 (Latest)</option>
       <option value="grok-3-latest">Grok 3 (Latest)</option>

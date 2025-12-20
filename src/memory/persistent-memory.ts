@@ -22,7 +22,7 @@ export type MemoryCategory =
   | "custom";      // User-defined
 
 export interface MemoryConfig {
-  projectMemoryPath: string;   // .codebuddy/GROK_MEMORY.md
+  projectMemoryPath: string;   // .codebuddy/CODEBUDDY_MEMORY.md
   userMemoryPath: string;      // ~/.codebuddy/memory.md
   autoCapture: boolean;        // Auto-capture important context
   maxMemories: number;         // Max memories per scope
@@ -30,16 +30,16 @@ export interface MemoryConfig {
 }
 
 const DEFAULT_CONFIG: MemoryConfig = {
-  projectMemoryPath: ".codebuddy/GROK_MEMORY.md",
+  projectMemoryPath: ".codebuddy/CODEBUDDY_MEMORY.md",
   userMemoryPath: path.join(os.homedir(), ".codebuddy", "memory.md"),
   autoCapture: true,
   maxMemories: 100,
   relevanceThreshold: 0.5,
 };
 
-const MEMORY_TEMPLATE = `# Grok Memory
+const MEMORY_TEMPLATE = `# Code Buddy Memory
 
-This file stores persistent memory for the Grok CLI agent.
+This file stores persistent memory for the Code Buddy agent.
 It is automatically managed but can be manually edited.
 
 ## Project Context
@@ -374,8 +374,8 @@ export class PersistentMemoryManager extends EventEmitter {
     }
 
     // Generate markdown
-    let content = `# Grok Memory\n\n`;
-    content += `This file stores persistent memory for the Grok CLI agent.\n`;
+    let content = `# Code Buddy Memory\n\n`;
+    content += `This file stores persistent memory for the Code Buddy agent.\n`;
     content += `It is automatically managed but can be manually edited.\n\n`;
 
     const categoryNames: Record<MemoryCategory, string> = {

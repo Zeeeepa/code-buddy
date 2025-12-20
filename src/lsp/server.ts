@@ -1,5 +1,5 @@
 /**
- * Grok Language Server Protocol (LSP) Server
+ * Code Buddy Language Server Protocol (LSP) Server
  *
  * Provides IDE integration for any LSP-compatible editor:
  * - VS Code, Neovim, Sublime Text, Emacs, etc.
@@ -67,7 +67,7 @@ let globalSettings: CodeBuddyLSPSettings = defaultSettings;
 const completionCache = new Map<string, CompletionItem[]>();
 
 connection.onInitialize((_params: InitializeParams): InitializeResult => {
-  connection.console.log('Grok LSP server initializing...');
+  connection.console.log('Code Buddy LSP server initializing...');
 
   return {
     capabilities: {
@@ -96,7 +96,7 @@ connection.onInitialize((_params: InitializeParams): InitializeResult => {
 });
 
 connection.onInitialized(() => {
-  connection.console.log('Grok LSP server initialized');
+  connection.console.log('Code Buddy LSP server initialized');
 
   // Initialize Grok client with API key
   const apiKey = process.env.GROK_API_KEY || globalSettings.apiKey;
@@ -184,7 +184,7 @@ Return [] if no issues.`,
           end: { line, character: lineText.length },
         },
         message: issue.message,
-        source: 'Grok',
+        source: 'Code Buddy',
       };
     });
 
@@ -312,15 +312,15 @@ connection.onCodeAction(
 
     // Quick fixes for diagnostics
     for (const diagnostic of params.context.diagnostics) {
-      if (diagnostic.source === 'Grok') {
+      if (diagnostic.source === 'Code Buddy') {
         actions.push({
           title: `Fix: ${diagnostic.message.slice(0, 50)}...`,
           kind: CodeActionKind.QuickFix,
           diagnostics: [diagnostic],
           isPreferred: true,
           command: {
-            command: 'grok.fix',
-            title: 'Fix with Grok',
+            command: 'codebuddy.fix',
+            title: 'Fix with Code Buddy',
             arguments: [params.textDocument.uri, diagnostic.range],
           },
         });
@@ -331,20 +331,20 @@ connection.onCodeAction(
     if (params.range.start.line !== params.range.end.line ||
         params.range.start.character !== params.range.end.character) {
       actions.push({
-        title: 'Refactor with Grok',
+        title: 'Refactor with Code Buddy',
         kind: CodeActionKind.Refactor,
         command: {
-          command: 'grok.refactor',
+          command: 'codebuddy.refactor',
           title: 'Refactor',
           arguments: [params.textDocument.uri, params.range],
         },
       });
 
       actions.push({
-        title: 'Explain with Grok',
+        title: 'Explain with Code Buddy',
         kind: CodeActionKind.Source,
         command: {
-          command: 'grok.explain',
+          command: 'codebuddy.explain',
           title: 'Explain',
           arguments: [params.textDocument.uri, params.range],
         },
@@ -523,4 +523,4 @@ documents.onDidChangeContent((change) => {
 documents.listen(connection);
 connection.listen();
 
-connection.console.log('Grok LSP server started');
+connection.console.log('Code Buddy LSP server started');

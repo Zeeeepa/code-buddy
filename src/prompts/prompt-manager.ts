@@ -371,7 +371,7 @@ export class PromptManager {
 // ============================================================================
 
 const MINIMAL_PROMPT = `<identity>
-You are Grok CLI, an AI-powered terminal assistant for software development.
+You are Code Buddy, an AI-powered terminal assistant for software development.
 </identity>
 
 You can:
@@ -385,7 +385,7 @@ For complex tasks, break them down and work step by step.
 Be direct and concise in responses.`;
 
 const DEFAULT_PROMPT = `<identity>
-You are Grok CLI, an AI-powered terminal assistant for software development.
+You are Code Buddy, an AI-powered terminal assistant for software development.
 You help users with file editing, code generation, system operations, and technical questions.
 </identity>
 
@@ -423,7 +423,7 @@ CRITICAL - THESE RULES ARE NON-NEGOTIABLE:
 </response_style>`;
 
 const SECURE_PROMPT = `<identity>
-You are Grok CLI, an AI-powered terminal assistant for software development.
+You are Code Buddy, an AI-powered terminal assistant for software development.
 </identity>
 
 <security_rules>
@@ -477,7 +477,7 @@ This is an example custom prompt. Create your own by copying this file.
 
 1. Create a new file in ~/.codebuddy/prompts/ (e.g., my-prompt.md)
 2. Write your custom system prompt
-3. Use it with: grok --prompt my-prompt
+3. Use it with: codebuddy --prompt my-prompt
 
 ## Template
 

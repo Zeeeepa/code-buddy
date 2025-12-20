@@ -291,41 +291,41 @@ export class IDEExtensionsServer extends EventEmitter {
       contributes: {
         commands: [
           {
-            command: 'grok.askQuestion',
-            title: 'Grok: Ask AI',
+            command: 'codebuddy.askQuestion',
+            title: 'Code Buddy: Ask AI',
           },
           {
-            command: 'grok.explainCode',
-            title: 'Grok: Explain Code',
+            command: 'codebuddy.explainCode',
+            title: 'Code Buddy: Explain Code',
           },
           {
-            command: 'grok.suggestFix',
-            title: 'Grok: Suggest Fix',
+            command: 'codebuddy.suggestFix',
+            title: 'Code Buddy: Suggest Fix',
           },
           {
-            command: 'grok.refactor',
-            title: 'Grok: Refactor Selection',
+            command: 'codebuddy.refactor',
+            title: 'Code Buddy: Refactor Selection',
           },
         ],
         keybindings: [
           {
-            command: 'grok.askQuestion',
+            command: 'codebuddy.askQuestion',
             key: 'ctrl+shift+g',
             mac: 'cmd+shift+g',
           },
         ],
         configuration: {
-          title: 'Grok',
+          title: 'Code Buddy',
           properties: {
-            'grok.serverPort': {
+            'codebuddy.serverPort': {
               type: 'number',
               default: this.config.port,
-              description: 'Grok server port',
+              description: 'Code Buddy server port',
             },
-            'grok.autoConnect': {
+            'codebuddy.autoConnect': {
               type: 'boolean',
               default: true,
-              description: 'Auto-connect to Grok server',
+              description: 'Auto-connect to Code Buddy server',
             },
           },
         },
@@ -350,10 +350,10 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Register commands
   context.subscriptions.push(
-    vscode.commands.registerCommand('grok.askQuestion', askQuestion),
-    vscode.commands.registerCommand('grok.explainCode', explainCode),
-    vscode.commands.registerCommand('grok.suggestFix', suggestFix),
-    vscode.commands.registerCommand('grok.refactor', refactorSelection),
+    vscode.commands.registerCommand('codebuddy.askQuestion', askQuestion),
+    vscode.commands.registerCommand('codebuddy.explainCode', explainCode),
+    vscode.commands.registerCommand('codebuddy.suggestFix', suggestFix),
+    vscode.commands.registerCommand('codebuddy.refactor', refactorSelection),
   );
 
   // Provide completions
@@ -418,7 +418,7 @@ function connectToServer(port: number) {
   });
 
   client.on('error', (err) => {
-    vscode.window.showWarningMessage('Grok: Connection error - ' + err.message);
+    vscode.window.showWarningMessage('Code Buddy: Connection error - ' + err.message);
     client = null;
   });
 
@@ -461,13 +461,13 @@ async function askQuestion() {
     const result = await sendRequest('ask', { question: input });
     const panel = vscode.window.createWebviewPanel(
       'codebuddyResponse',
-      'Grok Response',
+      'Code Buddy Response',
       vscode.ViewColumn.Beside,
       {}
     );
     panel.webview.html = '<pre>' + result.answer + '</pre>';
   } catch (err: any) {
-    vscode.window.showErrorMessage('Grok: ' + err.message);
+    vscode.window.showErrorMessage('Code Buddy: ' + err.message);
   }
 }
 
@@ -491,7 +491,7 @@ async function explainCode() {
 
     vscode.window.showInformationMessage(result.explanation, { modal: true });
   } catch (err: any) {
-    vscode.window.showErrorMessage('Grok: ' + err.message);
+    vscode.window.showErrorMessage('Code Buddy: ' + err.message);
   }
 }
 
@@ -528,7 +528,7 @@ async function suggestFix() {
       await vscode.workspace.applyEdit(edit);
     }
   } catch (err: any) {
-    vscode.window.showErrorMessage('Grok: ' + err.message);
+    vscode.window.showErrorMessage('Code Buddy: ' + err.message);
   }
 }
 
@@ -564,7 +564,7 @@ async function refactorSelection() {
       await vscode.workspace.applyEdit(edit);
     }
   } catch (err: any) {
-    vscode.window.showErrorMessage('Grok: ' + err.message);
+    vscode.window.showErrorMessage('Code Buddy: ' + err.message);
   }
 }
 
@@ -610,7 +610,7 @@ function M.connect()
   client:connect(M.config.host, M.config.port, function(err)
     if err then
       vim.schedule(function()
-        vim.notify('Grok: Connection failed - ' .. err, vim.log.levels.WARN)
+        vim.notify('Code Buddy: Connection failed - ' .. err, vim.log.levels.WARN)
       end)
       return
     end
@@ -625,7 +625,7 @@ function M.connect()
     client:read_start(function(err, data)
       if err then
         vim.schedule(function()
-          vim.notify('Grok: Read error - ' .. err, vim.log.levels.ERROR)
+          vim.notify('Code Buddy: Read error - ' .. err, vim.log.levels.ERROR)
         end)
         return
       end
@@ -685,7 +685,7 @@ end
 function M.ask(question)
   M.send_request('ask', { question = question }, function(result, err)
     if err then
-      vim.notify('Grok: ' .. err, vim.log.levels.ERROR)
+      vim.notify('Code Buddy: ' .. err, vim.log.levels.ERROR)
       return
     end
 
@@ -720,7 +720,7 @@ function M.explain()
     language = vim.bo.filetype,
   }, function(result, err)
     if err then
-      vim.notify('Grok: ' .. err, vim.log.levels.ERROR)
+      vim.notify('Code Buddy: ' .. err, vim.log.levels.ERROR)
       return
     end
 
@@ -741,7 +741,7 @@ function M.refactor(instruction)
     language = vim.bo.filetype,
   }, function(result, err)
     if err then
-      vim.notify('Grok: ' .. err, vim.log.levels.ERROR)
+      vim.notify('Code Buddy: ' .. err, vim.log.levels.ERROR)
       return
     end
 
@@ -770,9 +770,9 @@ function M.setup(opts)
   end, { range = true, nargs = '+' })
 
   -- Keymaps
-  vim.keymap.set('n', '<leader>ga', ':CodeBuddyAsk ', { desc = 'Grok: Ask AI' })
-  vim.keymap.set('v', '<leader>ge', ':CodeBuddyExplain<CR>', { desc = 'Grok: Explain' })
-  vim.keymap.set('v', '<leader>gr', ':CodeBuddyRefactor ', { desc = 'Grok: Refactor' })
+  vim.keymap.set('n', '<leader>ga', ':CodeBuddyAsk ', { desc = 'Code Buddy: Ask AI' })
+  vim.keymap.set('v', '<leader>ge', ':CodeBuddyExplain<CR>', { desc = 'Code Buddy: Explain' })
+  vim.keymap.set('v', '<leader>gr', ':CodeBuddyRefactor ', { desc = 'Code Buddy: Refactor' })
 
   -- Auto-connect
   if M.config.auto_connect then

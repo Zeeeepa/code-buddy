@@ -167,7 +167,7 @@ function ChatInterfaceWithAgent({
     console.log("    ");
 
     // Generate logo with MIT-licensed ascii-banner (replaces GPL cfonts)
-    const logoOutput = renderColorBanner("GROK", ["magenta", "cyan"]);
+    const logoOutput = renderColorBanner("CODE BUDDY", ["magenta", "cyan"]);
 
     // Add horizontal margin (2 spaces) to match Ink paddingX={2}
     const logoLines = logoOutput.split("\n");
@@ -186,7 +186,7 @@ function ChatInterfaceWithAgent({
     // Announce to screen readers
     if (settings.screenReader) {
       announceToScreenReader(
-        'Grok CLI started. Chat interface ready. Press Ctrl+H for help.',
+        'Code Buddy started. Chat interface ready. Press Ctrl+H for help.',
         'polite'
       );
     }
@@ -372,7 +372,7 @@ function ChatInterfaceWithAgent({
             </Text>
             <Text color={colors.textMuted}>2. Be specific for the best results.</Text>
             <Text color={colors.textMuted}>
-              3. Create GROK.md files to customize your interactions with Grok.
+              3. Create CODEBUDDY.md files to customize your interactions with Code Buddy.
             </Text>
             <Text color={colors.textMuted}>
               4. Press Shift+Tab to toggle auto-edit mode.

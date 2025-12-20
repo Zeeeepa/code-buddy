@@ -1,7 +1,7 @@
 /**
  * Interactive Setup - Inspired by Mistral Vibe CLI
  *
- * Interactive wizard for configuring Grok CLI:
+ * Interactive wizard for configuring Code Buddy:
  * - API key setup
  * - Model selection
  * - Base URL configuration
@@ -106,10 +106,10 @@ export async function runSetup(): Promise<SetupConfig> {
   const config: SetupConfig = {};
 
   console.log('\n' + '='.repeat(60));
-  console.log('  Grok CLI - Interactive Setup');
+  console.log('  Code Buddy - Interactive Setup');
   console.log('='.repeat(60) + '\n');
 
-  console.log('Welcome to Grok CLI! Let\'s configure your settings.\n');
+  console.log('Welcome to Code Buddy! Let\'s configure your settings.\n');
 
   // Step 1: API Key
   console.log('Step 1/4: API Key Configuration');
@@ -233,11 +233,11 @@ export async function runSetup(): Promise<SetupConfig> {
   console.log('\nSetup complete! Your settings have been saved to:');
   console.log(`  ${path.join(getCodeBuddyHome(), 'user-settings.json')}\n`);
 
-  console.log('You can now run grok to start using the CLI.\n');
+  console.log('You can now run codebuddy to start using the CLI.\n');
   console.log('Quick start:');
-  console.log('  grok "Hello, Grok!"');
-  console.log('  grok --help');
-  console.log('  grok --list-models\n');
+  console.log('  codebuddy "Hello, Code Buddy!"');
+  console.log('  codebuddy --help');
+  console.log('  codebuddy --list-models\n');
 
   return config;
 }
@@ -323,7 +323,7 @@ export function needsSetup(): boolean {
  * Get log file path
  */
 export function getLogPath(): string {
-  return path.join(getCodeBuddyHome(), 'grok.log');
+  return path.join(getCodeBuddyHome(), 'codebuddy.log');
 }
 
 /**

@@ -1,0 +1,166 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 650">
+  <defs>
+    <linearGradient id="userGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8b5cf6"/>
+      <stop offset="100%" style="stop-color:#6366f1"/>
+    </linearGradient>
+    <linearGradient id="agentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="llmGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f59e0b"/>
+      <stop offset="100%" style="stop-color:#d97706"/>
+    </linearGradient>
+    <linearGradient id="toolGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981"/>
+      <stop offset="100%" style="stop-color:#059669"/>
+    </linearGradient>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
+    </marker>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="650" fill="#0f172a"/>
+
+  <!-- Title -->
+  <text x="400" y="35" text-anchor="middle" fill="#e2e8f0" font-family="system-ui" font-size="22" font-weight="bold">
+    Agentic Loop - Core Flow
+  </text>
+
+  <!-- Step 1: User Input -->
+  <g transform="translate(50, 70)">
+    <rect x="0" y="0" width="200" height="80" rx="12" fill="url(#userGrad)" filter="url(#glow)"/>
+    <circle cx="30" cy="40" r="18" fill="#1e1b4b" stroke="#a78bfa" stroke-width="2"/>
+    <text x="30" y="46" text-anchor="middle" fill="#ffffff" font-family="system-ui" font-size="16" font-weight="bold">1</text>
+    <text x="120" y="35" text-anchor="middle" fill="#f5f3ff" font-family="system-ui" font-size="14" font-weight="bold">User Input</text>
+    <text x="120" y="55" text-anchor="middle" fill="#ddd6fe" font-family="system-ui" font-size="11">"Fix the bug in auth.ts"</text>
+  </g>
+
+  <!-- Arrow 1->2 -->
+  <path d="M250,110 L340,110" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+
+  <!-- Step 2: Context Assembly -->
+  <g transform="translate(350, 70)">
+    <rect x="0" y="0" width="200" height="80" rx="12" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>
+    <circle cx="30" cy="40" r="18" fill="#1e3a8a" stroke="#60a5fa" stroke-width="2"/>
+    <text x="30" y="46" text-anchor="middle" fill="#ffffff" font-family="system-ui" font-size="16" font-weight="bold">2</text>
+    <text x="120" y="30" text-anchor="middle" fill="#93c5fd" font-family="system-ui" font-size="14" font-weight="bold">Context Assembly</text>
+    <text x="120" y="50" text-anchor="middle" fill="#64748b" font-family="system-ui" font-size="10">System Prompt</text>
+    <text x="120" y="65" text-anchor="middle" fill="#64748b" font-family="system-ui" font-size="10">+ History + RAG Context</text>
+  </g>
+
+  <!-- Arrow 2->3 -->
+  <path d="M550,110 L640,110" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+
+  <!-- Step 3: LLM Call -->
+  <g transform="translate(550, 70)">
+    <rect x="100" y="0" width="130" height="80" rx="12" fill="url(#llmGrad2)" filter="url(#glow)"/>
+    <circle cx="130" cy="40" r="18" fill="#78350f" stroke="#fbbf24" stroke-width="2"/>
+    <text x="130" y="46" text-anchor="middle" fill="#ffffff" font-family="system-ui" font-size="16" font-weight="bold">3</text>
+    <text x="165" y="30" text-anchor="middle" fill="#fef3c7" font-family="system-ui" font-size="14" font-weight="bold">LLM</text>
+    <text x="165" y="50" text-anchor="middle" fill="#fde68a" font-family="system-ui" font-size="10">Grok API</text>
+    <text x="165" y="65" text-anchor="middle" fill="#fde68a" font-family="system-ui" font-size="10">OpenAI SDK</text>
+  </g>
+
+  <!-- Arrow 3->4 (down) -->
+  <path d="M715,150 L715,200" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+
+  <!-- Step 4: Response Parse -->
+  <g transform="translate(550, 210)">
+    <rect x="100" y="0" width="130" height="80" rx="12" fill="#1e293b" stroke="#f59e0b" stroke-width="2"/>
+    <circle cx="130" cy="40" r="18" fill="#78350f" stroke="#fbbf24" stroke-width="2"/>
+    <text x="130" y="46" text-anchor="middle" fill="#ffffff" font-family="system-ui" font-size="16" font-weight="bold">4</text>
+    <text x="165" y="30" text-anchor="middle" fill="#fde68a" font-family="system-ui" font-size="14" font-weight="bold">Parse</text>
+    <text x="165" y="50" text-anchor="middle" fill="#64748b" font-family="system-ui" font-size="10">Tool Calls?</text>
+    <text x="165" y="65" text-anchor="middle" fill="#64748b" font-family="system-ui" font-size="10">Text Response?</text>
+  </g>
+
+  <!-- Decision Diamond -->
+  <g transform="translate(400, 320)">
+    <polygon points="80,0 160,50 80,100 0,50" fill="#1e293b" stroke="#94a3b8" stroke-width="2"/>
+    <text x="80" y="45" text-anchor="middle" fill="#f1f5f9" font-family="system-ui" font-size="12" font-weight="bold">Tool</text>
+    <text x="80" y="60" text-anchor="middle" fill="#f1f5f9" font-family="system-ui" font-size="12" font-weight="bold">Call?</text>
+  </g>
+
+  <!-- Arrow 4->Decision -->
+  <path d="M650,290 L650,340 L560,340" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+
+  <!-- NO path - to output -->
+  <g transform="translate(200, 340)">
+    <text x="0" y="0" fill="#ef4444" font-family="system-ui" font-size="12" font-weight="bold">NO</text>
+  </g>
+  <path d="M400,370 L200,370 L200,480" stroke="#ef4444" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+
+  <!-- YES path - to tool execution -->
+  <g transform="translate(570, 340)">
+    <text x="0" y="0" fill="#22c55e" font-family="system-ui" font-size="12" font-weight="bold">YES</text>
+  </g>
+  <path d="M560,370 L650,370 L650,430" stroke="#22c55e" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+
+  <!-- Step 5: Tool Execution -->
+  <g transform="translate(550, 440)">
+    <rect x="50" y="0" width="180" height="100" rx="12" fill="url(#toolGrad2)" filter="url(#glow)"/>
+    <circle cx="80" cy="50" r="18" fill="#064e3b" stroke="#34d399" stroke-width="2"/>
+    <text x="80" y="56" text-anchor="middle" fill="#ffffff" font-family="system-ui" font-size="16" font-weight="bold">5</text>
+    <text x="155" y="30" text-anchor="middle" fill="#d1fae5" font-family="system-ui" font-size="14" font-weight="bold">Execute Tool</text>
+    <text x="155" y="50" text-anchor="middle" fill="#a7f3d0" font-family="system-ui" font-size="10">read_file, edit_file</text>
+    <text x="155" y="65" text-anchor="middle" fill="#a7f3d0" font-family="system-ui" font-size="10">bash, glob, grep...</text>
+    <text x="155" y="85" text-anchor="middle" fill="#6ee7b7" font-family="system-ui" font-size="10">(max 50 rounds)</text>
+  </g>
+
+  <!-- Arrow Tool -> back to LLM (loop) -->
+  <path d="M730,490 L770,490 L770,110 L680,110" stroke="#22c55e" stroke-width="2" stroke-dasharray="5,3" fill="none" marker-end="url(#arrowhead)"/>
+  <text x="775" y="300" fill="#22c55e" font-family="system-ui" font-size="10" transform="rotate(90, 775, 300)">Loop back with result</text>
+
+  <!-- Step 6: Output -->
+  <g transform="translate(50, 490)">
+    <rect x="0" y="0" width="300" height="80" rx="12" fill="url(#userGrad)" filter="url(#glow)"/>
+    <circle cx="30" cy="40" r="18" fill="#1e1b4b" stroke="#a78bfa" stroke-width="2"/>
+    <text x="30" y="46" text-anchor="middle" fill="#ffffff" font-family="system-ui" font-size="16" font-weight="bold">6</text>
+    <text x="175" y="30" text-anchor="middle" fill="#f5f3ff" font-family="system-ui" font-size="14" font-weight="bold">Output to User</text>
+    <text x="175" y="50" text-anchor="middle" fill="#ddd6fe" font-family="system-ui" font-size="11">Streaming response</text>
+    <text x="175" y="68" text-anchor="middle" fill="#c4b5fd" font-family="system-ui" font-size="10">+ Tool confirmations</text>
+  </g>
+
+  <!-- Stats Box -->
+  <g transform="translate(50, 200)">
+    <rect x="0" y="0" width="240" height="110" rx="8" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+    <text x="120" y="25" text-anchor="middle" fill="#94a3b8" font-family="system-ui" font-size="12" font-weight="bold">Loop Limits</text>
+    <text x="20" y="50" fill="#64748b" font-family="system-ui" font-size="11">Normal mode:</text>
+    <text x="170" y="50" fill="#f1f5f9" font-family="system-ui" font-size="11" font-weight="bold">50 rounds</text>
+    <text x="20" y="70" fill="#64748b" font-family="system-ui" font-size="11">YOLO mode:</text>
+    <text x="170" y="70" fill="#fbbf24" font-family="system-ui" font-size="11" font-weight="bold">400 rounds</text>
+    <text x="20" y="90" fill="#64748b" font-family="system-ui" font-size="11">Cost limit:</text>
+    <text x="170" y="90" fill="#f1f5f9" font-family="system-ui" font-size="11" font-weight="bold">$10-$100</text>
+  </g>
+
+  <!-- Tool Types Box -->
+  <g transform="translate(350, 440)">
+    <rect x="0" y="0" width="160" height="100" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1"/>
+    <text x="80" y="20" text-anchor="middle" fill="#6ee7b7" font-family="system-ui" font-size="11" font-weight="bold">45+ Tools</text>
+    <text x="15" y="40" fill="#64748b" font-family="system-ui" font-size="10">• File: read, write, edit</text>
+    <text x="15" y="55" fill="#64748b" font-family="system-ui" font-size="10">• Search: glob, grep</text>
+    <text x="15" y="70" fill="#64748b" font-family="system-ui" font-size="10">• System: bash, git</text>
+    <text x="15" y="85" fill="#64748b" font-family="system-ui" font-size="10">• Web: fetch, search</text>
+  </g>
+
+  <!-- Legend -->
+  <g transform="translate(50, 600)">
+    <text x="0" y="0" fill="#94a3b8" font-family="system-ui" font-size="11" font-weight="bold">Flow:</text>
+    <line x1="50" y1="-5" x2="100" y2="-5" stroke="#64748b" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <text x="110" y="0" fill="#64748b" font-family="system-ui" font-size="10">Normal</text>
+    <line x1="170" y1="-5" x2="220" y2="-5" stroke="#22c55e" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#arrowhead)"/>
+    <text x="230" y="0" fill="#22c55e" font-family="system-ui" font-size="10">Loop</text>
+    <line x1="280" y1="-5" x2="330" y2="-5" stroke="#ef4444" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <text x="340" y="0" fill="#ef4444" font-family="system-ui" font-size="10">Exit</text>
+  </g>
+</svg>

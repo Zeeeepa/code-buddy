@@ -625,7 +625,7 @@ Provide only the completed code, no explanations.`;
   private registerBuiltInResources(): void {
     // Current working directory info
     this.registerResource(
-      'grok://cwd',
+      'codebuddy://cwd',
       'Current Working Directory',
       async () => {
         const cwd = this.options.workdir || process.cwd();
@@ -645,7 +645,7 @@ Provide only the completed code, no explanations.`;
 
     // Git info resource
     this.registerResource(
-      'grok://git',
+      'codebuddy://git',
       'Git Repository Information',
       async () => {
         const { exec } = await import('child_process');
@@ -672,7 +672,7 @@ Provide only the completed code, no explanations.`;
 
     // System info resource
     this.registerResource(
-      'grok://system',
+      'codebuddy://system',
       'System Information',
       async () => {
         const os = await import('os');

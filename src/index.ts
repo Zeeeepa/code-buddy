@@ -333,10 +333,10 @@ async function processPromptHeadless(
 program
   .name("codebuddy")
   .description(
-    "A conversational AI CLI tool powered by Grok with text editor capabilities"
+    "A conversational AI CLI tool powered by AI with text editor capabilities"
   )
   .version("1.0.1")
-  .argument("[message...]", "Initial message to send to Grok")
+  .argument("[message...]", "Initial message to send to Code Buddy")
   .option("-d, --directory <dir>", "set working directory", process.cwd())
   .option("-k, --api-key <key>", "CodeBuddy API key (or set GROK_API_KEY env var)")
   .option(
@@ -370,7 +370,7 @@ program
   )
   .option(
     "--init",
-    "initialize .grok directory with templates and exit"
+    "initialize .codebuddy directory with templates and exit"
   )
   .option(
     "--dry-run",
@@ -542,7 +542,7 @@ program
         });
       }
 
-      console.log("\n💡 Usage: grok --system-prompt <id>");
+      console.log("\n💡 Usage: codebuddy --system-prompt <id>");
       console.log("   Create custom prompts in ~/.codebuddy/prompts/<name>.md");
       process.exit(0);
     }
@@ -570,7 +570,7 @@ program
         console.log(`\n  Total: ${agents.length} agent(s)`);
       }
 
-      console.log("\n💡 Usage: grok --agent <id>");
+      console.log("\n💡 Usage: codebuddy --agent <id>");
       process.exit(0);
     }
 
@@ -850,7 +850,7 @@ program
         console.log("🔧 Self-healing: DISABLED");
       }
 
-      console.log("🤖 Starting Grok CLI Conversational Assistant...\n");
+      console.log("🤖 Starting Code Buddy Conversational Assistant...\n");
 
       ensureUserSettingsDirectory();
 
@@ -866,7 +866,7 @@ program
       render(React.createElement(ChatInterface, { agent, initialMessage }));
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error("❌ Error initializing Grok CLI:", errorMessage);
+      console.error("❌ Error initializing Code Buddy:", errorMessage);
       process.exit(1);
     }
   });
