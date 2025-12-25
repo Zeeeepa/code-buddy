@@ -1,0 +1,81 @@
+name: code-buddy
+base: core22
+version: '1.0.0'
+summary: AI-powered coding agent for your terminal
+description: |
+  Code Buddy is an AI-powered command-line interface that helps developers
+  with coding tasks through natural language. It uses the Grok API to
+  provide intelligent assistance directly in your terminal.
+
+  Features:
+  - Natural language code generation
+  - File editing and creation
+  - Code review and suggestions
+  - Multi-agent collaboration
+  - Context-aware assistance
+
+  To use Code Buddy, you need a Grok API key from x.ai.
+  Set it with: export GROK_API_KEY=your-key
+
+grade: stable
+confinement: strict
+
+architectures:
+  - build-on: amd64
+  - build-on: arm64
+
+apps:
+  code-buddy:
+    command: bin/code-buddy
+    plugs:
+      - home
+      - network
+      - network-bind
+      - removable-media
+    environment:
+      NODE_ENV: production
+
+  buddy:
+    command: bin/code-buddy
+    plugs:
+      - home
+      - network
+      - network-bind
+      - removable-media
+    environment:
+      NODE_ENV: production
+
+parts:
+  code-buddy:
+    plugin: npm
+    source: .
+    npm-include-node: true
+    npm-node-version: "20.10.0"
+    build-packages:
+      - build-essential
+      - python3
+    stage-packages:
+      - git
+      - ripgrep
+    override-build: |
+      craftctl default
+      npm run build
+    organize:
+      lib/node_modules/code-buddy: /
+
+  wrapper:
+    plugin: dump
+    source: packaging/snap/
+    organize:
+      code-buddy.sh: bin/code-buddy
+    after: [code-buddy]
+
+layout:
+  /usr/bin/git:
+    bind-file: $SNAP/usr/bin/git
+  /usr/bin/rg:
+    bind-file: $SNAP/usr/bin/rg
+
+hooks:
+  configure:
+    plugs: [network]

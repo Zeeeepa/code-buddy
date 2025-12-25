@@ -123,7 +123,7 @@
 - [x] 78. Docker image officielle ✅ (Dockerfile existe déjà)
 - [x] 79. Homebrew formula pour macOS ✅ (homebrew/code-buddy.rb)
 - [x] 80. Package AUR pour Arch Linux ✅ (packaging/aur/PKGBUILD)
-- [ ] 81. Snap/Flatpak pour Linux
+- [x] 81. Snap/Flatpak pour Linux ✅ (packaging/snap/snapcraft.yaml)
 - [ ] 82. Windows installer (MSI/exe)
 
 ---
@@ -132,8 +132,8 @@
 
 - [x] 83. Ajouter Husky pour hooks git améliorés ✅ (.husky/ existe déjà)
 - [x] 84. SonarQube/SonarCloud pour analyse continue ✅ (sonar-project.properties + sonar.yml)
-- [ ] 85. Mutation testing avec Stryker
-- [ ] 86. Benchmark automatisé des performances
+- [x] 85. Mutation testing avec Stryker ✅ (stryker.conf.json)
+- [x] 86. Benchmark automatisé des performances ✅ (performance-benchmarks.ts)
 - [ ] 87. Tests de snapshot pour l'UI
 - [ ] 88. Fuzzing des inputs utilisateur
 - [ ] 89. Tests de charge pour le multi-agent
@@ -152,7 +152,7 @@
 
 ## 🔌 Intégrations
 
-- [ ] 95. GitHub/GitLab integration native
+- [x] 95. GitHub/GitLab integration native ✅ (git-platform-integration.ts)
 - [ ] 96. Jira/Linear pour gestion de tâches
 - [x] 97. Slack/Discord notifications ✅ (notification-integrations.ts)
 - [ ] 98. Notion/Obsidian export
