@@ -124,7 +124,7 @@
 - [x] 79. Homebrew formula pour macOS ✅ (homebrew/code-buddy.rb)
 - [x] 80. Package AUR pour Arch Linux ✅ (packaging/aur/PKGBUILD)
 - [x] 81. Snap/Flatpak pour Linux ✅ (packaging/snap/snapcraft.yaml)
-- [ ] 82. Windows installer (MSI/exe)
+- [x] 82. Windows installer (MSI/exe) ✅ (packaging/windows/)
 
 ---
 
@@ -143,19 +143,19 @@
 
 ## 🌐 Internationalisation
 
-- [ ] 91. Support i18n (français, espagnol, allemand, etc.)
-- [ ] 92. Messages d'erreur localisés
-- [ ] 93. Documentation multilingue
-- [ ] 94. Détection automatique de la langue système
+- [x] 91. Support i18n (français, espagnol, allemand, etc.) ✅ (src/i18n/)
+- [x] 92. Messages d'erreur localisés ✅ (locales/*.json)
+- [x] 93. Documentation multilingue ✅ (8 langues supportées)
+- [x] 94. Détection automatique de la langue système ✅ (detectSystemLocale)
 
 ---
 
 ## 🔌 Intégrations
 
 - [x] 95. GitHub/GitLab integration native ✅ (git-platform-integration.ts)
-- [ ] 96. Jira/Linear pour gestion de tâches
+- [x] 96. Jira/Linear pour gestion de tâches ✅ (task-management-integration.ts)
 - [x] 97. Slack/Discord notifications ✅ (notification-integrations.ts)
-- [ ] 98. Notion/Obsidian export
+- [x] 98. Notion/Obsidian export ✅ (knowledge-base-export.ts)
 - [x] 99. Sentry pour error tracking production ✅ (sentry-integration.ts)
 - [x] 100. OpenTelemetry pour observabilité ✅ (opentelemetry-integration.ts)
 
@@ -170,7 +170,7 @@
 - [ ] 105. Replay déterministe des sessions
 - [ ] 106. Branching de conversations amélioré
 - [ ] 107. Merge de branches de conversation
-- [ ] 108. Versioning des checkpoints
+- [x] 108. Versioning des checkpoints ✅ (checkpoint-versioning.ts)
 - [ ] 109. Rollback sélectif par fichier
 - [ ] 110. Diff 3-way pour conflits
 
