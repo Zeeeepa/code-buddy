@@ -100,16 +100,16 @@
 
 ## 🟣 Documentation
 
-- [ ] 63. Mettre à jour ARCHITECTURE.md
-- [ ] 64. Documenter le système multi-agent
-- [ ] 65. Ajouter des diagrammes Mermaid
+- [x] 63. Mettre à jour ARCHITECTURE.md ✅ (mise à jour complète)
+- [x] 64. Documenter le système multi-agent ✅ (docs/multi-agent-system.md)
+- [x] 65. Ajouter des diagrammes Mermaid ✅ (docs/architecture/diagrams.md)
 - [ ] 66. JSDoc complet sur toutes les fonctions publiques
 - [x] 67. Guide de contribution (CONTRIBUTING.md) ✅ (existe déjà)
 - [x] 68. Changelog automatisé avec conventional-changelog ✅ (changelog-generator.ts)
-- [ ] 69. Documentation API auto-générée (TypeDoc)
+- [x] 69. Documentation API auto-générée (TypeDoc) ✅ (typedoc.json)
 - [ ] 70. Tutoriels vidéo ou GIFs animés
-- [ ] 71. Exemples d'utilisation pour chaque outil
-- [ ] 72. FAQ des problèmes courants
+- [x] 71. Exemples d'utilisation pour chaque outil ✅ (docs/examples/tool-usage.md)
+- [x] 72. FAQ des problèmes courants ✅ (docs/FAQ.md)
 
 ---
 
@@ -130,8 +130,8 @@
 
 ## 🧪 Qualité de Code
 
-- [ ] 83. Ajouter Husky pour hooks git améliorés
-- [ ] 84. SonarQube/SonarCloud pour analyse continue
+- [x] 83. Ajouter Husky pour hooks git améliorés ✅ (.husky/ existe déjà)
+- [x] 84. SonarQube/SonarCloud pour analyse continue ✅ (sonar-project.properties + sonar.yml)
 - [ ] 85. Mutation testing avec Stryker
 - [ ] 86. Benchmark automatisé des performances
 - [ ] 87. Tests de snapshot pour l'UI
@@ -179,10 +179,10 @@
 ## 📊 Analytics & Métriques
 
 - [x] 111. Dashboard de métriques local ✅ (metrics-dashboard.ts)
-- [ ] 112. Graphiques d'évolution de la base de code
+- [x] 112. Graphiques d'évolution de la base de code ✅ (code-evolution.ts)
 - [x] 113. Heatmap des fichiers modifiés ✅ (codebase-heatmap.ts)
 - [x] 114. Tracking du ROI (temps gagné vs coût API) ✅ (roi-tracker.ts)
-- [ ] 115. Export des métriques vers Prometheus/Grafana
+- [x] 115. Export des métriques vers Prometheus/Grafana ✅ (prometheus-exporter.ts)
 
 ---
 

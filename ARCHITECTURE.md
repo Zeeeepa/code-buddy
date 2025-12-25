@@ -1,7 +1,7 @@
 # Architecture Documentation - Code Buddy
 
-> **Version**: 0.0.12
-> **Last Updated**: November 14, 2025
+> **Version**: 1.0.0
+> **Last Updated**: December 25, 2025
 
 This document provides a comprehensive overview of the Code Buddy architecture, design patterns, and technical decisions.
 
@@ -831,6 +831,205 @@ class HNSWVectorStore {
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Analytics Module (`src/analytics/`)
+
+**Purpose**: Track and analyze usage patterns, costs, and codebase evolution.
+
+### PrometheusExporter
+
+```typescript
+class PrometheusExporter extends EventEmitter {
+  registerMetric(definition: MetricDefinition): void
+  inc(name: string, value?: number, labels?: Record<string, string>): void
+  set(name: string, value: number, labels?: Record<string, string>): void
+  observe(name: string, value: number, labels?: Record<string, string>): void
+  start(): Promise<void>  // HTTP server on port 9090
+  pushToGateway(url: string, job: string): Promise<void>
+}
+```
+
+**Default Metrics**:
+- `codebuddy_sessions_total`: Total sessions started
+- `codebuddy_messages_total`: Messages by role
+- `codebuddy_tokens_total`: Token usage by type
+- `codebuddy_tool_calls_total`: Tool calls by tool/status
+- `codebuddy_api_cost_dollars`: API costs
+- `codebuddy_response_time_seconds`: Response latency histogram
+
+### ROITracker
+
+```typescript
+class ROITracker {
+  recordTask(task: TaskCompletion): void
+  getReport(days?: number): ROIReport
+  formatReport(report: ROIReport): string
+}
+```
+
+**Metrics Tracked**:
+- Time saved vs manual completion
+- API cost per task type
+- Productivity multiplier
+- Net value (time saved × hourly rate - API cost)
+
+### CodeEvolution
+
+```typescript
+function generateEvolutionReport(options: EvolutionOptions): EvolutionReport
+function formatEvolutionReport(report: EvolutionReport): string
+```
+
+**Analyzes**:
+- Lines of code over time
+- File count trends
+- Language distribution
+- Growth velocity
+
+### CodebaseHeatmap
+
+```typescript
+function generateHeatmap(options: HeatmapOptions): HeatmapData
+function formatHeatmap(data: HeatmapData): string
+```
+
+**Visualizes**:
+- File modification frequency
+- Churn analysis (additions + deletions)
+- Top contributors
+- Hot/cold spots
+
+---
+
+## Intelligence Module (`src/intelligence/`)
+
+**Purpose**: Provide intelligent suggestions and analysis capabilities.
+
+### SemanticSearch
+
+```typescript
+class SemanticSearchEngine {
+  indexConversation(messages: ConversationMessage[]): void
+  search(query: string, options?: SearchOptions): SearchResult[]
+  getSuggestions(partial: string): string[]
+}
+```
+
+**Features**:
+- Fuzzy matching with configurable threshold
+- Word-level indexing
+- Stop word filtering
+- Result scoring and ranking
+
+### ProactiveSuggestions
+
+```typescript
+class ProactiveSuggestions extends EventEmitter {
+  analyze(): Promise<Suggestion[]>
+  getGitSuggestions(): Promise<Suggestion[]>
+  getCodeSuggestions(): Promise<Suggestion[]>
+}
+```
+
+**Suggestion Types**:
+- Uncommitted changes
+- Outdated dependencies
+- Missing tests
+- Documentation gaps
+- Security issues
+
+### RefactoringRecommender
+
+```typescript
+class RefactoringRecommender {
+  analyzeFile(filePath: string): Promise<RefactoringOpportunity[]>
+  analyzeProject(options?: AnalysisOptions): Promise<RefactoringReport>
+}
+```
+
+**Detects 20+ Patterns**:
+- Extract method/variable
+- Simplify conditionals
+- Remove dead code
+- Modernize syntax
+- Improve type safety
+
+### TaskComplexityEstimator
+
+```typescript
+class TaskComplexityEstimator {
+  estimateTask(description: string): ComplexityEstimate
+  estimateFromFiles(files: string[]): ComplexityEstimate
+}
+```
+
+**Estimates**:
+- Task type classification
+- Effort in hours
+- Risk level
+- Breakdown by phase
+
+---
+
+## API Module (`src/api/`)
+
+**Purpose**: External integration capabilities.
+
+### RestApiServer
+
+```typescript
+class RestApiServer extends EventEmitter {
+  start(): Promise<void>
+  stop(): Promise<void>
+}
+```
+
+**Endpoints**:
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /health | Health check |
+| POST | /api/prompt | Send prompt to AI |
+| POST | /api/tools/:tool | Execute specific tool |
+| GET | /api/sessions | List sessions |
+| GET | /api/metrics | Get usage metrics |
+
+### WebhookManager
+
+```typescript
+class WebhookManager extends EventEmitter {
+  register(webhook: WebhookConfig): void
+  trigger(event: string, payload: object): Promise<void>
+  verify(signature: string, payload: string): boolean
+}
+```
+
+**Events**:
+- `session.start`, `session.end`
+- `message.sent`, `message.received`
+- `tool.called`, `tool.completed`
+- `file.read`, `file.write`
+- `error`, `cost.threshold`
+
+**Security**: HMAC-SHA256 signature verification
+
+---
+
+## UI Enhancements (`src/ui/`)
+
+### New Components
+
+| Component | Purpose |
+|-----------|---------|
+| `NavigableHistory` | Up/down arrow navigation |
+| `PathAutocomplete` | File path completion |
+| `ModificationPreview` | Diff before changes |
+| `SplitScreenDiff` | Side-by-side comparison |
+| `ClipboardManager` | Enhanced copy/paste with history |
+| `SoundNotifications` | Audio feedback |
+| `CompactMode` | Small screen optimization |
+| `MetricsDashboard` | Usage visualization |
 
 ---
 

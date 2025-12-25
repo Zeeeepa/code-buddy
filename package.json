@@ -41,7 +41,9 @@
     "typecheck": "tsc --noEmit",
     "typecheck:watch": "tsc --noEmit --watch",
     "validate": "npm run lint && npm run typecheck && npm test",
-    "install:bun": "bun install"
+    "install:bun": "bun install",
+    "docs": "typedoc",
+    "docs:watch": "typedoc --watch"
   },
   "keywords": [
     "cli",
@@ -111,6 +113,7 @@
     "prettier": "^3.7.4",
     "ts-jest": "^29.4.6",
     "tsx": "^4.21.0",
+    "typedoc": "^0.27.0",
     "typescript": "^5.9.3",
     "vscode-languageserver": "^9.0.1",
     "vscode-languageserver-textdocument": "^1.0.12"
