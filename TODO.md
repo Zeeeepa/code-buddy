@@ -45,24 +45,24 @@
 
 ### Fonctionnalités
 - [x] 24. Mode offline complet avec cache local des réponses ✅ (existe déjà)
-- [ ] 25. Historique de conversation avec recherche sémantique
+- [x] 25. Historique de conversation avec recherche sémantique ✅ (semantic-search.ts)
 - [x] 26. Export des sessions en formats multiples (JSON, Markdown, HTML) ✅ (existe déjà)
 - [x] 27. Thèmes d'interface personnalisables ✅ (themes.ts)
 - [ ] 28. Mode collaboratif multi-utilisateurs
 - [ ] 29. Intégration IDE (VS Code extension, JetBrains plugin)
-- [ ] 30. Support webhooks pour intégrations externes
-- [ ] 31. API REST locale pour scripts externes
+- [x] 30. Support webhooks pour intégrations externes ✅ (webhooks.ts)
+- [x] 31. API REST locale pour scripts externes ✅ (rest-server.ts)
 - [x] 32. Mode batch pour traitement de multiples fichiers ✅
 - [x] 33. Génération de rapports automatique post-session ✅
 
 ### Intelligence
-- [ ] 34. Apprentissage des préférences utilisateur persistant
-- [ ] 35. Suggestions proactives basées sur le contexte du projet
+- [x] 34. Apprentissage des préférences utilisateur persistant ✅ (user-preferences.ts)
+- [x] 35. Suggestions proactives basées sur le contexte du projet ✅ (proactive-suggestions.ts)
 - [x] 36. Auto-complétion des commandes basée sur l'historique ✅
-- [ ] 37. Détection d'anomalies dans le code analysé
+- [x] 37. Détection d'anomalies dans le code analysé ✅ (anomaly-detector.ts)
 - [x] 38. Scoring de qualité de code automatique ✅
-- [ ] 39. Recommandations de refactoring intelligentes
-- [ ] 40. Estimation de complexité des tâches demandées
+- [x] 39. Recommandations de refactoring intelligentes ✅ (refactoring-recommender.ts)
+- [x] 40. Estimation de complexité des tâches demandées ✅ (task-complexity-estimator.ts)
 
 ### Outils
 - [x] 41. Outil de migration de base de données ✅
@@ -81,14 +81,14 @@
 ### Interface Terminal
 - [x] 49. Barre de progression pour les opérations longues ✅ (multi-step-progress.tsx)
 - [x] 50. Indicateur de coût en temps réel plus visible ✅
-- [ ] 51. Historique navigable avec flèches haut/bas
-- [ ] 52. Auto-complétion des chemins de fichiers
-- [ ] 53. Prévisualisation des modifications avant application
-- [ ] 54. Mode split-screen pour diff avant/après
-- [ ] 55. Notifications sonores optionnelles
-- [ ] 56. Support du copier-coller amélioré
+- [x] 51. Historique navigable avec flèches haut/bas ✅ (navigable-history.ts)
+- [x] 52. Auto-complétion des chemins de fichiers ✅ (path-autocomplete.ts)
+- [x] 53. Prévisualisation des modifications avant application ✅ (modification-preview.ts)
+- [x] 54. Mode split-screen pour diff avant/après ✅ (split-screen-diff.ts)
+- [x] 55. Notifications sonores optionnelles ✅ (sound-notifications.ts)
+- [x] 56. Support du copier-coller amélioré ✅ (clipboard-manager.ts)
 - [x] 57. Raccourcis clavier personnalisables ✅
-- [ ] 58. Mode compact pour petits écrans
+- [x] 58. Mode compact pour petits écrans ✅ (compact-mode.ts)
 
 ### Feedback
 - [x] 59. Messages d'erreur plus explicites avec suggestions ✅ (error-recovery.ts)
@@ -105,7 +105,7 @@
 - [ ] 65. Ajouter des diagrammes Mermaid
 - [ ] 66. JSDoc complet sur toutes les fonctions publiques
 - [x] 67. Guide de contribution (CONTRIBUTING.md) ✅ (existe déjà)
-- [ ] 68. Changelog automatisé avec conventional-changelog
+- [x] 68. Changelog automatisé avec conventional-changelog ✅ (changelog-generator.ts)
 - [ ] 69. Documentation API auto-générée (TypeDoc)
 - [ ] 70. Tutoriels vidéo ou GIFs animés
 - [ ] 71. Exemples d'utilisation pour chaque outil
@@ -115,13 +115,13 @@
 
 ## ⚙️ DevOps & CI/CD
 
-- [ ] 73. GitHub Actions pour CI complète
-- [ ] 74. Tests automatiques sur PR
-- [ ] 75. Analyse de couverture avec Codecov
-- [ ] 76. Linting automatique avant merge
-- [ ] 77. Semantic release automatisé
-- [ ] 78. Docker image officielle
-- [ ] 79. Homebrew formula pour macOS
+- [x] 73. GitHub Actions pour CI complète ✅ (ci.yml existe déjà)
+- [x] 74. Tests automatiques sur PR ✅ (ci.yml existe déjà)
+- [x] 75. Analyse de couverture avec Codecov ✅ (ci.yml existe déjà)
+- [x] 76. Linting automatique avant merge ✅ (lint.yml existe déjà)
+- [x] 77. Semantic release automatisé ✅ (.releaserc.json + release.yml)
+- [x] 78. Docker image officielle ✅ (Dockerfile existe déjà)
+- [x] 79. Homebrew formula pour macOS ✅ (homebrew/code-buddy.rb)
 - [ ] 80. Package AUR pour Arch Linux
 - [ ] 81. Snap/Flatpak pour Linux
 - [ ] 82. Windows installer (MSI/exe)
@@ -178,10 +178,10 @@
 
 ## 📊 Analytics & Métriques
 
-- [ ] 111. Dashboard de métriques local
+- [x] 111. Dashboard de métriques local ✅ (metrics-dashboard.ts)
 - [ ] 112. Graphiques d'évolution de la base de code
-- [ ] 113. Heatmap des fichiers modifiés
-- [ ] 114. Tracking du ROI (temps gagné vs coût API)
+- [x] 113. Heatmap des fichiers modifiés ✅ (codebase-heatmap.ts)
+- [x] 114. Tracking du ROI (temps gagné vs coût API) ✅ (roi-tracker.ts)
 - [ ] 115. Export des métriques vers Prometheus/Grafana
 
 ---
