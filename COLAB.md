@@ -1,0 +1,790 @@
+# COLAB.md - AI Collaboration Workspace
+
+**Project:** Code Buddy - AI-Powered Terminal Agent
+**Version:** 1.0.0
+**Last Updated:** 2026-01-08
+**Status:** Active Development
+
+---
+
+## Table of Contents
+
+1. [Application Audit](#application-audit)
+2. [Architecture Overview](#architecture-overview)
+3. [Restructuration Plan](#restructuration-plan)
+4. [Feature Tasks](#feature-tasks)
+5. [AI Collaboration Rules](#ai-collaboration-rules)
+6. [Work Log](#work-log)
+
+---
+
+## Application Audit
+
+### Project Statistics
+
+| Metric | Value |
+|--------|-------|
+| Source Files | 539 |
+| Lines of Code | 161,169 |
+| Directories | 90+ |
+| Dependencies | 27 |
+| Optional Dependencies | 16 |
+| Test Files | 146 |
+| Test Coverage | ~49% |
+
+### Current State Assessment
+
+#### Strengths
+- Multi-provider AI support (Grok, Claude, ChatGPT, Gemini)
+- Comprehensive tool ecosystem (59 tools)
+- MCP (Model Context Protocol) integration
+- Lazy loading for performance optimization
+- Session persistence and recovery
+- Security modes (suggest, auto-edit, full-auto)
+
+#### Issues Identified
+1. **High Complexity**: 90+ directories, many with overlapping responsibilities
+2. **Code Duplication**: Similar patterns repeated across agents
+3. **Test Coverage**: 49% - needs improvement to 80%+
+4. **Documentation**: Inconsistent across modules
+5. **Type Safety**: Some `any` types present
+6. **Error Handling**: Inconsistent patterns
+
+### Directory Structure Analysis
+
+```
+src/
+├── agent/           (50 files) - Core AI agent logic
+│   ├── custom/      - Custom agent configurations
+│   ├── multi-agent/ - Multi-agent coordination
+│   ├── parallel/    - Parallel execution
+│   ├── reasoning/   - Reasoning engine
+│   ├── repair/      - Error repair
+│   ├── specialized/ - Domain-specific agents
+│   └── thinking/    - Extended thinking
+├── tools/           (59 files) - Tool implementations
+│   ├── advanced/    - Advanced tools
+│   └── intelligence/- AI-powered tools
+├── ui/              (52 files) - User interface
+│   ├── components/  - React components
+│   ├── hooks/       - Custom hooks
+│   └── context/     - React context
+├── commands/        (31 files) - CLI commands
+├── context/         (24 files) - Context management
+├── providers/       (11 files) - AI providers
+├── codebuddy/       (11 files) - Core functionality
+├── security/        (10 files) - Security features
+└── ... (80+ more directories)
+```
+
+---
+
+## Architecture Overview
+
+### Core Components
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        CLI Entry                             │
+│                      (src/index.ts)                          │
+└─────────────────────────┬───────────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────────┐
+│                    CodeBuddyAgent                            │
+│              (src/agent/codebuddy-agent.ts)                  │
+│  - Agentic loop (max 400 rounds)                            │
+│  - Tool selection & execution                               │
+│  - Context management                                        │
+└─────────────────────────┬───────────────────────────────────┘
+                          │
+    ┌─────────────────────┼─────────────────────┐
+    │                     │                     │
+┌───▼───┐           ┌─────▼─────┐         ┌────▼────┐
+│ Tools │           │ Providers │         │   UI    │
+│(59)   │           │ (4)       │         │ (Ink)   │
+└───────┘           └───────────┘         └─────────┘
+```
+
+### Data Flow
+
+```
+User Input → ChatInterface → CodeBuddyAgent → Provider API
+                                    ↓
+                              Tool Calls
+                                    ↓
+                          Tool Execution + Confirm
+                                    ↓
+                            Results → API (loop)
+```
+
+---
+
+## Restructuration Plan
+
+### Phase 1: Core Consolidation (Priority: HIGH)
+
+Consolidate overlapping modules into cohesive domains.
+
+#### 1.1 Agent Core Refactoring
+**Files to modify:** max 10 per iteration
+
+| Current | Target | Action |
+|---------|--------|--------|
+| `agent/codebuddy-agent.ts` | `core/agent.ts` | Extract base agent |
+| `agent/specialized/*` | `agents/specialized/*` | Flatten structure |
+| `agent/multi-agent/*` | `core/multi-agent.ts` | Consolidate |
+| `agent/reasoning/*` | `core/reasoning.ts` | Merge |
+
+#### 1.2 Tool System Cleanup
+**Files to modify:** max 10 per iteration
+
+| Current | Target | Action |
+|---------|--------|--------|
+| `tools/*.ts` | `tools/core/*` | Categorize by type |
+| `tools/advanced/*` | `tools/extended/*` | Rename |
+| `codebuddy/tools.ts` | `tools/registry.ts` | Move |
+
+### Phase 2: Provider Abstraction (Priority: HIGH)
+
+#### 2.1 Provider Interface
+Create unified provider interface for all AI services.
+
+```typescript
+interface AIProvider {
+  name: string;
+  chat(messages: Message[]): Promise<Response>;
+  stream(messages: Message[]): AsyncIterable<Chunk>;
+  getModels(): Promise<Model[]>;
+  supports(feature: Feature): boolean;
+}
+```
+
+### Phase 3: UI Modernization (Priority: MEDIUM)
+
+#### 3.1 Component Reorganization
+- Extract reusable components
+- Implement proper state management
+- Add accessibility features
+
+### Phase 4: Testing & Documentation (Priority: HIGH)
+
+#### 4.1 Test Coverage Target: 80%
+- Unit tests for all core modules
+- Integration tests for workflows
+- E2E tests for CLI commands
+
+---
+
+## Feature Tasks
+
+### Legend
+- [ ] Not started
+- [~] In progress
+- [x] Completed
+- [!] Blocked
+
+### Sprint 1: Core Stabilization
+
+#### Task 1.1: Base Agent Extraction
+**Status:** [x] Completed
+**Priority:** HIGH
+**Max Files:** 10
+**Estimated Tests:** 20+
+
+**Objective:** Extract base agent class from CodeBuddyAgent
+
+**Files to modify:**
+1. `src/agent/codebuddy-agent.ts` - Extract base class
+2. `src/agent/base-agent.ts` - New: Base agent interface
+3. `src/agent/index.ts` - Export base agent
+4. `src/types/agent.ts` - Agent types
+5. `tests/unit/base-agent.test.ts` - New: Unit tests
+
+**Acceptance Criteria:**
+- [x] Base agent class created with core methods
+- [x] CodeBuddyAgent extends BaseAgent
+- [x] All existing tests pass
+- [x] New unit tests pass (coverage > 80%)
+- [x] Type safety maintained (no `any`)
+
+**Proof of Functionality:**
+```bash
+npm test -- tests/unit/core-base-agent.test.ts
+npm test -- tests/unit/codebuddy-agent.test.ts
+npm run typecheck
+```
+
+---
+
+#### Task 1.2: Tool Registry Consolidation
+**Status:** [x] Completed
+**Priority:** HIGH
+**Max Files:** 10
+**Estimated Tests:** 15+
+
+**Objective:** Consolidate tool registration and selection
+
+**Files to modify:**
+1. `src/tools/types.ts` - New: Tool type definitions
+2. `src/tools/metadata.ts` - New: Centralized tool metadata
+3. `src/tools/registry.ts` - New: Centralized registry
+4. `src/tools/tool-selector.ts` - Refactor to use registry
+5. `src/codebuddy/tools.ts` - Refactor to use registry
+6. `src/tools/index.ts` - Export registry
+7. `tests/unit/tool-registry.test.ts` - New: Unit tests
+
+**Acceptance Criteria:**
+- [x] Single source of truth for tool definitions
+- [x] RAG-based selection preserved
+- [x] Tool caching maintained
+- [x] All existing functionality works
+
+**Proof of Functionality:**
+```bash
+npm test -- tests/unit/tool-registry.test.ts
+npm test -- tests/unit/tools.test.ts
+npm run typecheck
+```
+
+---
+
+#### Task 1.3: Provider Interface Unification
+**Status:** [x] Completed
+**Priority:** HIGH
+**Max Files:** 10
+**Estimated Tests:** 20+
+
+**Objective:** Create unified provider interface
+
+**Files to modify:**
+1. `src/providers/base-provider.ts` - New: Base interface
+2. `src/providers/grok-provider.ts` - Implement interface
+3. `src/providers/claude-provider.ts` - Implement interface
+4. `src/providers/openai-provider.ts` - Implement interface
+5. `src/providers/gemini-provider.ts` - Implement interface
+6. `src/providers/index.ts` - Export all
+7. `tests/unit/providers.test.ts` - New: Unit tests
+
+**Acceptance Criteria:**
+- [x] All providers implement same interface
+- [x] Feature detection works (streaming, tools, vision)
+- [x] Fallback mechanisms in place
+- [x] Provider switching works at runtime
+
+**Proof of Functionality:**
+```bash
+npm test -- tests/unit/providers.test.ts
+buddy provider list
+buddy provider switch claude
+```
+
+---
+
+#### Task 1.4: Error Handling Standardization
+**Status:** [ ] Not started
+**Priority:** MEDIUM
+**Max Files:** 8
+**Estimated Tests:** 15+
+
+**Objective:** Standardize error handling across codebase
+
+**Files to modify:**
+1. `src/errors/base-error.ts` - Base error class
+2. `src/errors/agent-error.ts` - Agent-specific errors
+3. `src/errors/tool-error.ts` - Tool-specific errors
+4. `src/errors/provider-error.ts` - Provider errors
+5. `src/errors/index.ts` - Export all
+6. `tests/unit/errors.test.ts` - New: Unit tests
+
+**Acceptance Criteria:**
+- [ ] Consistent error hierarchy
+- [ ] Proper error codes
+- [ ] Stack traces preserved
+- [ ] User-friendly messages
+
+**Proof of Functionality:**
+```bash
+npm test -- tests/unit/errors.test.ts
+```
+
+---
+
+### Sprint 2: Feature Enhancement
+
+#### Task 2.1: Context Manager V3
+**Status:** [ ] Not started
+**Priority:** MEDIUM
+**Max Files:** 10
+**Estimated Tests:** 25+
+
+**Objective:** Improve context management with better compression
+
+**Files to modify:**
+1. `src/context/context-manager-v3.ts` - New: Improved manager
+2. `src/context/compression.ts` - Better compression
+3. `src/context/token-counter.ts` - Accurate counting
+4. `src/context/types.ts` - Type definitions
+5. `tests/unit/context-v3.test.ts` - New: Unit tests
+
+**Acceptance Criteria:**
+- [ ] Token counting accuracy > 99%
+- [ ] Compression preserves semantic meaning
+- [ ] Memory usage reduced by 20%
+- [ ] Context window fully utilized
+
+---
+
+#### Task 2.2: Streaming Improvements
+**Status:** [ ] Not started
+**Priority:** MEDIUM
+**Max Files:** 8
+**Estimated Tests:** 15+
+
+**Objective:** Improve streaming response handling
+
+**Files to modify:**
+1. `src/streaming/stream-handler.ts` - Refactor
+2. `src/streaming/chunk-processor.ts` - New
+3. `src/streaming/types.ts` - Types
+4. `tests/unit/streaming.test.ts` - New: Unit tests
+
+---
+
+#### Task 2.3: MCP Server Enhancements
+**Status:** [ ] Not started
+**Priority:** LOW
+**Max Files:** 6
+**Estimated Tests:** 12+
+
+**Objective:** Improve MCP server management
+
+---
+
+### Sprint 3: Testing & Documentation
+
+#### Task 3.1: Increase Test Coverage to 80%
+**Status:** [~] In progress
+**Priority:** HIGH
+**Current Coverage:** 49%
+**Target Coverage:** 80%
+
+**Modules needing tests:**
+- [ ] `src/agent/` (50 files)
+- [ ] `src/tools/` (59 files)
+- [ ] `src/providers/` (11 files)
+- [ ] `src/commands/` (31 files)
+- [ ] `src/context/` (24 files)
+
+---
+
+#### Task 3.2: API Documentation
+**Status:** [ ] Not started
+**Priority:** MEDIUM
+
+**Deliverables:**
+- [ ] TSDoc comments on all public APIs
+- [ ] Generated API reference
+- [ ] Usage examples
+
+---
+
+## AI Collaboration Rules
+
+### General Guidelines
+
+1. **Maximum 10 files per iteration** - Keeps changes reviewable and reduces complexity
+2. **Test-first development** - Write tests before implementation
+3. **Proof of functionality required** - Every task must have verification steps
+4. **No breaking changes** - Maintain backward compatibility
+5. **Type safety** - No new `any` types allowed
+
+### Communication Protocol
+
+#### Starting Work on a Task
+
+```markdown
+## Starting Task [ID]
+
+**AI Agent:** [Name/ID]
+**Date:** [YYYY-MM-DD]
+**Task:** [Description]
+
+### Files to modify:
+1. file1.ts
+2. file2.ts
+...
+
+### Approach:
+[Brief description of implementation approach]
+```
+
+#### Completing a Task
+
+```markdown
+## Completed Task [ID]
+
+**AI Agent:** [Name/ID]
+**Date:** [YYYY-MM-DD]
+**Duration:** [Time spent]
+
+### Files modified:
+1. file1.ts - [Changes made]
+2. file2.ts - [Changes made]
+
+### Tests added:
+- test1.test.ts (X tests)
+- test2.test.ts (Y tests)
+
+### Proof of functionality:
+```bash
+[Commands run and output]
+```
+
+### Issues encountered:
+[Any problems or blockers]
+
+### Next steps:
+[Recommendations for next iteration]
+```
+
+#### Handoff Protocol
+
+When handing off to another AI:
+
+```markdown
+## Handoff from [Agent A] to [Agent B]
+
+**Date:** [YYYY-MM-DD]
+**Current Task:** [Task ID and status]
+
+### Context:
+[Brief summary of current state]
+
+### Files in progress:
+1. file.ts - [Current state]
+
+### Blockers:
+[Any issues preventing progress]
+
+### Recommended next steps:
+1. Step 1
+2. Step 2
+```
+
+### Code Standards
+
+#### TypeScript
+```typescript
+// Good: Explicit types
+function processMessage(message: Message): Promise<Response> {
+  // ...
+}
+
+// Bad: Using any
+function processMessage(message: any): any {
+  // ...
+}
+```
+
+#### Error Handling
+```typescript
+// Good: Specific error types
+throw new ToolExecutionError('Failed to execute bash', {
+  command: cmd,
+  exitCode: result.code,
+});
+
+// Bad: Generic errors
+throw new Error('Failed');
+```
+
+#### Testing
+```typescript
+describe('FeatureName', () => {
+  describe('methodName', () => {
+    it('should handle normal case', () => {
+      // Arrange
+      // Act
+      // Assert
+    });
+
+    it('should handle edge case', () => {
+      // ...
+    });
+
+    it('should throw on invalid input', () => {
+      // ...
+    });
+  });
+});
+```
+
+### Iteration Checklist
+
+Before completing an iteration:
+
+- [ ] All modified files are under 10
+- [ ] All new code has tests
+- [ ] All tests pass (`npm test`)
+- [ ] Type checking passes (`npm run typecheck`)
+- [ ] Linting passes (`npm run lint`)
+- [ ] No new `any` types introduced
+- [ ] Documentation updated if needed
+- [ ] Proof of functionality documented
+
+---
+
+## Work Log
+
+### 2026-01-08 - Initial Setup
+
+**Agent:** Claude Opus 4.5
+**Task:** Create COLAB.md and audit application
+
+**Summary:**
+- Completed full application audit
+- Identified 539 source files, 161K lines of code
+- Current test coverage: ~49%
+- Created restructuration plan with prioritized tasks
+- Established AI collaboration rules
+
+**Current Status:**
+- Application is functional but complex
+- Many opportunities for consolidation
+- Test coverage needs improvement
+
+**Next Steps:**
+1. Complete Task 1.1 (Base Agent Extraction)
+2. Increase test coverage to 60%
+3. Begin provider interface unification
+
+---
+
+### Template for New Entries
+
+```markdown
+### [DATE] - [Brief Description]
+
+**Agent:** [Name/ID]
+**Task:** [Task ID or description]
+
+**Summary:**
+- Point 1
+- Point 2
+
+**Files Modified:**
+1. file.ts - [changes]
+
+**Tests Added:**
+- test.test.ts (X tests)
+
+**Proof of Functionality:**
+```bash
+[command and output]
+```
+
+**Issues:**
+- [Any problems]
+
+**Next Steps:**
+1. Step 1
+2. Step 2
+```
+
+---
+
+## 2026-01-08 - Integration Collaboration System
+
+**Agent:** Claude Opus 4.5
+**Task:** Integration of AI Collaboration Methodology into Code Buddy
+
+### Summary
+Integrated the AI collaboration methodology directly into Code Buddy with `/colab` commands.
+
+### Files Modified:
+1. `src/collaboration/ai-colab-manager.ts` - New: Complete AI collaboration manager
+2. `src/commands/handlers/colab-handler.ts` - New: Handler for /colab commands
+3. `src/commands/slash-commands.ts` - Added /colab command
+4. `src/commands/handlers/index.ts` - Export colab handler
+5. `src/collaboration/index.ts` - Export ai-colab-manager
+6. `tests/unit/ai-colab-manager.test.ts` - New: 20 unit tests
+7. `tests/unit/colab-handler.test.ts` - New: 15 unit tests
+
+### Tests Added:
+- `tests/unit/ai-colab-manager.test.ts` (20 tests)
+- `tests/unit/colab-handler.test.ts` (15 tests)
+
+### Proof of Functionality:
+```bash
+npm test -- tests/unit/ai-colab-manager.test.ts tests/unit/colab-handler.test.ts
+# Test Suites: 2 passed, 2 total
+# Tests:       35 passed, 35 total
+```
+
+### New Commands Available:
+- `/colab status` - Show collaboration status
+- `/colab tasks` - List all tasks
+- `/colab start <id>` - Start working on a task
+- `/colab complete <id>` - Mark task completed
+- `/colab log` - View/add work log entries
+- `/colab handoff <agent>` - Create handoff to another AI
+- `/colab init` - Initialize default tasks
+- `/colab instructions [agent]` - Generate instructions for AI
+
+### Next Steps:
+1. Complete Task 1.2 (Tool Registry Consolidation)
+2. Fix TypeScript errors in codebuddy-agent.ts
+3. Continue improving test coverage
+
+---
+
+## Completed Task 1.3
+
+**Agent:** Gemini
+**Date:** 2026-01-08
+
+### Fichiers modifiés:
+1. `src/providers/base-provider.ts` - Refonte de `BaseLLMProvider` en `BaseProvider` implémentant l'interface unifiée `AIProvider` (`chat`, `stream`, `supports`).
+2. `src/providers/types.ts` - Ajout de `ProviderFeature` et mise à jour de `ProviderType`.
+3. `src/providers/grok-provider.ts` - Mise à jour pour étendre `BaseProvider` et supporter `vision`.
+4. `src/providers/claude-provider.ts` - Mise à jour pour étendre `BaseProvider` et supporter `vision`, `json_mode`.
+5. `src/providers/openai-provider.ts` - Mise à jour pour étendre `BaseProvider` et supporter `vision`, `json_mode`.
+6. `src/providers/gemini-provider.ts` - Mise à jour pour étendre `BaseProvider` et supporter `vision`.
+7. `src/providers/provider-manager.ts` - Mise à jour pour utiliser `AIProvider`.
+8. `src/providers/index.ts` - Export des nouvelles interfaces et classes.
+9. `src/providers/ai-provider.ts` & `src/providers/llm-provider.ts` - Supprimés (redondants).
+
+### Tests ajoutés:
+- `tests/unit/providers.test.ts` (12 tests) - Vérifie l'initialisation, les fonctionnalités et l'uniformité des providers.
+
+### Preuve de fonctionnement:
+```bash
+npm test -- tests/unit/providers.test.ts
+# PASS  tests/unit/providers.test.ts
+# 12 tests passed
+
+npm run typecheck
+# Exit Code: 0
+```
+
+### Prochaines étapes:
+1. Passer à la **Task 1.4: Error Handling Standardization** pour uniformiser la gestion des erreurs.
+
+---
+
+## Completed Task 1.2
+
+**Agent:** Gemini
+**Date:** 2026-01-08
+
+### Fichiers modifiés:
+1. `src/tools/types.ts` - Centralisation des types liés aux outils (`ToolCategory`, `ToolMetadata`, `ToolSelectionResult`, etc.).
+2. `src/tools/metadata.ts` - Centralisation des métadonnées des outils intégrés (mots-clés, catégories, priorités).
+3. `src/tools/registry.ts` - Implémentation du `ToolRegistry` (singleton) pour gérer l'enregistrement et l'activation des outils.
+4. `src/tools/tool-selector.ts` - Refactorisé pour utiliser le registre et les types centralisés.
+5. `src/codebuddy/tools.ts` - Refactorisé pour utiliser `ToolRegistry` pour l'assemblage des outils, tout en conservant la compatibilité descendante.
+6. `src/tools/index.ts` - Exportation du registre et des types.
+7. `tests/unit/tool-registry.test.ts` - Nouveaux tests pour le registre.
+
+### Tests ajoutés:
+- `tests/unit/tool-registry.test.ts` (5 tests)
+
+### Preuve de fonctionnement:
+```bash
+npm test -- tests/unit/tool-registry.test.ts
+# PASS  tests/unit/tool-registry.test.ts
+# 5 tests passed
+
+npm test -- tests/unit/tools.test.ts
+# PASS  tests/unit/tools.test.ts
+# 42 tests passed (vérification de la non-régression de l'assemblage et de la sélection RAG)
+
+npm run typecheck
+# Exit Code: 0
+```
+
+### Prochaines étapes:
+1. Passer à la **Task 1.3: Provider Interface Unification** pour unifier les interfaces des différents fournisseurs d'IA (Grok, Claude, Gemini, OpenAI).
+
+---
+
+## Completed Task 1.1
+
+**Agent:** Gemini
+**Date:** 2026-01-08
+
+### Fichiers modifiés:
+1. `src/agent/base-agent.ts` - Nouvelle classe de base abstraite regroupant l'infrastructure commune (gestion des messages, historique, coûts, managers).
+2. `src/agent/codebuddy-agent.ts` - Refactorisé pour étendre `BaseAgent` et suppression des méthodes redondantes.
+3. `src/agent/types.ts` - Ajout de l'interface `Agent`.
+4. `src/agent/index.ts` - Export de `BaseAgent`.
+5. `tests/unit/core-base-agent.test.ts` - Nouveaux tests unitaires pour la classe de base.
+
+### Tests ajoutés:
+- `tests/unit/core-base-agent.test.ts` (8 tests)
+
+### Preuve de fonctionnement:
+```bash
+npm test -- tests/unit/core-base-agent.test.ts
+# PASS  tests/unit/core-base-agent.test.ts
+# 8 tests passed
+
+npm test -- tests/unit/codebuddy-agent.test.ts
+# PASS  tests/unit/codebuddy-agent.test.ts
+# 124 tests passed
+
+npm run typecheck
+# Exit Code: 0
+```
+
+### Prochaines étapes:
+1. S'attaquer à la Task 1.2 : Consolidation du registre d'outils (Tool Registry Consolidation).
+2. Vérifier si `multi-agent/base-agent.ts` peut être unifié avec `BaseAgent` à terme.
+
+---
+
+## Quick Reference
+
+### Commands
+
+```bash
+# Development
+npm run dev          # Start with Bun
+npm run build        # Build TypeScript
+npm run validate     # Lint + typecheck + test
+
+# Testing
+npm test                          # Run all tests
+npm test -- path/to/file.test.ts  # Single file
+npm run test:coverage             # With coverage
+
+# Quality
+npm run lint         # ESLint
+npm run typecheck    # TypeScript check
+```
+
+### File Locations
+
+| Component | Location |
+|-----------|----------|
+| Entry Point | `src/index.ts` |
+| Main Agent | `src/agent/codebuddy-agent.ts` |
+| Tools | `src/tools/` |
+| Providers | `src/providers/` |
+| UI | `src/ui/` |
+| Tests | `tests/unit/` |
+| Config | `package.json`, `tsconfig.json` |
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `GROK_API_KEY` | API key for Grok |
+| `GROK_BASE_URL` | Custom API endpoint |
+| `GROK_MODEL` | Default model |
+| `YOLO_MODE` | Full autonomy mode |
+| `MAX_COST` | Session cost limit |
+
+---
+
+*This document is maintained by AI agents collaborating on Code Buddy development.*

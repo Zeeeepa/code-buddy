@@ -130,5 +130,10 @@ export {
   handleTrack,
 } from './track-handlers.js';
 
+// Colab handlers (AI Collaboration)
+export {
+  handleColabCommand,
+} from './colab-handler.js';
+
 // Re-export CommandHandlerResult type
 export type { CommandHandlerResult } from './branch-handlers.js';

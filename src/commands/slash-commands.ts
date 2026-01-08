@@ -830,6 +830,20 @@ Be systematic and thorough in your analysis.`,
         arguments: [
           { name: 'action', description: 'new, implement, status, list, complete, setup, context, update', required: false }
         ]
+      },
+      // ==========================================
+      // AI Collaboration Commands
+      // Multi-AI collaboration workflow management
+      // ==========================================
+      {
+        name: 'colab',
+        description: 'Manage AI collaboration workflow (multi-AI development)',
+        prompt: '__COLAB__',
+        filePath: '',
+        isBuiltin: true,
+        arguments: [
+          { name: 'action', description: 'status, tasks, start <id>, complete, log, handoff, init, instructions', required: false }
+        ]
       }
     ];
 
