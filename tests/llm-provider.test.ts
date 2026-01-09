@@ -13,7 +13,7 @@ import {
   type ProviderType,
   type LLMMessage,
   type ToolDefinition,
-} from '../src/providers/llm-provider.js';
+} from '../src/providers/index.js';
 
 describe('LLM Provider', () => {
   describe('GrokProvider', () => {

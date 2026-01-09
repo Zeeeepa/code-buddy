@@ -12,7 +12,7 @@ import type {
   LLMResponse,
   StreamChunk,
 } from '../../src/providers/types';
-import type { LLMProvider } from '../../src/providers/base-provider';
+import type { AIProvider } from '../../src/providers/base-provider';
 
 // ==========================================================================
 // Mock Provider Factory
@@ -22,7 +22,7 @@ function createMockProvider(
   type: ProviderType,
   name: string,
   defaultModel: string
-): LLMProvider & {
+): AIProvider & {
   _mockInitialize: jest.Mock;
   _mockComplete: jest.Mock;
   _mockStream: jest.Mock;
@@ -64,9 +64,11 @@ function createMockProvider(
     defaultModel,
     initialize: mockInitialize,
     isReady: () => ready,
+    chat: mockComplete,
     complete: mockComplete,
     stream: mockStream,
     getModels: jest.fn().mockResolvedValue([defaultModel, `${defaultModel}-fast`]),
+    supports: jest.fn().mockReturnValue(true),
     estimateTokens: jest.fn().mockImplementation((text: string) => Math.ceil(text.length / 4)),
     getPricing: jest.fn().mockReturnValue({ input: 3, output: 15 }),
     dispose: mockDispose,
