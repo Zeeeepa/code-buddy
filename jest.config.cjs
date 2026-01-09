@@ -7,6 +7,11 @@ module.exports = {
     '**/__tests__/**/*.ts',
     '**/?(*.)+(spec|test).ts'
   ],
+  // Exclude heavy tests from default runs (run with: npm test -- --testPathPattern=heavy)
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '\\.heavy\\.test\\.ts$'
+  ],
   transform: {
     '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.test.json' }],
   },

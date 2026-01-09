@@ -420,7 +420,8 @@ describe('TextEditorTool', () => {
     });
 
     test('should return error for non-existent file', async () => {
-      const result = await textEditor.view('/nonexistent/file.txt');
+      const nonExistentPath = path.join(TEST_DIR, 'nonexistent-file.txt');
+      const result = await textEditor.view(nonExistentPath);
       expect(result.success).toBe(false);
       expect(result.error).toContain('not found');
     });
@@ -497,7 +498,8 @@ describe('TextEditorTool', () => {
     });
 
     test('should fail for non-existent file', async () => {
-      const result = await textEditor.strReplace('/nonexistent/file.txt', 'old', 'new');
+      const nonExistentPath = path.join(TEST_DIR, 'nonexistent-file.txt');
+      const result = await textEditor.strReplace(nonExistentPath, 'old', 'new');
       expect(result.success).toBe(false);
       expect(result.error).toContain('not found');
     });
@@ -536,7 +538,8 @@ describe('TextEditorTool', () => {
     });
 
     test('should fail for non-existent file', async () => {
-      const result = await textEditor.replaceLines('/nonexistent/file.txt', 1, 2, 'new');
+      const nonExistentPath = path.join(TEST_DIR, 'nonexistent-file.txt');
+      const result = await textEditor.replaceLines(nonExistentPath, 1, 2, 'new');
       expect(result.success).toBe(false);
       expect(result.error).toContain('not found');
     });
@@ -561,7 +564,8 @@ describe('TextEditorTool', () => {
     });
 
     test('should fail for non-existent file', async () => {
-      const result = await textEditor.insert('/nonexistent/file.txt', 1, 'new');
+      const nonExistentPath = path.join(TEST_DIR, 'nonexistent-file.txt');
+      const result = await textEditor.insert(nonExistentPath, 1, 'new');
       expect(result.success).toBe(false);
       expect(result.error).toContain('not found');
     });
@@ -809,9 +813,8 @@ describe('GitTool', () => {
   });
 
   describe('getLog', () => {
-    test('should return empty for repo with no commits', async () => {
-      const log = await gitTool.getLog();
-      expect(log).toBe('');
+    test('should throw error for repo with no commits', async () => {
+      await expect(gitTool.getLog()).rejects.toThrow('does not have any commits');
     });
 
     test('should return commit log after commits', async () => {

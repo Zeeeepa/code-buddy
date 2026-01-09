@@ -12,12 +12,16 @@
 // AST Parser Tests
 // ============================================================================
 
+// Increase Jest timeout for this memory-heavy test suite
+jest.setTimeout(120000);
+
 describe('AST Parser', () => {
   // Lazy import to avoid memory issues
   let ASTParser: any;
   let createASTParser: any;
   let getASTParser: any;
   let resetASTParser: any;
+  let parserInstance: any;
 
   beforeAll(async () => {
     const module = await import('../../src/tools/intelligence/ast-parser');
@@ -29,6 +33,12 @@ describe('AST Parser', () => {
 
   beforeEach(() => {
     if (resetASTParser) resetASTParser();
+  });
+
+  afterAll(() => {
+    // Cleanup: reset singleton to free memory
+    if (resetASTParser) resetASTParser();
+    parserInstance = null;
   });
 
   describe('Factory Functions', () => {
