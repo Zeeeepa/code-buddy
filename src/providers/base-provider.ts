@@ -2,6 +2,7 @@
  * Base Provider
  *
  * Abstract base class and interface for AI providers.
+ * Defines the contract that all LLM providers (Grok, Claude, OpenAI, etc.) must fulfill.
  */
 
 import { EventEmitter } from 'events';
@@ -14,63 +15,100 @@ import type {
   ProviderFeature,
   LLMMessage,
 } from './types.js';
+import {
+  measureLatency,
+  getStreamingOptimizer,
+} from '../optimization/latency-optimizer.js';
 
 // ============================================================================
 // Provider Interface
 // ============================================================================
 
+/**
+ * Interface representing a generic AI Provider.
+ * This interface abstracts away the differences between various LLM APIs
+ * (e.g., Anthropic, OpenAI, XAI) providing a unified way to interact with them.
+ */
 export interface AIProvider {
+  /** The unique identifier for the provider type (e.g., 'grok', 'claude'). */
   readonly type: ProviderType;
+  /** The display name of the provider. */
   readonly name: string;
+  /** The default model ID used by this provider if none is specified. */
   readonly defaultModel: string;
 
   /**
-   * Initialize the provider
+   * Initializes the provider with the necessary configuration.
+   * This typically involves setting API keys and validating basic settings.
+   *
+   * @param config - The configuration object containing API keys, model preferences, etc.
+   * @returns A promise that resolves when initialization is complete.
    */
   initialize(config: ProviderConfig): Promise<void>;
 
   /**
-   * Check if provider is ready
+   * Checks if the provider is fully initialized and ready to accept requests.
+   *
+   * @returns `true` if the provider is ready, `false` otherwise.
    */
   isReady(): boolean;
 
   /**
-   * Chat completion (non-streaming)
+   * Sends a chat completion request to the provider (non-streaming).
+   *
+   * @param options - The options for the completion request (messages, tools, etc.).
+   * @returns A promise resolving to the standardized LLM response.
    */
   chat(options: CompletionOptions): Promise<LLMResponse>;
 
   /**
-   * Complete (alias for chat, legacy support)
+   * Legacy alias for `chat`.
+   * @deprecated Use `chat` instead.
    */
   complete(options: CompletionOptions): Promise<LLMResponse>;
 
   /**
-   * Stream chat completion
+   * Sends a chat completion request and returns a stream of chunks.
+   * Useful for real-time UIs where the response is displayed as it generates.
+   *
+   * @param options - The options for the completion request.
+   * @returns An async iterable of `StreamChunk` objects.
    */
   stream(options: CompletionOptions): AsyncIterable<StreamChunk>;
 
   /**
-   * Get available models
+   * Retrieves the list of available models for this provider.
+   *
+   * @returns A promise resolving to an array of model ID strings.
    */
   getModels(): Promise<string[]>;
 
   /**
-   * Check if provider supports a feature
+   * Checks if the provider supports a specific feature.
+   *
+   * @param feature - The feature to check (e.g., 'streaming', 'tools', 'vision').
+   * @returns `true` if the feature is supported, `false` otherwise.
    */
   supports(feature: ProviderFeature): boolean;
 
   /**
-   * Estimate token count for text or messages
+   * Estimates the number of tokens in a text string or list of messages.
+   * Used for context window management.
+   *
+   * @param content - The text or messages to estimate.
+   * @returns The estimated number of tokens.
    */
   estimateTokens(content: string | LLMMessage[]): number;
 
   /**
-   * Get pricing info
+   * Gets the pricing configuration for the current model.
+   *
+   * @returns An object containing input and output costs per 1k tokens (or similar unit).
    */
   getPricing(): { input: number; output: number };
 
   /**
-   * Dispose resources
+   * Cleans up resources, clears listeners, and resets the provider state.
    */
   dispose(): void;
 }
@@ -79,6 +117,10 @@ export interface AIProvider {
 // Base Provider Implementation
 // ============================================================================
 
+/**
+ * Abstract base class that implements common functionality for AI providers.
+ * Concrete provider implementations should extend this class.
+ */
 export abstract class BaseProvider extends EventEmitter implements AIProvider {
   abstract readonly type: ProviderType;
   abstract readonly name: string;
@@ -87,6 +129,10 @@ export abstract class BaseProvider extends EventEmitter implements AIProvider {
   protected config: ProviderConfig | null = null;
   protected ready = false;
 
+  /**
+   * Initializes the provider.
+   * Validates configuration and emits a 'ready' event upon success.
+   */
   async initialize(config: ProviderConfig): Promise<void> {
     this.config = config;
     await this.validateConfig();
@@ -98,6 +144,11 @@ export abstract class BaseProvider extends EventEmitter implements AIProvider {
     return this.ready;
   }
 
+  /**
+   * Validates the provided configuration.
+   * Throws an error if required fields (like apiKey) are missing.
+   * Can be overridden by subclasses for specific validation logic.
+   */
   protected async validateConfig(): Promise<void> {
     if (!this.config?.apiKey) {
       // Local providers might not need API key
@@ -108,16 +159,50 @@ export abstract class BaseProvider extends EventEmitter implements AIProvider {
   }
 
   /**
-   * Chat completion - implements the AIProvider interface
-   * Delegates to abstract complete() method for backward compatibility
+   * Standard chat completion method.
+   * Delegates to the abstract `complete` method which must be implemented by subclasses.
+   * Wrapped with latency measurement for performance tracking.
    */
   async chat(options: CompletionOptions): Promise<LLMResponse> {
-    return this.complete(options);
+    // Determine if this is a simple or complex response based on message count
+    const operationType = (options.messages?.length || 0) > 3 ? 'complex_response' : 'simple_response';
+    return measureLatency(operationType, () => this.complete(options));
   }
 
-  // Abstract method for specific implementation
+  /**
+   * Abstract method to perform the actual completion request.
+   * Must be implemented by concrete providers.
+   */
   abstract complete(options: CompletionOptions): Promise<LLMResponse>;
+
+  /**
+   * Abstract method to perform streaming completion.
+   * Must be implemented by concrete providers.
+   */
   abstract stream(options: CompletionOptions): AsyncIterable<StreamChunk>;
+
+  /**
+   * Wraps a stream with latency tracking for first-token and total time.
+   * Use this in provider implementations to get streaming metrics.
+   */
+  protected async *trackStreamLatency(
+    streamIterable: AsyncIterable<StreamChunk>
+  ): AsyncIterable<StreamChunk> {
+    const streamingOptimizer = getStreamingOptimizer();
+    const startTime = Date.now();
+    let firstChunkTime: number | null = null;
+
+    for await (const chunk of streamIterable) {
+      if (firstChunkTime === null) {
+        firstChunkTime = Date.now() - startTime;
+        streamingOptimizer.recordFirstToken(firstChunkTime);
+      }
+      yield chunk;
+    }
+
+    const totalTime = Date.now() - startTime;
+    streamingOptimizer.recordTotalTime(totalTime);
+  }
 
   async getModels(): Promise<string[]> {
     return [this.defaultModel];

@@ -2,6 +2,7 @@
  * Claude Provider (Anthropic)
  *
  * LLM provider implementation for Claude API.
+ * Handles interaction with Anthropic's Claude 3/3.5 models.
  */
 
 import { BaseProvider } from './base-provider.js';
@@ -18,6 +19,14 @@ import type {
   ProviderFeature,
 } from './types.js';
 
+/**
+ * Implementation of the Anthropic Claude provider.
+ * Uses the @anthropic-ai/sdk for API communication.
+ * Handles specifics like:
+ * - Tool use integration (beta)
+ * - Message formatting (system prompts separate from messages)
+ * - Streaming delta handling
+ */
 export class ClaudeProvider extends BaseProvider {
   readonly type: ProviderType = 'claude';
   readonly name = 'Claude (Anthropic)';
@@ -25,6 +34,12 @@ export class ClaudeProvider extends BaseProvider {
 
   private client: unknown = null;
 
+  /**
+   * Initializes the Claude provider.
+   * Dynamically imports the Anthropic SDK.
+   *
+   * @throws Error if @anthropic-ai/sdk is not installed.
+   */
   async initialize(config: ProviderConfig): Promise<void> {
     await super.initialize(config);
 
@@ -43,6 +58,11 @@ export class ClaudeProvider extends BaseProvider {
     }
   }
 
+  /**
+   * Sends a completion request to the Anthropic API.
+   * Handles separating system prompt from standard messages.
+   * Maps tool use blocks to standard ToolCall objects.
+   */
   async complete(options: CompletionOptions): Promise<LLMResponse> {
     if (!this.client || !this.config) {
       throw new Error('Provider not initialized');
@@ -93,7 +113,19 @@ export class ClaudeProvider extends BaseProvider {
     };
   }
 
+  /**
+   * Streams the response from the Anthropic API.
+   * Handles 'content_block_delta' events for both text and JSON (tool args).
+   * Wrapped with latency tracking for first-token and total streaming time.
+   */
   async *stream(options: CompletionOptions): AsyncIterable<StreamChunk> {
+    yield* this.trackStreamLatency(this.streamInternal(options));
+  }
+
+  /**
+   * Internal streaming implementation.
+   */
+  private async *streamInternal(options: CompletionOptions): AsyncIterable<StreamChunk> {
     if (!this.client || !this.config) {
       throw new Error('Provider not initialized');
     }
@@ -150,6 +182,12 @@ export class ClaudeProvider extends BaseProvider {
     }
   }
 
+  /**
+   * Formats messages for the Anthropic API.
+   * - Extracts system prompt.
+   * - Handles tool results (must be role='user').
+   * - Handles assistant tool calls (content array with tool_use blocks).
+   */
   private formatMessages(options: CompletionOptions): {
     system: string;
     messages: Array<{ role: 'user' | 'assistant'; content: string | Array<{ type: string; tool_use_id?: string; content?: string; text?: string }> }>;
@@ -205,6 +243,9 @@ export class ClaudeProvider extends BaseProvider {
     return { system, messages };
   }
 
+  /**
+   * Formats tool definitions for Anthropic.
+   */
   private formatTools(tools: ToolDefinition[]): Array<{
     name: string;
     description: string;

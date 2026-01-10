@@ -41,7 +41,7 @@
 | Sprint 3: Testing | 2 | 2 | **DONE** |
 | Sprint 4: Advanced | 3 | 3 | **DONE** |
 | Sprint 5: Intelligence | 3 | 3 | **DONE** |
-| Sprint 6: Extensibility | 3 | 2 | In Progress (Gemini, Claude) |
+| Sprint 6: Extensibility | 5 | 3 | In Progress (Gemini, Claude) |
 
 ### Current State Assessment
 
@@ -507,10 +507,18 @@ npm run typecheck
 - Integrated into agent (codebuddy-agent.ts), tool registry (metadata.ts), and tool definitions (web-tools.ts)
 
 #### Task 6.3: Latency Optimization Integration
-**Status:** [ ] Not started
+**Status:** [x] Completed (Claude)
 **Priority:** LOW
 **Objective:** Integrate `LatencyOptimizer` into critical paths (file ops, LLM calls) to measure and optimize responsiveness.
 **Files:** `src/optimization/latency-optimizer.ts`
+**Completion Notes:**
+- Integrated `measureLatency()` into UnifiedVfsRouter for file_read and file_write operations
+- Added latency measurement to BaseProvider.chat() for LLM completion calls
+- Added `trackStreamLatency()` wrapper to all providers (Grok, Claude, OpenAI, Gemini) for streaming first-token tracking
+- Added latency stats display to StatusBar component with showLatencyStats prop
+- Displays: average latency, P95, target met %, first token time
+- Color-coded indicators based on LATENCY_THRESHOLDS (green/yellow/red)
+- Comprehensive unit tests (23 tests) in tests/unit/latency-integration.test.ts
 
 #### Task 6.4: VFS Router Deprecation & Cleanup
 **Status:** [~] In progress (Gemini)

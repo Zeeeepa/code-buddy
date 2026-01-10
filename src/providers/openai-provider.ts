@@ -2,6 +2,7 @@
  * OpenAI Provider (GPT)
  *
  * LLM provider implementation for OpenAI API.
+ * Provides access to GPT-4o, GPT-4 Turbo, and O-series models.
  */
 
 import { BaseProvider } from './base-provider.js';
@@ -16,6 +17,10 @@ import type {
   ProviderFeature,
 } from './types.js';
 
+/**
+ * Implementation of the OpenAI provider.
+ * Uses the official OpenAI SDK.
+ */
 export class OpenAIProvider extends BaseProvider {
   readonly type: ProviderType = 'openai';
   readonly name = 'GPT (OpenAI)';
@@ -23,6 +28,10 @@ export class OpenAIProvider extends BaseProvider {
 
   private client: unknown = null;
 
+  /**
+   * Initializes the OpenAI provider.
+   * Dynamically imports the OpenAI SDK.
+   */
   async initialize(config: ProviderConfig): Promise<void> {
     await super.initialize(config);
 
@@ -35,6 +44,10 @@ export class OpenAIProvider extends BaseProvider {
     });
   }
 
+  /**
+   * Sends a completion request to the OpenAI API.
+   * Standardizes tool calls and finish reasons.
+   */
   async complete(options: CompletionOptions): Promise<LLMResponse> {
     if (!this.client || !this.config) {
       throw new Error('Provider not initialized');
@@ -78,7 +91,19 @@ export class OpenAIProvider extends BaseProvider {
     };
   }
 
+  /**
+   * Streams the response from the OpenAI API.
+   * Handles accumulating tool calls (which are streamed in parts).
+   * Wrapped with latency tracking for first-token and total streaming time.
+   */
   async *stream(options: CompletionOptions): AsyncIterable<StreamChunk> {
+    yield* this.trackStreamLatency(this.streamInternal(options));
+  }
+
+  /**
+   * Internal streaming implementation.
+   */
+  private async *streamInternal(options: CompletionOptions): AsyncIterable<StreamChunk> {
     if (!this.client || !this.config) {
       throw new Error('Provider not initialized');
     }
@@ -147,6 +172,9 @@ export class OpenAIProvider extends BaseProvider {
     }
   }
 
+  /**
+   * Formats internal messages to OpenAI's ChatCompletionMessageParam.
+   */
   private formatMessages(options: CompletionOptions): Array<{
     role: 'system' | 'user' | 'assistant' | 'tool';
     content: string | null;
@@ -179,6 +207,9 @@ export class OpenAIProvider extends BaseProvider {
     return messages;
   }
 
+  /**
+   * Formats tool definitions for OpenAI.
+   */
   private formatTools(tools: ToolDefinition[]): Array<{
     type: 'function';
     function: { name: string; description: string; parameters: Record<string, unknown> };

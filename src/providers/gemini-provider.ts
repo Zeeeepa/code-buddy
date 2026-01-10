@@ -15,6 +15,10 @@ import type {
   ProviderFeature,
 } from './types.js';
 
+/**
+ * Implementation of the Google Gemini provider.
+ * Uses `fetch` to interact with the REST API directly, avoiding the need for heavy SDKs.
+ */
 export class GeminiProvider extends BaseProvider {
   readonly type: ProviderType = 'gemini';
   readonly name = 'Gemini (Google)';
@@ -22,6 +26,10 @@ export class GeminiProvider extends BaseProvider {
 
   private client: unknown = null;
 
+  /**
+   * Initializes the Gemini provider.
+   * Sets up the API configuration.
+   */
   async initialize(config: ProviderConfig): Promise<void> {
     await super.initialize(config);
 
@@ -34,6 +42,11 @@ export class GeminiProvider extends BaseProvider {
     };
   }
 
+  /**
+   * Sends a completion request to the Gemini REST API.
+   * Transforms the request to Gemini's specific JSON format.
+   * Maps response candidates and tool calls back to standard types.
+   */
   async complete(options: CompletionOptions): Promise<LLMResponse> {
     if (!this.client || !this.config) {
       throw new Error('Provider not initialized');
@@ -102,7 +115,18 @@ export class GeminiProvider extends BaseProvider {
     };
   }
 
+  /**
+   * Streams the response from the Gemini REST API via SSE (Server-Sent Events).
+   * Decodes the chunked JSON response and maps it to standard StreamChunks. *
+   */
   async *stream(options: CompletionOptions): AsyncIterable<StreamChunk> {
+    yield* this.trackStreamLatency(this.streamInternal(options));
+  }
+
+  /**
+   * Internal streaming implementation.
+   */
+  private async *streamInternal(options: CompletionOptions): AsyncIterable<StreamChunk> {
     if (!this.client || !this.config) {
       throw new Error('Provider not initialized');
     }
@@ -185,6 +209,9 @@ export class GeminiProvider extends BaseProvider {
     }
   }
 
+  /**
+   * Returns a list of supported Gemini models.
+   */
   async getModels(): Promise<string[]> {
     return [
       'gemini-2.0-flash',
@@ -194,11 +221,19 @@ export class GeminiProvider extends BaseProvider {
     ];
   }
 
+  /**
+   * Returns the pricing information for the Gemini 2.0 Flash model.
+   * Pricing is per 1M tokens.
+   */
   getPricing(): { input: number; output: number } {
     // Gemini 2.0 Flash pricing per 1M tokens
     return { input: 0.075, output: 0.30 };
   }
 
+  /**
+   * Checks if the Gemini provider supports a given feature.
+   * Gemini supports 'vision' (multimodal) and 'json_mode'.
+   */
   supports(feature: ProviderFeature): boolean {
     switch (feature) {
       case 'vision':
@@ -210,6 +245,12 @@ export class GeminiProvider extends BaseProvider {
     }
   }
 
+  /**
+   * Formats the request body for Gemini API.
+   * - Maps roles (assistant -> model).
+   * - Structures tool calls as functionResponse parts.
+   * - Sets generation config.
+   */
   private formatRequest(options: CompletionOptions): Record<string, unknown> {
     const contents: Array<{ role: string; parts: Array<{ text?: string; functionResponse?: { name: string; response: unknown } }> }> = [];
 

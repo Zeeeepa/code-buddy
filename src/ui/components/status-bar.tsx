@@ -13,6 +13,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { useTheme } from '../context/theme-context.js';
 import { formatTokenCount } from '../../utils/token-counter.js';
+import {
+  getLatencyOptimizer,
+  getStreamingOptimizer,
+  LATENCY_THRESHOLDS,
+} from '../../optimization/latency-optimizer.js';
 
 /**
  * Props for StatusBar
@@ -28,6 +33,10 @@ interface StatusBarProps {
   budget?: number;
   /** Current model name */
   modelName?: string;
+  /** Current agent mode (plan, code, ask) */
+  mode?: string;
+  /** Whether YOLO mode is enabled */
+  yolo?: boolean;
   /** Processing time in seconds */
   processingTime?: number;
   /** Session start time */
@@ -36,6 +45,8 @@ interface StatusBarProps {
   showDetails?: boolean;
   /** Compact mode (single line) */
   compact?: boolean;
+  /** Show latency performance stats */
+  showLatencyStats?: boolean;
 }
 
 /**
@@ -55,6 +66,7 @@ function formatDuration(seconds: number): string {
  * Format cost in USD
  */
 function formatCost(cost: number): string {
+  if (cost === 0) return '$0.00';
   if (cost < 0.01) return `$${(cost * 1000).toFixed(2)}m`; // Show in millicents
   if (cost < 1) return `$${cost.toFixed(3)}`;
   return `$${cost.toFixed(2)}`;
@@ -77,13 +89,49 @@ export function StatusBar({
   cost = 0,
   budget = 10,
   modelName = 'codebuddy',
+  mode = 'code',
+  yolo = false,
   processingTime = 0,
   sessionStartTime,
   showDetails = false,
   compact = false,
+  showLatencyStats = false,
 }: StatusBarProps) {
   const { colors } = useTheme();
   const [sessionDuration, setSessionDuration] = useState(0);
+  const [latencyStats, setLatencyStats] = useState<{
+    avgDuration: number;
+    p95: number;
+    metTarget: number;
+    totalOperations: number;
+    avgFirstToken: number;
+  } | null>(null);
+
+  // Update latency stats periodically
+  useEffect(() => {
+    if (!showLatencyStats) return;
+
+    const updateStats = () => {
+      const latencyOptimizer = getLatencyOptimizer();
+      const streamingOptimizer = getStreamingOptimizer();
+      const opStats = latencyOptimizer.getStats();
+      const streamStats = streamingOptimizer.getStats();
+
+      setLatencyStats({
+        avgDuration: opStats.avgDuration,
+        p95: opStats.p95,
+        metTarget: opStats.totalOperations > 0
+          ? Math.round((opStats.metTarget / opStats.totalOperations) * 100)
+          : 0,
+        totalOperations: opStats.totalOperations,
+        avgFirstToken: streamStats.avgFirstToken,
+      });
+    };
+
+    updateStats(); // Initial update
+    const interval = setInterval(updateStats, 2000); // Update every 2 seconds
+    return () => clearInterval(interval);
+  }, [showLatencyStats]);
 
   // Update session duration every second
   useEffect(() => {
@@ -115,22 +163,37 @@ export function StatusBar({
     else if (costProgress < 80) costColor = colors.warning;
     else costColor = colors.error;
 
+    // Mode icons and colors
+    const modeIcons: Record<string, string> = {
+      plan: '📋',
+      code: '💻',
+      ask: '❓',
+    };
+    
+    const modeColors: Record<string, string> = {
+      plan: colors.info,
+      code: colors.primary,
+      ask: colors.secondary,
+    };
+
     return {
       tokenProgress,
       costProgress,
       tokensPerSec,
       tokenColor,
       costColor,
+      modeIcon: modeIcons[mode] || '🤖',
+      modeColor: modeColors[mode] || colors.primary,
     };
-  }, [tokenCount, maxTokens, cost, budget, processingTime, colors]);
+  }, [tokenCount, maxTokens, cost, budget, processingTime, colors, mode]);
 
   // Render progress bar
   const renderProgressBar = (progress: number, width: number = 10, color: string = colors.success) => {
-    const filledWidth = Math.round((progress / 100) * width);
+    const filledWidth = Math.max(0, Math.min(width, Math.round((progress / 100) * width)));
     const emptyWidth = width - filledWidth;
 
-    const filled = '█'.repeat(Math.max(0, filledWidth));
-    const empty = '░'.repeat(Math.max(0, emptyWidth));
+    const filled = '█'.repeat(filledWidth);
+    const empty = '░'.repeat(emptyWidth);
 
     return (
       <>
@@ -144,24 +207,18 @@ export function StatusBar({
   if (compact) {
     return (
       <Box borderStyle="single" borderColor={colors.border} paddingX={1}>
-        <Text color={colors.textMuted}>
-          {modelName}
-        </Text>
+        <Text color={metrics.modeColor}>{metrics.modeIcon} {mode}</Text>
         <Text dimColor> • </Text>
-        <Text color={metrics.tokenColor}>
-          {formatTokenCount(tokenCount)}
-        </Text>
+        <Text color={yolo ? colors.error : colors.success}>{yolo ? '🔥 YOLO' : '🛡 SAFE'}</Text>
+        <Text dimColor> • </Text>
+        <Text color={colors.textMuted}>{modelName}</Text>
+        <Text dimColor> • </Text>
+        <Text color={metrics.tokenColor}>{formatTokenCount(tokenCount)}</Text>
         <Text dimColor> tokens</Text>
         {cost > 0 && (
           <>
             <Text dimColor> • </Text>
             <Text color={metrics.costColor}>{formatCost(cost)}</Text>
-          </>
-        )}
-        {sessionStartTime && (
-          <>
-            <Text dimColor> • </Text>
-            <Text>{formatDuration(sessionDuration)}</Text>
           </>
         )}
       </Box>
@@ -172,13 +229,19 @@ export function StatusBar({
   return (
     <Box flexDirection="column" borderStyle="single" borderColor={colors.border} paddingX={1}>
       {/* Header */}
-      <Box>
-        <Text bold color={colors.primary}>
-          📊 Session Status
-        </Text>
-        {sessionStartTime && (
-          <Text dimColor> • {formatDuration(sessionDuration)}</Text>
-        )}
+      <Box justifyContent="space-between">
+        <Box>
+          <Text bold color={colors.primary}>
+            📊 Session Status
+          </Text>
+          {sessionStartTime && (
+            <Text dimColor> • {formatDuration(sessionDuration)}</Text>
+          )}
+        </Box>
+        <Box>
+          <Text color={metrics.modeColor}>{metrics.modeIcon} Mode: {mode.toUpperCase()} </Text>
+          <Text color={yolo ? colors.error : colors.success}>[{yolo ? 'YOLO' : 'SAFE'}]</Text>
+        </Box>
       </Box>
 
       {/* Token Usage */}
@@ -238,6 +301,43 @@ export function StatusBar({
               </Box>
             </>
           )}
+
+          {/* Latency Performance Stats */}
+          {showLatencyStats && latencyStats && latencyStats.totalOperations > 0 && (
+            <>
+              <Box marginTop={1}>
+                <Text bold color={colors.info}>⏱ Latency Stats</Text>
+              </Box>
+              <Box>
+                <Box width={15}>
+                  <Text color={colors.textMuted}>Avg:</Text>
+                </Box>
+                <Text color={latencyStats.avgDuration <= LATENCY_THRESHOLDS.FAST ? colors.success : latencyStats.avgDuration <= LATENCY_THRESHOLDS.ACCEPTABLE ? colors.warning : colors.error}>
+                  {Math.round(latencyStats.avgDuration)}ms
+                </Text>
+                <Text dimColor> (P95: {Math.round(latencyStats.p95)}ms)</Text>
+              </Box>
+              <Box>
+                <Box width={15}>
+                  <Text color={colors.textMuted}>Target Met:</Text>
+                </Box>
+                <Text color={latencyStats.metTarget >= 80 ? colors.success : latencyStats.metTarget >= 50 ? colors.warning : colors.error}>
+                  {latencyStats.metTarget}%
+                </Text>
+                <Text dimColor> ({latencyStats.totalOperations} ops)</Text>
+              </Box>
+              {latencyStats.avgFirstToken > 0 && (
+                <Box>
+                  <Box width={15}>
+                    <Text color={colors.textMuted}>First Token:</Text>
+                  </Box>
+                  <Text color={latencyStats.avgFirstToken <= LATENCY_THRESHOLDS.FAST ? colors.success : colors.warning}>
+                    {Math.round(latencyStats.avgFirstToken)}ms
+                  </Text>
+                </Box>
+              )}
+            </>
+          )}
         </>
       )}
 
@@ -265,15 +365,26 @@ export function MiniStatusBar({
   tokenCount,
   cost,
   modelName,
+  mode = 'code',
+  yolo = false,
 }: {
   tokenCount: number;
   cost?: number;
   modelName?: string;
+  mode?: string;
+  yolo?: boolean;
 }) {
   const { colors } = useTheme();
 
   return (
     <Box>
+      {mode && (
+        <Text color={mode === 'plan' ? colors.info : colors.primary}>
+          {mode === 'plan' ? '📋' : mode === 'ask' ? '❓' : '💻'}
+        </Text>
+      )}
+      {yolo && <Text color={colors.error}> 🔥</Text>}
+      <Text dimColor> • </Text>
       {modelName && (
         <>
           <Text color={colors.accent}>≋ {modelName}</Text>

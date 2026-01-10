@@ -2,6 +2,7 @@
  * Grok Provider (xAI)
  *
  * LLM provider implementation for Grok API (xAI).
+ * Uses the OpenAI SDK as xAI offers an OpenAI-compatible API.
  */
 
 import { BaseProvider } from './base-provider.js';
@@ -16,6 +17,10 @@ import type {
   ProviderFeature,
 } from './types.js';
 
+/**
+ * Implementation of the xAI Grok provider.
+ * Connects to the xAI API using the OpenAI client library (compatible API).
+ */
 export class GrokProvider extends BaseProvider {
   readonly type: ProviderType = 'grok';
   readonly name = 'Grok (xAI)';
@@ -23,6 +28,10 @@ export class GrokProvider extends BaseProvider {
 
   private client: unknown = null;
 
+  /**
+   * Initializes the Grok provider.
+   * Dynamically imports the OpenAI SDK to avoid heavy bundle size if not used.
+   */
   async initialize(config: ProviderConfig): Promise<void> {
     await super.initialize(config);
 
@@ -36,6 +45,10 @@ export class GrokProvider extends BaseProvider {
     });
   }
 
+  /**
+   * Sends a completion request to the xAI API.
+   * Maps internal types to OpenAI SDK types and normalizes the response.
+   */
   async complete(options: CompletionOptions): Promise<LLMResponse> {
     if (!this.client || !this.config) {
       throw new Error('Provider not initialized');
@@ -79,7 +92,19 @@ export class GrokProvider extends BaseProvider {
     };
   }
 
+  /**
+   * Streams the response from the xAI API.
+   * Handles delta updates for content and tool calls.
+   * Wrapped with latency tracking for first-token and total streaming time.
+   */
   async *stream(options: CompletionOptions): AsyncIterable<StreamChunk> {
+    yield* this.trackStreamLatency(this.streamInternal(options));
+  }
+
+  /**
+   * Internal streaming implementation.
+   */
+  private async *streamInternal(options: CompletionOptions): AsyncIterable<StreamChunk> {
     if (!this.client || !this.config) {
       throw new Error('Provider not initialized');
     }
@@ -146,6 +171,9 @@ export class GrokProvider extends BaseProvider {
     }
   }
 
+  /**
+   * Formats internal messages to OpenAI format.
+   */
   private formatMessages(options: CompletionOptions): Array<{
     role: 'system' | 'user' | 'assistant' | 'tool';
     content: string | null;
@@ -178,6 +206,9 @@ export class GrokProvider extends BaseProvider {
     return messages;
   }
 
+  /**
+   * Formats internal tool definitions to OpenAI format.
+   */
   private formatTools(tools: ToolDefinition[]): Array<{
     type: 'function';
     function: { name: string; description: string; parameters: Record<string, unknown> };
