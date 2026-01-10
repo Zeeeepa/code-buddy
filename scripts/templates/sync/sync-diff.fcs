@@ -1,0 +1,33 @@
+// sync-diff.fcs - Show differences between current state and snapshot
+// Usage: fcs run sync-diff.fcs [--snapshot <id>]
+
+let snapshotId = env("SNAPSHOT_ID") || ""
+
+print("=== Workspace Diff ===")
+print("")
+
+if snapshotId == "" {
+    print("Comparing with latest snapshot...")
+} else {
+    print("Comparing with snapshot: " + snapshotId)
+}
+
+print("")
+
+let diff = sync.diff(snapshotId)
+
+if diff == "No differences" {
+    print("✓ No changes detected")
+} else if diff == "No snapshots to compare with" {
+    print("⚠ No snapshots available. Create one first with:")
+    print("  sync.snapshot(\"name\", \"description\")")
+} else {
+    print("Changes detected:")
+    print("")
+    print(diff)
+    print("")
+    print("Legend:")
+    print("  + Added file")
+    print("  - Deleted file")
+    print("  ~ Modified file")
+}

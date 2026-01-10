@@ -1,0 +1,27 @@
+// sync-status.fcs - Display comprehensive sync status
+// Usage: fcs run sync-status.fcs
+
+print("╔══════════════════════════════════════════╗")
+print("║       Workspace Sync Status              ║")
+print("╚══════════════════════════════════════════╝")
+print("")
+
+// Get sync status
+let status = sync.status()
+print("📊 Status:")
+print(status)
+print("")
+
+// Show tracked files
+print("📁 Tracked Files:")
+print(sync.files())
+print("")
+
+// Show available snapshots
+print("📸 Snapshots:")
+print(sync.list())
+print("")
+
+// Show session context
+print("🔧 Session Context:")
+print(sync.context())

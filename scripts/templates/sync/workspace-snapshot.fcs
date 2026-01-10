@@ -1,0 +1,44 @@
+// workspace-snapshot.fcs - Create and manage workspace snapshots
+// Usage: fcs run workspace-snapshot.fcs [--name "My Snapshot"] [--track src/]
+
+// Configuration
+let snapshotName = env("SNAPSHOT_NAME") || "Workspace Snapshot"
+let description = env("SNAPSHOT_DESC") || "Auto-generated snapshot"
+let trackDir = env("TRACK_DIR") || "src/"
+
+// Display current status
+print("=== Workspace Sync Status ===")
+print(sync.status())
+print("")
+
+// Track files in directory if specified
+if trackDir != "" {
+    print("Scanning directory: " + trackDir)
+    let files = glob(trackDir + "**/*.ts")
+
+    for file in files {
+        let content = read(file)
+        sync.track(file, content)
+    }
+
+    print("Tracked " + len(files) + " files")
+}
+
+// Show tracked files
+print("")
+print("=== Tracked Files ===")
+print(sync.files())
+
+// Create snapshot
+print("")
+print("Creating snapshot: " + snapshotName)
+let snapshotId = sync.snapshot(snapshotName, description)
+
+print("")
+print("Snapshot created successfully!")
+print("ID: " + snapshotId)
+
+// Show all snapshots
+print("")
+print("=== All Snapshots ===")
+print(sync.list())

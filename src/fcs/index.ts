@@ -31,6 +31,18 @@ export {
   type ScriptCategory
 } from './script-registry.js';
 
+// Sync Bindings
+export {
+  createSyncBindings,
+  getWorkspaceTracker,
+  resetWorkspaceTracker,
+  WorkspaceStateTracker,
+  type WorkspaceSnapshot,
+  type FileState,
+  type SessionContext,
+  type FileDiff,
+} from './sync-bindings.js';
+
 // Convenience function to run FCS code
 import { tokenize } from './lexer.js';
 import { parse } from './parser.js';

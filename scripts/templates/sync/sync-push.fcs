@@ -1,0 +1,56 @@
+// sync-push.fcs - Push local changes to sync
+// Usage: fcs run sync-push.fcs [--track src/]
+
+let trackDir = env("TRACK_DIR") || ""
+let autoTrack = env("AUTO_TRACK") || "true"
+
+print("=== Sync Push ===")
+print("")
+
+// Auto-track modified files
+if autoTrack == "true" && trackDir != "" {
+    print("Auto-tracking files in: " + trackDir)
+
+    let patterns = [
+        trackDir + "**/*.ts",
+        trackDir + "**/*.tsx",
+        trackDir + "**/*.js",
+        trackDir + "**/*.json"
+    ]
+
+    let totalTracked = 0
+    for pattern in patterns {
+        let files = glob(pattern)
+        for file in files {
+            let content = read(file)
+            sync.track(file, content)
+            totalTracked = totalTracked + 1
+        }
+    }
+
+    print("Tracked " + totalTracked + " files")
+    print("")
+}
+
+// Show what will be pushed
+print("Files to sync:")
+print(sync.files())
+print("")
+
+// Show diff from last snapshot
+print("Changes since last snapshot:")
+print(sync.diff())
+print("")
+
+// Push changes
+print("Pushing changes...")
+let snapshotId = sync.push()
+
+print("")
+print("✓ Changes pushed successfully!")
+print("Snapshot ID: " + snapshotId)
+print("")
+
+// Final status
+print("Current sync status:")
+print(sync.status())

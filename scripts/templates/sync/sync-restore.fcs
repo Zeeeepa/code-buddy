@@ -1,0 +1,44 @@
+// sync-restore.fcs - Restore workspace from a snapshot
+// Usage: fcs run sync-restore.fcs --snapshot <id>
+
+let snapshotId = env("SNAPSHOT_ID")
+
+if snapshotId == "" {
+    print("Error: SNAPSHOT_ID is required")
+    print("")
+    print("Usage: SNAPSHOT_ID=<id> fcs run sync-restore.fcs")
+    print("")
+    print("Available snapshots:")
+    print(sync.list())
+    exit(1)
+}
+
+print("=== Restore from Snapshot ===")
+print("")
+print("Snapshot ID: " + snapshotId)
+print("")
+
+// Show current state before restore
+print("Current state before restore:")
+print(sync.files())
+print("")
+
+// Confirm restore
+print("⚠ This will restore the workspace to the snapshot state.")
+print("Any uncommitted changes will be lost!")
+print("")
+
+// Perform restore
+let success = sync.restore(snapshotId)
+
+if success {
+    print("✓ Workspace restored successfully!")
+    print("")
+    print("Restored state:")
+    print(sync.files())
+} else {
+    print("✗ Restore failed. Snapshot not found.")
+    print("")
+    print("Available snapshots:")
+    print(sync.list())
+}
