@@ -2,7 +2,7 @@
 
 **Project:** Code Buddy - AI-Powered Terminal Agent
 **Version:** 1.0.0
-**Last Updated:** 2026-01-08
+**Last Updated:** 2026-01-10
 **Status:** Active Development
 
 ---
@@ -41,7 +41,7 @@
 | Sprint 3: Testing | 2 | 2 | **DONE** |
 | Sprint 4: Advanced | 3 | 3 | **DONE** |
 | Sprint 5: Intelligence | 3 | 3 | **DONE** |
-| Sprint 6: Extensibility | 3 | 1 | In Progress (Gemini, Claude) |
+| Sprint 6: Extensibility | 3 | 2 | In Progress (Gemini, Claude) |
 
 ### Current State Assessment
 
@@ -525,10 +525,20 @@ npm run typecheck
 - Identified ~30 other tools requiring migration.
 
 #### Task 6.5: FCS Scripting Enhancements
-**Status:** [ ] Not started
+**Status:** [x] Completed (Claude)
 **Priority:** MEDIUM
 **Objective:** Expand the automation engine (FCS) with a library of standard scripts for refactoring, testing, and documentation generation.
 **Files:** `src/fcs/`, `scripts/templates/`
+**Completion Notes:**
+- Created 10 FCS script templates across 4 categories:
+  - Refactoring: rename-symbol, cleanup-imports, extract-function
+  - Testing: generate-tests, run-tests, coverage-report
+  - Documentation: generate-docs, add-tsdoc, changelog
+  - Utilities: project-stats
+- Added `ScriptRegistry` class for dynamic template discovery
+- Scripts support environment variables via `env()` function
+- Added `/fcs templates` command for listing/searching templates
+- Comprehensive unit tests (21 tests) for ScriptRegistry
 
 ---
 
@@ -731,6 +741,34 @@ npm test -- tests/unit/browser-tool.test.ts --no-coverage
 ### Prochaines étapes:
 - Add Playwright to optional dependencies in package.json if not already present
 - Document browser tool usage in README or user guide
+
+---
+
+## In Progress Task 6.4 (Part 3: Utility & Multi-Edit Tools)
+
+**Agent:** Gemini
+**Date:** 2026-01-10
+
+### Fichiers modifiés:
+1. `src/tools/env-tool.ts` - Migration vers `UnifiedVfsRouter`.
+2. `src/tools/notebook-tool.ts` - Migration vers `UnifiedVfsRouter`.
+3. `src/tools/sql-tool.ts` - Migration vers `UnifiedVfsRouter`.
+4. `src/tools/morph-editor.ts` - Migration vers `UnifiedVfsRouter`.
+5. `src/tools/multi-edit.ts` - Migration vers `UnifiedVfsRouter`.
+6. `tests/unit/multi-edit.test.ts` - Mise à jour des mocks pour support VFS.
+
+### Tests exécutés:
+- `tests/unit/multi-edit.test.ts` (5 tests)
+
+### Preuve de fonctionnement:
+```bash
+npm test -- tests/unit/multi-edit.test.ts
+# PASS  tests/unit/multi-edit.test.ts
+```
+
+### Prochaines étapes:
+- Migrer les outils restants : outils d'intelligence, générateurs de rapports, outils audio/image.
+- Finaliser le nettoyage des imports `fs` inutilisés.
 
 ---
 
