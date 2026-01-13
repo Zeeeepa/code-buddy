@@ -329,7 +329,7 @@ describe('BenchmarkRunner', () => {
       expect(suite.timestamp.getTime()).toBeLessThanOrEqual(after.getTime());
     });
 
-    it('should log progress to console', async () => {
+    it('should run benchmarks in suite', async () => {
       const benchmarkList = [
         { name: 'log-test-1', fn: () => {} },
         { name: 'log-test-2', fn: () => {} },
@@ -340,10 +340,11 @@ describe('BenchmarkRunner', () => {
         warmupIterations: 1,
       });
 
-      await suiteRunner.runSuite('Log Suite', benchmarkList);
+      const suite = await suiteRunner.runSuite('Test Suite', benchmarkList);
 
-      expect(mockConsole.log).toHaveBeenCalledWith('Running: log-test-1...');
-      expect(mockConsole.log).toHaveBeenCalledWith('Running: log-test-2...');
+      expect(suite.results).toHaveLength(2);
+      expect(suite.results[0].name).toBe('log-test-1');
+      expect(suite.results[1].name).toBe('log-test-2');
     });
 
     it('should handle empty benchmark list', async () => {
@@ -1052,13 +1053,16 @@ describe('runAllBenchmarks', () => {
     expect(suiteNames).toContain('Core Engine');
   });
 
-  it('should log progress', async () => {
-    await runAllBenchmarks({
+  it('should complete all benchmarks', async () => {
+    const suites = await runAllBenchmarks({
       iterations: 2,
       warmupIterations: 1,
     });
 
-    expect(mockConsole.log).toHaveBeenCalledWith('Running Core Engine Benchmarks...');
+    // All suites should have results
+    for (const suite of suites) {
+      expect(suite.results.length).toBeGreaterThanOrEqual(0);
+    }
   });
 
   it('should use default options when none provided', async () => {

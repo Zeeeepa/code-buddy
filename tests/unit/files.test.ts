@@ -40,11 +40,21 @@ const mockFsPromises = {
 };
 jest.mock('fs/promises', () => mockFsPromises);
 
-// Mock fs for watch
+// Mock fs for watch and symlink detection
 const mockFsWatch = jest.fn();
+const mockFsExistsSync = jest.fn<boolean, [string]>(() => true);
+const mockFsRealpathSync = jest.fn<string, [string]>((p: string) => p);
 jest.mock('fs', () => ({
   watch: mockFsWatch,
-  existsSync: jest.fn(() => true),
+  existsSync: (p: string) => mockFsExistsSync(p),
+  realpathSync: (p: string) => mockFsRealpathSync(p),
+  promises: {
+    readFile: jest.fn(),
+    writeFile: jest.fn(),
+    mkdir: jest.fn(),
+    unlink: jest.fn(),
+    rename: jest.fn(),
+  },
 }));
 
 // Mock confirmation service
@@ -80,6 +90,53 @@ jest.mock('../../src/utils/fuzzy-match', () => ({
   suggestWhitespaceFixes: jest.fn(() => []),
 }));
 
+// Mock VFS (UnifiedVfsRouter)
+// Note: resolvePath uses fs.existsSync and fs.realpathSync internally for symlink detection
+const mockVfs = {
+  exists: jest.fn(),
+  readFile: jest.fn(),
+  writeFile: jest.fn(),
+  ensureDir: jest.fn(),
+  readdir: jest.fn(),
+  stat: jest.fn(),
+  lstat: jest.fn(),
+  unlink: jest.fn(),
+  remove: jest.fn(),
+  mkdir: jest.fn(),
+  resolvePath: jest.fn((filePath: string, baseDir: string) => {
+    const resolved = path.resolve(filePath);
+    const normalizedBase = path.normalize(baseDir);
+    const normalizedResolved = path.normalize(resolved);
+
+    // First check: normalized path must be within base directory
+    if (!normalizedResolved.startsWith(normalizedBase)) {
+      return { valid: false, resolved, error: `Path traversal not allowed: ${filePath} resolves outside project directory` };
+    }
+
+    // Second check: if file exists, resolve symlinks and verify real path
+    try {
+      if (mockFsExistsSync(resolved)) {
+        const realPath = mockFsRealpathSync(resolved);
+        const realBase = mockFsRealpathSync(baseDir);
+        if (!realPath.startsWith(realBase)) {
+          return { valid: false, resolved, error: `Symlink traversal not allowed: ${filePath} points outside project directory` };
+        }
+      }
+    } catch {
+      // If realpath fails, allow the operation (file may not exist yet)
+    }
+
+    return { valid: true, resolved };
+  }),
+  isSymlink: jest.fn(() => Promise.resolve(false)),
+  realpath: jest.fn((p: string) => Promise.resolve(p)),
+};
+jest.mock('../../src/services/vfs/unified-vfs-router.js', () => ({
+  UnifiedVfsRouter: {
+    Instance: mockVfs,
+  },
+}));
+
 // Import modules after mocks
 import { TextEditorTool } from '../../src/tools/text-editor';
 import { MultiFileEditor, createMultiFileEditor, resetMultiFileEditor } from '../../src/tools/advanced/multi-file-editor';
@@ -109,6 +166,50 @@ describe('TextEditorTool', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Set up default fs mocks for symlink detection
+    mockFsExistsSync.mockReturnValue(true);
+    mockFsRealpathSync.mockImplementation((p: string) => p);
+
+    // Set up default VFS mock behaviors
+    mockVfs.exists.mockResolvedValue(false);
+    mockVfs.readFile.mockResolvedValue('');
+    mockVfs.writeFile.mockResolvedValue(undefined);
+    mockVfs.ensureDir.mockResolvedValue(undefined);
+    mockVfs.remove.mockResolvedValue(undefined);
+    mockVfs.stat.mockResolvedValue({ isDirectory: () => false, isFile: () => true, size: 0 });
+    mockVfs.lstat.mockResolvedValue({ isDirectory: () => false, isSymbolicLink: () => false });
+
+    // resolvePath - validate paths with symlink detection using fs mocks
+    mockVfs.resolvePath.mockImplementation((filePath: string, baseDir: string) => {
+      const resolved = path.resolve(filePath);
+      const normalizedBase = path.normalize(baseDir);
+      const normalizedResolved = path.normalize(resolved);
+
+      // First check: normalized path must be within base directory
+      if (!normalizedResolved.startsWith(normalizedBase)) {
+        return { valid: false, resolved, error: `Path traversal not allowed: ${filePath} resolves outside project directory` };
+      }
+
+      // Second check: if file exists, resolve symlinks and verify real path
+      try {
+        if (mockFsExistsSync(resolved)) {
+          const realPath = mockFsRealpathSync(resolved);
+          const realBase = mockFsRealpathSync(baseDir);
+          if (!realPath.startsWith(realBase)) {
+            return { valid: false, resolved, error: `Symlink traversal not allowed: ${filePath} points outside project directory` };
+          }
+        }
+      } catch {
+        // If realpath fails, allow the operation (file may not exist yet)
+      }
+
+      return { valid: true, resolved };
+    });
+
+    mockVfs.realpath.mockImplementation((p: string) => Promise.resolve(path.resolve(p)));
+    mockVfs.isSymlink.mockResolvedValue(false);
+
     editor = new TextEditorTool();
     editor.setBaseDirectory(testDir);
   });
@@ -119,9 +220,9 @@ describe('TextEditorTool', () => {
 
   describe('Path Validation', () => {
     it('should allow paths within base directory', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(true);
-      mockFsExtra.stat.mockResolvedValue({ isDirectory: () => false });
-      mockFsExtra.readFile.mockResolvedValue('file content');
+      mockVfs.exists.mockResolvedValue(true);
+      mockVfs.stat.mockResolvedValue({ isDirectory: () => false, size: 100 });
+      mockVfs.readFile.mockResolvedValue('file content');
 
       const result = await editor.view(path.join(testDir, 'src/file.ts'));
       expect(result.success).toBe(true);
@@ -140,9 +241,9 @@ describe('TextEditorTool', () => {
     });
 
     it('should detect symlink traversal attacks', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(true);
-      mockFsExtra.existsSync.mockReturnValue(true);
-      mockFsExtra.realpathSync.mockImplementation((p: string) => {
+      // Set up fs mocks for symlink detection (used by resolvePath internally)
+      mockFsExistsSync.mockReturnValue(true);
+      mockFsRealpathSync.mockImplementation((p: string) => {
         if (p === testDir) return testDir;
         return '/etc/passwd'; // Symlink points outside
       });
@@ -153,14 +254,17 @@ describe('TextEditorTool', () => {
     });
 
     it('should allow operations when symlinks stay within base', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(true);
-      mockFsExtra.stat.mockResolvedValue({ isDirectory: () => false });
-      mockFsExtra.readFile.mockResolvedValue('content');
-      mockFsExtra.existsSync.mockReturnValue(true);
-      mockFsExtra.realpathSync.mockImplementation((p: string) => {
+      // Set up fs mocks for symlink detection
+      mockFsExistsSync.mockReturnValue(true);
+      mockFsRealpathSync.mockImplementation((p: string) => {
         if (p === testDir) return testDir;
         return path.join(testDir, 'actual-file.ts');
       });
+
+      // Set up VFS mocks for file reading
+      mockVfs.exists.mockResolvedValue(true);
+      mockVfs.stat.mockResolvedValue({ isDirectory: () => false, isFile: () => true, size: 100 });
+      mockVfs.readFile.mockResolvedValue('content');
 
       const result = await editor.view(path.join(testDir, 'symlink-file.ts'));
       expect(result.success).toBe(true);
@@ -169,9 +273,9 @@ describe('TextEditorTool', () => {
 
   describe('View Operation', () => {
     it('should view file contents', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(true);
-      mockFsExtra.stat.mockResolvedValue({ isDirectory: () => false });
-      mockFsExtra.readFile.mockResolvedValue('line1\nline2\nline3');
+      mockVfs.exists.mockResolvedValue(true);
+      mockVfs.stat.mockResolvedValue({ isDirectory: () => false, size: 100 });
+      mockVfs.readFile.mockResolvedValue('line1\nline2\nline3');
 
       const result = await editor.view(path.join(testDir, 'file.ts'));
       expect(result.success).toBe(true);
@@ -180,9 +284,9 @@ describe('TextEditorTool', () => {
     });
 
     it('should view specific line range', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(true);
-      mockFsExtra.stat.mockResolvedValue({ isDirectory: () => false });
-      mockFsExtra.readFile.mockResolvedValue('line1\nline2\nline3\nline4\nline5');
+      mockVfs.exists.mockResolvedValue(true);
+      mockVfs.stat.mockResolvedValue({ isDirectory: () => false, size: 100 });
+      mockVfs.readFile.mockResolvedValue('line1\nline2\nline3\nline4\nline5');
 
       const result = await editor.view(path.join(testDir, 'file.ts'), [2, 4]);
       expect(result.success).toBe(true);
@@ -192,9 +296,9 @@ describe('TextEditorTool', () => {
     });
 
     it('should list directory contents', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(true);
-      mockFsExtra.stat.mockResolvedValue({ isDirectory: () => true });
-      mockFsExtra.readdir.mockResolvedValue(['file1.ts', 'file2.ts', 'folder']);
+      mockVfs.exists.mockResolvedValue(true);
+      mockVfs.stat.mockResolvedValue({ isDirectory: () => true });
+      mockVfs.readdir.mockResolvedValue(['file1.ts', 'file2.ts', 'folder']);
 
       const result = await editor.view(path.join(testDir, 'src'));
       expect(result.success).toBe(true);
@@ -203,7 +307,7 @@ describe('TextEditorTool', () => {
     });
 
     it('should handle file not found', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(false);
+      mockVfs.exists.mockResolvedValue(false);
 
       const result = await editor.view(path.join(testDir, 'nonexistent.ts'));
       expect(result.success).toBe(false);
@@ -212,9 +316,9 @@ describe('TextEditorTool', () => {
 
     it('should truncate large files for display', async () => {
       const manyLines = Array.from({ length: 50 }, (_, i) => `line${i + 1}`).join('\n');
-      mockFsExtra.pathExists.mockResolvedValue(true);
-      mockFsExtra.stat.mockResolvedValue({ isDirectory: () => false });
-      mockFsExtra.readFile.mockResolvedValue(manyLines);
+      mockVfs.exists.mockResolvedValue(true);
+      mockVfs.stat.mockResolvedValue({ isDirectory: () => false });
+      mockVfs.readFile.mockResolvedValue(manyLines);
 
       const result = await editor.view(path.join(testDir, 'large.ts'));
       expect(result.success).toBe(true);
@@ -224,21 +328,21 @@ describe('TextEditorTool', () => {
 
   describe('Create Operation', () => {
     it('should create a new file', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(false);
-      mockFsExtra.ensureDir.mockResolvedValue(undefined);
-      mockFsPromises.writeFile.mockResolvedValue(undefined);
+      mockVfs.exists.mockResolvedValue(false);
+      mockVfs.ensureDir.mockResolvedValue(undefined);
+      mockVfs.writeFile.mockResolvedValue(undefined);
 
       const result = await editor.create(
         path.join(testDir, 'new-file.ts'),
         'const x = 1;'
       );
       expect(result.success).toBe(true);
-      expect(mockFsPromises.writeFile).toHaveBeenCalled();
+      expect(mockVfs.writeFile).toHaveBeenCalled();
     });
 
     it('should prevent overwriting existing files', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(true);
-      mockFsExtra.stat.mockResolvedValue({ isFile: () => true });
+      mockVfs.exists.mockResolvedValue(true);
+      mockVfs.stat.mockResolvedValue({ isFile: () => true });
 
       const result = await editor.create(
         path.join(testDir, 'existing.ts'),
@@ -249,21 +353,21 @@ describe('TextEditorTool', () => {
     });
 
     it('should create parent directories', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(false);
-      mockFsExtra.ensureDir.mockResolvedValue(undefined);
-      mockFsPromises.writeFile.mockResolvedValue(undefined);
+      mockVfs.exists.mockResolvedValue(false);
+      mockVfs.ensureDir.mockResolvedValue(undefined);
+      mockVfs.writeFile.mockResolvedValue(undefined);
 
       await editor.create(
         path.join(testDir, 'deep/nested/folder/file.ts'),
         'content'
       );
-      expect(mockFsExtra.ensureDir).toHaveBeenCalled();
+      expect(mockVfs.ensureDir).toHaveBeenCalled();
     });
 
     it('should add to edit history after creation', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(false);
-      mockFsExtra.ensureDir.mockResolvedValue(undefined);
-      mockFsPromises.writeFile.mockResolvedValue(undefined);
+      mockVfs.exists.mockResolvedValue(false);
+      mockVfs.ensureDir.mockResolvedValue(undefined);
+      mockVfs.writeFile.mockResolvedValue(undefined);
 
       await editor.create(path.join(testDir, 'file.ts'), 'content');
       const history = editor.getEditHistory();
@@ -274,9 +378,9 @@ describe('TextEditorTool', () => {
 
   describe('String Replace Operation', () => {
     it('should replace string in file', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(true);
-      mockFsExtra.readFile.mockResolvedValue('const old = 1;');
-      mockFsPromises.writeFile.mockResolvedValue(undefined);
+      mockVfs.exists.mockResolvedValue(true);
+      mockVfs.readFile.mockResolvedValue('const old = 1;');
+      mockVfs.writeFile.mockResolvedValue(undefined);
 
       const result = await editor.strReplace(
         path.join(testDir, 'file.ts'),
@@ -284,7 +388,7 @@ describe('TextEditorTool', () => {
         'newValue'
       );
       expect(result.success).toBe(true);
-      expect(mockFsPromises.writeFile).toHaveBeenCalledWith(
+      expect(mockVfs.writeFile).toHaveBeenCalledWith(
         expect.any(String),
         'const newValue = 1;',
         'utf-8'
@@ -292,9 +396,9 @@ describe('TextEditorTool', () => {
     });
 
     it('should replace all occurrences when replaceAll is true', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(true);
-      mockFsExtra.readFile.mockResolvedValue('old old old');
-      mockFsPromises.writeFile.mockResolvedValue(undefined);
+      mockVfs.exists.mockResolvedValue(true);
+      mockVfs.readFile.mockResolvedValue('old old old');
+      mockVfs.writeFile.mockResolvedValue(undefined);
 
       const result = await editor.strReplace(
         path.join(testDir, 'file.ts'),
@@ -303,7 +407,7 @@ describe('TextEditorTool', () => {
         true
       );
       expect(result.success).toBe(true);
-      expect(mockFsPromises.writeFile).toHaveBeenCalledWith(
+      expect(mockVfs.writeFile).toHaveBeenCalledWith(
         expect.any(String),
         'new new new',
         'utf-8'
@@ -311,8 +415,8 @@ describe('TextEditorTool', () => {
     });
 
     it('should fail when string not found', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(true);
-      mockFsExtra.readFile.mockResolvedValue('some content');
+      mockVfs.exists.mockResolvedValue(true);
+      mockVfs.readFile.mockResolvedValue('some content');
 
       const result = await editor.strReplace(
         path.join(testDir, 'file.ts'),
@@ -324,7 +428,7 @@ describe('TextEditorTool', () => {
     });
 
     it('should handle file not found', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(false);
+      mockVfs.exists.mockResolvedValue(false);
 
       const result = await editor.strReplace(
         path.join(testDir, 'missing.ts'),
@@ -338,9 +442,9 @@ describe('TextEditorTool', () => {
 
   describe('Replace Lines Operation', () => {
     it('should replace specific lines', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(true);
-      mockFsExtra.readFile.mockResolvedValue('line1\nline2\nline3\nline4');
-      mockFsPromises.writeFile.mockResolvedValue(undefined);
+      mockVfs.exists.mockResolvedValue(true);
+      mockVfs.readFile.mockResolvedValue('line1\nline2\nline3\nline4');
+      mockVfs.writeFile.mockResolvedValue(undefined);
 
       const result = await editor.replaceLines(
         path.join(testDir, 'file.ts'),
@@ -349,7 +453,7 @@ describe('TextEditorTool', () => {
         'replaced\ncontent'
       );
       expect(result.success).toBe(true);
-      expect(mockFsPromises.writeFile).toHaveBeenCalledWith(
+      expect(mockVfs.writeFile).toHaveBeenCalledWith(
         expect.any(String),
         'line1\nreplaced\ncontent\nline4',
         'utf-8'
@@ -357,8 +461,8 @@ describe('TextEditorTool', () => {
     });
 
     it('should validate start line', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(true);
-      mockFsExtra.readFile.mockResolvedValue('line1\nline2');
+      mockVfs.exists.mockResolvedValue(true);
+      mockVfs.readFile.mockResolvedValue('line1\nline2');
 
       const result = await editor.replaceLines(
         path.join(testDir, 'file.ts'),
@@ -371,8 +475,8 @@ describe('TextEditorTool', () => {
     });
 
     it('should validate end line', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(true);
-      mockFsExtra.readFile.mockResolvedValue('line1\nline2');
+      mockVfs.exists.mockResolvedValue(true);
+      mockVfs.readFile.mockResolvedValue('line1\nline2');
 
       const result = await editor.replaceLines(
         path.join(testDir, 'file.ts'),
@@ -387,9 +491,9 @@ describe('TextEditorTool', () => {
 
   describe('Insert Operation', () => {
     it('should insert content at line', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(true);
-      mockFsExtra.readFile.mockResolvedValue('line1\nline2\nline3');
-      mockFsPromises.writeFile.mockResolvedValue(undefined);
+      mockVfs.exists.mockResolvedValue(true);
+      mockVfs.readFile.mockResolvedValue('line1\nline2\nline3');
+      mockVfs.writeFile.mockResolvedValue(undefined);
 
       const result = await editor.insert(
         path.join(testDir, 'file.ts'),
@@ -397,7 +501,7 @@ describe('TextEditorTool', () => {
         'inserted'
       );
       expect(result.success).toBe(true);
-      expect(mockFsPromises.writeFile).toHaveBeenCalledWith(
+      expect(mockVfs.writeFile).toHaveBeenCalledWith(
         expect.any(String),
         'line1\ninserted\nline2\nline3',
         'utf-8'
@@ -405,8 +509,8 @@ describe('TextEditorTool', () => {
     });
 
     it('should validate insert line number', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(true);
-      mockFsExtra.readFile.mockResolvedValue('line1\nline2');
+      mockVfs.exists.mockResolvedValue(true);
+      mockVfs.readFile.mockResolvedValue('line1\nline2');
 
       const result = await editor.insert(
         path.join(testDir, 'file.ts'),
@@ -420,24 +524,24 @@ describe('TextEditorTool', () => {
 
   describe('Undo Operation', () => {
     it('should undo create by removing file', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(false);
-      mockFsExtra.ensureDir.mockResolvedValue(undefined);
-      mockFsPromises.writeFile.mockResolvedValue(undefined);
-      mockFsExtra.remove.mockResolvedValue(undefined);
+      mockVfs.exists.mockResolvedValue(false);
+      mockVfs.ensureDir.mockResolvedValue(undefined);
+      mockVfs.writeFile.mockResolvedValue(undefined);
+      mockVfs.remove.mockResolvedValue(undefined);
 
       await editor.create(path.join(testDir, 'file.ts'), 'content');
       const result = await editor.undoEdit();
 
       expect(result.success).toBe(true);
-      expect(mockFsExtra.remove).toHaveBeenCalled();
+      expect(mockVfs.remove).toHaveBeenCalled();
     });
 
     it('should undo string replace', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(true);
-      mockFsExtra.readFile
+      mockVfs.exists.mockResolvedValue(true);
+      mockVfs.readFile
         .mockResolvedValueOnce('old content')
         .mockResolvedValueOnce('new content');
-      mockFsPromises.writeFile.mockResolvedValue(undefined);
+      mockVfs.writeFile.mockResolvedValue(undefined);
 
       await editor.strReplace(path.join(testDir, 'file.ts'), 'old', 'new');
       const result = await editor.undoEdit();
@@ -454,9 +558,9 @@ describe('TextEditorTool', () => {
 
   describe('Edit History', () => {
     it('should track edit history', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(true);
-      mockFsExtra.readFile.mockResolvedValue('content');
-      mockFsPromises.writeFile.mockResolvedValue(undefined);
+      mockVfs.exists.mockResolvedValue(true);
+      mockVfs.readFile.mockResolvedValue('content');
+      mockVfs.writeFile.mockResolvedValue(undefined);
 
       await editor.strReplace(path.join(testDir, 'a.ts'), 'content', 'new');
       await editor.strReplace(path.join(testDir, 'b.ts'), 'content', 'other');
@@ -466,9 +570,9 @@ describe('TextEditorTool', () => {
     });
 
     it('should clear history on dispose', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(true);
-      mockFsExtra.readFile.mockResolvedValue('content');
-      mockFsPromises.writeFile.mockResolvedValue(undefined);
+      mockVfs.exists.mockResolvedValue(true);
+      mockVfs.readFile.mockResolvedValue('content');
+      mockVfs.writeFile.mockResolvedValue(undefined);
 
       await editor.strReplace(path.join(testDir, 'file.ts'), 'content', 'new');
       editor.dispose();
@@ -578,34 +682,34 @@ describe('MultiFileEditor', () => {
   });
 
   describe('Transaction Validation', () => {
-    it('should return invalid when no transaction', () => {
-      const result = editor.validate();
+    it('should return invalid when no transaction', async () => {
+      const result = await editor.validate();
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('No active transaction');
     });
 
-    it('should warn when creating file that exists', () => {
-      const { existsSync } = require('fs');
-      (existsSync as jest.Mock).mockReturnValue(true);
+    it('should warn when creating file that exists', async () => {
+      // MultiFileEditor.validate() uses vfs.exists(), not native fs.existsSync
+      mockVfs.exists.mockResolvedValue(true);
 
       editor.beginTransaction();
       editor.addCreateFile(path.join(testDir, 'existing.ts'), 'content');
-      const result = editor.validate();
+      const result = await editor.validate();
 
       expect(result.warnings).toContainEqual(
         expect.stringContaining('already exists')
       );
     });
 
-    it('should error when editing non-existent file', () => {
-      const { existsSync } = require('fs');
-      (existsSync as jest.Mock).mockReturnValue(false);
+    it('should error when editing non-existent file', async () => {
+      // MultiFileEditor.validate() uses vfs.exists(), not native fs.existsSync
+      mockVfs.exists.mockResolvedValue(false);
 
       editor.beginTransaction();
       editor.addEditFile(path.join(testDir, 'missing.ts'), [
         { type: 'replace', startLine: 1, oldText: 'a', newText: 'b' },
       ]);
-      const result = editor.validate();
+      const result = await editor.validate();
 
       expect(result.valid).toBe(false);
       expect(result.errors).toContainEqual(
@@ -616,10 +720,9 @@ describe('MultiFileEditor', () => {
 
   describe('Transaction Commit', () => {
     it('should commit transaction successfully', async () => {
-      const { existsSync } = require('fs');
-      (existsSync as jest.Mock).mockReturnValue(false);
+      mockFsExistsSync.mockReturnValue(false);
       mockFsPromises.mkdir.mockResolvedValue(undefined);
-      mockFsPromises.writeFile.mockResolvedValue(undefined);
+      mockVfs.writeFile.mockResolvedValue(undefined);
 
       editor.beginTransaction('Create file');
       editor.addCreateFile(path.join(testDir, 'new.ts'), 'content');
@@ -635,10 +738,9 @@ describe('MultiFileEditor', () => {
     });
 
     it('should include duration in result', async () => {
-      const { existsSync } = require('fs');
-      (existsSync as jest.Mock).mockReturnValue(false);
+      mockFsExistsSync.mockReturnValue(false);
       mockFsPromises.mkdir.mockResolvedValue(undefined);
-      mockFsPromises.writeFile.mockResolvedValue(undefined);
+      mockVfs.writeFile.mockResolvedValue(undefined);
 
       editor.beginTransaction();
       editor.addCreateFile(path.join(testDir, 'file.ts'), 'content');
@@ -650,8 +752,7 @@ describe('MultiFileEditor', () => {
 
   describe('Transaction Rollback', () => {
     it('should rollback active transaction', async () => {
-      const { existsSync } = require('fs');
-      (existsSync as jest.Mock).mockReturnValue(false);
+      mockFsExistsSync.mockReturnValue(false);
 
       editor.beginTransaction();
       editor.addCreateFile(path.join(testDir, 'file.ts'), 'content');
@@ -684,10 +785,9 @@ describe('MultiFileEditor', () => {
 
   describe('Multi-File Atomic Operations', () => {
     it('should execute multiple operations atomically', async () => {
-      const { existsSync } = require('fs');
-      (existsSync as jest.Mock).mockReturnValue(false);
+      mockFsExistsSync.mockReturnValue(false);
       mockFsPromises.mkdir.mockResolvedValue(undefined);
-      mockFsPromises.writeFile.mockResolvedValue(undefined);
+      mockVfs.writeFile.mockResolvedValue(undefined);
 
       const result = await editor.executeMultiFileOperation(
         [
@@ -704,10 +804,9 @@ describe('MultiFileEditor', () => {
 
   describe('Transaction History', () => {
     it('should store transactions', async () => {
-      const { existsSync } = require('fs');
-      (existsSync as jest.Mock).mockReturnValue(false);
+      mockFsExistsSync.mockReturnValue(false);
       mockFsPromises.mkdir.mockResolvedValue(undefined);
-      mockFsPromises.writeFile.mockResolvedValue(undefined);
+      mockVfs.writeFile.mockResolvedValue(undefined);
 
       editor.beginTransaction();
       editor.addCreateFile(path.join(testDir, 'file.ts'), 'content');
@@ -718,10 +817,9 @@ describe('MultiFileEditor', () => {
     });
 
     it('should get transaction by ID', async () => {
-      const { existsSync } = require('fs');
-      (existsSync as jest.Mock).mockReturnValue(false);
+      mockFsExistsSync.mockReturnValue(false);
       mockFsPromises.mkdir.mockResolvedValue(undefined);
-      mockFsPromises.writeFile.mockResolvedValue(undefined);
+      mockVfs.writeFile.mockResolvedValue(undefined);
 
       const txnId = editor.beginTransaction();
       editor.addCreateFile(path.join(testDir, 'file.ts'), 'content');
@@ -821,6 +919,7 @@ describe('WatchModeManager', () => {
 
   describe('AI Comment Removal', () => {
     it('should remove AI comment from line', async () => {
+      // watch-mode uses fs-extra directly, not VFS
       mockFsExtra.readFile.mockResolvedValue('code // AI! Fix this\nother');
       mockFsExtra.writeFile.mockResolvedValue(undefined);
 
@@ -951,6 +1050,7 @@ describe('Context Files', () => {
 
   describe('loadProjectContextFiles', () => {
     it('should load project context files', async () => {
+      // context-files uses fs-extra (pathExists, readFile) directly, not VFS
       mockFsExtra.pathExists.mockImplementation(async (p: string) => {
         return p.includes('GROK.md');
       });
@@ -1029,6 +1129,7 @@ describe('Context Files', () => {
 
   describe('initContextFile', () => {
     it('should create context file with template', async () => {
+      // initContextFile uses fs-extra directly, not VFS
       mockFsExtra.pathExists.mockResolvedValue(false);
       mockFsExtra.ensureDir.mockResolvedValue(undefined);
       mockFsExtra.writeFile.mockResolvedValue(undefined);
@@ -1039,10 +1140,9 @@ describe('Context Files', () => {
     });
 
     it('should return existing path if file exists', async () => {
-      mockFsExtra.pathExists
-        .mockResolvedValueOnce(true) // For .codebuddy dir
-        .mockResolvedValueOnce(true); // For CONTEXT.md
+      // initContextFile uses fs-extra directly, not VFS
       mockFsExtra.ensureDir.mockResolvedValue(undefined);
+      mockFsExtra.pathExists.mockResolvedValue(true); // CONTEXT.md exists
 
       const filePath = await initContextFile(testProjectDir);
       expect(filePath).toContain('CONTEXT.md');
@@ -1052,6 +1152,7 @@ describe('Context Files', () => {
 
   describe('hasContextFiles', () => {
     it('should return true when context files exist', async () => {
+      // hasContextFiles calls loadProjectContextFiles which uses fs-extra
       mockFsExtra.pathExists.mockImplementation(async (p: string) => {
         return p.includes('GROK.md');
       });
@@ -1062,6 +1163,7 @@ describe('Context Files', () => {
     });
 
     it('should return false when no context files', async () => {
+      // hasContextFiles calls loadProjectContextFiles which uses fs-extra
       mockFsExtra.pathExists.mockResolvedValue(false);
 
       const hasFiles = await hasContextFiles(testProjectDir);
@@ -1135,9 +1237,10 @@ describe('Error Handling', () => {
     });
 
     it('should handle read errors gracefully', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(true);
-      mockFsExtra.stat.mockResolvedValue({ isDirectory: () => false });
-      mockFsExtra.readFile.mockRejectedValue(new Error('Permission denied'));
+      // TextEditorTool.view() uses vfs.readFile(), not fs-extra
+      mockVfs.exists.mockResolvedValue(true);
+      mockVfs.stat.mockResolvedValue({ isDirectory: () => false, isFile: () => true });
+      mockVfs.readFile.mockRejectedValue(new Error('Permission denied'));
 
       const result = await editor.view('/test/file.ts');
       expect(result.success).toBe(false);
@@ -1145,9 +1248,9 @@ describe('Error Handling', () => {
     });
 
     it('should handle write errors gracefully', async () => {
-      mockFsExtra.pathExists.mockResolvedValue(true);
-      mockFsExtra.readFile.mockResolvedValue('content');
-      mockFsPromises.writeFile.mockRejectedValue(new Error('Disk full'));
+      mockVfs.exists.mockResolvedValue(true);
+      mockVfs.readFile.mockResolvedValue('content');
+      mockVfs.writeFile.mockRejectedValue(new Error('Disk full'));
 
       const result = await editor.strReplace('/test/file.ts', 'content', 'new');
       expect(result.success).toBe(false);
@@ -1165,10 +1268,9 @@ describe('Error Handling', () => {
     });
 
     it('should handle commit errors and rollback', async () => {
-      const { existsSync } = require('fs');
-      (existsSync as jest.Mock).mockReturnValue(false);
+      mockFsExistsSync.mockReturnValue(false);
       mockFsPromises.mkdir.mockResolvedValue(undefined);
-      mockFsPromises.writeFile.mockRejectedValue(new Error('Write failed'));
+      mockVfs.writeFile.mockRejectedValue(new Error('Write failed'));
       mockFsPromises.unlink.mockResolvedValue(undefined);
 
       editor.beginTransaction();

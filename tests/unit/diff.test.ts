@@ -34,6 +34,25 @@ jest.mock('fs', () => ({
   },
 }));
 
+// Mock UnifiedVfsRouter
+const mockVfsExists = jest.fn();
+const mockVfsReadFile = jest.fn();
+const mockVfsWriteFile = jest.fn();
+const mockVfsEnsureDir = jest.fn();
+const mockVfsReaddir = jest.fn();
+
+jest.mock('../../src/services/vfs/unified-vfs-router.js', () => ({
+  UnifiedVfsRouter: {
+    Instance: {
+      exists: (...args: unknown[]) => mockVfsExists(...args),
+      readFile: (...args: unknown[]) => mockVfsReadFile(...args),
+      writeFile: (...args: unknown[]) => mockVfsWriteFile(...args),
+      ensureDir: (...args: unknown[]) => mockVfsEnsureDir(...args),
+      readdir: (...args: unknown[]) => mockVfsReaddir(...args),
+    },
+  },
+}));
+
 import {
   semanticDiff,
   semanticDiffFiles,
@@ -404,22 +423,22 @@ function first() { return 1; }`;
         const oldContent = 'const x = 1;';
         const newContent = 'const x = 2;';
 
-        mockFsReadFile
+        mockVfsReadFile
           .mockResolvedValueOnce(oldContent)
           .mockResolvedValueOnce(newContent);
 
         const result = await semanticDiffFiles('old.ts', 'new.ts');
 
         expect(result).toBeDefined();
-        expect(mockFsReadFile).toHaveBeenCalledWith('old.ts', 'utf-8');
-        expect(mockFsReadFile).toHaveBeenCalledWith('new.ts', 'utf-8');
+        expect(mockVfsReadFile).toHaveBeenCalledWith('old.ts', 'utf-8');
+        expect(mockVfsReadFile).toHaveBeenCalledWith('new.ts', 'utf-8');
       });
 
       it('should add file path to change locations', async () => {
         const oldContent = 'const x = 1;';
         const newContent = 'const y = 2;';
 
-        mockFsReadFile
+        mockVfsReadFile
           .mockResolvedValueOnce(oldContent)
           .mockResolvedValueOnce(newContent);
 
@@ -455,10 +474,10 @@ function first() { return 1; }`;
       it('should apply exact match hunk', async () => {
         const content = 'line1\nold line\nline3';
 
-        mockFsPromisesAccess.mockResolvedValue(undefined);
-        mockFsPromisesReadFile.mockResolvedValue(content);
-        mockFsPromisesMkdir.mockResolvedValue(undefined);
-        mockFsPromisesWriteFile.mockResolvedValue(undefined);
+        mockVfsExists.mockResolvedValue(true);
+        mockVfsReadFile.mockResolvedValue(content);
+        mockVfsEnsureDir.mockResolvedValue(undefined);
+        mockVfsWriteFile.mockResolvedValue(undefined);
 
         const operation: DiffOperation = {
           filePath: '/test/file.ts',
@@ -475,7 +494,7 @@ function first() { return 1; }`;
         expect(result.success).toBe(true);
         expect(result.hunksApplied).toBe(1);
         expect(result.hunksFailed).toBe(0);
-        expect(mockFsPromisesWriteFile).toHaveBeenCalledWith(
+        expect(mockVfsWriteFile).toHaveBeenCalledWith(
           expect.any(String),
           'line1\nnew line\nline3',
           'utf-8'
@@ -485,10 +504,10 @@ function first() { return 1; }`;
       it('should apply multiple hunks in sequence', async () => {
         const content = 'line1\nline2\nline3';
 
-        mockFsPromisesAccess.mockResolvedValue(undefined);
-        mockFsPromisesReadFile.mockResolvedValue(content);
-        mockFsPromisesMkdir.mockResolvedValue(undefined);
-        mockFsPromisesWriteFile.mockResolvedValue(undefined);
+        mockVfsExists.mockResolvedValue(true);
+        mockVfsReadFile.mockResolvedValue(content);
+        mockVfsEnsureDir.mockResolvedValue(undefined);
+        mockVfsWriteFile.mockResolvedValue(undefined);
 
         const operation: DiffOperation = {
           filePath: '/test/file.ts',
@@ -507,10 +526,10 @@ function first() { return 1; }`;
       it('should handle failed hunk application', async () => {
         const content = 'line1\nline2\nline3';
 
-        mockFsPromisesAccess.mockResolvedValue(undefined);
-        mockFsPromisesReadFile.mockResolvedValue(content);
-        mockFsPromisesMkdir.mockResolvedValue(undefined);
-        mockFsPromisesWriteFile.mockResolvedValue(undefined);
+        mockVfsExists.mockResolvedValue(true);
+        mockVfsReadFile.mockResolvedValue(content);
+        mockVfsEnsureDir.mockResolvedValue(undefined);
+        mockVfsWriteFile.mockResolvedValue(undefined);
 
         const operation: DiffOperation = {
           filePath: '/test/file.ts',
@@ -530,10 +549,10 @@ function first() { return 1; }`;
       it('should apply fuzzy match when exact match fails', async () => {
         const content = 'function test() {\n  return 1;\n}';
 
-        mockFsPromisesAccess.mockResolvedValue(undefined);
-        mockFsPromisesReadFile.mockResolvedValue(content);
-        mockFsPromisesMkdir.mockResolvedValue(undefined);
-        mockFsPromisesWriteFile.mockResolvedValue(undefined);
+        mockVfsExists.mockResolvedValue(true);
+        mockVfsReadFile.mockResolvedValue(content);
+        mockVfsEnsureDir.mockResolvedValue(undefined);
+        mockVfsWriteFile.mockResolvedValue(undefined);
 
         const operation: DiffOperation = {
           filePath: '/test/file.ts',
@@ -555,10 +574,10 @@ function first() { return 1; }`;
       it('should handle context before/after for disambiguation', async () => {
         const content = 'return 1;\nreturn 2;\nreturn 1;';
 
-        mockFsPromisesAccess.mockResolvedValue(undefined);
-        mockFsPromisesReadFile.mockResolvedValue(content);
-        mockFsPromisesMkdir.mockResolvedValue(undefined);
-        mockFsPromisesWriteFile.mockResolvedValue(undefined);
+        mockVfsExists.mockResolvedValue(true);
+        mockVfsReadFile.mockResolvedValue(content);
+        mockVfsEnsureDir.mockResolvedValue(undefined);
+        mockVfsWriteFile.mockResolvedValue(undefined);
 
         const operation: DiffOperation = {
           filePath: '/test/file.ts',
@@ -581,7 +600,7 @@ function first() { return 1; }`;
 
     describe('File Operations', () => {
       it('should return error when file not found', async () => {
-        mockFsPromisesAccess.mockRejectedValue(new Error('ENOENT'));
+        mockVfsExists.mockResolvedValue(false);
 
         const operation: DiffOperation = {
           filePath: '/nonexistent/file.ts',
@@ -595,9 +614,9 @@ function first() { return 1; }`;
       });
 
       it('should create file when createIfMissing is true', async () => {
-        mockFsPromisesAccess.mockRejectedValue(new Error('ENOENT'));
-        mockFsPromisesMkdir.mockResolvedValue(undefined);
-        mockFsPromisesWriteFile.mockResolvedValue(undefined);
+        mockVfsExists.mockResolvedValue(false);
+        mockVfsEnsureDir.mockResolvedValue(undefined);
+        mockVfsWriteFile.mockResolvedValue(undefined);
 
         const operation: DiffOperation = {
           filePath: '/new/file.ts',
@@ -613,10 +632,10 @@ function first() { return 1; }`;
       it('should generate diff output after successful application', async () => {
         const content = 'old content';
 
-        mockFsPromisesAccess.mockResolvedValue(undefined);
-        mockFsPromisesReadFile.mockResolvedValue(content);
-        mockFsPromisesMkdir.mockResolvedValue(undefined);
-        mockFsPromisesWriteFile.mockResolvedValue(undefined);
+        mockVfsExists.mockResolvedValue(true);
+        mockVfsReadFile.mockResolvedValue(content);
+        mockVfsEnsureDir.mockResolvedValue(undefined);
+        mockVfsWriteFile.mockResolvedValue(undefined);
 
         const operation: DiffOperation = {
           filePath: '/test/file.ts',
@@ -640,10 +659,10 @@ function first() { return 1; }`;
 
         const content = 'original content';
 
-        mockFsPromisesAccess.mockResolvedValue(undefined);
-        mockFsPromisesReadFile.mockResolvedValue(content);
-        mockFsPromisesMkdir.mockResolvedValue(undefined);
-        mockFsPromisesWriteFile.mockResolvedValue(undefined);
+        mockVfsExists.mockResolvedValue(true);
+        mockVfsReadFile.mockResolvedValue(content);
+        mockVfsEnsureDir.mockResolvedValue(undefined);
+        mockVfsWriteFile.mockResolvedValue(undefined);
 
         const operation: DiffOperation = {
           filePath: '/test/file.ts',
@@ -654,7 +673,7 @@ function first() { return 1; }`;
 
         // Backup file should be written
         if (result.backup) {
-          expect(mockFsPromisesWriteFile).toHaveBeenCalledWith(
+          expect(mockVfsWriteFile).toHaveBeenCalledWith(
             expect.stringContaining('.bak'),
             content,
             'utf-8'
@@ -665,18 +684,18 @@ function first() { return 1; }`;
       it('should restore from backup', async () => {
         const backupContent = 'backup content';
 
-        mockFsPromisesAccess.mockResolvedValue(undefined);
-        mockFsPromisesReadFile.mockResolvedValue(backupContent);
-        mockFsPromisesWriteFile.mockResolvedValue(undefined);
+        mockVfsExists.mockResolvedValue(true);
+        mockVfsReadFile.mockResolvedValue(backupContent);
+        mockVfsWriteFile.mockResolvedValue(undefined);
 
         const success = await editor.restoreBackup('/backups/file.bak', '/original/file.ts');
 
         expect(success).toBe(true);
-        expect(mockFsPromisesWriteFile).toHaveBeenCalledWith('/original/file.ts', backupContent, 'utf-8');
+        expect(mockVfsWriteFile).toHaveBeenCalledWith('/original/file.ts', backupContent, 'utf-8');
       });
 
       it('should return false when backup not found', async () => {
-        mockFsPromisesAccess.mockRejectedValue(new Error('ENOENT'));
+        mockVfsExists.mockResolvedValue(false);
 
         const success = await editor.restoreBackup('/nonexistent.bak', '/file.ts');
 
@@ -684,8 +703,8 @@ function first() { return 1; }`;
       });
 
       it('should list available backups', async () => {
-        mockFsPromisesAccess.mockResolvedValue(undefined);
-        mockFsPromisesReaddir.mockResolvedValue([
+        mockVfsExists.mockResolvedValue(true);
+        mockVfsReaddir.mockResolvedValue([
           'file.ts.2024-01-01.bak',
           'file.ts.2024-01-02.bak',
           'other.ts.2024-01-01.bak',
@@ -698,7 +717,7 @@ function first() { return 1; }`;
       });
 
       it('should return empty array when backup dir not found', async () => {
-        mockFsPromisesAccess.mockRejectedValue(new Error('ENOENT'));
+        mockVfsExists.mockResolvedValue(false);
 
         const backups = await editor.listBackups('/path/to/file.ts');
 

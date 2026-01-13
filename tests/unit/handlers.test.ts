@@ -20,7 +20,7 @@ import type { CommandHandlerResult as _CommandHandlerResult } from '../../src/co
 // MOCKS
 // ============================================================================
 
-// Mock memory manager
+// Mock memory manager (legacy - may be used by old tests)
 const mockMemoryManager = {
   initialize: jest.fn(),
   recall: jest.fn(),
@@ -31,6 +31,20 @@ const mockMemoryManager = {
 
 jest.mock('../../src/memory/persistent-memory', () => ({
   getMemoryManager: jest.fn(() => mockMemoryManager),
+}));
+
+// Mock EnhancedMemory (new memory system used by handlers)
+const mockEnhancedMemory = {
+  store: jest.fn().mockResolvedValue({ id: 'test-id' }),
+  recall: jest.fn().mockResolvedValue([]),
+  forget: jest.fn().mockResolvedValue(undefined),
+  buildContext: jest.fn().mockResolvedValue('Mock context'),
+  formatStatus: jest.fn().mockReturnValue('Memory Status: OK'),
+  dispose: jest.fn(),
+};
+
+jest.mock('../../src/memory/index.js', () => ({
+  getEnhancedMemory: jest.fn(() => mockEnhancedMemory),
 }));
 
 // Mock comment watcher
@@ -330,58 +344,65 @@ describe('Memory Handlers', () => {
 
   describe('handleMemory', () => {
     test('should list memories by default', async () => {
-      mockMemoryManager.formatMemories.mockReturnValue('Memory: key1 = value1');
+      mockEnhancedMemory.formatStatus.mockReturnValue('Memory Status: 5 memories');
 
       const result = await handleMemory([]);
 
       expect(result.handled).toBe(true);
       expect(result.entry?.type).toBe('assistant');
-      expect(result.entry?.content).toBe('Memory: key1 = value1');
-      expect(mockMemoryManager.initialize).toHaveBeenCalled();
+      expect(result.entry?.content).toBe('Memory Status: 5 memories');
+      expect(mockEnhancedMemory.formatStatus).toHaveBeenCalled();
     });
 
     test('should list memories with "list" action', async () => {
       const result = await handleMemory(['list']);
 
       expect(result.handled).toBe(true);
-      expect(mockMemoryManager.formatMemories).toHaveBeenCalled();
+      expect(mockEnhancedMemory.formatStatus).toHaveBeenCalled();
     });
 
-    test('should recall a specific memory', async () => {
-      mockMemoryManager.recall.mockReturnValue('stored-value');
+    test('should recall memories matching query', async () => {
+      mockEnhancedMemory.recall.mockResolvedValueOnce([
+        { id: '1', type: 'fact', content: 'stored-value', importance: 0.8, createdAt: new Date() },
+      ]);
 
       const result = await handleMemory(['recall', 'mykey']);
 
       expect(result.handled).toBe(true);
-      expect(result.entry?.content).toContain('mykey: stored-value');
+      expect(result.entry?.content).toContain('Recall Results');
+      expect(result.entry?.content).toContain('stored-value');
     });
 
-    test('should show error when recalling non-existent memory', async () => {
-      mockMemoryManager.recall.mockReturnValue(null);
+    test('should show message when no memories found', async () => {
+      mockEnhancedMemory.recall.mockResolvedValueOnce([]);
 
       const result = await handleMemory(['recall', 'nonexistent']);
 
-      expect(result.entry?.content).toContain('Memory not found: nonexistent');
+      expect(result.entry?.content).toContain('No matching memories found');
     });
 
     test('should show usage when recall has no key', async () => {
       const result = await handleMemory(['recall']);
 
-      expect(result.entry?.content).toBe('Usage: /memory recall <key>');
+      expect(result.entry?.content).toBe('Usage: /memory recall <query>');
     });
 
     test('should forget a memory', async () => {
+      // Mock finding memories with the tag
+      mockEnhancedMemory.recall.mockResolvedValueOnce([{ id: 'mem-1', type: 'fact', content: 'test', importance: 0.8, createdAt: new Date() }]);
+
       const result = await handleMemory(['forget', 'mykey']);
 
       expect(result.handled).toBe(true);
-      expect(result.entry?.content).toContain('Forgot: mykey');
-      expect(mockMemoryManager.forget).toHaveBeenCalledWith('mykey');
+      expect(result.entry?.content).toContain('Forgot');
+      expect(result.entry?.content).toContain('mykey');
+      expect(mockEnhancedMemory.recall).toHaveBeenCalledWith({ tags: ['mykey'] });
     });
 
     test('should show usage when forget has no key', async () => {
       const result = await handleMemory(['forget']);
 
-      expect(result.entry?.content).toBe('Usage: /memory forget <key>');
+      expect(result.entry?.content).toBe('Usage: /memory forget <tag>');
     });
 
     test('should have timestamp in entry', async () => {
@@ -396,14 +417,26 @@ describe('Memory Handlers', () => {
       const result = await handleRemember(['apiKey', 'secret123']);
 
       expect(result.handled).toBe(true);
-      expect(result.entry?.content).toContain('Remembered: apiKey = secret123');
-      expect(mockMemoryManager.remember).toHaveBeenCalledWith('apiKey', 'secret123');
+      expect(result.entry?.content).toContain('Remembered:');
+      expect(result.entry?.content).toContain('secret123');
+      expect(result.entry?.content).toContain('apiKey');
+      expect(mockEnhancedMemory.store).toHaveBeenCalledWith({
+        type: 'fact',
+        content: 'secret123',
+        tags: ['apiKey'],
+        importance: 0.8,
+      });
     });
 
     test('should join multiple value words', async () => {
       const result = await handleRemember(['note', 'this', 'is', 'a', 'note']);
 
-      expect(mockMemoryManager.remember).toHaveBeenCalledWith('note', 'this is a note');
+      expect(mockEnhancedMemory.store).toHaveBeenCalledWith({
+        type: 'fact',
+        content: 'this is a note',
+        tags: ['note'],
+        importance: 0.8,
+      });
       expect(result.entry?.content).toContain('this is a note');
     });
 
@@ -419,10 +452,10 @@ describe('Memory Handlers', () => {
       expect(result.entry?.content).toBe('Usage: /remember <key> <value>');
     });
 
-    test('should initialize memory manager before storing', async () => {
+    test('should store via EnhancedMemory', async () => {
       await handleRemember(['key', 'value']);
 
-      expect(mockMemoryManager.initialize).toHaveBeenCalled();
+      expect(mockEnhancedMemory.store).toHaveBeenCalled();
     });
   });
 

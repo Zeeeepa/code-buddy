@@ -231,11 +231,17 @@ jest.mock('../../src/agent/repair/index.js', () => ({
     setExecutors: jest.fn(),
     dispose: jest.fn(),
   })),
+  createRepairEngine: jest.fn().mockImplementation(() => ({
+    repair: jest.fn().mockResolvedValue([]),
+    setExecutors: jest.fn(),
+    dispose: jest.fn(),
+  })),
   getRepairEngine: jest.fn().mockImplementation(() => ({
     repair: jest.fn().mockResolvedValue([]),
     setExecutors: jest.fn(),
     dispose: jest.fn(),
   })),
+  resetRepairEngine: jest.fn(),
 }));
 
 describe('Agent Memory Integration', () => {

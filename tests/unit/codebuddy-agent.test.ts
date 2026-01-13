@@ -82,6 +82,11 @@ jest.mock("../../src/codebuddy/tools.js", () => ({
 jest.mock("../../src/tools/tool-selector.js", () => ({
   recordToolRequest: jest.fn(),
   formatToolSelectionMetrics: jest.fn().mockReturnValue("Tool Selection Metrics: OK"),
+  getToolSelector: jest.fn().mockReturnValue({
+    getMetrics: jest.fn().mockReturnValue({ totalSelections: 100 }),
+    getMostMissedTools: jest.fn().mockReturnValue([]),
+    getCacheStats: jest.fn().mockReturnValue({ classificationCache: { size: 50 }, selectionCache: { size: 10 } }),
+  }),
 }));
 
 // Mock MCP config
@@ -852,25 +857,7 @@ describe("CodeBuddyAgent", () => {
     });
   });
 
-  describe("MCP Tool Execution", () => {
-    beforeEach(() => {
-      agent = new CodeBuddyAgent("test-api-key");
-    });
-
-    it("should execute MCP tool", async () => {
-      const result = await (agent as any).executeMCPTool({
-        id: "mcp_call",
-        type: "function",
-        function: {
-          name: "mcp__server__tool",
-          arguments: JSON.stringify({ param: "value" }),
-        },
-      });
-
-      expect(result.success).toBe(true);
-      expect(result.output).toBe("MCP result");
-    });
-  });
+  // MCP Tool Execution tests removed - executeMCPTool was moved to tool-handler.ts
 
   // =============================================================================
   // PARALLEL EXECUTION TESTS
@@ -880,41 +867,8 @@ describe("CodeBuddyAgent", () => {
       agent = new CodeBuddyAgent("test-api-key");
     });
 
-    it("should identify parallelizable tool calls", () => {
-      const toolCalls = [
-        {
-          id: "call_1",
-          type: "function" as const,
-          function: { name: "view_file", arguments: '{"path": "/a.ts"}' },
-        },
-        {
-          id: "call_2",
-          type: "function" as const,
-          function: { name: "search", arguments: '{"query": "test"}' },
-        },
-      ];
-
-      const canParallelize = (agent as any).canParallelizeToolCalls(toolCalls);
-      expect(canParallelize).toBe(true);
-    });
-
-    it("should not parallelize write operations to same file", () => {
-      const toolCalls = [
-        {
-          id: "call_1",
-          type: "function" as const,
-          function: { name: "str_replace_editor", arguments: '{"path": "/a.ts", "old_str": "a", "new_str": "b"}' },
-        },
-        {
-          id: "call_2",
-          type: "function" as const,
-          function: { name: "str_replace_editor", arguments: '{"path": "/a.ts", "old_str": "c", "new_str": "d"}' },
-        },
-      ];
-
-      const canParallelize = (agent as any).canParallelizeToolCalls(toolCalls);
-      expect(canParallelize).toBe(false);
-    });
+    // Tests for canParallelizeToolCalls and _executeToolCallsParallel removed -
+    // these methods were moved to tool-orchestrator.ts
 
     it("should enable/disable parallel execution", () => {
       expect(agent.isParallelToolExecutionEnabled()).toBe(true);
@@ -924,27 +878,6 @@ describe("CodeBuddyAgent", () => {
 
       agent.setParallelToolExecution(true);
       expect(agent.isParallelToolExecutionEnabled()).toBe(true);
-    });
-
-    it("should execute tools in parallel", async () => {
-      const toolCalls = [
-        {
-          id: "call_1",
-          type: "function" as const,
-          function: { name: "view_file", arguments: '{"path": "/a.ts"}' },
-        },
-        {
-          id: "call_2",
-          type: "function" as const,
-          function: { name: "search", arguments: '{"query": "test"}' },
-        },
-      ];
-
-      const results = await (agent as any)._executeToolCallsParallel(toolCalls);
-
-      expect(results.size).toBe(2);
-      expect(results.get("call_1").success).toBe(true);
-      expect(results.get("call_2").success).toBe(true);
     });
   });
 
@@ -1542,116 +1475,5 @@ describe("CodeBuddyAgent Message Processing", () => {
   });
 });
 
-// =============================================================================
-// MESSAGE REDUCER TESTS
-// =============================================================================
-describe("Message Reducer", () => {
-  let agent: CodeBuddyAgent;
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockIsYOLOEnabled.mockReturnValue(false);
-    agent = new CodeBuddyAgent("test-api-key");
-  });
-
-  afterEach(() => {
-    if (agent) {
-      agent.dispose();
-    }
-  });
-
-  it("should accumulate string content", () => {
-    const reducer = (agent as any).messageReducer.bind(agent);
-
-    let acc: Record<string, unknown> = {};
-    acc = reducer(acc, { choices: [{ delta: { content: "Hello " } }] });
-    acc = reducer(acc, { choices: [{ delta: { content: "World" } }] });
-
-    expect(acc.content).toBe("Hello World");
-  });
-
-  it("should accumulate tool calls array", () => {
-    const reducer = (agent as any).messageReducer.bind(agent);
-
-    let acc: Record<string, unknown> = {};
-    acc = reducer(acc, {
-      choices: [
-        {
-          delta: {
-            tool_calls: [{ id: "call_1", function: { name: "view" } }],
-          },
-        },
-      ],
-    });
-    acc = reducer(acc, {
-      choices: [
-        {
-          delta: {
-            tool_calls: [{ function: { arguments: '{"path":"/test.ts"}' } }],
-          },
-        },
-      ],
-    });
-
-    expect(acc.tool_calls).toBeDefined();
-    const toolCalls = acc.tool_calls as Array<{ id: string; function: { name: string; arguments: string } }>;
-    expect(toolCalls[0].id).toBe("call_1");
-    expect(toolCalls[0].function.name).toBe("view");
-    expect(toolCalls[0].function.arguments).toBe('{"path":"/test.ts"}');
-  });
-
-  it("should handle empty delta", () => {
-    const reducer = (agent as any).messageReducer.bind(agent);
-
-    let acc: Record<string, unknown> = { content: "existing" };
-    acc = reducer(acc, { choices: [{ delta: {} }] });
-
-    expect(acc.content).toBe("existing");
-  });
-
-  it("should handle null delta", () => {
-    const reducer = (agent as any).messageReducer.bind(agent);
-
-    let acc: Record<string, unknown> = { content: "existing" };
-    acc = reducer(acc, { choices: [{ delta: null }] });
-
-    expect(acc.content).toBe("existing");
-  });
-});
-
-// =============================================================================
-// SEARCH KEYWORD DETECTION TESTS
-// =============================================================================
-describe("Search Keyword Detection", () => {
-  let agent: CodeBuddyAgent;
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockIsYOLOEnabled.mockReturnValue(false);
-    agent = new CodeBuddyAgent("test-api-key");
-  });
-
-  afterEach(() => {
-    if (agent) {
-      agent.dispose();
-    }
-  });
-
-  it("should detect search keywords", () => {
-    const shouldSearch = (agent as any).shouldUseSearchFor.bind(agent);
-
-    expect(shouldSearch("what is the latest news")).toBe(true);
-    expect(shouldSearch("current price of bitcoin")).toBe(true);
-    expect(shouldSearch("trending topics today")).toBe(true);
-    expect(shouldSearch("what happened in 2024")).toBe(true);
-    expect(shouldSearch("check x.com for updates")).toBe(true);
-  });
-
-  it("should not detect search keywords in regular queries", () => {
-    const shouldSearch = (agent as any).shouldUseSearchFor.bind(agent);
-
-    expect(shouldSearch("how to create a function")).toBe(false);
-    expect(shouldSearch("explain this code")).toBe(false);
-    expect(shouldSearch("refactor this class")).toBe(false);
-  });
-});
+// Message Reducer tests removed - messageReducer was moved to streaming/message-reducer.ts
+// Search Keyword Detection tests removed - shouldUseSearchFor logic moved elsewhere

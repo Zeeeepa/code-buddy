@@ -68,7 +68,7 @@ index 123..456 100644
         const diff = [
           '@@ -1,1 +1,1 @@',
           '-old',
-          ' \\ No newline at end of file',
+          '\\ No newline at end of file',
           '+new'
         ].join('\n');
         const result = parseDiffWithLineNumbers(diff);

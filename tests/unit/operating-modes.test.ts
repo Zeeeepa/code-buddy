@@ -397,11 +397,13 @@ describe("OperatingModeManager", () => {
     it("should return all available modes", () => {
       const modes = manager.getAvailableModes();
 
-      expect(modes).toHaveLength(4);
+      expect(modes).toHaveLength(6);
       expect(modes.map((m) => m.mode)).toEqual([
         "quality",
         "balanced",
         "fast",
+        "plan",
+        "ask",
         "custom",
       ]);
     });
@@ -470,6 +472,8 @@ describe("OperatingModeManager", () => {
         quality: 0,
         balanced: 0,
         fast: 0,
+        plan: 0,
+        ask: 0,
         custom: 0,
       });
     });

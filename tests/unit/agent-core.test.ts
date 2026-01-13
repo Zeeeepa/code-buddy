@@ -422,12 +422,10 @@ describe("Agent Core Module Tests", () => {
         expect(agent.getChatHistory()).toEqual([]);
       });
 
-      it("should initialize system message in messages array", () => {
+      it("should initialize empty messages array", () => {
         agent = new CodeBuddyAgent("test-api-key");
-        // Wait for async initialization
-        return new Promise((resolve) => setTimeout(resolve, 10)).then(() => {
-          expect((agent as any).messages.length).toBeGreaterThanOrEqual(1);
-        });
+        // Messages array starts empty - system message added when processing begins
+        expect((agent as any).messages.length).toBe(0);
       });
     });
 
@@ -760,136 +758,8 @@ describe("Agent Core Module Tests", () => {
       });
     });
 
-    describe("Parallel Tool Execution", () => {
-      it("should identify parallelizable read-only tool calls", () => {
-        const toolCalls = [
-          {
-            id: "call_1",
-            type: "function" as const,
-            function: { name: "view_file", arguments: '{"path": "/a.ts"}' },
-          },
-          {
-            id: "call_2",
-            type: "function" as const,
-            function: { name: "search", arguments: '{"query": "test"}' },
-          },
-        ];
-        const canParallelize = (agent as any).canParallelizeToolCalls(toolCalls);
-        expect(canParallelize).toBe(true);
-      });
-
-      it("should not parallelize single tool call", () => {
-        const toolCalls = [
-          {
-            id: "call_1",
-            type: "function" as const,
-            function: { name: "view_file", arguments: '{"path": "/a.ts"}' },
-          },
-        ];
-        const canParallelize = (agent as any).canParallelizeToolCalls(toolCalls);
-        expect(canParallelize).toBe(false);
-      });
-
-      it("should not parallelize write operations to same file", () => {
-        const toolCalls = [
-          {
-            id: "call_1",
-            type: "function" as const,
-            function: {
-              name: "str_replace_editor",
-              arguments: '{"path": "/a.ts", "old_str": "a", "new_str": "b"}',
-            },
-          },
-          {
-            id: "call_2",
-            type: "function" as const,
-            function: {
-              name: "str_replace_editor",
-              arguments: '{"path": "/a.ts", "old_str": "c", "new_str": "d"}',
-            },
-          },
-        ];
-        const canParallelize = (agent as any).canParallelizeToolCalls(toolCalls);
-        expect(canParallelize).toBe(false);
-      });
-
-      it("should parallelize write operations to different files", () => {
-        const toolCalls = [
-          {
-            id: "call_1",
-            type: "function" as const,
-            function: {
-              name: "str_replace_editor",
-              arguments: '{"path": "/a.ts", "old_str": "a", "new_str": "b"}',
-            },
-          },
-          {
-            id: "call_2",
-            type: "function" as const,
-            function: {
-              name: "str_replace_editor",
-              arguments: '{"path": "/b.ts", "old_str": "c", "new_str": "d"}',
-            },
-          },
-        ];
-        const canParallelize = (agent as any).canParallelizeToolCalls(toolCalls);
-        expect(canParallelize).toBe(true);
-      });
-
-      it("should execute tools in parallel when enabled", async () => {
-        const toolCalls = [
-          {
-            id: "call_1",
-            type: "function" as const,
-            function: { name: "view_file", arguments: '{"path": "/a.ts"}' },
-          },
-          {
-            id: "call_2",
-            type: "function" as const,
-            function: { name: "search", arguments: '{"query": "test"}' },
-          },
-        ];
-        const results = await (agent as any)._executeToolCallsParallel(toolCalls);
-        expect(results.size).toBe(2);
-        expect(results.get("call_1").success).toBe(true);
-        expect(results.get("call_2").success).toBe(true);
-      });
-
-      it("should handle parallel execution with one failing tool", async () => {
-        mockSearchTool.mockRejectedValueOnce(new Error("Search failed"));
-        const toolCalls = [
-          {
-            id: "call_1",
-            type: "function" as const,
-            function: { name: "view_file", arguments: '{"path": "/a.ts"}' },
-          },
-          {
-            id: "call_2",
-            type: "function" as const,
-            function: { name: "search", arguments: '{"query": "test"}' },
-          },
-        ];
-        const results = await (agent as any)._executeToolCallsParallel(toolCalls);
-        expect(results.size).toBe(2);
-        expect(results.get("call_1").success).toBe(true);
-        expect(results.get("call_2").success).toBe(false);
-      });
-    });
-
-    describe("MCP Tool Execution", () => {
-      it("should execute MCP tool successfully", async () => {
-        const result = await (agent as any).executeMCPTool({
-          id: "mcp_call",
-          type: "function",
-          function: {
-            name: "mcp__server__tool",
-            arguments: JSON.stringify({ param: "value" }),
-          },
-        });
-        expect(result.success).toBe(true);
-        expect(result.output).toBe("MCP result");
-      });
-    });
+    // Parallel Tool Execution tests removed - methods moved to tool-orchestrator.ts
+    // MCP Tool Execution tests removed - executeMCPTool moved to tool-handler.ts
   });
 
   // ===========================================================================
@@ -964,60 +834,7 @@ describe("Agent Core Module Tests", () => {
       });
     });
 
-    describe("Message Accumulation", () => {
-      it("should accumulate string content", () => {
-        const reducer = (agent as any).messageReducer.bind(agent);
-        let acc: Record<string, unknown> = {};
-        acc = reducer(acc, { choices: [{ delta: { content: "Hello " } }] });
-        acc = reducer(acc, { choices: [{ delta: { content: "World" } }] });
-        expect(acc.content).toBe("Hello World");
-      });
-
-      it("should accumulate tool calls array", () => {
-        const reducer = (agent as any).messageReducer.bind(agent);
-        let acc: Record<string, unknown> = {};
-        acc = reducer(acc, {
-          choices: [
-            {
-              delta: {
-                tool_calls: [{ id: "call_1", function: { name: "view" } }],
-              },
-            },
-          ],
-        });
-        acc = reducer(acc, {
-          choices: [
-            {
-              delta: {
-                tool_calls: [{ function: { arguments: '{"path":"/test.ts"}' } }],
-              },
-            },
-          ],
-        });
-        expect(acc.tool_calls).toBeDefined();
-        const toolCalls = acc.tool_calls as Array<{
-          id: string;
-          function: { name: string; arguments: string };
-        }>;
-        expect(toolCalls[0].id).toBe("call_1");
-        expect(toolCalls[0].function.name).toBe("view");
-        expect(toolCalls[0].function.arguments).toBe('{"path":"/test.ts"}');
-      });
-
-      it("should handle empty delta", () => {
-        const reducer = (agent as any).messageReducer.bind(agent);
-        let acc: Record<string, unknown> = { content: "existing" };
-        acc = reducer(acc, { choices: [{ delta: {} }] });
-        expect(acc.content).toBe("existing");
-      });
-
-      it("should handle null delta", () => {
-        const reducer = (agent as any).messageReducer.bind(agent);
-        let acc: Record<string, unknown> = { content: "existing" };
-        acc = reducer(acc, { choices: [{ delta: null }] });
-        expect(acc.content).toBe("existing");
-      });
-    });
+    // Message Accumulation tests removed - messageReducer moved to streaming/message-reducer.ts
 
     describe("Tool Call Response Handling", () => {
       it("should process tool calls in response", async () => {

@@ -13,11 +13,17 @@ jest.mock('../../src/agent/repair/index.js', () => ({
     setExecutors: jest.fn(),
     dispose: jest.fn(),
   })),
+  createRepairEngine: jest.fn().mockImplementation(() => ({
+    repair: jest.fn().mockResolvedValue([]),
+    setExecutors: jest.fn(),
+    dispose: jest.fn(),
+  })),
   getRepairEngine: jest.fn().mockImplementation(() => ({
     repair: jest.fn().mockResolvedValue([]),
     setExecutors: jest.fn(),
     dispose: jest.fn(),
   })),
+  resetRepairEngine: jest.fn(),
 }));
 
 // Mock other dependencies
@@ -193,14 +199,18 @@ describe('Agent Repair Integration', () => {
     // Reset mocks
     jest.clearAllMocks();
 
+    // Reset the repair coordinator singleton
+    const { resetRepairCoordinator } = require('../../src/agent/execution/repair-coordinator.js');
+    resetRepairCoordinator();
+
     // Get reference to mock repair engine
-    const { getRepairEngine } = require('../../src/agent/repair/index.js');
+    const { createRepairEngine } = require('../../src/agent/repair/index.js');
     mockRepairEngine = {
       repair: jest.fn().mockResolvedValue([]),
       setExecutors: jest.fn(),
       dispose: jest.fn(),
     };
-    getRepairEngine.mockReturnValue(mockRepairEngine);
+    createRepairEngine.mockReturnValue(mockRepairEngine);
 
     // Create agent instance
     agent = new CodeBuddyAgent('test-api-key');
@@ -372,7 +382,7 @@ describe('Agent Repair Integration', () => {
 
       await agent.attemptAutoRepair('error TS2339: test');
 
-      expect(listener).toHaveBeenCalledWith({ reason: 'No successful fixes found' });
+      expect(listener).toHaveBeenCalledWith({ reason: 'No successful fixes found', attempts: 1 });
     });
 
     it('should emit repair:error event on exception', async () => {
