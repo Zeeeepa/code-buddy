@@ -37,8 +37,8 @@ export {
 // ============================================================================
 
 import type { CloudConfig, SyncConfig, BackupConfig } from './types.js';
-import { createSyncManager, type SyncManagerConfig } from './sync-manager.js';
-import { createBackupManager, type BackupManagerConfig } from './backup-manager.js';
+import { createSyncManager } from './sync-manager.js';
+import { createBackupManager } from './backup-manager.js';
 
 /**
  * Create a fully configured sync system with both sync and backup capabilities

@@ -6,8 +6,8 @@
 
 import { EventEmitter } from 'events';
 import { createHash, randomUUID } from 'crypto';
-import { readFile, writeFile, mkdir, readdir, stat, unlink } from 'fs/promises';
-import { join, dirname, relative, basename } from 'path';
+import { readFile, writeFile, mkdir, readdir, stat } from 'fs/promises';
+import { join, dirname, relative } from 'path';
 import { promisify } from 'util';
 import type {
   BackupConfig,

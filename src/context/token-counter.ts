@@ -47,12 +47,12 @@ export function createTokenCounter(model: string = 'gpt-4'): TokenCounter {
   try {
     // Try to get encoding for specific model
     encoder = encoding_for_model(model as TiktokenModel);
-  } catch (error) {
+  } catch (_error) {
     // Fallback to cl100k_base (used by GPT-4, GPT-3.5-turbo)
     logger.debug(`Could not load encoding for model ${model}, falling back to cl100k_base`);
     try {
       encoder = get_encoding('cl100k_base');
-    } catch (e) {
+    } catch (_e) {
       // Ultimate fallback to estimation if tiktoken fails completely (e.g. wasm issues)
       logger.warn('Failed to initialize tiktoken, using character-based estimation');
       return new EstimatingTokenCounter();

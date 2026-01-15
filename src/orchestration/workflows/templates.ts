@@ -4,7 +4,7 @@
  * Pre-built workflow templates for common multi-agent tasks.
  */
 
-import type { WorkflowDefinition, TaskDefinition, WorkflowStep } from '../types.js';
+import type { WorkflowDefinition } from '../types.js';
 
 // ============================================================================
 // Code Review Workflow

@@ -8,7 +8,7 @@ import { EventEmitter } from 'events';
 import { createHash } from 'crypto';
 import { readFile, writeFile, mkdir, readdir, stat } from 'fs/promises';
 import { join, dirname, relative } from 'path';
-import { createGzip, createGunzip } from 'zlib';
+// Note: createGzip, createGunzip reserved for streaming compression (future use)
 import { promisify } from 'util';
 import { logger } from '../../utils/logger.js';
 import type {

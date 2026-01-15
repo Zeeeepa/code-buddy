@@ -184,7 +184,7 @@ export class MCPManager extends EventEmitter {
     if (client) {
       try {
         await client.close();
-      } catch (e) {
+      } catch {
         // Ignore close errors
       }
       this.clients.delete(serverName);
@@ -195,7 +195,7 @@ export class MCPManager extends EventEmitter {
     if (transport) {
       try {
         await transport.disconnect();
-      } catch (e) {
+      } catch {
         // Ignore disconnect errors
       }
       this.transports.delete(serverName);

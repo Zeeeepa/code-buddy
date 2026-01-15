@@ -86,7 +86,7 @@ export class SessionEncryption {
       }
 
       this.initialized = true;
-    } catch (error) {
+    } catch {
       // Fallback to machine-based key
       this.key = this.deriveMachineKey();
       this.initialized = true;

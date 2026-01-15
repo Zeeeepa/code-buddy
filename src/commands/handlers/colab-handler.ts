@@ -3,7 +3,7 @@
  * Handles /colab commands for AI collaboration workflow
  */
 
-import { getAIColabManager, type ColabTask, type WorkLogEntry } from '../../collaboration/ai-colab-manager.js';
+import { getAIColabManager } from '../../collaboration/ai-colab-manager.js';
 
 export interface ColabCommandResult {
   success: boolean;
