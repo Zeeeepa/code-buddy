@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// Record startup time as early as possible
+const STARTUP_TIME = Date.now();
+
 import { program } from "commander";
 
 // Types for dynamically imported modules
@@ -13,6 +16,30 @@ import {
   getShutdownManager,
 } from "./utils/graceful-shutdown.js";
 
+// Startup timing (enabled via PERF_TIMING=true or DEBUG=true)
+const PERF_TIMING = process.env.PERF_TIMING === 'true' || process.env.DEBUG === 'true';
+const startupPhases: { name: string; time: number }[] = [];
+
+function recordStartupPhase(name: string): void {
+  if (!PERF_TIMING) return;
+  startupPhases.push({ name, time: Date.now() - STARTUP_TIME });
+}
+
+function logStartupMetrics(): void {
+  if (!PERF_TIMING || startupPhases.length === 0) return;
+  console.log('\n=== Startup Performance ===');
+  console.log(`Total time: ${Date.now() - STARTUP_TIME}ms`);
+  console.log('Phase breakdown:');
+  for (const phase of startupPhases) {
+    console.log(`  ${phase.name}: ${phase.time}ms`);
+  }
+  console.log('===========================\n');
+}
+
+recordStartupPhase('imports-start');
+
+recordStartupPhase('imports-done');
+
 // ============================================================================
 // Lazy Import System - Defer heavy modules until needed
 // ============================================================================
@@ -24,7 +51,14 @@ async function lazyLoad<T>(key: string, loader: () => Promise<T>): Promise<T> {
   if (lazyModuleCache.has(key)) {
     return lazyModuleCache.get(key) as T;
   }
+  const startTime = PERF_TIMING ? Date.now() : 0;
   const module = await loader();
+  if (PERF_TIMING) {
+    const loadTime = Date.now() - startTime;
+    if (loadTime > 50) { // Only log slow loads
+      recordStartupPhase(`lazy:${key} (${loadTime}ms)`);
+    }
+  }
   lazyModuleCache.set(key, module);
   return module;
 }
@@ -988,6 +1022,7 @@ program
       }
 
       // Configure caching and performance
+      recordStartupPhase('perf-init-start');
       if (options.cache === false) {
         console.log("📦 Response cache: DISABLED");
         // Disable performance caching when cache is disabled
@@ -998,6 +1033,7 @@ program
         const { initializePerformanceManager } = await lazyImport.performance();
         await initializePerformanceManager();
       }
+      recordStartupPhase('perf-init-done');
 
       // Configure self-healing
       if (options.selfHeal === false) {
@@ -1024,9 +1060,15 @@ program
         : message;
 
       // Lazy load React and Ink for UI
+      recordStartupPhase('ui-load-start');
       const React = await lazyImport.React();
       const { render } = await lazyImport.ink();
       const ChatInterface = await lazyImport.ChatInterface();
+
+      // Log startup metrics before UI render
+      recordStartupPhase('ui-render');
+      logStartupMetrics();
+
       render(React.createElement(ChatInterface, { agent, initialMessage }));
 
       // Start background preloading of common modules after UI renders

@@ -43,23 +43,107 @@ export async function handleMemory(args: string[]): Promise<CommandHandlerResult
         break;
 
       case "forget":
-        // TODO: Enhance to support forgetting by query or last added
         if (args[1]) {
-           const tag = args[1];
-           // Try to forget by tag for now as we don't expose IDs easily
-           const mems = await memory.recall({ tags: [tag] });
-           if (mems.length > 0) {
-             let count = 0;
-             for (const m of mems) {
-               await memory.forget(m.id);
-               count++;
-             }
-             content = `🗑️ Forgot ${count} memories with tag "${tag}"`;
-           } else {
-             content = `No memories found with tag "${tag}"`;
-           }
+          const searchTerm = args.slice(1).join(" ");
+
+          // Special case: "forget last" or "forget last N"
+          if (searchTerm.toLowerCase().startsWith("last")) {
+            const countMatch = searchTerm.match(/last\s+(\d+)/i);
+            const count = countMatch ? parseInt(countMatch[1], 10) : 1;
+
+            // Get all memories sorted by creation date (most recent first)
+            const allMems = await memory.recall({ limit: 10000 });
+            const sortedByDate = allMems.sort((a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            );
+
+            const toForget = sortedByDate.slice(0, count);
+            if (toForget.length > 0) {
+              for (const m of toForget) {
+                await memory.forget(m.id);
+              }
+              content = `🗑️ Forgot ${toForget.length} most recent ${toForget.length === 1 ? 'memory' : 'memories'}`;
+            } else {
+              content = `No memories to forget`;
+            }
+          } else {
+            // Fuzzy search: try tag match first, then content match
+            let mems = await memory.recall({ tags: [searchTerm] });
+
+            // If no exact tag match, try fuzzy content search
+            if (mems.length === 0) {
+              mems = await memory.recall({ query: searchTerm, limit: 50 });
+
+              // Further filter for fuzzy matching on tags and content
+              const searchLower = searchTerm.toLowerCase();
+              mems = mems.filter(m => {
+                // Check if any tag contains the search term (fuzzy)
+                const tagMatch = m.tags.some(tag =>
+                  tag.toLowerCase().includes(searchLower) ||
+                  searchLower.includes(tag.toLowerCase())
+                );
+                // Check if content contains the search term
+                const contentMatch = m.content.toLowerCase().includes(searchLower);
+                return tagMatch || contentMatch;
+              });
+            }
+
+            if (mems.length > 0) {
+              // Show preview of what will be forgotten
+              if (mems.length > 5) {
+                // For many matches, ask for confirmation by showing count
+                const preview = mems.slice(0, 3).map(m =>
+                  `  - ${m.content.slice(0, 50)}${m.content.length > 50 ? '...' : ''}`
+                ).join('\n');
+                content = `🗑️ Found ${mems.length} memories matching "${searchTerm}":\n${preview}\n  ... and ${mems.length - 3} more.\n\nTo forget all, run: /memory forget-confirm ${searchTerm}`;
+              } else {
+                let forgotCount = 0;
+                for (const m of mems) {
+                  await memory.forget(m.id);
+                  forgotCount++;
+                }
+                content = `🗑️ Forgot ${forgotCount} ${forgotCount === 1 ? 'memory' : 'memories'} matching "${searchTerm}"`;
+              }
+            } else {
+              content = `No memories found matching "${searchTerm}"`;
+            }
+          }
         } else {
-          content = `Usage: /memory forget <tag>`;
+          content = `Usage: /memory forget <tag|query|last [N]>\n\nExamples:\n  /memory forget api-keys     - Forget memories with tag or containing "api-keys"\n  /memory forget last         - Forget the most recently added memory\n  /memory forget last 5       - Forget the 5 most recently added memories`;
+        }
+        break;
+
+      case "forget-confirm":
+        // Force forget all matches without preview
+        if (args[1]) {
+          const searchTerm = args.slice(1).join(" ");
+          let mems = await memory.recall({ tags: [searchTerm] });
+
+          if (mems.length === 0) {
+            mems = await memory.recall({ query: searchTerm, limit: 1000 });
+            const searchLower = searchTerm.toLowerCase();
+            mems = mems.filter(m => {
+              const tagMatch = m.tags.some(tag =>
+                tag.toLowerCase().includes(searchLower) ||
+                searchLower.includes(tag.toLowerCase())
+              );
+              const contentMatch = m.content.toLowerCase().includes(searchLower);
+              return tagMatch || contentMatch;
+            });
+          }
+
+          if (mems.length > 0) {
+            let forgotCount = 0;
+            for (const m of mems) {
+              await memory.forget(m.id);
+              forgotCount++;
+            }
+            content = `🗑️ Forgot ${forgotCount} ${forgotCount === 1 ? 'memory' : 'memories'} matching "${searchTerm}"`;
+          } else {
+            content = `No memories found matching "${searchTerm}"`;
+          }
+        } else {
+          content = `Usage: /memory forget-confirm <query>`;
         }
         break;
 

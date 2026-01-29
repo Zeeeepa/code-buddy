@@ -2,291 +2,249 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0] - 2026-01-28
+
+### Overview
+
+Major release featuring three waves of improvements via 27+ parallel AI agents, delivering comprehensive security hardening, performance optimizations, architectural refactoring, and extensive test coverage (362 test files, 16,900+ test cases).
+
+---
+
+### Security (7 Improvements)
+
+- **CSP Headers**: Add Content Security Policy headers for XSS prevention in HTTP server
+- **Command Injection Prevention**: Fix bash command injection with shell escaping and blocked command patterns
+- **Workspace Isolation**: Implement path validation and symlink detection to prevent directory traversal
+- **Plugin Isolation**: Add worker thread sandboxing with resource limits (CPU, memory, timeout)
+- **Input Validation Layer**: Comprehensive Zod schema validation for all user inputs
+- **Secure API Key Handling**: Environment variable filtering to prevent key leakage in logs/errors
+- **Migration Transactions**: Database migrations now support atomic transactions with rollback on failure
+
+---
+
+### Performance (6 Improvements)
+
+- **Semantic Caching**: Implement LSH-based semantic cache for O(1) similarity lookups
+- **Async Optimization**: Replace sync I/O with async across 16 files (context-loader, session-store, plan-generator)
+- **Promise.all/allSettled**: Optimize concurrent operations throughout the codebase
+- **Parallel Tool Execution**: Add semaphore pattern for controlled parallel tool runs
+- **Context Compression**: Sliding window with intelligent summarization for long conversations
+- **Enhanced Streaming**: Chunk timeouts, adaptive throttle, and progress indicators
+
+---
+
+### Architecture (5 Improvements)
+
+- **Tool Registry Pattern**: Replace 30+ switch cases with extensible registry pattern
+- **Unified Events System**: TypedEventEmitter with 13+ event categories for type-safe pub/sub
+- **BaseAgent Refactoring**: Extract into focused facades (Session, ModelRouting, Infrastructure, MessageHistory)
+- **Type Safety Improvements**: Add type guards and explicit interfaces across 10+ modules
+- **Memory Leak Fixes**: Bounded data structures with MAX_SUMMARIES limit to prevent unbounded growth
+
+---
+
+### New Features (5 Improvements)
+
+- **Reverse Search**: Ctrl+R bash-style reverse search for command history
+- **Debug Command**: `/debug` with subcommands (on/off, status, dump, timing, replay)
+- **Config Validation**: `/config` command with Zod schema validation and migration support
+- **Health Check Endpoints**: REST API endpoints (`/api/health`, `/api/health/ready`, `/api/health/live`)
+- **Plugin Provider System**: Register custom LLM, embedding, and search providers via plugins
+
+---
+
+### Observability (4 Improvements)
+
+- **Telemetry System**: Counter, Gauge, and Histogram metric types with export support
+- **Error UX Improvements**: Structured errors with categories, severity levels, and diagnostics
+- **Retry Logic**: Exponential backoff with jitter for transient failures
+- **Graceful Shutdown**: Signal handlers (SIGINT, SIGTERM) for clean resource cleanup
+
+---
+
+### Tests (300+ New Test Files)
+
+Total: **362 test files** with **16,900+ test cases**
+
+Key test additions from the three improvement waves:
+
+| Test File | Description |
+|-----------|-------------|
+| `http-server.test.ts` | 49 tests, 100% coverage |
+| `local-llm-provider.test.ts` | 2000+ lines, comprehensive streaming tests |
+| `scripting-parser.test.ts` | 1516 lines, Buddy Script language tests |
+| `fcs-parser.test.ts` | 1516 lines, FCS language tests |
+| `plugin-manager.test.ts` | 313+ tests for plugin system |
+| `workspace-isolation.test.ts` | Security boundary tests |
+| `tool-permissions.test.ts` | Permission model tests (853 lines) |
+| `bash-tool.test.ts` | Command injection prevention tests |
+| `cache.test.ts` | Semantic caching tests |
+| `metrics.test.ts` | Observability tests |
+| `middleware-pipeline.test.ts` | Request processing tests (748 lines) |
+| `queue-base.test.ts` | Task queue tests (909 lines) |
+| `priority-queue.test.ts` | Scheduling tests (659 lines) |
+| `agent-infrastructure.test.ts` | Infrastructure facade tests |
+| `credential-manager.test.ts` | Credential security tests (620 lines) |
+| `chunk-processor.test.ts` | Stream processing tests (571 lines) |
+| `formal-tool-registry.test.ts` | Registry pattern tests (554 lines) |
+| `service-container.test.ts` | DI container tests |
+| `architect-mode.test.ts` | Architecture mode tests |
+
+---
 
 ### Added
 
-#### Local LLM Infrastructure (December 2025)
+#### Third Wave (January 28, 2026)
 
-Optimizations for running local LLMs via Ollama and LM Studio:
+- **Plugin Provider Interface**: Register custom LLM, embedding, and search providers
+- **Priority-based Provider Selection**: Intelligent fallback when providers are unavailable
+- **Stream Helpers**: Utility functions (`withTimeout`, `safeStreamRead`, `withMaxIterations`)
+- **Unified Validators**: Consolidated validation utilities in `input-validator.ts`
+- **Loop Guards**: Timeout protection for parser loops (FCS, scripting)
+
+#### Second Wave (January 28, 2026)
+
+- **Plugin Configuration System**: Schema-validated config with defaults
+- **Cache File Watching**: Automatic invalidation when source files change
+- **RAG Reranking**: Improved relevance scoring for codebase search
+- **Async Document Parsing**: Streaming support for large documents
+- **Enhanced Error Types**: Additional context and stack traces
+
+#### First Wave (January 22, 2026) - via 27 Parallel Agents
+
+- **Docker Tool**: Container management (build, run, exec, compose)
+- **Kubernetes Tool**: K8s cluster management (pods, deployments, services, logs)
+- **Browser Tool**: Web automation with Playwright integration
+- **Multi-Provider Support**: Claude, ChatGPT, Gemini, Ollama, local LLMs
+- **Application Factory**: Dependency injection for application bootstrap
+- **Diff Generator**: Unified diff output for file changes
+- **Debug Logger**: Comprehensive debugging with timing and replay
+
+---
+
+### Fixed
+
+#### Third Wave
+- Stream reader cleanup in `model-hub.ts` and `ollama-embeddings.ts`
+- Generator function lint errors in tool orchestrator
+- Process.env null checks across codebase
+
+#### Second Wave
+- Plugin config loading with proper parameter handling
+- HTTP server stream error handling and cleanup
+- Parser loop guards with timeout protection
+
+#### First Wave
+- Cache test thresholds for `minTokensToCache`
+- Memory leaks in event emitters
+- Async/await consistency across modules
+
+---
+
+### Changed
+
+- **Input Validator**: Unified validators object consolidating all validation utilities
+- **Error Types**: Enhanced error classes with categories and severity
+- **Plugin Types**: Comprehensive TypeScript interfaces for plugin system
+- **Streaming Types**: Extended with progress indicators and throttle config
+
+---
+
+### Breaking Changes
+
+- **Plugin API v2**: Plugins must implement new `PluginProvider` interface for provider registration
+- **Event System**: Migrate from legacy events to TypedEventEmitter
+- **Config Format**: New schema-validated configuration format (auto-migrated on first run)
+
+---
+
+### Documentation
+
+- **Plugin Development Guide**: `docs/guides/PLUGIN_DEVELOPMENT.md`
+
+---
+
+### Previous Features (Now Released)
+
+#### Local LLM Infrastructure (December 2025)
 
 - **GPU VRAM Monitor** (`src/hardware/gpu-monitor.ts`)
   - Real-time VRAM monitoring for NVIDIA, AMD, Apple, Intel GPUs
   - Dynamic offload recommendations based on available memory
   - Layer count calculation for optimal GPU/CPU split
-  - Memory pressure detection and alerts
-  - New methods: `getStats()`, `calculateOffloadRecommendation()`, `getRecommendedLayers()`
 
 - **Ollama Embeddings** (`src/context/codebase-rag/ollama-embeddings.ts`)
   - Neural embeddings via Ollama /api/embeddings endpoint
   - 100% local, no external API needed
   - Models: nomic-embed-text (768d), mxbai-embed-large (1024d), all-minilm (384d)
-  - Auto-pulls models if not present
-  - Batch processing with retry logic
-  - Semantic code similarity vs TF-IDF keyword matching
 
 - **HNSW Vector Store** (`src/context/codebase-rag/hnsw-store.ts`)
   - Hierarchical Navigable Small World algorithm for O(log n) search
   - 50x faster than brute force at 100K vectors
-  - Configurable parameters: M (connections), efConstruction, efSearch
   - Persistence to disk with save/load
-  - Incremental updates without full rebuild
-  - Up to 1M vectors supported
 
 - **Model Hub HuggingFace** (`src/models/model-hub.ts`)
   - Auto-download GGUF models from HuggingFace
   - VRAM-based model recommendations
   - Quantization support: Q8_0, Q6_K, Q5_K_M, Q4_K_M, Q4_0
-  - Recommended models: devstral-7b, codellama-7b, deepseek-coder-7b, qwen-coder-7b, llama-3.2-3b, granite-3b
-  - Download progress tracking with resume support
-  - Model integrity verification
 
 #### Research-Based Improvements (December 2025)
 
-Based on 2024-2025 scientific publications and GitHub best practices:
+- **TDD Mode** - Test-first code generation (ICSE 2024: +45.97% Pass@1)
+- **Prompt Caching** - Up to 90% cost reduction
+- **Auto-Lint Integration** - Multi-linter support (ESLint, Prettier, Ruff, Clippy)
+- **Auto-Test Integration** - Multi-framework support (Jest, Vitest, pytest)
+- **Lifecycle Hooks** - Pre/post hooks for edit, bash, commit, prompt
+- **AI Code Review** - Pre-commit review with 73.8% acceptance rate
+- **CI/CD Integration** - GitHub Actions, GitLab CI, CircleCI
 
-- **TDD Mode** (`src/testing/tdd-mode.ts`)
-  - Test-first code generation workflow (ICSE 2024: +45.97% Pass@1 accuracy)
-  - State machine: idle → requirements → generating-tests → reviewing-tests → implementing → running-tests → iterating → complete
-  - New commands: `/tdd`, `/tdd start`, `/tdd status`, `/tdd tests`, `/tdd approve`
+#### Enterprise Features
 
-- **Prompt Caching** (`src/optimization/prompt-cache.ts`)
-  - LRU cache with TTL for system prompts and tools
-  - Up to 90% cost reduction (Anthropic/OpenAI research)
-  - Cache key generation with SHA-256
-  - Statistics: hit rate, estimated savings, entry count
-  - New commands: `/prompt-cache`, `/prompt-cache stats`, `/prompt-cache clear`
+- **Team Collaboration** - WebSocket real-time collaboration with RBAC
+- **Analytics Dashboard** - Usage metrics, cost tracking, performance (P50/P90/P99)
+- **Plugin Marketplace** - Discovery, installation, sandboxed execution
+- **Offline Mode** - Response caching, local LLM fallback, request queuing
+- **Checkpoint System** - File snapshots, undo/redo, diff viewing
+- **Custom Personas** - 7 built-in personas, trigger-based selection
+- **Enhanced Memory** - Long-term semantic memory, project context learning
 
-- **Auto-Lint Integration** (`src/testing/auto-lint.ts`)
-  - Multi-linter support: ESLint, Prettier, Ruff, Clippy, golangci-lint, RuboCop
-  - JSON output parsing for LLM context
-  - Auto-detection of project linter
-  - Fix suggestions with confidence levels
+#### IDE Integrations
 
-- **Auto-Test Integration** (`src/testing/auto-test.ts`)
-  - Multi-framework support: Jest, Vitest, pytest, cargo test, go test, RSpec
-  - Test result parsing and formatting for LLM
-  - Coverage integration
-  - Watch mode support
+- **VS Code Extension** - Chat sidebar, code actions, inline completions
+- **LSP Server** - Works with Neovim, Sublime, Emacs
+- **Embedded Browser** - Puppeteer-based headless browser
+- **Voice Control** - Wake word detection, speech-to-text
 
-- **Lifecycle Hooks** (`src/hooks/lifecycle-hooks.ts`)
-  - Hook types: pre-edit, post-edit, pre-bash, post-bash, pre-commit, post-commit, pre-prompt, post-response
-  - Built-in hooks: lint-on-edit, format-on-save, test-on-edit, pre-commit-review
-  - Custom hook support with command or handler
-  - New commands: `/hooks`, `/hooks list`, `/hooks enable`, `/hooks disable`
+#### Core Features
 
-- **AI Code Review** (`src/integrations/code-review.ts`)
-  - Pre-commit AI review (73.8% acceptance rate - industrial study)
-  - Pattern detection: security issues, performance problems, code smells
-  - Severity levels: critical, major, minor, info
-  - Integration with git workflow
+- **AI Code Review** - Security, bug, performance, style detection
+- **Parallel Executor** - Git worktree isolation, up to 16 concurrent agents
+- **GitHub Integration** - PR creation, issue management, webhooks
 
-- **CI/CD Integration** (`src/integrations/cicd-integration.ts`)
-  - Providers: GitHub Actions, GitLab CI, CircleCI
-  - Workflow templates for common use cases
-  - Workflow status monitoring
-  - New commands: `/workflow`, `/workflow list`, `/workflow create`, `/workflow status`
+---
 
-- **New Slash Commands**
-  - `/tdd` - Enter TDD mode
-  - `/workflow` - Manage CI/CD workflows
-  - `/hooks` - Manage lifecycle hooks
-  - `/prompt-cache` - Manage prompt caching
+## [1.0.0] - 2025-12-01
 
-#### Phase 4: Enterprise Features (~7,900 lines)
-- **Team Collaboration** (`src/collaboration/team-session.ts`)
-  - WebSocket-based real-time collaboration
-  - Role-based permissions (owner, admin, editor, viewer)
-  - Session sharing with invite codes
-  - Complete audit trail
-  - Annotations and comments on shared code
-  - Encrypted session data
+### Added
 
-- **Analytics Dashboard** (`src/analytics/dashboard.ts`)
-  - Usage metrics (sessions, messages, tokens, tool calls)
-  - Cost tracking with model pricing
-  - Performance metrics (P50, P90, P99)
-  - Export to JSON, CSV, Markdown
-  - Daily/weekly/monthly reports
+- Initial public release of Code Buddy
+- Agentic loop with Grok API integration via OpenAI SDK
+- Terminal UI with React/Ink
+- File editing with automatic checkpoints
+- MCP (Model Context Protocol) support
+- Agent modes: plan, code, ask, architect
+- Security modes: suggest, auto-edit, full-auto
+- YOLO mode for full autonomy (400 tool rounds, $100 limit)
+- Session management and history persistence
+- Plugin system foundation
+- Git integration with smart diff handling
+- Search tools with ripgrep integration
+- Todo list management
 
-- **Plugin Marketplace** (`src/plugins/marketplace.ts`)
-  - Plugin discovery and installation
-  - Sandboxed plugin execution
-  - Plugin API (commands, tools, providers, hooks)
-  - Version management with semver
-  - Community plugin support
-
-- **Offline Mode** (`src/offline/offline-mode.ts`)
-  - Response caching with LRU eviction
-  - Local LLM fallback (Ollama, llama.cpp)
-  - Request queuing when offline
-  - Auto-sync on reconnect
-  - Network status monitoring
-
-- **Checkpoint System** (`src/undo/checkpoint-manager.ts`)
-  - File state snapshots before changes
-  - Undo/redo operations
-  - Diff viewing with diff-match-patch
-  - Auto-checkpoint on dangerous operations
-  - Search and tag checkpoints
-
-- **Custom Personas** (`src/personas/persona-manager.ts`)
-  - 7 built-in personas (default, senior-developer, code-reviewer, debugger, teacher, minimalist, security-expert)
-  - Trigger-based auto-selection
-  - Custom persona creation
-  - Import/export personas
-  - Style customization
-
-- **Enhanced Memory** (`src/memory/enhanced-memory.ts`)
-  - Long-term semantic memory
-  - Project context learning
-  - User profile and preferences
-  - Conversation summaries
-  - Memory decay algorithm
-  - Embedding-based retrieval
-
-- **Tests for Phase 4 modules** (7 test files)
-  - `tests/team-session.test.ts`
-  - `tests/analytics-dashboard.test.ts`
-  - `tests/plugin-marketplace.test.ts`
-  - `tests/offline-mode.test.ts`
-  - `tests/checkpoint-manager.test.ts`
-  - `tests/persona-manager.test.ts`
-  - `tests/enhanced-memory.test.ts`
-
-#### Phase 3: IDE Integrations (~5,450 lines)
-- **VS Code Extension** (`src/ide/vscode-extension.ts`)
-  - Chat sidebar panel
-  - Code actions (explain, refactor, generate tests)
-  - Inline completions
-  - Problem diagnostics
-  - File decorations
-
-- **LSP Server** (`src/ide/lsp-server.ts`)
-  - Language Server Protocol implementation
-  - Works with Neovim, Sublime, Emacs
-  - Hover information
-  - Code completions
-  - Diagnostics
-
-- **Embedded Browser** (`src/ide/embedded-browser.ts`)
-  - Puppeteer-based headless browser
-  - DOM element selection and inspection
-  - Screenshot capture
-  - Console log forwarding
-  - Network request interception
-
-- **Voice Control** (`src/ide/voice-control.ts`)
-  - Wake word detection ("Hey Grok")
-  - Speech-to-text (Web Speech API / Whisper)
-  - Text-to-speech responses
-  - Voice command recognition
-  - Multi-language support
-
-#### Phase 2: Core Features (~3,700 lines)
-- **AI Code Review** (`src/tools/ai-code-review.ts`)
-  - Security vulnerability detection
-  - Bug pattern detection
-  - Performance issue detection
-  - Code style violations
-  - Complexity analysis
-  - Auto-fix suggestions
-
-- **Parallel Executor** (`src/agent/parallel/parallel-executor.ts`)
-  - Git worktree-based isolation
-  - Remote machine support (SSH)
-  - Concurrent agent execution (up to 16)
-  - Conflict detection and resolution
-  - Result aggregation and merging
-
-- **GitHub Integration** (`src/tools/github-integration.ts`)
-  - PR creation and review
-  - Issue management
-  - CI/CD integration
-  - Webhook handling
-
-#### Phase 1: Quality & Security
-- Comprehensive test infrastructure with Jest
-  - Unit tests for cache system
-  - Unit tests for error utilities
-  - Unit tests for model utilities
-  - Test coverage reporting
-  - Watch mode and coverage scripts
-- **Sandboxed Terminal** (`src/tools/sandboxed-terminal.ts`)
-  - Namespace isolation (PID, NET, IPC, UTS, USER)
-  - Filesystem restrictions with chroot
-  - Resource limits (memory, CPU, file descriptors)
-  - Timeout enforcement
-  - Audit logging
-- **Rate Limiter** (`src/utils/rate-limiter.ts`)
-  - Token bucket algorithm
-  - Exponential backoff (configurable)
-  - Request queue with priority
-  - Per-user/session quotas
-  - Graceful degradation
-- **Config Validator** (`src/utils/config-validator.ts`)
-  - JSON Schema validation
-  - Descriptive error messages
-  - Auto-migration support
-- Input sanitization utilities
-  - File path sanitization (prevent directory traversal)
-  - Command argument sanitization (prevent injection)
-  - HTML/XSS sanitization
-  - Email and URL validation
-  - JSON parsing with validation
-- Performance monitoring system
-  - PerformanceMonitor class for timing operations
-  - Async and sync function measurement
-  - Performance reports and summaries
-  - Metric export to JSON
-  - Global monitor instance
-- Centralized configuration management
-  - Cascading config priority (CLI > ENV > User > Defaults)
-  - Configuration validation
-  - Help text generation
-- Custom error class hierarchy
-  - GrokError base class
-  - Specialized errors (APIError, FileError, NetworkError, etc.)
-  - withTimeout and withRetry utilities
-- Model validation and utilities
-  - Support for multiple providers (Grok, Claude, Gemini)
-  - Model information and token limits
-  - Fuzzy model suggestions
-- Search result caching
-  - 60-second TTL cache for search operations
-  - Automatic expiration and cleanup
-- Resource cleanup
-  - dispose() method for CodeBuddyAgent
-  - Proper cleanup in token counter
-- GitHub Actions workflows
-  - CI workflow for automated testing
-  - Release workflow for automated publishing
-- Contribution guidelines (CONTRIBUTING.md)
-- Example configuration files
-- Comprehensive documentation
-
-### Changed
-- Improved error handling across all tools
-- Enhanced bash command validation
-  - Dangerous command detection
-  - Blocked command list
-  - Command injection prevention
-- Refactored configuration loading
-  - Removed code duplication in index.ts
-  - Unified config resolution
-- Updated README with
-  - Architecture section
-  - Troubleshooting guide
-  - Contributing guidelines
-  - Roadmap
-- Improved .npmignore to exclude development files
-
-### Fixed
-- Security improvements in bash command execution
-- Better error messages throughout the application
+---
 
 ## [0.0.12] - Previous Release
 
@@ -332,13 +290,14 @@ Based on 2024-2025 scientific publications and GitHub best practices:
 
 1. Update this CHANGELOG with all changes since last release
 2. Update version in package.json
-3. Create git tag: `git tag v0.0.13`
-4. Push tag: `git push origin v0.0.13`
+3. Create git tag: `git tag v2.0.0`
+4. Push tag: `git push origin v2.0.0`
 5. GitHub Actions will automatically publish to npm
 
 ---
 
-[Unreleased]: https://github.com/phuetz/code-buddy/compare/v0.0.12...HEAD
+[2.0.0]: https://github.com/phuetz/code-buddy/compare/v1.0.0...v2.0.0
+[1.0.0]: https://github.com/phuetz/code-buddy/compare/v0.0.12...v1.0.0
 [0.0.12]: https://github.com/phuetz/code-buddy/compare/v0.0.11...v0.0.12
 [0.0.11]: https://github.com/phuetz/code-buddy/compare/v0.0.10...v0.0.11
 [0.0.10]: https://github.com/phuetz/code-buddy/releases/tag/v0.0.10

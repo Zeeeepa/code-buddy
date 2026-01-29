@@ -27,6 +27,15 @@ import type {
   EnhancedCompressionResult,
 } from './types.js';
 
+// Lazy import memory monitor to avoid circular dependencies
+let memoryMonitorModule: typeof import('../utils/memory-monitor.js') | null = null;
+async function getMemoryMonitorModule() {
+  if (!memoryMonitorModule) {
+    memoryMonitorModule = await import('../utils/memory-monitor.js');
+  }
+  return memoryMonitorModule;
+}
+
 export interface ContextManagerConfig {
   /** Maximum tokens for the context window */
   maxContextTokens: number;
@@ -639,6 +648,60 @@ export class ContextManagerV2 {
     logger.info(`Force cleanup: removed ${summariesRemoved} summaries, freed ~${tokensFreed} tokens`);
 
     return { summariesRemoved, tokensFreed };
+  }
+
+  /**
+   * Check memory pressure and cleanup if needed
+   * Returns true if cleanup was performed
+   */
+  async checkMemoryPressure(): Promise<boolean> {
+    try {
+      const memModule = await getMemoryMonitorModule();
+      const pressure = memModule.getMemoryPressure();
+
+      if (pressure === 'critical' || pressure === 'high') {
+        logger.warn(`Memory pressure ${pressure}: triggering context cleanup`);
+        const result = this.forceCleanup();
+        logger.info(`Cleanup freed ${result.tokensFreed} tokens from ${result.summariesRemoved} summaries`);
+        return true;
+      }
+
+      return false;
+    } catch {
+      // Memory module not available, skip check
+      return false;
+    }
+  }
+
+  /**
+   * Get combined health metrics including memory
+   */
+  async getHealthMetrics(): Promise<{
+    context: ContextMemoryMetrics;
+    memory?: {
+      heapUsed: number;
+      heapTotal: number;
+      pressure: 'low' | 'medium' | 'high' | 'critical';
+    };
+  }> {
+    const contextMetrics = this.getMemoryMetrics();
+
+    try {
+      const memModule = await getMemoryMonitorModule();
+      const snapshot = memModule.getMemoryUsage();
+      const pressure = memModule.getMemoryPressure();
+
+      return {
+        context: contextMetrics,
+        memory: {
+          heapUsed: snapshot.heapUsed,
+          heapTotal: snapshot.heapTotal,
+          pressure,
+        },
+      };
+    } catch {
+      return { context: contextMetrics };
+    }
   }
 
   // ==========================================

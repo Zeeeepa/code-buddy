@@ -2,9 +2,9 @@
 
 <img src="https://img.shields.io/badge/🤖-Code_Buddy-blueviolet?style=for-the-badge&labelColor=1a1a2e" alt="Code Buddy"/>
 
-# ✨ Code Buddy ✨
+# Code Buddy
 
-### 🚀 L'Agent IA de Développement Nouvelle Génération pour Votre Terminal
+### AI-Powered Development Agent for Your Terminal
 
 <p align="center">
   <a href="https://www.npmjs.com/package/@phuetz/code-buddy"><img src="https://img.shields.io/npm/v/@phuetz/code-buddy.svg?style=flat-square&color=ff6b6b&label=version" alt="npm version"/></a>
@@ -15,1075 +15,35 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Tests-2909_passed-00d26a?style=flat-square&logo=jest" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-passing-00d26a?style=flat-square&logo=jest" alt="Tests"/>
   <img src="https://img.shields.io/badge/Coverage-85%25-48dbfb?style=flat-square" alt="Coverage"/>
   <img src="https://img.shields.io/badge/Build-passing-00d26a?style=flat-square" alt="Build"/>
 </p>
 
 <br/>
 
-**🎯 Un outil CLI puissant qui amène les meilleures IA (Grok, Claude, ChatGPT, Gemini) directement dans votre terminal avec une intelligence de niveau Claude Code, une analyse de code avancée et des capacités de développement complètes.**
+**A powerful CLI tool that brings the best AI models (Grok, Claude, ChatGPT, Gemini) directly into your terminal with Claude Code-level intelligence, advanced code analysis, and full development capabilities.**
 
 <br/>
 
-[🚀 Démarrage Rapide](#-démarrage-rapide) •
-[🤖 Providers IA](#-providers-ia-multi-cloud) •
-[✨ Fonctionnalités](#-fonctionnalités) •
-[🧠 Intelligence du Code](#-intelligence-du-code) •
-[💾 Base de Données](#-système-de-persistance) •
-[📚 Documentation](#-documentation) •
-[📖 Le Livre](docs/livre/)
+[Quick Start](#-quick-start) |
+[AI Providers](#-ai-providers) |
+[Features](#-features) |
+[Configuration](#-configuration) |
+[Plugin Development](#-plugin-development) |
+[API Server](#-api-server) |
+[Troubleshooting](#-troubleshooting)
 
 </div>
 
 ---
 
-## 💖 Code Buddy — L'Assistant Dev Fait avec Amour
+## Installation
 
-> *"Parce que refactorer, c'est mieux quand on sourit."*
+### Prerequisites
 
-Bienvenue dans **code-buddy**, un outil né d'une idée simple :
-👉 Si on code avec une IA, autant que ce soit une IA **intelligente**, **élégante**... et de **bonne compagnie**.
-
-Ce projet a été créé avec :
-- 🏗️ Une architecture moderne
-- 🎨 Une pointe de folie créative
-- ☕ Beaucoup de café
-- 💕 Et surtout... tout notre cœur
-
----
-
-## 🚀 Démarrage Rapide
-
-```bash
-# 🎯 Lancer sans installer (essayez maintenant !)
-npx @phuetz/code-buddy@latest
-
-# 📦 Ou installer globalement
-npm install -g @phuetz/code-buddy
-
-# 🔑 Configurer votre clé API (depuis x.ai)
-export GROK_API_KEY=votre_clé_api
-
-# ▶️ Démarrer en mode interactif
-grok
-
-# 🤖 Ou exécuter une commande unique (mode headless)
-grok --prompt "analyse la structure du projet"
-```
-
-<details>
-<summary>📋 <b>Plus d'options de démarrage...</b></summary>
-
-```bash
-# Spécifier un répertoire de travail
-grok -d /chemin/vers/projet
-
-# Utiliser un modèle spécifique
-grok --model grok-4-latest
-
-# Reprendre la dernière session
-grok --resume
-
-# Mode YOLO (autonomie totale - à utiliser avec prudence !)
-YOLO_MODE=true grok
-
-# Avec un serveur local (Ollama)
-export GROK_BASE_URL=http://localhost:11434/v1
-export GROK_API_KEY=ollama
-grok --model llama3.2
-```
-
-</details>
-
----
-
-## 🤖 Providers IA Multi-Cloud
-
-> *"Choisissez votre IA préférée : Grok, Claude, ChatGPT ou Gemini"*
-
-<table>
-<tr>
-<td width="50%">
-
-**🎯 Providers disponibles :**
-
-| Provider | Modèle par défaut | Context |
-|:---------|:------------------|:--------|
-| 🚀 **Grok** (xAI) | `grok-code-fast-1` | 128K |
-| 🧠 **Claude** (Anthropic) | `claude-sonnet-4` | 200K |
-| 💬 **ChatGPT** (OpenAI) | `gpt-4o` | 128K |
-| ✨ **Gemini** (Google) | `gemini-2.0-flash` | 2M |
-
-</td>
-<td width="50%">
-
-**⚡ Configuration rapide :**
-
-```bash
-# Configurer les clés API
-export GROK_API_KEY="votre-clé-xai"
-export ANTHROPIC_API_KEY="votre-clé-anthropic"
-export OPENAI_API_KEY="votre-clé-openai"
-export GOOGLE_API_KEY="votre-clé-google"
-
-# Installer les SDKs optionnels
-npm install @anthropic-ai/sdk  # Pour Claude
-```
-
-</td>
-</tr>
-</table>
-
-### 🔄 Changer de Provider
-
-```bash
-# Lister les providers disponibles
-buddy provider list
-
-# Utiliser Claude
-buddy provider set claude
-
-# Utiliser ChatGPT
-buddy provider set openai
-
-# Utiliser Gemini
-buddy provider set gemini
-
-# Voir le provider actif
-buddy provider current
-
-# Lister les modèles disponibles
-buddy provider models claude
-```
-
-### 💡 Utilisation directe
-
-```bash
-# Avec un provider spécifique
-buddy --provider claude "explique ce code"
-buddy --provider openai "refactor cette fonction"
-
-# Avec un modèle spécifique
-buddy --model gpt-4o "analyse la sécurité"
-buddy --model claude-3-5-sonnet-latest "génère des tests"
-```
-
-📖 **[Documentation complète des providers](docs/ai-providers.md)**
-
----
-
-## ✨ Fonctionnalités
-
-### 🧠 Le Cerveau : Système Multi-Agent
-
-<table>
-<tr>
-<td width="50%">
-
-**🎭 Une équipe d'agents spécialisés travaille pour vous :**
-
-| Agent | 🎯 Rôle |
-|:------|:--------|
-| 🎼 **Orchestrateur** | Chef d'orchestre, calme et élégant |
-| 💻 **Codeur** | Écrit vite et bien |
-| 🔍 **Revieweur** | Entre dans les détails |
-| 🧪 **Testeur** | Casse tout pour voir si ça tient |
-| ♻️ **Refactoreur** | Fait du feng-shui dans votre code |
-| 📝 **Documenteur** | Le poète technique |
-| 📊 **Analyste** | Le sage silencieux |
-
-</td>
-<td width="50%">
-
-<img src="assets/diagrams/multi-agent-orchestrator.svg" alt="Multi-Agent Orchestrator" width="400"/>
-
-</td>
-</tr>
-</table>
-
----
-
-### 🌳 Raisonnement Avancé : Tree-of-Thought + MCTS
-
-> *"Ici, l'IA réfléchit comme un adulte."*
-
-L'IA ne se contente pas de répondre. Elle :
-1. 🔍 **Explore** plusieurs chemins
-2. ⚖️ **Compare** les solutions
-3. 📊 **Évalue** chaque approche
-4. 🎯 **Choisit** la meilleure avec un sourire satisfait
-
-<table>
-<tr>
-<td>
-
-**🎮 4 modes de raisonnement :**
-
-| Mode | Profondeur | 📝 Usage |
-|:-----|:-----------|:---------|
-| `shallow` | ⭐ | Questions rapides |
-| `medium` | ⭐⭐ | Problèmes standards |
-| `deep` | ⭐⭐⭐ | Défis complexes |
-| `exhaustive` | ⭐⭐⭐⭐ | Architectures critiques |
-
-</td>
-<td>
-
-**💡 Mots-clés magiques :**
-
-```bash
-# Réflexion standard (4K tokens)
-"think about how to refactor this"
-
-# Réflexion profonde (10K tokens)
-"megathink: design a scalable API"
-
-# Réflexion exhaustive (32K tokens)
-"ultrathink this security issue"
-```
-
-</td>
-</tr>
-</table>
-
----
-
-### 🔧 Auto-Réparation : APR Engine
-
-> *"Ce développeur du lundi matin qui répare vos bugs sans broncher ? C'est code-buddy."*
-
-<table>
-<tr>
-<td width="60%">
-
-**🩺 Comment ça marche :**
-
-1. **📍 Localisation** — Trouve exactement où est le bug
-2. **🔬 Analyse** — Comprend la cause racine
-3. **💊 Génération** — Crée plusieurs patchs candidats
-4. **✅ Validation** — Teste automatiquement chaque solution
-5. **🎉 Application** — Applique le meilleur fix
-
-**Techniques utilisées :**
-- Ochiai, DStar, Tarantula (fault localization)
-- 30+ templates de réparation
-- Génération guidée par LLM
-- Feedback loop avec les tests
-
-</td>
-<td width="40%">
-
-<img src="assets/diagrams/apr-engine.svg" alt="APR Engine Flow" width="200"/>
-
-</td>
-</tr>
-</table>
-
----
-
-### 💾 Système de Persistance
-
-> *"Nouveau ! Code Buddy se souvient de tout... vraiment tout."*
-
-<table>
-<tr>
-<td>
-
-**🗄️ Base de données SQLite intégrée :**
-
-| Table | 🎯 Usage |
-|:------|:---------|
-| `memories` | 🧠 Mémoires avec embeddings vectoriels |
-| `sessions` | 💬 Historique des conversations |
-| `messages` | 📨 Messages individuels |
-| `code_embeddings` | 🔍 Recherche sémantique du code |
-| `tool_stats` | 📊 Statistiques des outils |
-| `repair_learning` | 🔧 Apprentissage des réparations |
-| `analytics` | 📈 Données d'usage quotidiennes |
-| `conventions` | 📋 Conventions de code apprises |
-| `checkpoints` | 💾 Points de sauvegarde |
-| `cache` | ⚡ Cache haute performance |
-
-</td>
-<td>
-
-**✨ Fonctionnalités clés :**
-
-- 🚀 **Mode WAL** — Haute performance
-- 🎯 **Embeddings vectoriels** — Recherche sémantique réelle
-- 📦 **Migration auto** — JSON → SQLite
-- 🔄 **Repository pattern** — Code propre
-- 💰 **Budget alerts** — Alertes quand vous dépassez
-
-**📍 Localisation :**
-```
-~/.grok/grok.db        # Base de données
-~/.grok/models/        # Modèles d'embeddings
-```
-
-</td>
-</tr>
-</table>
-
----
-
-### 🎯 Embeddings Vectoriels
-
-> *"Fini les faux embeddings ! Place à la vraie recherche sémantique."*
-
-<table>
-<tr>
-<td width="50%">
-
-**🧬 Providers disponibles :**
-
-| Provider | 📐 Dimensions | ⚡ Vitesse |
-|:---------|:--------------|:-----------|
-| 🏠 **Local** (transformers.js) | 384 | Rapide |
-| 🌐 **OpenAI** | 1536-3072 | Très rapide |
-| 🤖 **Grok API** | Variable | Rapide |
-| 🧪 **Mock** (tests) | 384 | Instantané |
-
-</td>
-<td width="50%">
-
-```typescript
-// Exemple d'utilisation
-import { getEmbeddingProvider } from 'code-buddy';
-
-const provider = getEmbeddingProvider();
-await provider.initialize();
-
-// Générer un embedding
-const result = await provider.embed("function hello()");
-console.log(result.embedding); // Float32Array[384]
-
-// Recherche par similarité
-const similar = await searchSimilar(queryEmbedding);
-```
-
-</td>
-</tr>
-</table>
-
----
-
-### 📊 Analytics & Cost Tracking
-
-> *"Savez-vous combien de tokens vous consommez ? Maintenant oui."*
-
-<table>
-<tr>
-<td>
-
-**📈 Dashboard intégré :**
-
-<img src="assets/diagrams/analytics-dashboard.svg" alt="Analytics Dashboard" width="350"/>
-
-</td>
-<td>
-
-**🔔 Alertes automatiques :**
-
-- ⚠️ **Warning** à 80% du budget
-- 🚫 **Stop** à 100% (optionnel)
-- 📧 Export CSV/JSON disponible
-
-**💡 Commandes :**
-```bash
-/cost           # Dashboard
-/cost budget    # Modifier les limites
-/cost export    # Exporter les données
-/cost reset     # Réinitialiser
-```
-
-</td>
-</tr>
-</table>
-
----
-
-### 🎓 Apprentissage Persistant
-
-> *"Code Buddy apprend de ses erreurs... pour ne plus jamais les refaire."*
-
-<table>
-<tr>
-<td width="50%">
-
-**🧠 Ce qui est appris :**
-
-| Catégorie | 📝 Exemples |
-|:----------|:------------|
-| 🔧 **Réparations** | Quelle stratégie fonctionne pour quel bug |
-| 📋 **Conventions** | Votre style de code préféré |
-| 🛠️ **Outils** | Quels outils sont les plus efficaces |
-| ⚡ **Patterns** | Vos habitudes de développement |
-
-</td>
-<td width="50%">
-
-**📊 Insights générés :**
-
-<img src="assets/diagrams/learning-statistics.svg" alt="Learning Statistics" width="350"/>
-
-</td>
-</tr>
-</table>
-
----
-
-### 🔒 Sécurité : Trois Niveaux de Contrôle
-
-<table>
-<tr>
-<td>
-
-| Mode | 🔓 Permissions | 📝 Usage |
-|:-----|:---------------|:---------|
-| 🔒 **read-only** | Lecture seule | Exploration sécurisée |
-| ⚖️ **auto** | Auto + confirmation | Usage quotidien |
-| 🔓 **full-access** | Tout automatique | Environnements de confiance |
-
-</td>
-<td>
-
-```bash
-# Changer de mode
-/mode read-only     # 🔒 Mode sécurisé
-/mode auto          # ⚖️ Mode standard
-/mode full-access   # 🔓 Mode confiance
-
-# Voir le dashboard sécurité
-/security status
-```
-
-</td>
-</tr>
-</table>
-
-**🛡️ Protections intégrées :**
-- 🔍 Détection de patterns dangereux (`rm -rf /`, fork bombs...)
-- 🔐 Redaction automatique des secrets (API keys, passwords...)
-- 📦 Sandbox optionnel avec firejail
-- ✅ Validation des commandes avant exécution
-
----
-
-### 🤖 Support IA Locale
-
-> *"Pas d'internet ? Pas de problème !"*
-
-<table>
-<tr>
-<td>
-
-**🏠 Providers locaux supportés :**
-
-| Provider | Port | 🎯 Notes |
-|:---------|:-----|:---------|
-| **Ollama** | 11434 | Native, recommandé |
-| **LM Studio** | 1234 | Interface graphique |
-| **llama.cpp** | 8080 | Léger et rapide |
-
-</td>
-<td>
-
-```bash
-# Configuration Ollama
-export GROK_BASE_URL=http://localhost:11434/v1
-export GROK_API_KEY=ollama
-grok --model llama3.2
-
-# Configuration LM Studio
-export GROK_BASE_URL=http://localhost:1234/v1
-export GROK_API_KEY=lm-studio
-grok --model hermes-4-14b
-```
-
-</td>
-</tr>
-</table>
-
-**🧠 Modèles avec support des outils :**
-`Hermes 2/3/4` • `Llama 3.1/3.2` • `Qwen 2.5` • `Mistral` • `Mixtral` • `Functionary` • `DeepSeek Coder`
-
----
-
-### 🖥️ GPU & Gestion VRAM (Nouveau!)
-
-> *"Optimisation automatique selon votre matériel"*
-
-<table>
-<tr>
-<td width="50%">
-
-**🎮 GPUs supportés :**
-
-| Vendor | 🛠️ Méthode |
-|:-------|:-----------|
-| **NVIDIA** | nvidia-smi |
-| **AMD** | ROCm (rocm-smi) |
-| **Apple** | Metal (ioreg) |
-| **Intel** | intel_gpu_top |
-
-</td>
-<td width="50%">
-
-**⚡ Offload dynamique :**
-
-- Détection automatique de la VRAM
-- Recommandation du nombre de layers GPU
-- Ajustement selon la mémoire disponible
-- Monitoring en temps réel
-
-</td>
-</tr>
-</table>
-
-```typescript
-// Utilisation programmatique
-import { getGPUMonitor } from 'code-buddy';
-
-const gpu = getGPUMonitor();
-const stats = await gpu.getStats();
-console.log(`VRAM: ${stats.usedVRAM}/${stats.totalVRAM} MB`);
-
-const recommendation = gpu.calculateOffloadRecommendation(modelSize);
-console.log(`Layers GPU: ${recommendation.gpuLayers}`);
-```
-
----
-
-### 🧬 Embeddings Ollama (Nouveau!)
-
-> *"Embeddings neuraux 100% locaux via Ollama"*
-
-<table>
-<tr>
-<td width="50%">
-
-**📐 Modèles disponibles :**
-
-| Modèle | Dimensions | 📝 Description |
-|:-------|:-----------|:---------------|
-| `nomic-embed-text` | 768 | Meilleure qualité |
-| `mxbai-embed-large` | 1024 | Haute qualité |
-| `all-minilm` | 384 | Rapide, léger |
-| `snowflake-arctic-embed` | 1024 | State-of-the-art |
-| `bge-m3` | 1024 | Multilingue |
-
-</td>
-<td width="50%">
-
-**✨ Avantages vs TF-IDF :**
-
-- Compréhension sémantique
-- Synonymes et concepts
-- Similarité de code améliorée
-- Compréhension cross-langage
-- Auto-download des modèles
-
-</td>
-</tr>
-</table>
-
----
-
-### 🔍 HNSW Vector Search (Nouveau!)
-
-> *"Recherche O(log n) pour les gros codebases"*
-
-<table>
-<tr>
-<td>
-
-**📊 Performance :**
-
-| Taille | Brute Force | HNSW |
-|:-------|:------------|:-----|
-| 10K chunks | 100ms | 2ms |
-| 100K chunks | 1s | 5ms |
-| 1M chunks | 10s | 10ms |
-
-</td>
-<td>
-
-**⚙️ Configuration :**
-
-```typescript
-// Paramètres HNSW
-{
-  M: 16,              // Connexions par nœud
-  efConstruction: 200, // Qualité build
-  efSearch: 50,        // Qualité recherche
-  maxElements: 1000000 // Capacité max
-}
-```
-
-</td>
-</tr>
-</table>
-
----
-
-### 📦 Model Hub HuggingFace (Nouveau!)
-
-> *"Auto-téléchargement intelligent des modèles GGUF"*
-
-<table>
-<tr>
-<td width="50%">
-
-**🎯 Modèles recommandés :**
-
-| Modèle | VRAM | 📝 Usage |
-|:-------|:-----|:---------|
-| `devstral-7b` | 6GB | Code spécialisé |
-| `codellama-7b` | 6GB | Code Meta |
-| `deepseek-coder-7b` | 6GB | Code chinois |
-| `qwen-coder-7b` | 6GB | Code Alibaba |
-| `llama-3.2-3b` | 3GB | Léger, rapide |
-| `granite-3b` | 3GB | IBM, efficace |
-
-</td>
-<td width="50%">
-
-**📐 Quantizations :**
-
-| Type | Qualité | Taille |
-|:-----|:--------|:-------|
-| `Q8_0` | Excellente | 100% |
-| `Q6_K` | Très bonne | 75% |
-| `Q5_K_M` | Bonne | 62% |
-| `Q4_K_M` | Acceptable | 50% |
-
-</td>
-</tr>
-</table>
-
-```typescript
-// Utilisation
-import { getModelHub } from 'code-buddy';
-
-const hub = getModelHub();
-await hub.initialize();
-
-// Télécharger un modèle recommandé
-const model = await hub.downloadModel('devstral-7b', 'Q4_K_M');
-console.log(`Modèle: ${model.path}`);
-
-// Recommandation basée sur la VRAM
-const recommended = hub.getRecommendedModels(8000); // 8GB VRAM
-```
-
----
-
-### 🎤 Contrôle Vocal
-
-> *"Parlez à votre code, il vous répond !"*
-
-<table>
-<tr>
-<td>
-
-**🎙️ Speech-to-Text (Whisper) :**
-```bash
-/voice on      # Activer
-/voice toggle  # Enregistrer
-/voice off     # Désactiver
-```
-
-</td>
-<td>
-
-**🔊 Text-to-Speech (Edge TTS) :**
-```bash
-/speak Bonjour!   # Parler
-/tts on           # Activer auto
-/tts voices       # Lister les voix
-```
-
-</td>
-</tr>
-</table>
-
----
-
-## 🧠 Intelligence du Code
-
-### 🔍 Suite d'Outils d'Analyse
-
-<table>
-<tr>
-<td width="50%">
-
-**📊 Outils disponibles :**
-
-| Outil | 🎯 Capacités |
-|:------|:-------------|
-| 🌳 **AST Parser** | Parse multi-langage avec cache |
-| 🔎 **Symbol Search** | Recherche fuzzy Levenshtein |
-| 🔗 **Dependency Analyzer** | Détection cycles, graphes |
-| 📐 **Code Context** | Métriques, patterns, qualité |
-| ♻️ **Refactoring** | Rename, extract, inline, move |
-
-</td>
-<td width="50%">
-
-**💻 Langages supportés :**
-
-- 📘 TypeScript (.ts, .tsx)
-- 📒 JavaScript (.js, .jsx)
-- 🐍 Python (.py)
-- 🐹 Go (.go)
-- 🦀 Rust (.rs) *bientôt*
-
-</td>
-</tr>
-</table>
-
-### 📚 RAG Avancé pour le Code
-
-> *"Comme si votre projet était un livre que code-buddy lit vraiment."*
-
-- 🧩 **Chunking intelligent** par langage
-- 🎯 **Embeddings sémantiques** pour le code
-- 🔄 **Recherche hybride** TF-IDF + vecteurs
-- ✅ **RAG correctif** pour éviter les hors-sujets
-- 📦 **Gestion de contexte** automatique
-
----
-
-### 🧪 Mode TDD (Test-Driven Development)
-
-> *"Écrire les tests d'abord : +45.97% de précision (ICSE 2024)"*
-
-<table>
-<tr>
-<td width="50%">
-
-**🔄 Cycle TDD automatisé :**
-
-1. **📝 Requirements** — Décrivez la fonctionnalité
-2. **🧪 Generate Tests** — L'IA génère les tests
-3. **👁️ Review** — Validez les tests générés
-4. **💻 Implement** — L'IA implémente le code
-5. **✅ Verify** — Tests exécutés automatiquement
-6. **🔁 Iterate** — Boucle jusqu'au succès
-
-</td>
-<td width="50%">
-
-```bash
-# Démarrer le mode TDD
-/tdd start
-
-# Décrire la fonctionnalité
-"Une fonction qui valide les emails"
-
-# L'IA génère les tests, puis le code
-# Tests passent ? Terminé !
-
-# Voir le statut
-/tdd status
-```
-
-</td>
-</tr>
-</table>
-
----
-
-### 🔗 Lifecycle Hooks
-
-> *"Automatisez vos workflows avec des hooks pre/post opération"*
-
-<table>
-<tr>
-<td>
-
-**🎯 Hooks disponibles :**
-
-| Hook | 📝 Déclencheur |
-|:-----|:---------------|
-| `pre-edit` | Avant modification de fichier |
-| `post-edit` | Après modification de fichier |
-| `pre-bash` | Avant exécution de commande |
-| `post-bash` | Après exécution de commande |
-| `pre-commit` | Avant commit (AI review) |
-| `post-commit` | Après commit |
-| `pre-prompt` | Avant envoi au LLM |
-| `post-response` | Après réponse du LLM |
-
-</td>
-<td>
-
-```bash
-# Gérer les hooks
-/hooks list
-/hooks enable pre-commit
-/hooks disable post-edit
-
-# Exemple: review automatique
-# avant chaque commit
-/hooks enable pre-commit
-
-# L'IA analyse les changements
-# et suggère des améliorations
-```
-
-</td>
-</tr>
-</table>
-
----
-
-### 🚀 Intégration CI/CD
-
-> *"Générez et gérez vos workflows directement depuis le CLI"*
-
-<table>
-<tr>
-<td>
-
-**🛠️ Providers supportés :**
-
-- **GitHub Actions** — Workflows .github/workflows/
-- **GitLab CI** — .gitlab-ci.yml
-- **CircleCI** — .circleci/config.yml
-
-</td>
-<td>
-
-```bash
-# Gérer les workflows
-/workflow list
-/workflow create github
-/workflow status
-
-# Générer un workflow CI
-"Crée un workflow GitHub Actions
-pour build, test et deploy"
-```
-
-</td>
-</tr>
-</table>
-
----
-
-## 🔬 Fonctionnalités Basées sur la Recherche
-
-> *"Code Buddy intègre les dernières avancées de la recherche en IA pour le développement logiciel."*
-
-<table>
-<tr>
-<th>🧠 Catégorie</th>
-<th>✨ Fonctionnalité</th>
-<th>📁 Implémentation</th>
-<th>📚 Basé sur</th>
-</tr>
-
-<tr>
-<td rowspan="2"><b>Raisonnement</b></td>
-<td>🌳 Tree-of-Thought</td>
-<td><code>src/agent/reasoning/tree-of-thought.ts</code></td>
-<td><a href="https://arxiv.org/abs/2305.10601">ToT (2023)</a></td>
-</tr>
-<tr>
-<td>🎲 Monte Carlo Tree Search</td>
-<td><code>src/agent/reasoning/mcts.ts</code></td>
-<td><a href="https://arxiv.org/abs/2404.09932">RethinkMCTS (2024)</a></td>
-</tr>
-
-<tr>
-<td rowspan="3"><b>Contexte</b></td>
-<td>🔗 Dependency-Aware RAG</td>
-<td><code>src/context/dependency-aware-rag.ts</code></td>
-<td><a href="https://arxiv.org/abs/2402.01767">CodeRAG (2024)</a></td>
-</tr>
-<tr>
-<td>📦 Context Compression</td>
-<td><code>src/context/context-compressor.ts</code></td>
-<td>JetBrains Research (2024)</td>
-</tr>
-<tr>
-<td>👁️ Observation Masking</td>
-<td><code>src/context/observation-masking.ts</code></td>
-<td>JetBrains / AgentCoder</td>
-</tr>
-
-<tr>
-<td rowspan="2"><b>Réparation</b></td>
-<td>🔧 Iterative Repair</td>
-<td><code>src/agent/repair/iterative-repair.ts</code></td>
-<td><a href="https://dl.acm.org/doi/10.1145/3650212.3680328">ChatRepair (ISSTA 2024)</a></td>
-</tr>
-<tr>
-<td>📍 Fault Localization</td>
-<td><code>src/agent/repair/fault-localization.ts</code></td>
-<td>Ochiai, DStar, Tarantula</td>
-</tr>
-
-<tr>
-<td rowspan="5"><b>Optimisation</b></td>
-<td>🎯 Model Routing</td>
-<td><code>src/optimization/model-routing.ts</code></td>
-<td><a href="https://arxiv.org/abs/2305.05176">FrugalGPT (Stanford)</a></td>
-</tr>
-<tr>
-<td>⚡ Parallel Executor</td>
-<td><code>src/optimization/parallel-executor.ts</code></td>
-<td><a href="https://arxiv.org/abs/2312.04511">LLMCompiler (2023)</a></td>
-</tr>
-<tr>
-<td>🎛️ Tool Filtering</td>
-<td><code>src/optimization/tool-filtering.ts</code></td>
-<td><a href="https://arxiv.org/abs/2402.08702">Less-is-More (2024)</a></td>
-</tr>
-<tr>
-<td>⏱️ Latency Optimizer</td>
-<td><code>src/optimization/latency-optimizer.ts</code></td>
-<td>Human-AI Flow Research</td>
-</tr>
-<tr>
-<td>💾 Prompt Caching</td>
-<td><code>src/optimization/prompt-cache.ts</code></td>
-<td>Anthropic / OpenAI (90% cost reduction)</td>
-</tr>
-
-<tr>
-<td rowspan="2"><b>Persistance</b></td>
-<td>💾 SQLite + Embeddings</td>
-<td><code>src/database/</code> + <code>src/embeddings/</code></td>
-<td>Architecture moderne</td>
-</tr>
-<tr>
-<td>🧠 Persistent Learning</td>
-<td><code>src/learning/persistent-learning.ts</code></td>
-<td>Apprentissage continu</td>
-</tr>
-
-<tr>
-<td rowspan="4"><b>Qualité (2025)</b></td>
-<td>🧪 TDD Mode</td>
-<td><code>src/testing/tdd-mode.ts</code></td>
-<td><a href="https://dl.acm.org/doi/10.1145/3597503.3639186">ICSE 2024 (+45% accuracy)</a></td>
-</tr>
-<tr>
-<td>🔍 AI Code Review</td>
-<td><code>src/integrations/code-review.ts</code></td>
-<td>73.8% review acceptance (industrial study)</td>
-</tr>
-<tr>
-<td>🧹 Auto-Lint</td>
-<td><code>src/testing/auto-lint.ts</code></td>
-<td>ESLint, Prettier, Ruff, Clippy, etc.</td>
-</tr>
-<tr>
-<td>✅ Auto-Test</td>
-<td><code>src/testing/auto-test.ts</code></td>
-<td>Jest, pytest, cargo test, go test</td>
-</tr>
-
-<tr>
-<td rowspan="2"><b>Intégrations (2025)</b></td>
-<td>🔗 Lifecycle Hooks</td>
-<td><code>src/hooks/lifecycle-hooks.ts</code></td>
-<td>Pre/post: edit, commit, bash, prompt</td>
-</tr>
-<tr>
-<td>🚀 CI/CD</td>
-<td><code>src/integrations/cicd-integration.ts</code></td>
-<td>GitHub Actions, GitLab CI, CircleCI</td>
-</tr>
-</table>
-
-### 📊 Améliorations Mesurées
-
-| Optimisation | Impact | Source |
-|:-------------|:-------|:-------|
-| Context Compression | **-7% coûts**, **+2.6% succès** | JetBrains 2024 |
-| Model Routing | **30-70% réduction coûts** | FrugalGPT |
-| Parallel Execution | **2.5-4.6x speedup** | LLMCompiler |
-| Tool Filtering | **70% réduction temps** | Less-is-More |
-| Semantic Caching | **68% réduction API** | Optimisation interne |
-| Prompt Caching | **90% réduction coûts** | Anthropic/OpenAI |
-| TDD Mode | **+45.97% Pass@1** | ICSE 2024 |
-| AI Code Review | **73.8% acceptance** | Industrial Study |
-
----
-
-## 📋 Commandes Slash
-
-<table>
-<tr>
-<td>
-
-| Commande | 📝 Description |
-|:---------|:---------------|
-| `/help` | 📖 Afficher l'aide |
-| `/clear` | 🧹 Effacer la conversation |
-| `/model` | 🤖 Changer de modèle |
-| `/mode` | 🔒 Changer le mode sécurité |
-| `/think` | 💭 Activer la réflexion |
-| `/megathink` | 🧠 Réflexion profonde |
-| `/ultrathink` | 🌟 Réflexion exhaustive |
-
-</td>
-<td>
-
-| Commande | 📝 Description |
-|:---------|:---------------|
-| `/cost` | 💰 Dashboard des coûts |
-| `/stats` | 📊 Statistiques |
-| `/security` | 🔒 Dashboard sécurité |
-| `/commit` | 📝 Créer un commit |
-| `/review` | 🔍 Review du code |
-| `/test` | 🧪 Lancer les tests |
-| `/voice` | 🎤 Contrôle vocal |
-
-</td>
-</tr>
-</table>
-
-### 🆕 Nouvelles Commandes (2025)
-
-<table>
-<tr>
-<td>
-
-| Commande | 📝 Description |
-|:---------|:---------------|
-| `/tdd` | 🧪 Mode TDD (+45% accuracy) |
-| `/tdd start` | Démarrer le cycle TDD |
-| `/tdd status` | Voir l'état actuel |
-| `/tdd tests` | Voir les tests générés |
-
-</td>
-<td>
-
-| Commande | 📝 Description |
-|:---------|:---------------|
-| `/workflow` | 🚀 Gérer CI/CD |
-| `/hooks` | 🔗 Gérer les hooks lifecycle |
-| `/prompt-cache` | 💾 Gérer le cache prompts |
-| `/prompt-cache stats` | Statistiques du cache |
-
-</td>
-</tr>
-</table>
-
----
-
-## 📦 Installation
-
-### Prérequis
-
-- **Node.js** 18.0.0 ou supérieur
-- **ripgrep** (optionnel mais recommandé)
+- **Node.js** 18.0.0 or higher
+- **ripgrep** (optional but recommended for faster code search)
 
 ```bash
 # macOS
@@ -1096,10 +56,10 @@ sudo apt-get install ripgrep
 choco install ripgrep
 ```
 
-### Installation
+### Install Code Buddy
 
 ```bash
-# npm
+# npm (recommended)
 npm install -g @phuetz/code-buddy
 
 # yarn
@@ -1112,173 +72,406 @@ pnpm add -g @phuetz/code-buddy
 bun add -g @phuetz/code-buddy
 ```
 
-### Configuration
+---
+
+## Quick Start
 
 ```bash
-# 1. Configurer la clé API
-export GROK_API_KEY=votre_clé_api
+# Try without installing (npx)
+npx @phuetz/code-buddy@latest
 
-# 2. (Optionnel) Fichier de configuration
-cat > ~/.grok/user-settings.json << EOF
-{
-  "apiKey": "votre_clé_api",
-  "defaultModel": "grok-4-latest",
-  "theme": "dark"
-}
-EOF
+# Configure your API key (from x.ai)
+export GROK_API_KEY=your_api_key
 
-# 3. Lancer !
-grok
+# Start interactive mode
+buddy
+
+# Or run a single command (headless mode)
+buddy --prompt "analyze the project structure"
+```
+
+### Common Options
+
+```bash
+# Specify working directory
+buddy -d /path/to/project
+
+# Use a specific model
+buddy --model grok-4-latest
+
+# Resume last session
+buddy --resume
+
+# YOLO mode (full autonomy - use with caution!)
+YOLO_MODE=true buddy
+
+# Use with local LLM (Ollama)
+export GROK_BASE_URL=http://localhost:11434/v1
+export GROK_API_KEY=ollama
+buddy --model llama3.2
 ```
 
 ---
 
-## 🔬 Fondation Scientifique
+## AI Providers
 
-> *"Construit sur les dernières recherches en IA assistée."*
+Code Buddy supports multiple AI providers:
 
-<table>
-<tr>
-<td>
+| Provider | Default Model | Context | API Key Variable |
+|:---------|:--------------|:--------|:-----------------|
+| **Grok** (xAI) | `grok-code-fast-1` | 128K | `GROK_API_KEY` |
+| **Claude** (Anthropic) | `claude-sonnet-4` | 200K | `ANTHROPIC_API_KEY` |
+| **ChatGPT** (OpenAI) | `gpt-4o` | 128K | `OPENAI_API_KEY` |
+| **Gemini** (Google) | `gemini-2.0-flash` | 2M | `GOOGLE_API_KEY` |
 
-| 📚 Recherche | 🎯 Contribution |
-|:-------------|:----------------|
-| **RethinkMCTS** | +74% vs CoT simple |
-| **ChatRepair** | Réparation conversationnelle |
-| **CodeRAG** | Context avec graphe de deps |
-| **JetBrains 2024** | -7% coût, +2.6% succès |
-| **FrugalGPT** | 30-70% réduction coûts |
-| **LLMCompiler** | 2.5-4.6x speedup |
+### Switching Providers
 
-</td>
-<td>
+```bash
+# List available providers
+buddy provider list
 
-| 📊 Benchmark | 📝 Description |
-|:-------------|:---------------|
-| **SWE-bench** | Tâches réelles |
-| **SWE-bench Verified** | 500 problèmes validés |
-| **Berkeley FCL** | Benchmark outils |
+# Set active provider
+buddy provider set claude
 
-</td>
-</tr>
-</table>
+# Use provider for a single command
+buddy --provider openai "explain this code"
+
+# List models for a provider
+buddy provider models claude
+```
 
 ---
 
-## 🤝 Contribuer
+## Features
 
-Les contributions sont les bienvenues ! 💖
+### Recent Improvements (27+ enhancements)
+
+- **Facade Architecture** - Clean separation of concerns with `AgentContextFacade`, `SessionFacade`, `ModelRoutingFacade`, `InfrastructureFacade`
+- **Plugin Providers** - Plugins can now register LLM, embedding, and search providers
+- **Stream Helpers** - Standardized async iterable handling with timeouts, iteration limits, and error categorization
+- **Input Validators** - Result-based validation for file paths, commands, URLs, API keys, and JSON
+- **HTTP Server** - Full REST API with WebSocket support, JWT auth, rate limiting, and Prometheus metrics
+
+### Core Capabilities
+
+| Feature | Description |
+|:--------|:------------|
+| **Multi-Agent System** | Specialized agents (Coder, Reviewer, Tester, Refactorer, Documenter) |
+| **Tree-of-Thought + MCTS** | Advanced reasoning with exploration and evaluation |
+| **APR Engine** | Automatic Program Repair with fault localization |
+| **RAG for Code** | Semantic code search with embeddings |
+| **TDD Mode** | Test-first development workflow |
+| **Cost Tracking** | Real-time token usage and cost monitoring |
+| **Lifecycle Hooks** | Pre/post hooks for edit, bash, commit, prompt |
+
+### Security Modes
+
+| Mode | Description |
+|:-----|:------------|
+| `read-only` | No modifications allowed |
+| `auto` | Auto-approve safe operations, confirm others |
+| `full-access` | Full autonomy (use in trusted environments) |
 
 ```bash
-# 1. Fork et clone
+/mode read-only   # Switch to safe mode
+/security status  # View security dashboard
+```
+
+### Slash Commands
+
+| Command | Description |
+|:--------|:------------|
+| `/help` | Show help |
+| `/model` | Change model |
+| `/mode` | Change security mode |
+| `/think` | Enable reasoning (4K tokens) |
+| `/megathink` | Deep reasoning (10K tokens) |
+| `/ultrathink` | Exhaustive reasoning (32K tokens) |
+| `/cost` | Show cost dashboard |
+| `/tdd start` | Start TDD mode |
+| `/hooks list` | List lifecycle hooks |
+
+---
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Description | Default |
+|:---------|:------------|:--------|
+| `GROK_API_KEY` | xAI API key (required) | - |
+| `ANTHROPIC_API_KEY` | Anthropic API key | - |
+| `OPENAI_API_KEY` | OpenAI API key | - |
+| `GOOGLE_API_KEY` | Google AI API key | - |
+| `GROK_BASE_URL` | Custom API endpoint | `https://api.x.ai/v1` |
+| `GROK_MODEL` | Default model | `grok-code-fast-1` |
+| `YOLO_MODE` | Enable full autonomy | `false` |
+| `MAX_COST` | Session cost limit ($) | `10` |
+| `MORPH_API_KEY` | Enable fast file editing | - |
+
+### User Settings
+
+Create `~/.grok/user-settings.json`:
+
+```json
+{
+  "apiKey": "your-api-key",
+  "defaultModel": "grok-4-latest",
+  "theme": "dark",
+  "securityMode": "auto"
+}
+```
+
+### Project Settings
+
+Create `.codebuddy/settings.json` in your project root:
+
+```json
+{
+  "systemPrompt": "You are working on a TypeScript project using React.",
+  "tools": {
+    "enabled": ["read_file", "write_file", "bash"],
+    "disabled": ["web_search"]
+  }
+}
+```
+
+---
+
+## Plugin Development
+
+Plugins extend Code Buddy with custom tools, commands, and providers.
+
+### Plugin Structure
+
+```
+~/.codebuddy/plugins/
+  my-plugin/
+    manifest.json
+    index.js
+```
+
+### manifest.json
+
+```json
+{
+  "id": "my-plugin",
+  "name": "My Plugin",
+  "version": "1.0.0",
+  "description": "A custom plugin",
+  "author": "Your Name",
+  "permissions": {
+    "filesystem": ["./data"],
+    "network": ["api.example.com"]
+  },
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "apiKey": { "type": "string", "description": "API key" }
+    },
+    "required": ["apiKey"]
+  }
+}
+```
+
+### Plugin Implementation
+
+```typescript
+// index.ts
+import { Plugin, PluginContext } from '@phuetz/code-buddy/plugins';
+
+const plugin: Plugin = {
+  async activate(context: PluginContext) {
+    // Register a tool
+    context.registerTool({
+      name: 'my_tool',
+      description: 'Does something useful',
+      parameters: {
+        type: 'object',
+        properties: {
+          input: { type: 'string', description: 'Input text' }
+        },
+        required: ['input']
+      },
+      execute: async (args) => {
+        return { success: true, output: `Processed: ${args.input}` };
+      }
+    });
+
+    // Register a provider (LLM, embedding, or search)
+    context.registerProvider({
+      id: 'my-llm',
+      name: 'My LLM Provider',
+      type: 'llm',
+      priority: 10,
+      async initialize() { /* setup */ },
+      async chat(messages) { return 'response'; }
+    });
+
+    context.logger.info('Plugin activated');
+  },
+
+  async deactivate() {
+    // Cleanup
+  }
+};
+
+export default plugin;
+```
+
+### Plugin Management
+
+```bash
+/plugin list              # List installed plugins
+/plugin enable my-plugin  # Enable a plugin
+/plugin disable my-plugin # Disable a plugin
+```
+
+---
+
+## API Server
+
+Code Buddy includes a REST API server with WebSocket support.
+
+### Starting the Server
+
+```bash
+# Start with defaults (port 3000)
+buddy server
+
+# Custom port
+buddy server --port 8080
+
+# With authentication disabled (development only)
+AUTH_ENABLED=false buddy server
+```
+
+### Endpoints
+
+| Endpoint | Method | Description |
+|:---------|:-------|:------------|
+| `/api/health` | GET | Health check |
+| `/api/metrics` | GET | Prometheus metrics |
+| `/api/chat` | POST | Send chat message |
+| `/api/chat/completions` | POST | OpenAI-compatible endpoint |
+| `/api/tools` | GET | List available tools |
+| `/api/tools/{name}/execute` | POST | Execute a tool |
+| `/api/sessions` | GET/POST | List/create sessions |
+| `/api/memory` | GET/POST | Memory entries |
+
+### WebSocket
+
+Connect to `/ws` for real-time streaming:
+
+```javascript
+const ws = new WebSocket('ws://localhost:3000/ws');
+
+// Authenticate
+ws.send(JSON.stringify({
+  type: 'authenticate',
+  payload: { token: 'your-jwt-token' }
+}));
+
+// Send chat message
+ws.send(JSON.stringify({
+  type: 'chat_stream',
+  payload: { messages: [{ role: 'user', content: 'Hello' }] }
+}));
+```
+
+See [docs/API.md](docs/API.md) for full API documentation.
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+**API key not working**
+```bash
+# Verify your key is set
+echo $GROK_API_KEY
+
+# Test connection
+buddy --prompt "hello"
+```
+
+**High latency**
+- Try a faster model: `buddy --model grok-code-fast-1`
+- Use local LLM with Ollama for offline work
+
+**Out of memory**
+- Reduce context window: adjust `contextWindow` in settings
+- Clear conversation: `/clear`
+
+**Tools not executing**
+- Check security mode: `/mode auto`
+- Verify file permissions in working directory
+
+**Plugin not loading**
+- Check manifest.json format
+- Verify plugin path: `~/.codebuddy/plugins/plugin-name/`
+- Check logs: `buddy --debug`
+
+### Debug Mode
+
+```bash
+# Enable verbose logging
+DEBUG=codebuddy:* buddy
+
+# Check version
+buddy --version
+```
+
+### Getting Help
+
+- [GitHub Issues](https://github.com/phuetz/code-buddy/issues)
+- [Discussions](https://github.com/phuetz/code-buddy/discussions)
+
+---
+
+## Documentation
+
+- [Architecture](ARCHITECTURE.md) - System design
+- [AI Providers](docs/ai-providers.md) - Provider configuration
+- [API Reference](docs/API.md) - HTTP/WebSocket API
+- [CLAUDE.md](CLAUDE.md) - Guide for AI assistants
+- [Changelog](CHANGELOG.md) - Version history
+
+---
+
+## Contributing
+
+```bash
+# Clone and install
 git clone https://github.com/phuetz/code-buddy.git
 cd code-buddy
-
-# 2. Install et dev
 npm install
+
+# Development
 npm run dev
 
-# 3. Tester
+# Run tests
 npm test
 
-# 4. Créer une PR !
+# Validate before committing
+npm run validate
 ```
 
 ---
 
-## 📚 Documentation
+## License
 
-- 📖 [Architecture](ARCHITECTURE.md) — Design système détaillé
-- 🤖 [Providers IA](docs/ai-providers.md) — Configuration Claude, ChatGPT, Gemini
-- 🔧 [CLAUDE.md](CLAUDE.md) — Guide pour les IA
-- 🔬 [Research](docs/RESEARCH_IMPROVEMENTS.md) — Améliorations basées recherche
-- 🔒 [Security](SECURITY.md) — Politique de sécurité
-- 📝 [Changelog](CHANGELOG.md) — Historique des versions
-
----
-
-## 📖 Le Livre : "Construire un Agent LLM Moderne"
-
-> *Un guide complet de 60 000 mots pour comprendre et construire des agents IA comme Code Buddy*
-
-<table>
-<tr>
-<td width="60%">
-
-**15 chapitres couvrant :**
-
-| Partie | Chapitres | Sujets |
-|:-------|:----------|:-------|
-| **I. Fondations** | 1-3 | LLMs, taxonomie agents, anatomie |
-| **II. Raisonnement** | 4-6 | Tree-of-Thought, MCTS, Repair |
-| **III. Mémoire & RAG** | 7-9 | RAG moderne, dépendances, compression |
-| **IV. Actions** | 10-11 | Tool-use, MCP, plugins |
-| **V. Optimisation** | 12-13 | Cache, routing, parallélisation |
-| **VI. Apprentissage** | 14 | Mémoire persistante |
-| **VII. Architecture** | 15 | Code Buddy de A à Z |
-
-</td>
-<td width="40%">
-
-**Contenu :**
-- Scènes narratives avec "Lina"
-- Code TypeScript complet
-- Diagrammes ASCII
-- Exercices pratiques
-- Références scientifiques
-
-**Format :** 16 fichiers Markdown
-
-</td>
-</tr>
-</table>
-
-### Lire le livre
-
-```bash
-# Avec glow (recommandé)
-brew install glow        # macOS
-sudo apt install glow    # Ubuntu
-
-glow docs/livre/         # Parcourir tous les chapitres
-glow docs/livre/01-comprendre-les-llms.md  # Lire un chapitre
-
-# Dans VS Code
-code docs/livre/
-# Puis Ctrl+Shift+V pour prévisualiser
-
-# Générer un PDF
-cd docs/livre
-pandoc -o livre-code-buddy.pdf *.md --pdf-engine=xelatex
-
-# Dans le navigateur (GitHub style)
-pip install grip
-grip docs/livre/
-# Ouvrir http://localhost:6419
-```
-
-**[Accéder au livre](docs/livre/)**
-
----
-
-## 📜 Licence
-
-MIT License — voir [LICENSE](LICENSE) pour les détails.
+MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
 <div align="center">
 
-### 💖 Fait avec amour par la communauté Code Buddy
+**[Report Bug](https://github.com/phuetz/code-buddy/issues)** |
+**[Request Feature](https://github.com/phuetz/code-buddy/discussions)** |
+**[Star on GitHub](https://github.com/phuetz/code-buddy)**
 
-<br/>
-
-**[🐛 Signaler un Bug](https://github.com/phuetz/code-buddy/issues)** •
-**[💡 Proposer une Fonctionnalité](https://github.com/phuetz/code-buddy/discussions)** •
-**[⭐ Donner une Étoile](https://github.com/phuetz/code-buddy)**
-
-<br/>
-
-<sub>🤖 Multi-IA : Grok • Claude • ChatGPT • Gemini • 🧠 Inspiré par Claude Code • 💕 Créé pour les développeurs</sub>
+<sub>Multi-AI: Grok | Claude | ChatGPT | Gemini | Inspired by Claude Code</sub>
 
 </div>

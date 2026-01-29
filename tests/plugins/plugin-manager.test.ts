@@ -1,6 +1,7 @@
 import { PluginManager } from '../../src/plugins/plugin-manager.js';
 import fs from 'fs-extra';
 import path from 'path';
+import os from 'os';
 import { Plugin, PluginContext, PluginProvider, PluginProviderType } from '../../src/plugins/types.js';
 
 // Mock dependencies
@@ -424,6 +425,172 @@ describe('PluginManager', () => {
           })
         );
       });
+    });
+  });
+
+  describe('plugin configuration', () => {
+    const pluginId = 'config-test-plugin';
+    const userConfigDir = path.join(os.homedir(), '.codebuddy', 'plugins', pluginId);
+    const userConfigPath = path.join(userConfigDir, 'config.json');
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should load default config from manifest', async () => {
+      const manifest = {
+        id: pluginId,
+        name: 'Config Test Plugin',
+        version: '1.0.0',
+        description: 'Test',
+        defaultConfig: {
+          setting1: 'default-value',
+          setting2: 42
+        }
+      };
+
+      // No user config exists
+      (fs.pathExists as jest.Mock).mockResolvedValue(false);
+
+      const config = await (manager as any).loadPluginConfig(manifest);
+
+      expect(config).toEqual({
+        setting1: 'default-value',
+        setting2: 42
+      });
+    });
+
+    it('should merge user config over defaults', async () => {
+      const manifest = {
+        id: pluginId,
+        name: 'Config Test Plugin',
+        version: '1.0.0',
+        description: 'Test',
+        defaultConfig: {
+          setting1: 'default-value',
+          setting2: 42,
+          setting3: 'not-overridden'
+        }
+      };
+
+      // User config exists
+      (fs.pathExists as jest.Mock).mockImplementation(async (p: string) => {
+        return p === userConfigPath;
+      });
+
+      (fs.readJson as jest.Mock).mockResolvedValue({
+        setting1: 'user-value',
+        setting2: 100
+      });
+
+      const config = await (manager as any).loadPluginConfig(manifest);
+
+      expect(config).toEqual({
+        setting1: 'user-value',  // overridden
+        setting2: 100,          // overridden
+        setting3: 'not-overridden' // kept from defaults
+      });
+    });
+
+    it('should handle missing user config gracefully', async () => {
+      const manifest = {
+        id: pluginId,
+        name: 'Config Test Plugin',
+        version: '1.0.0',
+        description: 'Test'
+        // no defaultConfig
+      };
+
+      (fs.pathExists as jest.Mock).mockResolvedValue(false);
+
+      const config = await (manager as any).loadPluginConfig(manifest);
+
+      expect(config).toEqual({});
+    });
+
+    it('should handle invalid user config file', async () => {
+      const manifest = {
+        id: pluginId,
+        name: 'Config Test Plugin',
+        version: '1.0.0',
+        description: 'Test',
+        defaultConfig: {
+          setting1: 'default'
+        }
+      };
+
+      (fs.pathExists as jest.Mock).mockImplementation(async (p: string) => {
+        return p === userConfigPath;
+      });
+
+      // Simulate JSON parse error
+      (fs.readJson as jest.Mock).mockRejectedValue(new Error('Invalid JSON'));
+
+      const config = await (manager as any).loadPluginConfig(manifest);
+
+      // Should fall back to defaults
+      expect(config).toEqual({
+        setting1: 'default'
+      });
+    });
+
+    it('should validate config against schema and emit event on errors', async () => {
+      const manifest = {
+        id: pluginId,
+        name: 'Config Test Plugin',
+        version: '1.0.0',
+        description: 'Test',
+        configSchema: {
+          type: 'object',
+          properties: {
+            apiKey: { type: 'string' },
+            port: { type: 'number' }
+          },
+          required: ['apiKey']
+        },
+        defaultConfig: {}
+      };
+
+      (fs.pathExists as jest.Mock).mockResolvedValue(false);
+
+      const eventHandler = jest.fn();
+      manager.on('plugin:config-validation-failed', eventHandler);
+
+      await (manager as any).loadPluginConfig(manifest);
+
+      // Should emit validation error event for missing required field
+      expect(eventHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pluginId,
+          errors: expect.any(Array)
+        })
+      );
+    });
+
+    it('should cache loaded config for retrieval', async () => {
+      const manifest = {
+        id: pluginId,
+        name: 'Config Test Plugin',
+        version: '1.0.0',
+        description: 'Test',
+        defaultConfig: {
+          cached: 'value'
+        }
+      };
+
+      (fs.pathExists as jest.Mock).mockResolvedValue(false);
+
+      await (manager as any).loadPluginConfig(manifest);
+
+      const cachedConfig = manager.getPluginConfig(pluginId);
+      expect(cachedConfig).toEqual({
+        cached: 'value'
+      });
+    });
+
+    it('should return undefined for uncached plugin config', () => {
+      const config = manager.getPluginConfig('non-existent-plugin');
+      expect(config).toBeUndefined();
     });
   });
 });

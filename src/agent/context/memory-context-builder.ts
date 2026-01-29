@@ -552,3 +552,380 @@ export function resetMemoryContextBuilder(): void {
   }
   builderInstance = null;
 }
+
+// ============================================================================
+// Smart Suggestions Module
+// ============================================================================
+
+/**
+ * User input pattern for suggestion learning
+ */
+export interface InputPattern {
+  keywords: string[];
+  suggestedTools: string[];
+  frequency: number;
+  successRate: number;
+  lastUsed: Date;
+}
+
+/**
+ * Tool suggestion based on input analysis
+ */
+export interface SmartSuggestion {
+  toolName: string;
+  confidence: number;
+  reason: string;
+  basedOn: 'keyword' | 'pattern' | 'history' | 'context';
+}
+
+/**
+ * Smart Suggestions Manager
+ *
+ * Learns from user input patterns and successful tool chains
+ * to provide intelligent tool suggestions.
+ */
+export class SmartSuggestionsManager extends EventEmitter {
+  private patterns: Map<string, InputPattern> = new Map();
+  private toolChainHistory: Array<{ tools: string[]; success: boolean; timestamp: Date }> = [];
+  private maxHistory: number = 500;
+  private keywordToolMap: Map<string, string[]>;
+
+  constructor() {
+    super();
+    // Initialize common keyword -> tool mappings
+    this.keywordToolMap = new Map([
+      ['read', ['read_file', 'list_directory']],
+      ['file', ['read_file', 'write_file', 'edit_file']],
+      ['write', ['write_file', 'edit_file']],
+      ['edit', ['edit_file', 'search_replace']],
+      ['search', ['ripgrep_search', 'codebase_search', 'grep_search']],
+      ['find', ['ripgrep_search', 'list_directory', 'glob_search']],
+      ['grep', ['ripgrep_search', 'grep_search']],
+      ['list', ['list_directory', 'glob_search']],
+      ['run', ['bash', 'execute_command']],
+      ['execute', ['bash', 'execute_command']],
+      ['bash', ['bash']],
+      ['terminal', ['bash', 'execute_command']],
+      ['command', ['bash', 'execute_command']],
+      ['git', ['bash', 'git_status', 'git_diff']],
+      ['commit', ['bash', 'git_commit']],
+      ['test', ['bash', 'run_tests']],
+      ['npm', ['bash']],
+      ['install', ['bash']],
+      ['build', ['bash']],
+      ['create', ['write_file', 'create_directory']],
+      ['delete', ['delete_file', 'bash']],
+      ['remove', ['delete_file', 'bash']],
+      ['copy', ['bash', 'write_file']],
+      ['move', ['bash']],
+      ['rename', ['bash', 'edit_file']],
+      ['web', ['fetch_url', 'web_search']],
+      ['fetch', ['fetch_url']],
+      ['url', ['fetch_url']],
+      ['api', ['fetch_url', 'bash']],
+      ['image', ['view_image', 'generate_image']],
+      ['screenshot', ['take_screenshot']],
+      ['think', ['thinking', 'extended_thinking']],
+      ['plan', ['thinking', 'create_plan']],
+      ['analyze', ['codebase_search', 'read_file', 'thinking']],
+      ['refactor', ['edit_file', 'search_replace']],
+      ['debug', ['bash', 'read_file', 'thinking']],
+      ['fix', ['edit_file', 'bash']],
+      ['error', ['read_file', 'bash', 'thinking']],
+      ['todo', ['ripgrep_search', 'edit_file']],
+      ['comment', ['edit_file']],
+      ['document', ['write_file', 'edit_file']],
+      ['readme', ['read_file', 'write_file']],
+    ]);
+  }
+
+  /**
+   * Get tool suggestions based on user input
+   */
+  suggestTools(input: string): SmartSuggestion[] {
+    const suggestions: SmartSuggestion[] = [];
+    const inputLower = input.toLowerCase();
+    const words = inputLower.split(/\s+/);
+
+    // 1. Keyword-based suggestions
+    const keywordSuggestions = this.suggestFromKeywords(words);
+    suggestions.push(...keywordSuggestions);
+
+    // 2. Pattern-based suggestions (from learned patterns)
+    const patternSuggestions = this.suggestFromPatterns(inputLower);
+    suggestions.push(...patternSuggestions);
+
+    // 3. History-based suggestions
+    const historySuggestions = this.suggestFromHistory();
+    suggestions.push(...historySuggestions);
+
+    // Deduplicate and sort by confidence
+    const seen = new Set<string>();
+    const uniqueSuggestions = suggestions.filter(s => {
+      if (seen.has(s.toolName)) return false;
+      seen.add(s.toolName);
+      return true;
+    });
+
+    return uniqueSuggestions
+      .sort((a, b) => b.confidence - a.confidence)
+      .slice(0, 10);
+  }
+
+  /**
+   * Get suggestions from keyword mappings
+   */
+  private suggestFromKeywords(words: string[]): SmartSuggestion[] {
+    const suggestions: SmartSuggestion[] = [];
+    const toolScores = new Map<string, number>();
+
+    for (const word of words) {
+      // Check direct match
+      if (this.keywordToolMap.has(word)) {
+        const tools = this.keywordToolMap.get(word)!;
+        for (let i = 0; i < tools.length; i++) {
+          const tool = tools[i];
+          const score = (tools.length - i) / tools.length; // Higher score for earlier tools
+          toolScores.set(tool, (toolScores.get(tool) || 0) + score);
+        }
+      }
+
+      // Check partial matches
+      for (const [keyword, tools] of this.keywordToolMap) {
+        if (keyword.includes(word) || word.includes(keyword)) {
+          for (const tool of tools) {
+            toolScores.set(tool, (toolScores.get(tool) || 0) + 0.3);
+          }
+        }
+      }
+    }
+
+    // Convert to suggestions
+    for (const [tool, score] of toolScores) {
+      suggestions.push({
+        toolName: tool,
+        confidence: Math.min(1, score),
+        reason: 'Matches keywords in your input',
+        basedOn: 'keyword',
+      });
+    }
+
+    return suggestions;
+  }
+
+  /**
+   * Get suggestions from learned patterns
+   */
+  private suggestFromPatterns(input: string): SmartSuggestion[] {
+    const suggestions: SmartSuggestion[] = [];
+
+    for (const [, pattern] of this.patterns) {
+      // Check if input matches any keywords in the pattern
+      const matchCount = pattern.keywords.filter(kw => input.includes(kw)).length;
+      if (matchCount > 0) {
+        const matchScore = matchCount / pattern.keywords.length;
+        for (const tool of pattern.suggestedTools) {
+          suggestions.push({
+            toolName: tool,
+            confidence: matchScore * pattern.successRate,
+            reason: `Learned pattern (${(pattern.successRate * 100).toFixed(0)}% success rate)`,
+            basedOn: 'pattern',
+          });
+        }
+      }
+    }
+
+    return suggestions;
+  }
+
+  /**
+   * Get suggestions from recent successful tool chains
+   */
+  private suggestFromHistory(): SmartSuggestion[] {
+    const suggestions: SmartSuggestion[] = [];
+    const recentSuccess = this.toolChainHistory
+      .filter(h => h.success)
+      .slice(-20);
+
+    // Count tool frequencies in successful chains
+    const toolFreq = new Map<string, number>();
+    for (const chain of recentSuccess) {
+      for (const tool of chain.tools) {
+        toolFreq.set(tool, (toolFreq.get(tool) || 0) + 1);
+      }
+    }
+
+    // Convert to suggestions
+    const maxFreq = Math.max(...Array.from(toolFreq.values()), 1);
+    for (const [tool, freq] of toolFreq) {
+      suggestions.push({
+        toolName: tool,
+        confidence: (freq / maxFreq) * 0.5, // Lower confidence for history-based
+        reason: `Used in ${freq} recent successful interactions`,
+        basedOn: 'history',
+      });
+    }
+
+    return suggestions;
+  }
+
+  /**
+   * Learn from a successful tool chain
+   */
+  learnFromSuccess(input: string, tools: string[]): void {
+    if (tools.length === 0) return;
+
+    // Extract keywords from input
+    const keywords = input.toLowerCase()
+      .split(/\s+/)
+      .filter(w => w.length > 2);
+
+    if (keywords.length === 0) return;
+
+    const patternKey = keywords.sort().join('|');
+    const existing = this.patterns.get(patternKey);
+
+    if (existing) {
+      existing.frequency++;
+      existing.successRate = (existing.successRate * (existing.frequency - 1) + 1) / existing.frequency;
+      existing.lastUsed = new Date();
+      // Merge tools
+      for (const tool of tools) {
+        if (!existing.suggestedTools.includes(tool)) {
+          existing.suggestedTools.push(tool);
+        }
+      }
+    } else {
+      this.patterns.set(patternKey, {
+        keywords,
+        suggestedTools: [...tools],
+        frequency: 1,
+        successRate: 1,
+        lastUsed: new Date(),
+      });
+    }
+
+    // Record in history
+    this.toolChainHistory.push({
+      tools,
+      success: true,
+      timestamp: new Date(),
+    });
+
+    // Trim history
+    if (this.toolChainHistory.length > this.maxHistory) {
+      this.toolChainHistory = this.toolChainHistory.slice(-this.maxHistory);
+    }
+
+    this.emit('pattern:learned', { keywords, tools });
+  }
+
+  /**
+   * Learn from a failed tool chain
+   */
+  learnFromFailure(input: string, tools: string[]): void {
+    const keywords = input.toLowerCase()
+      .split(/\s+/)
+      .filter(w => w.length > 2);
+
+    if (keywords.length === 0) return;
+
+    const patternKey = keywords.sort().join('|');
+    const existing = this.patterns.get(patternKey);
+
+    if (existing) {
+      existing.frequency++;
+      existing.successRate = (existing.successRate * (existing.frequency - 1)) / existing.frequency;
+      existing.lastUsed = new Date();
+    }
+
+    // Record in history
+    this.toolChainHistory.push({
+      tools,
+      success: false,
+      timestamp: new Date(),
+    });
+
+    // Trim history
+    if (this.toolChainHistory.length > this.maxHistory) {
+      this.toolChainHistory = this.toolChainHistory.slice(-this.maxHistory);
+    }
+  }
+
+  /**
+   * Add a custom keyword -> tool mapping
+   */
+  addKeywordMapping(keyword: string, tools: string[]): void {
+    const existing = this.keywordToolMap.get(keyword) || [];
+    const merged = [...new Set([...existing, ...tools])];
+    this.keywordToolMap.set(keyword, merged);
+  }
+
+  /**
+   * Get learned patterns
+   */
+  getLearnedPatterns(): InputPattern[] {
+    return Array.from(this.patterns.values())
+      .sort((a, b) => b.frequency - a.frequency);
+  }
+
+  /**
+   * Format suggestions for display
+   */
+  formatSuggestions(suggestions: SmartSuggestion[]): string {
+    if (suggestions.length === 0) {
+      return 'No tool suggestions available.';
+    }
+
+    const lines: string[] = [];
+    lines.push('Suggested Tools:');
+    lines.push('-'.repeat(40));
+
+    for (const suggestion of suggestions) {
+      const confidence = (suggestion.confidence * 100).toFixed(0);
+      lines.push(`  ${suggestion.toolName} (${confidence}% confidence)`);
+      lines.push(`    ${suggestion.reason}`);
+    }
+
+    return lines.join('\n');
+  }
+
+  /**
+   * Clear learned data
+   */
+  clear(): void {
+    this.patterns.clear();
+    this.toolChainHistory = [];
+  }
+
+  /**
+   * Dispose and cleanup
+   */
+  dispose(): void {
+    this.clear();
+    this.removeAllListeners();
+  }
+}
+
+// Singleton for SmartSuggestionsManager
+let suggestionsInstance: SmartSuggestionsManager | null = null;
+
+/**
+ * Get global SmartSuggestionsManager instance
+ */
+export function getSmartSuggestionsManager(): SmartSuggestionsManager {
+  if (!suggestionsInstance) {
+    suggestionsInstance = new SmartSuggestionsManager();
+  }
+  return suggestionsInstance;
+}
+
+/**
+ * Reset global SmartSuggestionsManager
+ */
+export function resetSmartSuggestionsManager(): void {
+  if (suggestionsInstance) {
+    suggestionsInstance.dispose();
+  }
+  suggestionsInstance = null;
+}

@@ -371,6 +371,309 @@ export class SessionStore {
   }
 
   /**
+   * Export session to JSON format
+   */
+  async exportToJson(sessionId: string): Promise<string | null> {
+    const session = await this.loadSession(sessionId);
+    if (!session) return null;
+
+    const exportData = {
+      format: 'code-buddy-session',
+      version: '1.0',
+      exportedAt: new Date().toISOString(),
+      session: {
+        id: session.id,
+        name: session.name,
+        workingDirectory: session.workingDirectory,
+        model: session.model,
+        createdAt: session.createdAt.toISOString(),
+        lastAccessedAt: session.lastAccessedAt.toISOString(),
+        metadata: session.metadata,
+      },
+      messages: session.messages.map(msg => ({
+        type: msg.type,
+        content: msg.content,
+        timestamp: msg.timestamp,
+        toolCallName: msg.toolCallName,
+        toolCallSuccess: msg.toolCallSuccess,
+      })),
+      statistics: {
+        totalMessages: session.messages.length,
+        userMessages: session.messages.filter(m => m.type === 'user').length,
+        assistantMessages: session.messages.filter(m => m.type === 'assistant').length,
+        toolCalls: session.messages.filter(m => m.type === 'tool_call' || m.type === 'tool_result').length,
+        successfulToolCalls: session.messages.filter(m => m.toolCallSuccess === true).length,
+        failedToolCalls: session.messages.filter(m => m.toolCallSuccess === false).length,
+      },
+    };
+
+    return JSON.stringify(exportData, null, 2);
+  }
+
+  /**
+   * Export session to HTML format with syntax highlighting
+   */
+  async exportToHtml(sessionId: string): Promise<string | null> {
+    const session = await this.loadSession(sessionId);
+    if (!session) return null;
+
+    const escapeHtml = (text: string): string => {
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    };
+
+    // Highlight code blocks in content
+    const highlightCodeBlocks = (content: string): string => {
+      // Match code blocks with language specification
+      return content.replace(/```(\w+)?\n([\s\S]*?)```/g, (_, lang, code) => {
+        const language = lang || 'text';
+        return `<pre class="code-block" data-language="${language}"><code class="language-${language}">${escapeHtml(code.trim())}</code></pre>`;
+      });
+    };
+
+    const css = `
+      :root {
+        --bg-primary: #1a1a2e;
+        --bg-secondary: #16213e;
+        --bg-tertiary: #0f3460;
+        --text-primary: #e4e4e4;
+        --text-secondary: #a4a4a4;
+        --accent-user: #00d9ff;
+        --accent-assistant: #00ff88;
+        --accent-tool: #ff9f43;
+        --accent-error: #ff6b6b;
+        --accent-success: #2ed573;
+      }
+      * { box-sizing: border-box; }
+      body {
+        font-family: 'SF Mono', 'Fira Code', Monaco, Consolas, monospace;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 20px;
+        line-height: 1.6;
+      }
+      h1, h2, h3 { color: var(--accent-assistant); }
+      .metadata {
+        background: var(--bg-secondary);
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 24px;
+        border-left: 4px solid var(--accent-assistant);
+      }
+      .metadata p { margin: 8px 0; }
+      .metadata strong { color: var(--accent-user); }
+      .message {
+        background: var(--bg-secondary);
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 16px;
+        position: relative;
+      }
+      .message.user { border-left: 4px solid var(--accent-user); }
+      .message.assistant { border-left: 4px solid var(--accent-assistant); }
+      .message.tool_call, .message.tool_result { border-left: 4px solid var(--accent-tool); }
+      .message.tool_result.success { border-left-color: var(--accent-success); }
+      .message.tool_result.failure { border-left-color: var(--accent-error); }
+      .role-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.85em;
+        font-weight: bold;
+        margin-bottom: 8px;
+      }
+      .role-badge.user { background: var(--accent-user); color: var(--bg-primary); }
+      .role-badge.assistant { background: var(--accent-assistant); color: var(--bg-primary); }
+      .role-badge.tool { background: var(--accent-tool); color: var(--bg-primary); }
+      .timestamp {
+        position: absolute;
+        top: 12px;
+        right: 16px;
+        font-size: 0.75em;
+        color: var(--text-secondary);
+      }
+      .content {
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        margin-top: 8px;
+      }
+      .code-block {
+        background: var(--bg-tertiary);
+        border-radius: 6px;
+        padding: 12px;
+        overflow-x: auto;
+        margin: 12px 0;
+        position: relative;
+      }
+      .code-block::before {
+        content: attr(data-language);
+        position: absolute;
+        top: 4px;
+        right: 8px;
+        font-size: 0.7em;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+      }
+      .code-block code {
+        font-family: inherit;
+        font-size: 0.9em;
+      }
+      .statistics {
+        background: var(--bg-tertiary);
+        border-radius: 8px;
+        padding: 16px;
+        margin-top: 32px;
+      }
+      .statistics h3 { margin-top: 0; }
+      .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+      }
+      .stat-item {
+        background: var(--bg-secondary);
+        padding: 12px;
+        border-radius: 6px;
+        text-align: center;
+      }
+      .stat-value {
+        font-size: 1.5em;
+        font-weight: bold;
+        color: var(--accent-user);
+      }
+      .stat-label { font-size: 0.85em; color: var(--text-secondary); }
+      footer {
+        text-align: center;
+        margin-top: 32px;
+        color: var(--text-secondary);
+        font-size: 0.85em;
+      }
+    `;
+
+    const lines: string[] = [];
+    lines.push('<!DOCTYPE html>');
+    lines.push('<html lang="en">');
+    lines.push('<head>');
+    lines.push('  <meta charset="UTF-8">');
+    lines.push('  <meta name="viewport" content="width=device-width, initial-scale=1.0">');
+    lines.push(`  <title>${escapeHtml(session.name)} - Code Buddy Session</title>`);
+    lines.push(`  <style>${css}</style>`);
+    lines.push('</head>');
+    lines.push('<body>');
+
+    // Header
+    lines.push(`  <h1>${escapeHtml(session.name)}</h1>`);
+
+    // Metadata
+    lines.push('  <div class="metadata">');
+    lines.push(`    <p><strong>Session ID:</strong> ${escapeHtml(session.id)}</p>`);
+    lines.push(`    <p><strong>Created:</strong> ${session.createdAt.toLocaleString()}</p>`);
+    lines.push(`    <p><strong>Last Accessed:</strong> ${session.lastAccessedAt.toLocaleString()}</p>`);
+    lines.push(`    <p><strong>Working Directory:</strong> ${escapeHtml(session.workingDirectory)}</p>`);
+    lines.push(`    <p><strong>Model:</strong> ${escapeHtml(session.model)}</p>`);
+    lines.push('  </div>');
+
+    // Messages
+    lines.push('  <h2>Conversation</h2>');
+    for (const message of session.messages) {
+      const successClass = message.toolCallSuccess === true ? ' success' : message.toolCallSuccess === false ? ' failure' : '';
+      lines.push(`  <div class="message ${message.type}${successClass}">`);
+
+      // Timestamp
+      const time = new Date(message.timestamp).toLocaleTimeString();
+      lines.push(`    <span class="timestamp">${time}</span>`);
+
+      // Role badge
+      let roleText = message.type.charAt(0).toUpperCase() + message.type.slice(1).replace('_', ' ');
+      let roleClass = message.type === 'tool_call' || message.type === 'tool_result' ? 'tool' : message.type;
+      if (message.toolCallName) {
+        roleText = `Tool: ${message.toolCallName}`;
+      }
+      lines.push(`    <span class="role-badge ${roleClass}">${roleText}</span>`);
+
+      // Content with highlighted code blocks
+      const processedContent = highlightCodeBlocks(escapeHtml(message.content));
+      lines.push(`    <div class="content">${processedContent}</div>`);
+
+      lines.push('  </div>');
+    }
+
+    // Statistics
+    const stats = {
+      total: session.messages.length,
+      user: session.messages.filter(m => m.type === 'user').length,
+      assistant: session.messages.filter(m => m.type === 'assistant').length,
+      toolSuccess: session.messages.filter(m => m.toolCallSuccess === true).length,
+      toolFail: session.messages.filter(m => m.toolCallSuccess === false).length,
+    };
+
+    lines.push('  <div class="statistics">');
+    lines.push('    <h3>Session Statistics</h3>');
+    lines.push('    <div class="stat-grid">');
+    lines.push(`      <div class="stat-item"><div class="stat-value">${stats.total}</div><div class="stat-label">Total Messages</div></div>`);
+    lines.push(`      <div class="stat-item"><div class="stat-value">${stats.user}</div><div class="stat-label">User Messages</div></div>`);
+    lines.push(`      <div class="stat-item"><div class="stat-value">${stats.assistant}</div><div class="stat-label">Assistant Responses</div></div>`);
+    lines.push(`      <div class="stat-item"><div class="stat-value">${stats.toolSuccess}</div><div class="stat-label">Successful Tools</div></div>`);
+    lines.push(`      <div class="stat-item"><div class="stat-value">${stats.toolFail}</div><div class="stat-label">Failed Tools</div></div>`);
+    lines.push('    </div>');
+    lines.push('  </div>');
+
+    // Footer
+    lines.push('  <footer>');
+    lines.push(`    <p>Exported from Code Buddy on ${new Date().toLocaleString()}</p>`);
+    lines.push('  </footer>');
+    lines.push('</body>');
+    lines.push('</html>');
+
+    return lines.join('\n');
+  }
+
+  /**
+   * Export session to file with specified format
+   */
+  async exportSessionToFileWithFormat(
+    sessionId: string,
+    format: 'markdown' | 'json' | 'html',
+    outputPath?: string
+  ): Promise<string | null> {
+    let content: string | null;
+    let extension: string;
+
+    switch (format) {
+      case 'json':
+        content = await this.exportToJson(sessionId);
+        extension = 'json';
+        break;
+      case 'html':
+        content = await this.exportToHtml(sessionId);
+        extension = 'html';
+        break;
+      case 'markdown':
+      default:
+        content = await this.exportToMarkdown(sessionId);
+        extension = 'md';
+        break;
+    }
+
+    if (!content) return null;
+
+    const session = await this.loadSession(sessionId);
+    if (!session) return null;
+
+    const fileName = outputPath || `codebuddy-session-${session.id.slice(0, 8)}.${extension}`;
+    const fullPath = path.resolve(process.cwd(), fileName);
+
+    await fsPromises.writeFile(fullPath, content);
+    return fullPath;
+  }
+
+  /**
    * Resume a session (set as current)
    */
   async resumeSession(sessionId: string): Promise<Session | null> {

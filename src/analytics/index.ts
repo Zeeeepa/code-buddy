@@ -9,6 +9,7 @@
  * - Daily/weekly/monthly summaries
  * - Export to CSV
  * - Budget alerts
+ * - Tool usage analytics
  */
 
 export {
@@ -32,3 +33,14 @@ export {
   type SessionMetrics,
   type PerformanceMetrics,
 } from './metrics-dashboard.js';
+
+export {
+  ToolAnalytics,
+  getToolAnalytics,
+  resetToolAnalytics,
+  type ToolExecution,
+  type ToolStats,
+  type ToolChain,
+  type ToolSuggestion,
+  type ToolAnalyticsSnapshot,
+} from './tool-analytics.js';

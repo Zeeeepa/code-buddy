@@ -134,6 +134,30 @@ const WRITE_TOOLS = new Set([
 ]);
 
 /**
+ * Fast tools that typically complete in <100ms
+ * Used for optimization hints
+ */
+const FAST_TOOLS = new Set([
+  "view_file",
+  "codebase_map",
+  "clipboard",
+]);
+
+/**
+ * Slow tools that may benefit from higher timeout
+ * Used for optimization hints
+ */
+const SLOW_TOOLS = new Set([
+  "web_search",
+  "web_fetch",
+  "bash",
+  "search",
+  "pdf",
+  "audio",
+  "video",
+]);
+
+/**
  * ToolExecutionOrchestrator - Manages the agentic tool execution loop
  *
  * This class handles the orchestration of tool execution during an
@@ -251,39 +275,44 @@ export class ToolExecutionOrchestrator extends EventEmitter {
     const canParallelize = this.canParallelizeToolCalls(toolCalls);
 
     if (canParallelize) {
-      // Execute in parallel with proper error handling per tool
-      const promises = toolCalls.map(async (toolCall) => {
-        const toolStartTime = Date.now();
-        this.emit("tool:start", { toolCall });
+      // Execute in parallel with concurrency limit
+      const concurrencyLimit = Math.min(this.config.maxConcurrent, toolCalls.length);
 
-        try {
-          const result = await this.executeWithTimeout(toolCall);
-          const duration = Date.now() - toolStartTime;
+      if (toolCalls.length <= concurrencyLimit) {
+        // Simple parallel execution for small batches
+        const promises = toolCalls.map(async (toolCall) => {
+          return this.executeSingleTool(toolCall);
+        });
 
-          this.emit("tool:complete", { toolCall, result, duration });
-          this.updateToolStats(toolCall.function.name, result.success, duration);
-
-          return { id: toolCall.id, result };
-        } catch (error) {
-          const duration = Date.now() - toolStartTime;
-          const errorResult: ToolResult = {
-            success: false,
-            error: `Tool execution failed: ${getErrorMessage(error)}`,
-          };
-
-          this.emit("tool:error", {
-            toolCall,
-            error: getErrorMessage(error),
-          });
-          this.updateToolStats(toolCall.function.name, false, duration);
-
-          return { id: toolCall.id, result: errorResult };
+        const settled = await Promise.all(promises);
+        for (const { id, result } of settled) {
+          results.set(id, result);
         }
-      });
+      } else {
+        // Use controlled concurrency for larger batches
+        const executing: Promise<void>[] = [];
+        const queue = [...toolCalls];
 
-      const settled = await Promise.all(promises);
-      for (const { id, result } of settled) {
-        results.set(id, result);
+        while (queue.length > 0 || executing.length > 0) {
+          // Fill up to concurrency limit
+          while (executing.length < concurrencyLimit && queue.length > 0) {
+            const toolCall = queue.shift()!;
+            const promise = this.executeSingleTool(toolCall)
+              .then(({ id, result }) => {
+                results.set(id, result);
+              })
+              .finally(() => {
+                const index = executing.indexOf(promise);
+                if (index !== -1) executing.splice(index, 1);
+              });
+            executing.push(promise);
+          }
+
+          // Wait for at least one to complete
+          if (executing.length > 0) {
+            await Promise.race(executing);
+          }
+        }
       }
     } else {
       // Execute sequentially
@@ -354,6 +383,40 @@ export class ToolExecutionOrchestrator extends EventEmitter {
     });
 
     return batchResult;
+  }
+
+  /**
+   * Execute a single tool call with full tracking
+   */
+  private async executeSingleTool(
+    toolCall: CodeBuddyToolCall
+  ): Promise<{ id: string; result: ToolResult }> {
+    const toolStartTime = Date.now();
+    this.emit("tool:start", { toolCall });
+
+    try {
+      const result = await this.executeWithTimeout(toolCall);
+      const duration = Date.now() - toolStartTime;
+
+      this.emit("tool:complete", { toolCall, result, duration });
+      this.updateToolStats(toolCall.function.name, result.success, duration);
+
+      return { id: toolCall.id, result };
+    } catch (error) {
+      const duration = Date.now() - toolStartTime;
+      const errorResult: ToolResult = {
+        success: false,
+        error: `Tool execution failed: ${getErrorMessage(error)}`,
+      };
+
+      this.emit("tool:error", {
+        toolCall,
+        error: getErrorMessage(error),
+      });
+      this.updateToolStats(toolCall.function.name, false, duration);
+
+      return { id: toolCall.id, result: errorResult };
+    }
   }
 
   /**
@@ -456,6 +519,75 @@ export class ToolExecutionOrchestrator extends EventEmitter {
    */
   updateConfig(config: Partial<OrchestratorConfig>): void {
     this.config = { ...this.config, ...config };
+  }
+
+  /**
+   * Get optimization hints based on tool execution patterns
+   */
+  getOptimizationHints(): string[] {
+    const hints: string[] = [];
+    const stats = this.metrics.toolStats;
+
+    // Check for slow tools
+    for (const [tool, stat] of stats) {
+      if (stat.avgTime > 1000) {
+        hints.push(`Tool "${tool}" is slow (avg ${stat.avgTime.toFixed(0)}ms). Consider caching.`);
+      }
+    }
+
+    // Check for high failure rates
+    for (const [tool, stat] of stats) {
+      const failRate = stat.failures / stat.calls;
+      if (stat.calls >= 3 && failRate > 0.3) {
+        hints.push(`Tool "${tool}" has high failure rate (${(failRate * 100).toFixed(0)}%).`);
+      }
+    }
+
+    // Check for tools that could be parallelized
+    const sequentialWriteTools = [...stats.entries()]
+      .filter(([tool]) => WRITE_TOOLS.has(tool))
+      .filter(([_, stat]) => stat.calls > 3);
+
+    if (sequentialWriteTools.length > 1) {
+      hints.push('Multiple write tools detected. Consider batching write operations.');
+    }
+
+    // Check parallelization efficiency
+    const parallelTools = [...stats.entries()]
+      .filter(([tool]) => SAFE_PARALLEL_TOOLS.has(tool));
+
+    if (parallelTools.length > 3) {
+      hints.push(`${parallelTools.length} parallelizable tools used. Ensure parallel execution is enabled.`);
+    }
+
+    return hints;
+  }
+
+  /**
+   * Check if a tool is typically fast
+   */
+  isToolFast(toolName: string): boolean {
+    return FAST_TOOLS.has(toolName);
+  }
+
+  /**
+   * Check if a tool is typically slow
+   */
+  isToolSlow(toolName: string): boolean {
+    return SLOW_TOOLS.has(toolName);
+  }
+
+  /**
+   * Get recommended timeout for a tool
+   */
+  getRecommendedTimeout(toolName: string): number {
+    if (FAST_TOOLS.has(toolName)) {
+      return Math.min(30000, this.config.toolTimeout);
+    }
+    if (SLOW_TOOLS.has(toolName)) {
+      return Math.max(180000, this.config.toolTimeout);
+    }
+    return this.config.toolTimeout;
   }
 
   /**

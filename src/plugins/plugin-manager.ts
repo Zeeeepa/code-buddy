@@ -358,11 +358,19 @@ export class PluginManager extends EventEmitter {
    * Activate a plugin in an isolated Worker Thread
    */
   private async activateIsolatedPlugin(metadata: PluginMetadata): Promise<void> {
+    // Load plugin-specific configuration before creating the runner
+    this.emit('plugin:progress', {
+      id: metadata.manifest.id,
+      phase: 'loading-config',
+      message: `Loading configuration for ${metadata.manifest.name}...`,
+    });
+    const pluginConfig = await this.loadPluginConfig(metadata.manifest);
+
     const runner = createIsolatedPluginRunner({
       pluginPath: metadata.path,
       pluginId: metadata.manifest.id,
       dataDir: path.join(this.config.pluginDir, metadata.manifest.id, 'data'),
-      config: {}, // TODO: Load plugin-specific config
+      config: pluginConfig,
       permissions: metadata.manifest.permissions ?? {},
       timeout: this.config.isolation?.timeout ?? 30000,
     });

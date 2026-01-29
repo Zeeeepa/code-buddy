@@ -20,6 +20,13 @@ const coreCommands: SlashCommand[] = [
     isBuiltin: true
   },
   {
+    name: 'shortcuts',
+    description: 'Show all keyboard shortcuts and keybindings',
+    prompt: '__SHORTCUTS__',
+    filePath: '',
+    isBuiltin: true
+  },
+  {
     name: 'clear',
     description: 'Clear the chat history',
     prompt: '__CLEAR_CHAT__',
@@ -699,6 +706,16 @@ const statsCommands: SlashCommand[] = [
     isBuiltin: true,
     arguments: [
       { name: 'action', description: 'summary, cache, requests, reset', required: false }
+    ]
+  },
+  {
+    name: 'tool-analytics',
+    description: 'Show tool usage analytics and suggestions',
+    prompt: '__TOOL_ANALYTICS__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'action', description: 'status, top [n], suggest [context], clear, export, save', required: false }
     ]
   }
 ];

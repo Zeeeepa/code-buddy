@@ -1,6 +1,6 @@
 {
   "name": "@phuetz/code-buddy",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "An open-source AI coding agent that brings AI power directly into your terminal.",
   "author": "Patrice Huetz <ton-email@example.com>",
   "repository": {
@@ -43,7 +43,12 @@
     "validate": "npm run lint && npm run typecheck && npm test",
     "install:bun": "bun install",
     "docs": "typedoc",
-    "docs:watch": "typedoc --watch"
+    "docs:watch": "typedoc --watch",
+    "bench": "npm run bench:startup && npm run bench:tools",
+    "bench:startup": "npx tsx benchmarks/startup.bench.ts",
+    "bench:tools": "npx tsx benchmarks/tools.bench.ts",
+    "perf": "PERF_TIMING=true npm start -- --help",
+    "perf:verbose": "PERF_TIMING=true VERBOSE=true npm start -- --help"
   },
   "keywords": [
     "cli",
@@ -58,7 +63,20 @@
     "hooks",
     "grok",
     "openai",
-    "claude"
+    "claude",
+    "xai",
+    "automation",
+    "code-generation",
+    "agentic",
+    "llm",
+    "rag",
+    "semantic-search",
+    "ai-agent",
+    "terminal-ui",
+    "multi-provider",
+    "gemini",
+    "ollama",
+    "local-llm"
   ],
   "license": "MIT",
   "dependencies": {
@@ -75,6 +93,7 @@
     "fast-glob": "^3.3.3",
     "form-data": "^4.0.5",
     "fs-extra": "^11.3.2",
+    "glob": "^10.4.5",
     "ignore": "^5.3.2",
     "ink": "^4.4.1",
     "marked": "^15.0.12",
@@ -108,6 +127,7 @@
     "@types/diff-match-patch": "^1.0.36",
     "@types/express": "^5.0.6",
     "@types/fs-extra": "^11.0.4",
+    "@types/glob": "^8.1.0",
     "@types/jest": "^29.5.14",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.19.26",

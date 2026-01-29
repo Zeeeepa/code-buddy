@@ -65,6 +65,8 @@ export {
   handleModelRouter,
   handleSkill,
   handleSaveConversation,
+  handleShortcuts,
+  handleToolAnalytics,
 } from './core-handlers.js';
 
 // Export handlers

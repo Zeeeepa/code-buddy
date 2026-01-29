@@ -502,3 +502,148 @@ The conversation has been exported in Markdown format.`,
     },
   };
 }
+
+/**
+ * Shortcuts - Display all keyboard shortcuts
+ */
+export function handleShortcuts(): CommandHandlerResult {
+  const content = `
+╔══════════════════════════════════════════════════════════════════╗
+║                    ⌨️  KEYBOARD SHORTCUTS                         ║
+╚══════════════════════════════════════════════════════════════════╝
+
+── Navigation ─────────────────────────────────────────────────────
+
+  Ctrl+R          Reverse search through command history
+  Ctrl+P          Previous command in history
+  Ctrl+N          Next command in history
+  Up/Down         Navigate through history
+  Tab             Auto-complete file paths and commands
+
+── Editing ────────────────────────────────────────────────────────
+
+  Ctrl+A          Move cursor to beginning of line
+  Ctrl+E          Move cursor to end of line
+  Ctrl+W          Delete word before cursor
+  Ctrl+U          Clear entire line
+  Ctrl+K          Delete from cursor to end of line
+  Ctrl+L          Clear screen (keeps current input)
+  Alt+Backspace   Delete previous word
+
+── Control ────────────────────────────────────────────────────────
+
+  Ctrl+C          Cancel current operation/interrupt
+  Ctrl+D          Exit (when input is empty)
+  Ctrl+Z          Suspend to background (Unix only)
+  Enter           Submit input / Send message
+
+── Multiline Input ────────────────────────────────────────────────
+
+  Shift+Enter     New line without submitting
+  Ctrl+Enter      Submit multiline input
+  Esc             Cancel multiline mode
+
+── Tool Confirmations ─────────────────────────────────────────────
+
+  Y / Enter       Accept/confirm operation
+  N               Reject operation
+  A               Accept all remaining operations
+  S               Skip this operation
+  E               Edit before accepting
+
+── Voice Mode (when enabled) ──────────────────────────────────────
+
+  Ctrl+V          Toggle voice input on/off
+  Space           Push-to-talk (hold while speaking)
+
+── Special ────────────────────────────────────────────────────────
+
+  /               Start slash command
+  !               Run shell command directly (e.g., !ls -la)
+  @               Reference a file (e.g., @src/index.ts)
+  #               Add context tag (e.g., #urgent)
+
+── Vim Mode (when enabled with /vim on) ───────────────────────────
+
+  i               Enter insert mode
+  Esc             Exit insert mode
+  j/k             Navigate history (normal mode)
+  dd              Delete line
+  yy              Yank (copy) line
+  p               Paste
+
+───────────────────────────────────────────────────────────────────
+  Tip: Use /shortcuts anytime to see this reference
+───────────────────────────────────────────────────────────────────
+`.trim();
+
+  return {
+    handled: true,
+    entry: {
+      type: "assistant",
+      content,
+      timestamp: new Date(),
+    },
+  };
+}
+
+/**
+ * Tool Analytics - Show tool usage statistics
+ */
+export async function handleToolAnalytics(args: string[]): Promise<CommandHandlerResult> {
+  // Lazy import to avoid circular dependencies
+  const { getToolAnalytics } = await import('../../analytics/tool-analytics.js');
+  const analytics = getToolAnalytics();
+  const action = args[0]?.toLowerCase();
+
+  let content: string;
+
+  switch (action) {
+    case 'clear':
+      analytics.clear();
+      content = 'Tool analytics data cleared.';
+      break;
+
+    case 'export':
+      content = analytics.exportToJson();
+      break;
+
+    case 'save':
+      await analytics.save();
+      content = 'Tool analytics saved to disk.';
+      break;
+
+    case 'top':
+      const limit = parseInt(args[1]) || 10;
+      const topTools = analytics.getMostUsedTools(limit);
+      const lines: string[] = ['Top Used Tools:', '-'.repeat(40)];
+      for (const tool of topTools) {
+        lines.push(`  ${tool.toolName}: ${tool.totalExecutions} uses (${tool.successRate.toFixed(1)}% success)`);
+      }
+      content = lines.join('\n');
+      break;
+
+    case 'suggest':
+      const suggestions = analytics.suggestTools(args.slice(1).join(' '), args[1]);
+      const suggLines: string[] = ['Suggested Tools:', '-'.repeat(40)];
+      for (const s of suggestions.slice(0, 5)) {
+        suggLines.push(`  ${s.toolName} (${(s.confidence * 100).toFixed(0)}% confidence)`);
+        suggLines.push(`    ${s.reason}`);
+      }
+      content = suggLines.join('\n');
+      break;
+
+    default:
+      content = analytics.formatAnalytics();
+      break;
+  }
+
+  return {
+    handled: true,
+    entry: {
+      type: 'assistant',
+      content,
+      timestamp: new Date(),
+    },
+  };
+}

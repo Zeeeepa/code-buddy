@@ -1,27 +1,356 @@
-# Code Buddy API Documentation
+# Code Buddy API Reference
 
-## Overview
-
-Code Buddy is an AI-powered terminal agent using the Grok API (xAI) via OpenAI SDK. This document covers the main public APIs for developers.
+This document covers both the programmatic API and the HTTP/WebSocket server API.
 
 ## Table of Contents
 
-1. [CodeBuddyAgent](#1-grokagent)
-2. [Tool Executor](#2-tool-executor)
-3. [Tools](#3-tools)
-4. [Providers](#4-providers)
-5. [Commands](#5-commands)
-6. [Security](#6-security)
-7. [Database](#7-database)
-8. [Settings](#8-settings)
+1. [HTTP Server API](#http-server-api)
+   - [Authentication](#authentication)
+   - [REST Endpoints](#rest-endpoints)
+   - [WebSocket API](#websocket-api)
+2. [Plugin Provider API](#plugin-provider-api)
+3. [Programmatic API](#programmatic-api)
+   - [CodeBuddyAgent](#codebuddyagent)
+   - [Tool Executor](#tool-executor)
+   - [Tools](#tools)
+   - [Providers](#providers)
+4. [Types Reference](#types-reference)
 
 ---
 
-## 1. CodeBuddyAgent
+# HTTP Server API
 
-**File:** `src/agent/grok-agent.ts`
+## Quick Start
 
-Main orchestrator implementing the agentic loop.
+```bash
+# Start the server
+buddy server --port 3000
+
+# Test the health endpoint
+curl http://localhost:3000/api/health
+```
+
+## Authentication
+
+The API supports JWT-based authentication. In production, set `JWT_SECRET` environment variable.
+
+### Using Bearer Token
+
+```bash
+curl http://localhost:3000/api/chat \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"messages": [{"role": "user", "content": "Hello"}]}'
+```
+
+### Using API Key Header
+
+```bash
+curl http://localhost:3000/api/chat \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"messages": [{"role": "user", "content": "Hello"}]}'
+```
+
+## REST Endpoints
+
+### Health
+
+#### GET /api/health
+
+Health check endpoint (no auth required).
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "uptime": 3600,
+  "version": "1.0.0",
+  "components": {
+    "api": "up",
+    "websocket": "up",
+    "ai": "up"
+  }
+}
+```
+
+### Metrics
+
+#### GET /api/metrics
+
+Prometheus-compatible metrics.
+
+#### GET /api/metrics/json
+
+JSON format metrics.
+
+**Response:**
+```json
+{
+  "totalRequests": 195,
+  "activeConnections": 5,
+  "totalTokens": 50000,
+  "totalCost": 0.25,
+  "averageLatency": 450
+}
+```
+
+#### GET /api/metrics/dashboard
+
+HTML metrics dashboard.
+
+### Chat
+
+#### POST /api/chat
+
+Send a chat message.
+
+**Request:**
+```json
+{
+  "messages": [
+    {"role": "user", "content": "Explain async/await"}
+  ],
+  "model": "grok-code-fast-1",
+  "temperature": 0.7,
+  "maxTokens": 2000,
+  "stream": false,
+  "sessionId": "optional-session-id",
+  "tools": true
+}
+```
+
+**Response:**
+```json
+{
+  "id": "chat_abc123",
+  "content": "Async/await is...",
+  "model": "grok-code-fast-1",
+  "finishReason": "stop",
+  "usage": {
+    "promptTokens": 50,
+    "completionTokens": 200,
+    "totalTokens": 250
+  },
+  "cost": 0.001,
+  "latency": 1200
+}
+```
+
+#### POST /api/chat/completions
+
+OpenAI-compatible endpoint (supports streaming via SSE).
+
+### Tools
+
+#### GET /api/tools
+
+List available tools.
+
+**Response:**
+```json
+{
+  "tools": [
+    {
+      "name": "read_file",
+      "description": "Read contents of a file",
+      "category": "filesystem",
+      "parameters": {...}
+    }
+  ],
+  "total": 25
+}
+```
+
+#### POST /api/tools/:name/execute
+
+Execute a tool.
+
+**Request:**
+```json
+{
+  "parameters": {"path": "/README.md"},
+  "confirmed": true,
+  "timeout": 30000
+}
+```
+
+**Response:**
+```json
+{
+  "toolName": "read_file",
+  "success": true,
+  "output": "# README...",
+  "executionTime": 15
+}
+```
+
+### Sessions
+
+#### GET /api/sessions
+
+List sessions (supports `limit`, `offset` query params).
+
+#### POST /api/sessions
+
+Create a new session.
+
+#### GET /api/sessions/:id
+
+Get session details with messages.
+
+#### DELETE /api/sessions/:id
+
+Delete a session.
+
+### Memory
+
+#### GET /api/memory
+
+List memory entries (supports `type`, `tags`, `limit` query params).
+
+#### POST /api/memory
+
+Create a memory entry.
+
+#### POST /api/memory/search
+
+Semantic search over memories.
+
+**Request:**
+```json
+{
+  "query": "error handling patterns",
+  "limit": 10,
+  "minScore": 0.5
+}
+```
+
+## WebSocket API
+
+Connect to `/ws` for real-time streaming.
+
+### Message Format
+
+```json
+{
+  "type": "message_type",
+  "id": "request-id",
+  "payload": {}
+}
+```
+
+### Message Types
+
+| Type | Description |
+|:-----|:------------|
+| `authenticate` | JWT authentication |
+| `chat_stream` | Streaming chat request |
+| `tool_execute` | Execute a tool |
+| `stop` | Stop streaming |
+| `ping` | Keep-alive |
+
+### Example: Streaming Chat
+
+```javascript
+const ws = new WebSocket('ws://localhost:3000/ws');
+
+ws.send(JSON.stringify({
+  type: 'authenticate',
+  payload: { token: 'your-jwt-token' }
+}));
+
+ws.send(JSON.stringify({
+  type: 'chat_stream',
+  id: 'req_123',
+  payload: {
+    messages: [{ role: 'user', content: 'Hello' }]
+  }
+}));
+
+// Receive responses
+ws.onmessage = (event) => {
+  const msg = JSON.parse(event.data);
+  // msg.type: 'stream_start', 'stream_chunk', 'stream_end'
+};
+```
+
+## Server Configuration
+
+| Variable | Description | Default |
+|:---------|:------------|:--------|
+| `PORT` | Server port | `3000` |
+| `HOST` | Server host | `0.0.0.0` |
+| `JWT_SECRET` | JWT secret (required in production) | - |
+| `AUTH_ENABLED` | Enable authentication | `true` |
+| `RATE_LIMIT_MAX` | Max requests per minute | `100` |
+| `WS_ENABLED` | Enable WebSocket | `true` |
+
+## Error Codes
+
+| Code | Status | Description |
+|:-----|:-------|:------------|
+| `UNAUTHORIZED` | 401 | Authentication required |
+| `FORBIDDEN` | 403 | Insufficient permissions |
+| `NOT_FOUND` | 404 | Resource not found |
+| `RATE_LIMITED` | 429 | Too many requests |
+| `VALIDATION_ERROR` | 400 | Invalid request |
+
+---
+
+# Plugin Provider API
+
+Plugins can register custom providers for LLM, embedding, or search.
+
+## Provider Interface
+
+```typescript
+interface PluginProvider {
+  id: string;
+  name: string;
+  type: 'llm' | 'embedding' | 'search';
+  priority?: number;
+
+  initialize(): Promise<void>;
+  shutdown?(): Promise<void>;
+
+  // LLM methods
+  chat?(messages: LLMMessage[]): Promise<string>;
+
+  // Embedding methods
+  embed?(text: string | string[]): Promise<number[] | number[][]>;
+
+  // Search methods
+  search?(query: string, options?: SearchOptions): Promise<SearchResult[]>;
+}
+```
+
+## Example: LLM Provider
+
+```typescript
+const myProvider: PluginProvider = {
+  id: 'my-llm',
+  name: 'My Custom LLM',
+  type: 'llm',
+  priority: 5,
+
+  async initialize() {},
+
+  async chat(messages) {
+    return 'response';
+  }
+};
+
+context.registerProvider(myProvider);
+```
+
+---
+
+# Programmatic API
+
+## CodeBuddyAgent
+
+**File:** `src/agent/codebuddy-agent.ts`
 
 ### Constructor
 
@@ -30,129 +359,61 @@ const agent = new CodeBuddyAgent(
   apiKey: string,
   baseURL?: string,
   model?: string,
-  maxToolRounds?: number,
-  useRAGToolSelection?: boolean,
-  systemPromptId?: string,
-  provider?: ProviderType
+  maxToolRounds?: number
 );
 ```
 
 ### Key Methods
 
 | Method | Description |
-|--------|-------------|
-| `processUserMessage(prompt): Promise<ChatEntry[]>` | Process message with tool execution |
-| `processUserMessageStream(prompt): AsyncIterable<StreamingChunk>` | Stream-based processing |
-| `executeBashCommand(command): Promise<ToolResult>` | Execute bash commands |
-| `setParallelToolExecution(enabled): void` | Enable/disable parallel tools |
-| `setSelfHealing(enabled): void` | Configure self-healing |
-| `dispose(): void` | Clean up resources |
+|:-------|:------------|
+| `processUserMessage(prompt)` | Process message with tools |
+| `processUserMessageStream(prompt)` | Streaming processing |
+| `executeBashCommand(command)` | Execute bash |
+| `dispose()` | Cleanup resources |
 
 ### Events
 
 ```typescript
 agent.on('tool:start', (toolName, args) => {});
 agent.on('tool:complete', (toolName, result) => {});
-agent.on('streaming:chunk', (chunk) => {});
 agent.on('cost:update', (cost) => {});
 ```
 
----
-
-## 2. Tool Executor
+## Tool Executor
 
 **File:** `src/agent/tool-executor.ts`
 
-Centralized tool execution with parallel support.
-
-### Constructor
-
 ```typescript
-const executor = new ToolExecutor({
-  textEditor: TextEditorTool,
-  bash: BashTool,
-  search: SearchTool,
-  todoTool: TodoTool,
-  imageTool: ImageTool,
-  webSearch: WebSearchTool,
-  checkpointManager: CheckpointManager,
-  morphEditor?: MorphEditorTool
-});
+const executor = new ToolExecutor(tools);
+
+// Single execution
+const result = await executor.executeTool(toolCall);
+
+// Parallel execution
+const results = await executor.executeToolsConcurrent(toolCalls);
 ```
 
-### Key Methods
+## Tools
 
-| Method | Description |
-|--------|-------------|
-| `executeTool(toolCall, options?): Promise<ToolResult>` | Execute single tool |
-| `executeToolsConcurrent(toolCalls): Promise<ToolResult[]>` | Parallel execution |
-| `executeToolsSequential(toolCalls): Promise<ToolResult[]>` | Sequential execution |
-| `getMetrics(): ToolMetrics` | Get execution statistics |
+Available tools in `src/tools/`:
 
-### Metrics
+| Tool | Purpose |
+|:-----|:--------|
+| `BashTool` | Shell commands |
+| `TextEditorTool` | File operations |
+| `SearchTool` | Code search |
+| `WebSearchTool` | Web search |
+| `GitTool` | Git operations |
 
-```typescript
-interface ToolMetrics {
-  totalRequests: number;
-  successfulRequests: number;
-  failedRequests: number;
-  timeouts: number;
-  averageExecutionTime: number;
-  byTool: Map<string, ToolStats>;
-}
-```
-
----
-
-## 3. Tools
-
-**File:** `src/tools/index.ts`
-
-### Available Tools
-
-| Tool | Class | Purpose |
-|------|-------|---------|
-| BashTool | `BashTool` | Shell command execution |
-| TextEditor | `TextEditorTool` | File operations (view, create, str_replace) |
-| Search | `SearchTool` | Codebase search with ripgrep |
-| WebSearch | `WebSearchTool` | Web search capabilities |
-| MultiEdit | `MultiEditTool` | Batch file editing |
-| Git | `GitTool` | Git operations |
-| Todo | `TodoTool` | Task management |
-
-### BashTool
+### Example
 
 ```typescript
 const bash = new BashTool();
 const result = await bash.execute('ls -la', { timeout: 30000 });
-// result: { success: boolean, output: string, error?: string }
 ```
 
-**Security Features:**
-- Blocked patterns: `rm -rf /`, `dd`, `mkfs`, fork bombs
-- Protected paths: `.ssh`, `.gnupg`, `.aws`, `.docker`
-- Confirmation service integration
-
-### TextEditorTool
-
-```typescript
-const editor = new TextEditorTool();
-
-// View file
-await editor.view('/path/to/file.ts');
-
-// Create file
-await editor.create('/path/to/new.ts', 'content');
-
-// Replace text
-await editor.strReplace('/path/to/file.ts', 'oldText', 'newText');
-```
-
-**Security:** Path traversal prevention, symlink resolution, protected paths
-
----
-
-## 4. Providers
+## Providers
 
 **File:** `src/providers/types.ts`
 
@@ -161,253 +422,36 @@ await editor.strReplace('/path/to/file.ts', 'oldText', 'newText');
 ```typescript
 interface LLMProvider {
   initialize(config: ProviderConfig): Promise<void>;
-  isReady(): boolean;
   complete(options: CompletionOptions): Promise<LLMResponse>;
   stream(options: CompletionOptions): AsyncIterable<StreamChunk>;
-  getModels(): Promise<string[]>;
-  estimateTokens(text: string): number;
-  getPricing(): { input: number; output: number };
   dispose(): void;
 }
 ```
 
 ### Supported Providers
 
-| Provider | Type | Description |
-|----------|------|-------------|
-| `grok` | Default | xAI Grok API |
-| `claude-max` | OAuth | Anthropic Claude Max |
-| `claude-sdk` | SDK | Claude Agent SDK |
-| `openai` | API | OpenAI models |
-| `gemini` | API | Google Gemini |
+| Provider | Type |
+|:---------|:-----|
+| `grok` | xAI Grok API |
+| `claude` | Anthropic Claude |
+| `openai` | OpenAI |
+| `gemini` | Google Gemini |
 
-### Response Types
+---
+
+# Types Reference
+
+## ToolResult
 
 ```typescript
-interface LLMResponse {
-  id: string;
-  content: string | null;
-  toolCalls: ToolCall[];
-  finishReason: 'stop' | 'tool_calls' | 'length' | 'content_filter';
-  usage: { promptTokens: number; completionTokens: number; totalTokens: number };
-  model: string;
-  provider: ProviderType;
-}
-
-interface StreamChunk {
-  type: 'content' | 'tool_call' | 'done' | 'error';
-  content?: string;
-  toolCall?: Partial<ToolCall>;
+interface ToolResult {
+  success: boolean;
+  output?: string;
   error?: string;
 }
 ```
 
----
-
-## 5. Commands
-
-### Slash Commands
-
-**File:** `src/commands/slash-commands.ts`
-
-```typescript
-const manager = new SlashCommandManager(workingDirectory);
-manager.loadBuiltinCommands();
-manager.loadCustomCommands(); // from .grok/commands/*.md
-
-const result = await manager.executeCommand('review', ['--file', 'src/index.ts']);
-```
-
-**Built-in Commands:**
-- `/help` - Show help
-- `/clear` - Clear chat history
-- `/model <name>` - Change model
-- `/mode <plan|code|ask>` - Change agent mode
-- `/checkpoints` - List checkpoints
-- `/restore <id>` - Restore checkpoint
-- `/review` - Code review
-- `/commit` - Generate commit
-
-### Enhanced Command Handler
-
-**File:** `src/commands/enhanced-command-handler.ts`
-
-Categories:
-- **Branch/Checkpoint:** `/fork`, `/branches`, `/checkout`, `/merge`
-- **Memory:** `/memory`, `/remember`, `/scan-todos`
-- **Stats:** `/cost`, `/stats`, `/cache`
-- **Security:** `/security`, `/dry-run`, `/guardian`
-- **Context:** `/add-context`, `/context`, `/workspace`
-
----
-
-## 6. Security
-
-**File:** `src/security/index.ts`
-
-### SecurityManager
-
-```typescript
-const security = getSecurityManager();
-
-// Check approval
-const result = security.checkApproval({
-  type: 'file_write',
-  path: '/path/to/file',
-  description: 'Create new file'
-});
-
-// Sandbox execution
-const sandboxResult = await security.sandboxExecute('npm test');
-
-// Data redaction
-const redacted = security.redact(sensitiveText);
-```
-
-### Configuration
-
-```typescript
-interface SecurityConfig {
-  enabled: boolean;
-  approvalMode: 'read-only' | 'auto' | 'full-access';
-  securityMode: 'suggest' | 'auto-edit' | 'full-auto';
-  sandboxEnabled: boolean;
-  redactionEnabled: boolean;
-  logEvents: boolean;
-}
-```
-
-### Blocked Patterns
-
-- `rm -rf /` or `~` - Destructive commands
-- `dd if=* of=/dev/*` - Disk writes
-- `mkfs.*` - Filesystem formatting
-- `:(){ :|:& };:` - Fork bombs
-- `wget|sh`, `curl|bash` - Remote execution
-
----
-
-## 7. Database
-
-**File:** `src/database/database-manager.ts`
-
-### DatabaseManager
-
-```typescript
-const db = getDatabaseManager();
-await db.initialize();
-
-// Execute SQL
-const results = db.execute('SELECT * FROM memories WHERE type = ?', ['episodic']);
-
-// Get stats
-const stats = await db.getStats();
-```
-
-### Tables
-
-| Table | Purpose |
-|-------|---------|
-| `memories` | Episodic memory storage |
-| `sessions` | Chat sessions |
-| `messages` | Chat messages |
-| `code_embeddings` | Code embeddings for RAG |
-| `tool_stats` | Tool usage statistics |
-| `checkpoints` | Saved agent states |
-| `cache` | Response cache |
-
-**Location:** `~/.grok/grok.db` (SQLite with WAL mode)
-
----
-
-## 8. Settings
-
-**File:** `src/utils/settings-manager.ts`
-
-### SettingsManager
-
-```typescript
-const settings = getSettingsManager();
-
-// Get values
-const apiKey = settings.getApiKey();
-const model = settings.getCurrentModel();
-const timeout = settings.getToolTimeout('bash'); // 300000ms
-
-// Update settings
-settings.updateUserSetting('defaultModel', 'grok-3');
-settings.saveUserSettings();
-```
-
-### Settings Paths
-
-- User settings: `~/.grok/user-settings.json`
-- Project settings: `./.grok/settings.json`
-
-### Tool Timeouts (ms)
-
-| Tool | Timeout |
-|------|---------|
-| bash | 300,000 (5 min) |
-| search | 30,000 (30 sec) |
-| view_file | 10,000 (10 sec) |
-| create_file | 10,000 (10 sec) |
-| str_replace_editor | 30,000 (30 sec) |
-| web_search | 30,000 (30 sec) |
-| default | 60,000 (60 sec) |
-| hardLimit | 600,000 (10 min) |
-
----
-
-## CLI Options
-
-```bash
-grok [options] [prompt]
-
-Options:
-  -d, --directory <dir>     Set working directory
-  -k, --api-key <key>       API key
-  -u, --base-url <url>      API endpoint
-  -m, --model <model>       AI model
-  -p, --prompt <prompt>     Headless mode
-  --max-tool-rounds <n>     Max rounds (default: 400)
-  --security-mode <mode>    suggest|auto-edit|full-auto
-  --provider <provider>     grok|claude|openai|gemini
-  --yolo                    YOLO mode (full autonomy)
-  --auto-approve            Auto-approve all operations
-  --dry-run                 Preview mode
-  --continue                Resume last session
-  --resume <id>             Resume specific session
-```
-
----
-
-## Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `GROK_API_KEY` | Required API key from x.ai |
-| `MORPH_API_KEY` | Optional fast file editing |
-| `YOLO_MODE=true` | Full autonomy mode |
-| `MAX_COST` | Session cost limit (default $10) |
-
----
-
-## Types Reference
-
-### ChatEntry
-
-```typescript
-interface ChatEntry {
-  type: 'user' | 'assistant' | 'tool_result';
-  content: string;
-  timestamp: Date;
-  toolCalls?: ToolCall[];
-  toolResults?: ToolResult[];
-}
-```
-
-### ToolCall
+## ToolCall
 
 ```typescript
 interface ToolCall {
@@ -420,13 +464,69 @@ interface ToolCall {
 }
 ```
 
-### ToolResult
+## ChatEntry
 
 ```typescript
-interface ToolResult {
-  success: boolean;
-  output?: string;
-  error?: string;
+interface ChatEntry {
+  type: 'user' | 'assistant' | 'tool_result';
+  content: string;
+  timestamp: Date;
+  toolCalls?: ToolCall[];
+}
+```
+
+## LLMResponse
+
+```typescript
+interface LLMResponse {
+  id: string;
+  content: string | null;
+  toolCalls: ToolCall[];
+  finishReason: 'stop' | 'tool_calls' | 'length';
+  usage: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+}
+```
+
+## SearchResult (Plugin API)
+
+```typescript
+interface SearchResult {
+  id: string;
+  content: string;
+  score: number;
   metadata?: Record<string, unknown>;
 }
 ```
+
+---
+
+## CLI Options
+
+```bash
+buddy [options] [prompt]
+
+Options:
+  -d, --directory <dir>     Working directory
+  -m, --model <model>       AI model
+  -p, --prompt <prompt>     Headless mode
+  --provider <provider>     grok|claude|openai|gemini
+  --security-mode <mode>    suggest|auto-edit|full-auto
+  --yolo                    Full autonomy mode
+  --continue                Resume last session
+```
+
+## Environment Variables
+
+| Variable | Description |
+|:---------|:------------|
+| `GROK_API_KEY` | API key from x.ai |
+| `ANTHROPIC_API_KEY` | Anthropic API key |
+| `OPENAI_API_KEY` | OpenAI API key |
+| `GOOGLE_API_KEY` | Google AI API key |
+| `GROK_BASE_URL` | Custom API endpoint |
+| `YOLO_MODE` | Full autonomy mode |
+| `MAX_COST` | Session cost limit |
