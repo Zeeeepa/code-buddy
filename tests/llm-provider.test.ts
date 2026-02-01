@@ -131,12 +131,12 @@ describe('LLM Provider', () => {
     it('should have correct type and name', () => {
       expect(provider.type).toBe('gemini');
       expect(provider.name).toBe('Gemini (Google)');
-      expect(provider.defaultModel).toBe('gemini-2.0-flash');
+      expect(provider.defaultModel).toBe('gemini-2.5-flash');
     });
 
     it('should return models list', async () => {
       const models = await provider.getModels();
-      expect(models).toContain('gemini-2.0-flash');
+      expect(models).toContain('gemini-2.5-flash');
       expect(models).toContain('gemini-1.5-pro');
     });
 

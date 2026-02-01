@@ -241,7 +241,7 @@ export const DEFAULT_PROFILES: ConnectionProfile[] = [
     name: 'Google Gemini',
     provider: 'gemini',
     baseURL: 'https://generativelanguage.googleapis.com/v1beta',
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
     icon: '💎',
     description: 'Google Gemini models',
     enabled: true,

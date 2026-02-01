@@ -200,7 +200,7 @@ describe('Provider Configuration', () => {
       grok: ['grok-beta', 'grok-code-fast-1'],
       claude: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-latest'],
       openai: ['gpt-4o', 'gpt-4o-mini'],
-      gemini: ['gemini-2.0-flash', 'gemini-1.5-pro'],
+      gemini: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-pro'],
     };
 
     it('should have models for each provider', () => {

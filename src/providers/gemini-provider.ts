@@ -41,7 +41,7 @@ const TOOL_TRIGGER_KEYWORDS = [
 export class GeminiProvider extends BaseProvider {
   readonly type: ProviderType = 'gemini';
   readonly name = 'Gemini (Google)';
-  readonly defaultModel = 'gemini-2.0-flash';
+  readonly defaultModel = 'gemini-2.5-flash';
 
   private client: unknown = null;
 
@@ -296,6 +296,8 @@ export class GeminiProvider extends BaseProvider {
    */
   async getModels(): Promise<string[]> {
     return [
+      'gemini-2.5-flash',
+      'gemini-2.5-pro',
       'gemini-2.0-flash',
       'gemini-2.0-flash-thinking',
       'gemini-1.5-pro',

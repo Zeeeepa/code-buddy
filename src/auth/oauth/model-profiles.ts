@@ -416,8 +416,8 @@ export class ModelProfileManager extends EventEmitter {
       apiKey: process.env.GOOGLE_API_KEY,
       baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
       priority: 70,
-      models: ['gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-*'],
-      defaultModel: 'gemini-2.0-flash',
+      models: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-*'],
+      defaultModel: 'gemini-2.5-flash',
       enabled: !!process.env.GOOGLE_API_KEY,
     });
 

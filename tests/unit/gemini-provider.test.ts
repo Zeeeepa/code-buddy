@@ -33,7 +33,7 @@ describe('GeminiProvider', () => {
     });
 
     it('should have correct default model', () => {
-      expect(provider.defaultModel).toBe('gemini-2.0-flash');
+      expect(provider.defaultModel).toBe('gemini-2.5-flash');
     });
   });
 
@@ -426,6 +426,8 @@ describe('GeminiProvider', () => {
     it('should return list of available models', async () => {
       const models = await provider.getModels();
 
+      expect(models).toContain('gemini-2.5-flash');
+      expect(models).toContain('gemini-2.5-pro');
       expect(models).toContain('gemini-2.0-flash');
       expect(models).toContain('gemini-2.0-flash-thinking');
       expect(models).toContain('gemini-1.5-pro');

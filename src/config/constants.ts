@@ -108,8 +108,12 @@ export const SUPPORTED_MODELS = {
   'claude-sonnet-4-20250514': { maxTokens: 200000, provider: 'anthropic' },
   'claude-opus-4-20250514': { maxTokens: 200000, provider: 'anthropic' },
   // Gemini models (when using custom base URL)
-  'gemini-2.5-pro': { maxTokens: 1000000, provider: 'google' },
   'gemini-2.5-flash': { maxTokens: 1000000, provider: 'google' },
+  'gemini-2.5-pro': { maxTokens: 1000000, provider: 'google' },
+  'gemini-2.0-flash': { maxTokens: 1000000, provider: 'google' },
+  'gemini-2.0-flash-thinking': { maxTokens: 1000000, provider: 'google' },
+  'gemini-1.5-pro': { maxTokens: 2000000, provider: 'google' },
+  'gemini-1.5-flash': { maxTokens: 1000000, provider: 'google' },
   // LM Studio models (local inference via OpenAI-compatible API)
   'lmstudio': { maxTokens: 8192, provider: 'lmstudio' },
   'local-model': { maxTokens: 8192, provider: 'lmstudio' },
