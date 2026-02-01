@@ -458,6 +458,15 @@ export class CodeBuddyClient {
       body.toolConfig = { functionCallingConfig: { mode: 'AUTO' } };
     }
 
+    // Log request for debugging
+    logger.debug('Gemini request', {
+      source: 'CodeBuddyClient',
+      model: opts?.model || this.currentModel,
+      contentsCount: contents.length,
+      hasTools: !!(tools && tools.length > 0),
+      toolCount: tools?.length || 0,
+    });
+
     // Make request with retry
     const response = await retry(
       async () => {
@@ -469,6 +478,12 @@ export class CodeBuddyClient {
 
         if (!res.ok) {
           const errorText = await res.text();
+          logger.error('Gemini API error', {
+            source: 'CodeBuddyClient',
+            status: res.status,
+            statusText: res.statusText,
+            errorBody: errorText?.substring(0, 500),
+          });
           throw new Error(`${res.status} ${errorText || res.statusText}`);
         }
 
