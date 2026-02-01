@@ -87,7 +87,7 @@ const DEFAULT_CONFIG: ToolSelectionConfig = {
   useRAG: true,
   maxTools: 15,
   minScore: 0.5,
-  alwaysInclude: ['view_file', 'bash', 'search', 'str_replace_editor'],
+  alwaysInclude: ['view_file', 'bash', 'search', 'str_replace_editor', 'web_search'],
   useAdaptiveThreshold: true,
   enableCaching: true,
   cacheTTLMs: 5 * 60 * 1000, // 5 minutes

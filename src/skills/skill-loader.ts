@@ -5,7 +5,7 @@
  * support for global, project, and agent-specific skills.
  */
 
-import * as fs from 'fs-extra';
+import fs from 'fs-extra';
 import * as path from 'path';
 import * as os from 'os';
 import type { Skill } from './skill-manager.js';

@@ -1,4 +1,4 @@
-import * as fs from "fs-extra";
+import fs from "fs-extra";
 import * as path from "path";
 import { measureLatency } from "../../optimization/latency-optimizer.js";
 import { getWorkspaceIsolation, type PathValidationResult } from "../../workspace/workspace-isolation.js";

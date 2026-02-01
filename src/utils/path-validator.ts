@@ -9,7 +9,7 @@
  * Based on text-editor.ts implementation, extracted for reuse across tools.
  */
 
-import * as fs from "fs-extra";
+import fs from "fs-extra";
 import * as path from "path";
 
 export interface PathValidationResult {

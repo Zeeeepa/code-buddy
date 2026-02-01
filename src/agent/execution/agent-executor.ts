@@ -182,11 +182,13 @@ export class AgentExecutor {
             if (newIdx !== -1) newEntries[newIdx] = updatedEntry;
 
             // Add tool result to messages
+            // Note: 'name' is required for Gemini API to match functionResponse with functionCall
             messages.push({
               role: "tool",
               content: result.success ? result.output || "Success" : result.error || "Error",
               tool_call_id: toolCall.id,
-            });
+              name: toolCall.function.name,
+            } as CodeBuddyMessage);
           }
 
           // Get next response
@@ -377,11 +379,13 @@ export class AgentExecutor {
             history.push(toolResultEntry);
             yield { type: "tool_result", toolCall, toolResult: result };
 
+            // Note: 'name' is required for Gemini API to match functionResponse with functionCall
             messages.push({
               role: "tool",
               content: result.success ? result.output || "Success" : result.error || "Error",
               tool_call_id: toolCall.id,
-            });
+              name: toolCall.function.name,
+            } as CodeBuddyMessage);
           }
 
           inputTokens = this.deps.tokenCounter.countMessageTokens(messages as Parameters<typeof this.deps.tokenCounter.countMessageTokens>[0]);

@@ -337,7 +337,8 @@ describe('Encoding Module', () => {
         });
 
         it('should throw on unsupported encoding', () => {
-          expect(() => stringToBytes('test', 'invalid' as unknown as BufferEncoding)).toThrow(EncodingError);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          expect(() => stringToBytes('test', 'invalid' as any)).toThrow(EncodingError);
         });
       });
 
@@ -777,11 +778,13 @@ describe('Encoding Module', () => {
         });
 
         it('should throw on null input', () => {
-          expect(() => jsonToQueryString(null as unknown as object)).toThrow(EncodingError);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          expect(() => jsonToQueryString(null as any)).toThrow(EncodingError);
         });
 
         it('should throw on array input', () => {
-          expect(() => jsonToQueryString([] as unknown as object)).toThrow(EncodingError);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          expect(() => jsonToQueryString([] as any)).toThrow(EncodingError);
         });
       });
     });

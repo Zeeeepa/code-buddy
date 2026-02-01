@@ -289,10 +289,29 @@ export const DIAGRAM_TOOL: CodeBuddyTool = {
         },
         nodes: {
           type: "array",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              label: { type: "string" },
+              type: { type: "string", enum: ["default", "round", "diamond", "stadium"] }
+            },
+            required: ["id", "label"]
+          },
           description: "Nodes for flowchart or ASCII tree"
         },
         connections: {
           type: "array",
+          items: {
+            type: "object",
+            properties: {
+              from: { type: "string" },
+              to: { type: "string" },
+              label: { type: "string" },
+              type: { type: "string", enum: ["arrow", "dotted", "thick"] }
+            },
+            required: ["from", "to"]
+          },
           description: "Connections between nodes"
         },
         participants: {
@@ -302,22 +321,80 @@ export const DIAGRAM_TOOL: CodeBuddyTool = {
         },
         messages: {
           type: "array",
+          items: {
+            type: "object",
+            properties: {
+              from: { type: "string" },
+              to: { type: "string" },
+              message: { type: "string" },
+              type: { type: "string", enum: ["sync", "async", "reply"] }
+            },
+            required: ["from", "to", "message"]
+          },
           description: "Messages for sequence diagram"
         },
         classes: {
           type: "array",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              attributes: { type: "array", items: { type: "string" } },
+              methods: { type: "array", items: { type: "string" } }
+            },
+            required: ["name"]
+          },
           description: "Classes for class diagram"
         },
         relationships: {
           type: "array",
+          items: {
+            type: "object",
+            properties: {
+              from: { type: "string" },
+              to: { type: "string" },
+              type: { type: "string", enum: ["inheritance", "composition", "aggregation", "association", "dependency"] },
+              label: { type: "string" }
+            },
+            required: ["from", "to", "type"]
+          },
           description: "Relationships for class diagram"
         },
         data: {
           type: "array",
+          items: {
+            type: "object",
+            properties: {
+              label: { type: "string" },
+              value: { type: "number" }
+            },
+            required: ["label", "value"]
+          },
           description: "Data points for pie chart"
         },
         sections: {
           type: "array",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              tasks: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    id: { type: "string" },
+                    start: { type: "string" },
+                    duration: { type: "string" },
+                    status: { type: "string", enum: ["done", "active", "crit"] }
+                  },
+                  required: ["name", "id", "start", "duration"]
+                }
+              }
+            },
+            required: ["name", "tasks"]
+          },
           description: "Sections for Gantt chart"
         },
         format: {
@@ -352,10 +429,21 @@ export const EXPORT_TOOL: CodeBuddyTool = {
         },
         messages: {
           type: "array",
+          items: {
+            type: "object",
+            properties: {
+              role: { type: "string" },
+              content: { type: "string" },
+              timestamp: { type: "string" }
+            }
+          },
           description: "Messages to export"
         },
         data: {
           type: "array",
+          items: {
+            type: "object"
+          },
           description: "Data array for CSV export"
         },
         title: {

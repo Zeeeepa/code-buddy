@@ -92,9 +92,9 @@ export const TOOL_METADATA: ToolMetadata[] = [
   {
     name: 'web_search',
     category: 'web',
-    keywords: ['search', 'google', 'web', 'internet', 'online', 'latest', 'news', 'documentation', 'docs', 'how to'],
-    priority: 7,
-    description: 'Search the web for information'
+    keywords: ['search', 'google', 'web', 'internet', 'online', 'latest', 'news', 'documentation', 'docs', 'how to', 'weather', 'météo', 'meteo', 'forecast', 'temperature', 'info', 'find', 'lookup'],
+    priority: 8,
+    description: 'Search the web for information including weather, news, documentation, and general queries'
   },
   {
     name: 'web_fetch',

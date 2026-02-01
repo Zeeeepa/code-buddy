@@ -106,8 +106,10 @@ PLANNING:
 - update_todo_list: Update task progress
 
 WEB ACCESS:
-- web_search: Search the web for current information
+- web_search: Search the web for current information (weather, news, documentation, general queries)
 - web_fetch: Fetch content from URLs
+
+IMPORTANT: Use web_search for ANY query requiring external/current information (weather, news, prices, etc.)
 </available_tools>
 
 <tool_usage_rules>

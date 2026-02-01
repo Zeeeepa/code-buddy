@@ -422,11 +422,21 @@ export class CodeBuddyClient {
         }
       } else if (msg.role === 'tool') {
         const toolMsg = msg as { tool_call_id?: string; name?: string; content?: string };
+        const functionName = toolMsg.name || toolMsg.tool_call_id || 'unknown';
+
+        logger.debug('Adding functionResponse to Gemini request', {
+          source: 'CodeBuddyClient',
+          functionName,
+          hasName: !!toolMsg.name,
+          toolCallId: toolMsg.tool_call_id,
+          contentLength: toolMsg.content?.length || 0,
+        });
+
         contents.push({
           role: 'user',
           parts: [{
             functionResponse: {
-              name: toolMsg.name || toolMsg.tool_call_id || 'unknown',
+              name: functionName,
               response: { result: toolMsg.content },
             },
           }],
@@ -452,10 +462,19 @@ export class CodeBuddyClient {
       const functionDeclarations = tools.map(tool => ({
         name: tool.function.name,
         description: tool.function.description,
-        parameters: tool.function.parameters,
+        parameters: this.sanitizeSchemaForGemini(tool.function.parameters),
       }));
       body.tools = [{ functionDeclarations }];
       body.toolConfig = { functionCallingConfig: { mode: 'AUTO' } };
+
+      // Log first tool's sanitized schema for debugging
+      if (functionDeclarations.length > 0) {
+        logger.debug('Gemini tool schema sample (first tool)', {
+          source: 'CodeBuddyClient',
+          toolName: functionDeclarations[0].name,
+          parametersType: (functionDeclarations[0].parameters as Record<string, unknown>)?.type,
+        });
+      }
     }
 
     // Log request for debugging
@@ -465,6 +484,7 @@ export class CodeBuddyClient {
       contentsCount: contents.length,
       hasTools: !!(tools && tools.length > 0),
       toolCount: tools?.length || 0,
+      toolNames: tools?.slice(0, 10).map(t => t.function.name).join(', ') || 'none',
     });
 
     // Make request with retry
@@ -516,7 +536,17 @@ export class CodeBuddyClient {
     };
 
     // Convert response to CodeBuddy format
-    const candidate = data.candidates[0];
+    const candidate = data.candidates?.[0];
+    if (!candidate || !candidate.content || !candidate.content.parts) {
+      logger.error('Gemini response missing candidate or content', {
+        source: 'CodeBuddyClient',
+        hasCandidates: !!data.candidates,
+        candidatesLength: data.candidates?.length,
+        rawResponse: JSON.stringify(data).substring(0, 500),
+      });
+      throw new Error('Invalid Gemini response: missing candidate content');
+    }
+
     const toolCalls: CodeBuddyToolCall[] = [];
     let content = '';
 
@@ -524,16 +554,31 @@ export class CodeBuddyClient {
       if (part.text) {
         content += part.text;
       } else if (part.functionCall) {
-        toolCalls.push({
+        const toolCall = {
           id: `call_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-          type: 'function',
+          type: 'function' as const,
           function: {
             name: part.functionCall.name,
             arguments: JSON.stringify(part.functionCall.args),
           },
+        };
+        toolCalls.push(toolCall);
+        logger.debug('Gemini tool call extracted', {
+          source: 'CodeBuddyClient',
+          toolName: part.functionCall.name,
+          args: JSON.stringify(part.functionCall.args).substring(0, 200),
         });
       }
     }
+
+    // Log response summary
+    logger.debug('Gemini response parsed', {
+      source: 'CodeBuddyClient',
+      hasContent: !!content,
+      contentLength: content.length,
+      toolCallCount: toolCalls.length,
+      finishReason: candidate.finishReason,
+    });
 
     return {
       choices: [{
@@ -632,6 +677,69 @@ export class CodeBuddyClient {
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(`CodeBuddy API error: ${message}`);
     }
+  }
+
+  /**
+   * Gemini type mapping: lowercase OpenAI types to uppercase Gemini types
+   */
+  private static readonly GEMINI_TYPE_MAP: Record<string, string> = {
+    'string': 'STRING',
+    'number': 'NUMBER',
+    'integer': 'INTEGER',
+    'boolean': 'BOOLEAN',
+    'array': 'ARRAY',
+    'object': 'OBJECT',
+  };
+
+  /**
+   * Sanitize JSON Schema for Gemini API compatibility
+   * - Converts lowercase types to uppercase (string -> STRING, object -> OBJECT)
+   * - Ensures all array types have 'items' defined
+   */
+  private sanitizeSchemaForGemini(schema: Record<string, unknown>): Record<string, unknown> {
+    if (!schema || typeof schema !== 'object') {
+      return schema;
+    }
+
+    const result: Record<string, unknown> = { ...schema };
+
+    // Convert lowercase type to uppercase for Gemini
+    if (typeof result.type === 'string') {
+      const upperType = CodeBuddyClient.GEMINI_TYPE_MAP[result.type.toLowerCase()];
+      if (upperType) {
+        result.type = upperType;
+      }
+    }
+
+    // If this is an array type without items, add default items (use uppercase for Gemini)
+    if (result.type === 'ARRAY' && !result.items) {
+      result.items = { type: 'OBJECT' };
+      logger.debug('Added missing items to array schema', {
+        source: 'CodeBuddyClient',
+      });
+    }
+
+    // Recursively sanitize properties
+    if (result.properties && typeof result.properties === 'object') {
+      const props = result.properties as Record<string, Record<string, unknown>>;
+      const sanitizedProps: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(props)) {
+        sanitizedProps[key] = this.sanitizeSchemaForGemini(value);
+      }
+      result.properties = sanitizedProps;
+    }
+
+    // Recursively sanitize items if present
+    if (result.items && typeof result.items === 'object') {
+      result.items = this.sanitizeSchemaForGemini(result.items as Record<string, unknown>);
+    }
+
+    // Recursively sanitize enum values (keep as-is, just ensure array items are sanitized)
+    if (result.enum && Array.isArray(result.enum)) {
+      // Enum values stay as-is (they're string values, not types)
+    }
+
+    return result;
   }
 
   /**

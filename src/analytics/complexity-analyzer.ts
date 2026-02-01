@@ -8,7 +8,7 @@
  * - Maintainability index
  */
 
-import * as fs from 'fs-extra';
+import fs from 'fs-extra';
 import { glob } from 'fast-glob';
 
 export interface FunctionComplexity {
