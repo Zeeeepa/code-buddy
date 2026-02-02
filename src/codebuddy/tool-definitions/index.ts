@@ -71,5 +71,11 @@ export {
   MULTIMODAL_TOOLS,
 } from './multimodal-tools.js';
 
+// Computer Control tools (OpenClaw-inspired)
+export {
+  COMPUTER_CONTROL_TOOL,
+  COMPUTER_CONTROL_TOOLS,
+} from './computer-control-tools.js';
+
 // Re-export CodeBuddyTool from client for convenience
 export type { CodeBuddyTool as Tool } from './types.js';
