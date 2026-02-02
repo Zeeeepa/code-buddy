@@ -4,37 +4,57 @@
 
 # Code Buddy
 
-### AI-Powered Development Agent for Your Terminal
+### Multi-AI Personal Assistant with OpenClaw-Inspired Architecture
 
 <p align="center">
   <a href="https://www.npmjs.com/package/@phuetz/code-buddy"><img src="https://img.shields.io/npm/v/@phuetz/code-buddy.svg?style=flat-square&color=ff6b6b&label=version" alt="npm version"/></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-feca57.svg?style=flat-square" alt="License: MIT"/></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D18.0.0-54a0ff?style=flat-square&logo=node.js" alt="Node Version"/></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.3-5f27cd?style=flat-square&logo=typescript" alt="TypeScript"/></a>
-  <a href="https://www.npmjs.com/package/@phuetz/code-buddy"><img src="https://img.shields.io/npm/dm/@phuetz/code-buddy.svg?style=flat-square&color=10ac84" alt="npm downloads"/></a>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Tests-passing-00d26a?style=flat-square&logo=jest" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-300%2B-00d26a?style=flat-square&logo=jest" alt="Tests"/>
   <img src="https://img.shields.io/badge/Coverage-85%25-48dbfb?style=flat-square" alt="Coverage"/>
   <img src="https://img.shields.io/badge/Build-passing-00d26a?style=flat-square" alt="Build"/>
 </p>
 
 <br/>
 
-**A powerful CLI tool that brings the best AI models (Grok, Claude, ChatGPT, Gemini) directly into your terminal with Claude Code-level intelligence, advanced code analysis, and full development capabilities.**
+**A powerful multi-AI terminal agent inspired by [OpenClaw](https://github.com/openclaw/openclaw) architecture. Supports Grok, Claude, ChatGPT, Gemini, LM Studio, and Ollama with advanced memory, multi-channel messaging, and intelligent context management.**
 
 <br/>
 
 [Quick Start](#-quick-start) |
-[AI Providers](#-ai-providers) |
-[Features](#-features) |
-[Configuration](#-configuration) |
-[Plugin Development](#-plugin-development) |
-[API Server](#-api-server) |
-[Troubleshooting](#-troubleshooting)
+[Architecture](#-architecture) |
+[Memory System](#-memory-system) |
+[Channels](#-multi-channel-support) |
+[Security](#-security) |
+[API](#-api-server)
 
 </div>
+
+---
+
+## What's New
+
+### OpenClaw-Inspired Features
+
+Code Buddy now incorporates advanced patterns from the [OpenClaw](https://github.com/openclaw/openclaw) project:
+
+| Module | Status | Description |
+|:-------|:------:|:------------|
+| **Tool Policy System** | ✅ 100% | Fine-grained tool permissions with allowlist/denylist |
+| **Bash Allowlist** | ✅ 100% | Secure command execution with pattern matching |
+| **Context Window Guard** | ✅ 100% | Automatic context management with 34 test cases |
+| **Smart Compaction** | ✅ 100% | Multi-stage conversation compression |
+| **Context Pruning** | ✅ 100% | TTL-based message expiration |
+| **Hybrid Search** | ✅ 100% | Combined keyword + semantic search |
+| **Lifecycle Hooks** | ✅ 100% | Pre/post hooks with 52 test cases |
+| **Connection Profiles** | ✅ 100% | Multi-provider switching with 57 tests |
+| **Desktop Automation** | ✅ 100% | Screen capture, OCR, UI control |
+| **Auto-Capture Memory** | ✅ 100% | Pattern-based memory extraction |
+| **Memory Lifecycle** | ✅ 100% | Auto-recall and auto-capture hooks |
 
 ---
 
@@ -43,7 +63,7 @@
 ### Prerequisites
 
 - **Node.js** 18.0.0 or higher
-- **ripgrep** (optional but recommended for faster code search)
+- **ripgrep** (recommended for faster search)
 
 ```bash
 # macOS
@@ -62,14 +82,8 @@ choco install ripgrep
 # npm (recommended)
 npm install -g @phuetz/code-buddy
 
-# yarn
-yarn global add @phuetz/code-buddy
-
-# pnpm
-pnpm add -g @phuetz/code-buddy
-
-# bun
-bun add -g @phuetz/code-buddy
+# Or try without installing
+npx @phuetz/code-buddy@latest
 ```
 
 ---
@@ -77,170 +91,373 @@ bun add -g @phuetz/code-buddy
 ## Quick Start
 
 ```bash
-# Try without installing (npx)
-npx @phuetz/code-buddy@latest
-
-# Configure your API key (from x.ai)
+# Configure API key (Grok/xAI)
 export GROK_API_KEY=your_api_key
 
 # Start interactive mode
 buddy
 
-# Or run a single command (headless mode)
-buddy --prompt "analyze the project structure"
+# Or with a specific task
+buddy --prompt "analyze the codebase structure"
+
+# Use with local LLM (LM Studio)
+buddy --profile lmstudio
+
+# Full autonomy mode
+YOLO_MODE=true buddy
 ```
 
-### Common Options
+---
 
-```bash
-# Specify working directory
-buddy -d /path/to/project
+## Architecture
 
-# Use a specific model
-buddy --model grok-4-latest
+Code Buddy uses a **facade architecture** for clean separation of concerns:
 
-# Resume last session
-buddy --resume
+```
+CodeBuddyAgent
+    │
+    ├── AgentContextFacade      # Context window and memory management
+    │       - Token counting, compression, memory retrieval
+    │
+    ├── SessionFacade           # Session persistence and checkpoints
+    │       - Save/load, checkpoint creation, rewind
+    │
+    ├── ModelRoutingFacade      # Model routing and cost tracking
+    │       - Provider selection, cost calculation
+    │
+    ├── InfrastructureFacade    # MCP, sandbox, hooks, plugins
+    │       - Hook execution, plugin loading
+    │
+    └── MessageHistoryManager   # Chat and LLM message history
+```
 
-# YOLO mode (full autonomy - use with caution!)
-YOLO_MODE=true buddy
+### Core Flow
 
-# Use with local LLM (Ollama)
-export GROK_BASE_URL=http://localhost:11434/v1
-export GROK_API_KEY=ollama
-buddy --model llama3.2
+```
+User Input → ChatInterface (Ink/React) → CodeBuddyAgent → AI Provider
+                                              │
+                                         Tool Calls (max 50/400 rounds)
+                                              │
+                                      Tool Execution + Confirmation
+                                              │
+                                        Results back to API (loop)
 ```
 
 ---
 
 ## AI Providers
 
-Code Buddy supports multiple AI providers:
+Code Buddy supports multiple AI providers with automatic failover:
 
-| Provider | Default Model | Context | API Key Variable |
-|:---------|:--------------|:--------|:-----------------|
-| **Grok** (xAI) | `grok-code-fast-1` | 128K | `GROK_API_KEY` |
-| **Claude** (Anthropic) | `claude-sonnet-4` | 200K | `ANTHROPIC_API_KEY` |
-| **ChatGPT** (OpenAI) | `gpt-4o` | 128K | `OPENAI_API_KEY` |
-| **Gemini** (Google) | `gemini-2.0-flash` | 2M | `GOOGLE_API_KEY` |
+| Provider | Models | Context | Configuration |
+|:---------|:-------|:--------|:--------------|
+| **Grok** (xAI) | grok-4, grok-code-fast-1 | 128K | `GROK_API_KEY` |
+| **Claude** (Anthropic) | claude-sonnet-4, opus | 200K | `ANTHROPIC_API_KEY` |
+| **ChatGPT** (OpenAI) | gpt-4o, gpt-4-turbo | 128K | `OPENAI_API_KEY` |
+| **Gemini** (Google) | gemini-2.0-flash | 2M | `GOOGLE_API_KEY` |
+| **LM Studio** | Any local model | Varies | `--profile lmstudio` |
+| **Ollama** | llama3, codellama, etc. | Varies | `--profile ollama` |
 
-### Switching Providers
+### Connection Profiles
 
-```bash
-# List available providers
-buddy provider list
-
-# Set active provider
-buddy provider set claude
-
-# Use provider for a single command
-buddy --provider openai "explain this code"
-
-# List models for a provider
-buddy provider models claude
-```
-
----
-
-## Features
-
-### Recent Improvements (27+ enhancements)
-
-- **Facade Architecture** - Clean separation of concerns with `AgentContextFacade`, `SessionFacade`, `ModelRoutingFacade`, `InfrastructureFacade`
-- **Plugin Providers** - Plugins can now register LLM, embedding, and search providers
-- **Stream Helpers** - Standardized async iterable handling with timeouts, iteration limits, and error categorization
-- **Input Validators** - Result-based validation for file paths, commands, URLs, API keys, and JSON
-- **HTTP Server** - Full REST API with WebSocket support, JWT auth, rate limiting, and Prometheus metrics
-
-### Core Capabilities
-
-| Feature | Description |
-|:--------|:------------|
-| **Multi-Agent System** | Specialized agents (Coder, Reviewer, Tester, Refactorer, Documenter) |
-| **Tree-of-Thought + MCTS** | Advanced reasoning with exploration and evaluation |
-| **APR Engine** | Automatic Program Repair with fault localization |
-| **RAG for Code** | Semantic code search with embeddings |
-| **TDD Mode** | Test-first development workflow |
-| **Cost Tracking** | Real-time token usage and cost monitoring |
-| **Lifecycle Hooks** | Pre/post hooks for edit, bash, commit, prompt |
-
-### Security Modes
-
-| Mode | Description |
-|:-----|:------------|
-| `read-only` | No modifications allowed |
-| `auto` | Auto-approve safe operations, confirm others |
-| `full-access` | Full autonomy (use in trusted environments) |
+Switch between providers instantly:
 
 ```bash
-/mode read-only   # Switch to safe mode
-/security status  # View security dashboard
+# List profiles
+buddy --list-profiles
+
+# Use specific profile
+buddy --profile lmstudio
+
+# Auto-detect local servers
+buddy --detect-servers
 ```
 
-### Slash Commands
-
-| Command | Description |
-|:--------|:------------|
-| `/help` | Show help |
-| `/model` | Change model |
-| `/mode` | Change security mode |
-| `/think` | Enable reasoning (4K tokens) |
-| `/megathink` | Deep reasoning (10K tokens) |
-| `/ultrathink` | Exhaustive reasoning (32K tokens) |
-| `/cost` | Show cost dashboard |
-| `/tdd start` | Start TDD mode |
-| `/hooks list` | List lifecycle hooks |
-
----
-
-## Configuration
-
-### Environment Variables
-
-| Variable | Description | Default |
-|:---------|:------------|:--------|
-| `GROK_API_KEY` | xAI API key (required) | - |
-| `ANTHROPIC_API_KEY` | Anthropic API key | - |
-| `OPENAI_API_KEY` | OpenAI API key | - |
-| `GOOGLE_API_KEY` | Google AI API key | - |
-| `GROK_BASE_URL` | Custom API endpoint | `https://api.x.ai/v1` |
-| `GROK_MODEL` | Default model | `grok-code-fast-1` |
-| `YOLO_MODE` | Enable full autonomy | `false` |
-| `MAX_COST` | Session cost limit ($) | `10` |
-| `MORPH_API_KEY` | Enable fast file editing | - |
-
-### User Settings
-
-Create `~/.codebuddy/user-settings.json`:
+### Profile Configuration
 
 ```json
+// ~/.codebuddy/user-settings.json
 {
-  "apiKey": "your-api-key",
-  "defaultModel": "grok-4-latest",
-  "theme": "dark",
-  "securityMode": "auto"
-}
-```
-
-### Project Settings
-
-Create `.codebuddy/settings.json` in your project root:
-
-```json
-{
-  "systemPrompt": "You are working on a TypeScript project using React.",
-  "tools": {
-    "enabled": ["read_file", "write_file", "bash"],
-    "disabled": ["web_search"]
+  "connection": {
+    "activeProfileId": "grok",
+    "profiles": [
+      {
+        "id": "grok",
+        "name": "Grok API (xAI)",
+        "provider": "grok",
+        "baseURL": "https://api.x.ai/v1",
+        "model": "grok-4-latest"
+      },
+      {
+        "id": "lmstudio",
+        "name": "LM Studio Local",
+        "provider": "lmstudio",
+        "baseURL": "http://localhost:1234/v1",
+        "apiKey": "lm-studio"
+      }
+    ]
   }
 }
 ```
 
 ---
 
-## Plugin Development
+## Memory System
 
-Plugins extend Code Buddy with custom tools, commands, and providers.
+Code Buddy features a sophisticated memory system inspired by OpenClaw:
+
+### Three Memory Subsystems
+
+| Subsystem | Storage | Purpose |
+|:----------|:--------|:--------|
+| **Persistent Memory** | Markdown files | Project/user notes |
+| **Enhanced Memory** | SQLite + embeddings | Semantic search |
+| **Prospective Memory** | SQLite | Tasks, goals, reminders |
+
+### Auto-Capture (OpenClaw Pattern)
+
+Automatically detects and stores important information:
+
+```typescript
+// Detected patterns (English + French)
+"Remember that..."        → Stored as instruction
+"I prefer..."             → Stored as preference
+"This project uses..."    → Stored as project fact
+"My email is..."          → Stored as contact info
+"We decided to..."        → Stored as decision
+```
+
+### Memory Lifecycle Hooks
+
+```typescript
+// Before execution: Inject relevant memories
+beforeExecute(context) → { injectedContext, recalledMemories }
+
+// After response: Capture important info
+afterResponse(context) → { capturedCount, capturedMemories }
+
+// Session end: Summarize conversation
+sessionEnd(sessionId) → { summaryId, memoriesStored }
+```
+
+### Deduplication
+
+- Jaccard similarity threshold: 0.95
+- Hash-based recent capture cache
+- Automatic duplicate detection
+
+---
+
+## Multi-Channel Support
+
+Code Buddy supports multiple messaging channels:
+
+| Channel | Status | Features |
+|:--------|:------:|:---------|
+| **Discord** | 🟡 Base | Bot integration, slash commands |
+| **Telegram** | 🟡 Base | Bot API, message handlers |
+| **Slack** | 🟡 Base | Bolt framework, events |
+| **Terminal** | ✅ Full | Native CLI interface |
+| **HTTP API** | ✅ Full | REST + WebSocket |
+
+### Channel Configuration
+
+```typescript
+// Enable Discord channel
+const discord = new DiscordChannel({
+  token: process.env.DISCORD_TOKEN,
+  allowedGuilds: ['guild-id'],
+});
+await discord.connect();
+```
+
+---
+
+## Security
+
+### Tool Policy System
+
+Fine-grained control over tool execution:
+
+```typescript
+const policy = new ToolPolicy({
+  allowlist: ['read_file', 'search', 'web_fetch'],
+  denylist: ['bash', 'write_file'],
+  requireConfirmation: ['delete_file'],
+});
+```
+
+### Bash Allowlist
+
+Secure command execution:
+
+```typescript
+const bashPolicy = new BashAllowlist({
+  patterns: [
+    /^npm (install|test|run)/,
+    /^git (status|diff|log)/,
+    /^ls -la?/,
+  ],
+  blocked: [
+    /rm -rf/,
+    /sudo/,
+    /curl.*\|.*sh/,
+  ],
+});
+```
+
+### Security Modes
+
+| Mode | Description |
+|:-----|:------------|
+| `suggest` | Confirm all operations |
+| `auto-edit` | Auto-approve safe ops |
+| `full-auto` | Full autonomy (YOLO) |
+
+```bash
+/mode suggest    # Maximum safety
+/mode full-auto  # Full autonomy
+```
+
+### Sandbox Isolation
+
+Docker-based execution environment:
+
+```typescript
+const sandbox = new DockerSandbox({
+  image: 'codebuddy/sandbox:latest',
+  memoryLimit: '512m',
+  networkMode: 'none',
+  timeout: 30000,
+});
+```
+
+---
+
+## Context Management
+
+### Context Window Guard
+
+Automatic context management with configurable thresholds:
+
+```typescript
+const guard = new ContextWindowGuard({
+  maxTokens: 128000,
+  warningThreshold: 0.8,  // Warn at 80%
+  compactionThreshold: 0.9,  // Compact at 90%
+});
+```
+
+### Smart Compaction
+
+Multi-stage compression:
+
+1. **Stage 1**: Remove tool results older than TTL
+2. **Stage 2**: Summarize older messages
+3. **Stage 3**: Aggressive truncation if needed
+
+### Hybrid Search
+
+Combined keyword + semantic search:
+
+```typescript
+const results = await hybridSearch({
+  query: "authentication flow",
+  keywordWeight: 0.3,
+  semanticWeight: 0.7,
+});
+```
+
+---
+
+## Tools
+
+### Built-in Tools
+
+| Category | Tools |
+|:---------|:------|
+| **File Operations** | `view_file`, `create_file`, `str_replace_editor`, `edit_file`, `multi_edit` |
+| **Search** | `search`, `codebase_map` |
+| **System** | `bash`, `docker`, `kubernetes` |
+| **Web** | `web_search`, `web_fetch`, `browser` |
+| **Planning** | `create_todo_list`, `get_todo_list`, `update_todo_list` |
+| **Media** | `screenshot`, `audio`, `video`, `ocr`, `clipboard` |
+| **Documents** | `pdf`, `document`, `archive` |
+
+### RAG-Based Tool Selection
+
+Tools are selected based on query relevance:
+
+```typescript
+// Query: "what's the weather in Paris?"
+// Selected tools: web_search, web_fetch
+// Not selected: bash, edit_file, etc.
+```
+
+---
+
+## API Server
+
+REST API with WebSocket support:
+
+### Starting the Server
+
+```bash
+buddy server --port 3000
+```
+
+### Endpoints
+
+| Endpoint | Method | Description |
+|:---------|:-------|:------------|
+| `/api/health` | GET | Health check |
+| `/api/metrics` | GET | Prometheus metrics |
+| `/api/chat` | POST | Chat completion |
+| `/api/chat/completions` | POST | OpenAI-compatible |
+| `/api/tools` | GET | List tools |
+| `/api/tools/{name}/execute` | POST | Execute tool |
+| `/api/sessions` | GET/POST | Session management |
+| `/api/memory` | GET/POST | Memory entries |
+
+### WebSocket Events
+
+```javascript
+const ws = new WebSocket('ws://localhost:3000/ws');
+
+// Authenticate
+ws.send(JSON.stringify({
+  type: 'authenticate',
+  payload: { token: 'jwt-token' }
+}));
+
+// Stream chat
+ws.send(JSON.stringify({
+  type: 'chat_stream',
+  payload: { messages: [{ role: 'user', content: 'Hello' }] }
+}));
+```
+
+---
+
+## Slash Commands
+
+| Command | Description |
+|:--------|:------------|
+| `/help` | Show help |
+| `/model [name]` | Change model |
+| `/mode [mode]` | Change security mode |
+| `/profile [id]` | Switch connection profile |
+| `/think` | Enable reasoning (4K tokens) |
+| `/megathink` | Deep reasoning (10K tokens) |
+| `/ultrathink` | Exhaustive reasoning (32K tokens) |
+| `/cost` | Show cost dashboard |
+| `/memory` | Memory management |
+| `/hooks list` | List lifecycle hooks |
+| `/plugin list` | List plugins |
+
+---
+
+## Plugin System
 
 ### Plugin Structure
 
@@ -251,135 +468,126 @@ Plugins extend Code Buddy with custom tools, commands, and providers.
     index.js
 ```
 
-### manifest.json
+### Plugin Types
 
-```json
-{
-  "id": "my-plugin",
-  "name": "My Plugin",
-  "version": "1.0.0",
-  "description": "A custom plugin",
-  "author": "Your Name",
-  "permissions": {
-    "filesystem": ["./data"],
-    "network": ["api.example.com"]
-  },
-  "configSchema": {
-    "type": "object",
-    "properties": {
-      "apiKey": { "type": "string", "description": "API key" }
-    },
-    "required": ["apiKey"]
-  }
-}
-```
+- **Tool Plugins**: Add custom tools
+- **Provider Plugins**: Add LLM/embedding/search providers
+- **Command Plugins**: Add slash commands
+- **Hook Plugins**: Add lifecycle hooks
 
-### Plugin Implementation
+### Example Plugin
 
 ```typescript
-// index.ts
-import { Plugin, PluginContext } from '@phuetz/code-buddy/plugins';
-
 const plugin: Plugin = {
   async activate(context: PluginContext) {
-    // Register a tool
     context.registerTool({
       name: 'my_tool',
-      description: 'Does something useful',
-      parameters: {
-        type: 'object',
-        properties: {
-          input: { type: 'string', description: 'Input text' }
-        },
-        required: ['input']
-      },
+      description: 'Custom tool',
       execute: async (args) => {
-        return { success: true, output: `Processed: ${args.input}` };
+        return { success: true, output: 'Done!' };
       }
     });
 
-    // Register a provider (LLM, embedding, or search)
     context.registerProvider({
       id: 'my-llm',
-      name: 'My LLM Provider',
       type: 'llm',
-      priority: 10,
-      async initialize() { /* setup */ },
       async chat(messages) { return 'response'; }
     });
-
-    context.logger.info('Plugin activated');
-  },
-
-  async deactivate() {
-    // Cleanup
   }
 };
-
-export default plugin;
-```
-
-### Plugin Management
-
-```bash
-/plugin list              # List installed plugins
-/plugin enable my-plugin  # Enable a plugin
-/plugin disable my-plugin # Disable a plugin
 ```
 
 ---
 
-## API Server
-
-Code Buddy includes a REST API server with WebSocket support.
-
-### Starting the Server
+## Development
 
 ```bash
-# Start with defaults (port 3000)
-buddy server
+# Clone and install
+git clone https://github.com/phuetz/code-buddy.git
+cd code-buddy
+npm install
 
-# Custom port
-buddy server --port 8080
+# Development mode
+npm run dev
 
-# With authentication disabled (development only)
-AUTH_ENABLED=false buddy server
+# Run tests
+npm test
+
+# Validate before commit
+npm run validate
+
+# Build
+npm run build
 ```
 
-### Endpoints
+### Test Coverage
 
-| Endpoint | Method | Description |
-|:---------|:-------|:------------|
-| `/api/health` | GET | Health check |
-| `/api/metrics` | GET | Prometheus metrics |
-| `/api/chat` | POST | Send chat message |
-| `/api/chat/completions` | POST | OpenAI-compatible endpoint |
-| `/api/tools` | GET | List available tools |
-| `/api/tools/{name}/execute` | POST | Execute a tool |
-| `/api/sessions` | GET/POST | List/create sessions |
-| `/api/memory` | GET/POST | Memory entries |
-
-### WebSocket
-
-Connect to `/ws` for real-time streaming:
-
-```javascript
-const ws = new WebSocket('ws://localhost:3000/ws');
-
-// Authenticate
-ws.send(JSON.stringify({
-  type: 'authenticate',
-  payload: { token: 'your-jwt-token' }
-}));
-
-// Send chat message
-ws.send(JSON.stringify({
-  type: 'chat_stream',
-  payload: { messages: [{ role: 'user', content: 'Hello' }] }
-}));
+```
+300+ tests across:
+- Tool Policy System (2 suites)
+- Bash Allowlist (2 suites)
+- Context Window Guard (34 tests)
+- Context Compaction (4 suites)
+- Moltbot Hooks (52 tests)
+- Connection Profiles (57 tests)
+- Desktop Automation (100 tests)
+- And more...
 ```
 
-See [docs/API.md](docs/API.md) for full API documentation.
+---
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Description | Default |
+|:---------|:------------|:--------|
+| `GROK_API_KEY` | xAI API key | Required |
+| `ANTHROPIC_API_KEY` | Anthropic API key | - |
+| `OPENAI_API_KEY` | OpenAI API key | - |
+| `GOOGLE_API_KEY` | Google AI API key | - |
+| `SERPER_API_KEY` | Web search API key | - |
+| `GROK_BASE_URL` | Custom API endpoint | - |
+| `GROK_MODEL` | Default model | - |
+| `YOLO_MODE` | Full autonomy | `false` |
+| `MAX_COST` | Cost limit ($) | `10` |
+| `JWT_SECRET` | API server auth | Required in prod |
+
+### Project Settings
+
+Create `.codebuddy/settings.json`:
+
+```json
+{
+  "systemPrompt": "You are working on a TypeScript project.",
+  "tools": {
+    "enabled": ["read_file", "search", "bash"],
+    "disabled": ["web_search"]
+  },
+  "security": {
+    "mode": "auto-edit",
+    "bashAllowlist": ["npm *", "git *"]
+  }
+}
+```
+
+---
+
+## Roadmap
+
+### Planned Features
+
+| Feature | Priority | Status |
+|:--------|:---------|:-------|
+| Gateway WebSocket Control Plane | HIGH | 🔲 Planned |
+| Canvas A2UI Visual Workspace | HIGH | 🔲 Planned |
+| ClawHub Skills Registry | MEDIUM | 🔲 Planned |
+| DM Pairing Policies | MEDIUM | 🔲 Planned |
+| OAuth Authentication | MEDIUM | 🔲 Planned |
+| Voice Wake Word Detection | MEDIUM | 🔲 Planned |
+| TTS Providers (OpenAI, ElevenLabs) | MEDIUM | 🔲 Planned |
+| Companion Apps (iOS, Android, macOS) | LOW | 🔲 Planned |
+| Tailscale Integration | LOW | 🔲 Planned |
 
 ---
 
@@ -389,73 +597,37 @@ See [docs/API.md](docs/API.md) for full API documentation.
 
 **API key not working**
 ```bash
-# Verify your key is set
-echo $GROK_API_KEY
+echo $GROK_API_KEY  # Verify key is set
+buddy --prompt "test"
+```
 
-# Test connection
-buddy --prompt "hello"
+**Switching profiles doesn't work**
+```bash
+# Check current profile
+buddy --show-config
+
+# Force profile switch
+buddy --profile lmstudio --prompt "test"
+```
+
+**Memory not persisting**
+```bash
+# Check memory directory
+ls ~/.codebuddy/memory/
+
+# Clear and reinitialize
+rm -rf ~/.codebuddy/memory/
+buddy
 ```
 
 **High latency**
-- Try a faster model: `buddy --model grok-code-fast-1`
-- Use local LLM with Ollama for offline work
-
-**Out of memory**
-- Reduce context window: adjust `contextWindow` in settings
-- Clear conversation: `/clear`
-
-**Tools not executing**
-- Check security mode: `/mode auto`
-- Verify file permissions in working directory
-
-**Plugin not loading**
-- Check manifest.json format
-- Verify plugin path: `~/.codebuddy/plugins/plugin-name/`
-- Check logs: `buddy --debug`
+- Use a faster model: `buddy --model grok-code-fast-1`
+- Use local LLM: `buddy --profile ollama`
 
 ### Debug Mode
 
 ```bash
-# Enable verbose logging
 DEBUG=codebuddy:* buddy
-
-# Check version
-buddy --version
-```
-
-### Getting Help
-
-- [GitHub Issues](https://github.com/phuetz/code-buddy/issues)
-- [Discussions](https://github.com/phuetz/code-buddy/discussions)
-
----
-
-## Documentation
-
-- [Architecture](ARCHITECTURE.md) - System design
-- [AI Providers](docs/ai-providers.md) - Provider configuration
-- [API Reference](docs/API.md) - HTTP/WebSocket API
-- [CLAUDE.md](CLAUDE.md) - Guide for AI assistants
-- [Changelog](CHANGELOG.md) - Version history
-
----
-
-## Contributing
-
-```bash
-# Clone and install
-git clone https://github.com/phuetz/code-buddy.git
-cd code-buddy
-npm install
-
-# Development
-npm run dev
-
-# Run tests
-npm test
-
-# Validate before committing
-npm run validate
 ```
 
 ---
@@ -472,6 +644,6 @@ MIT License - see [LICENSE](LICENSE) for details.
 **[Request Feature](https://github.com/phuetz/code-buddy/discussions)** |
 **[Star on GitHub](https://github.com/phuetz/code-buddy)**
 
-<sub>Multi-AI: Grok | Claude | ChatGPT | Gemini | Inspired by Claude Code</sub>
+<sub>Inspired by [OpenClaw](https://github.com/openclaw/openclaw) | Multi-AI: Grok | Claude | ChatGPT | Gemini | LM Studio | Ollama</sub>
 
 </div>
