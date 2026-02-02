@@ -120,6 +120,13 @@ export const TOOL_METADATA: ToolMetadata[] = [
     description: 'Create todo list for task planning'
   },
   {
+    name: 'get_todo_list',
+    category: 'planning',
+    keywords: ['todo', 'task', 'list', 'view', 'show', 'what', 'do', 'faire', 'tâches', 'taches', 'pending', 'status'],
+    priority: 7,
+    description: 'View current todo list and task status'
+  },
+  {
     name: 'update_todo_list',
     category: 'planning',
     keywords: ['todo', 'update', 'complete', 'done', 'progress', 'status', 'mark'],

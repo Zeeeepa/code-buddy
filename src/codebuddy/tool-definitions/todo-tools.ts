@@ -51,6 +51,26 @@ export const CREATE_TODO_LIST_TOOL: CodeBuddyTool = {
   },
 };
 
+// Get todo list
+export const GET_TODO_LIST_TOOL: CodeBuddyTool = {
+  type: "function",
+  function: {
+    name: "get_todo_list",
+    description: "Get the current todo list to see all tasks and their status",
+    parameters: {
+      type: "object",
+      properties: {
+        filter: {
+          type: "string",
+          enum: ["all", "pending", "in_progress", "completed"],
+          description: "Filter todos by status (default: all)",
+        },
+      },
+      required: [],
+    },
+  },
+};
+
 // Update todo list
 export const UPDATE_TODO_LIST_TOOL: CodeBuddyTool = {
   type: "function",
@@ -99,5 +119,6 @@ export const UPDATE_TODO_LIST_TOOL: CodeBuddyTool = {
  */
 export const TODO_TOOLS: CodeBuddyTool[] = [
   CREATE_TODO_LIST_TOOL,
+  GET_TODO_LIST_TOOL,
   UPDATE_TODO_LIST_TOOL,
 ];

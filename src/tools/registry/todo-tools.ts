@@ -107,6 +107,77 @@ export class CreateTodoListTool implements ITool {
 }
 
 // ============================================================================
+// GetTodoListTool
+// ============================================================================
+
+/**
+ * GetTodoListTool - ITool adapter for viewing todo lists
+ */
+export class GetTodoListTool implements ITool {
+  readonly name = 'get_todo_list';
+  readonly description = 'Get the current todo list to see all tasks and their status';
+
+  async execute(input: Record<string, unknown>): Promise<ToolResult> {
+    const filter = input.filter as string | undefined;
+    const result = await getTodo().viewTodoList();
+
+    // Apply filter if specified
+    if (filter && filter !== 'all' && result.success && result.output) {
+      const lines = result.output.split('\n');
+      const filtered = lines.filter(line => {
+        if (filter === 'pending') return line.includes('⬜') || line.includes('pending');
+        if (filter === 'in_progress') return line.includes('🔄') || line.includes('in_progress');
+        if (filter === 'completed') return line.includes('✅') || line.includes('completed');
+        return true;
+      });
+      return { success: true, output: filtered.join('\n') || 'No todos matching filter' };
+    }
+
+    return result;
+  }
+
+  getSchema(): ToolSchema {
+    return {
+      name: this.name,
+      description: this.description,
+      parameters: {
+        type: 'object',
+        properties: {
+          filter: {
+            type: 'string',
+            description: 'Filter by status: all, pending, in_progress, completed',
+          },
+        },
+        required: [],
+      },
+    };
+  }
+
+  validate(input: unknown): IValidationResult {
+    if (typeof input !== 'object' || input === null) {
+      return { valid: false, errors: ['Input must be an object'] };
+    }
+    return { valid: true };
+  }
+
+  getMetadata(): IToolMetadata {
+    return {
+      name: this.name,
+      description: this.description,
+      category: 'planning' as ToolCategoryType,
+      keywords: ['todo', 'task', 'list', 'view', 'get', 'show'],
+      priority: 5,
+      modifiesFiles: false,
+      makesNetworkRequests: false,
+    };
+  }
+
+  isAvailable(): boolean {
+    return true;
+  }
+}
+
+// ============================================================================
 // UpdateTodoListTool
 // ============================================================================
 
@@ -192,6 +263,7 @@ export class UpdateTodoListTool implements ITool {
 export function createTodoTools(): ITool[] {
   return [
     new CreateTodoListTool(),
+    new GetTodoListTool(),
     new UpdateTodoListTool(),
   ];
 }
