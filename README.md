@@ -53,6 +53,7 @@ Code Buddy incorporates advanced patterns from the [OpenClaw](https://github.com
 | **Lifecycle Hooks** | ✅ 100% | Pre/post hooks with 52 test cases |
 | **Connection Profiles** | ✅ 100% | Multi-provider switching with 57 tests |
 | **Desktop Automation** | ✅ 100% | Screen capture, OCR, UI control |
+| **Gemini Vision** | ✅ 100% | Native image support via `inlineData` (base64 data URLs) |
 | **Auto-Capture Memory** | ✅ 100% | Pattern-based memory extraction |
 | **Memory Lifecycle** | ✅ 100% | Auto-recall and auto-capture hooks |
 
@@ -209,7 +210,7 @@ Code Buddy supports multiple AI providers with automatic failover:
 | **Grok** (xAI) | grok-4, grok-code-fast-1 | 128K | `GROK_API_KEY` |
 | **Claude** (Anthropic) | claude-sonnet-4, opus | 200K | `ANTHROPIC_API_KEY` |
 | **ChatGPT** (OpenAI) | gpt-4o, gpt-4-turbo | 128K | `OPENAI_API_KEY` |
-| **Gemini** (Google) | gemini-2.0-flash | 2M | `GOOGLE_API_KEY` |
+| **Gemini** (Google) | gemini-2.0-flash (+ vision) | 2M | `GOOGLE_API_KEY` |
 | **LM Studio** | Any local model | Varies | `--profile lmstudio` |
 | **Ollama** | llama3, codellama, etc. | Varies | `--profile ollama` |
 
@@ -533,6 +534,31 @@ buddy trigger add <pattern> <action>  # Add a trigger
 buddy trigger remove <id>      # Remove a trigger
 ```
 
+### Voice & TTS Commands
+
+```bash
+buddy speak "Bonjour, je suis Code Buddy"   # Synthesize and play speech
+buddy speak --voice af_bella "Hello world"   # Use a specific voice
+buddy speak --list-voices                    # List available voices
+buddy speak --speed 1.5 "Fast speech"        # Adjust speed (0.25-4.0)
+buddy speak --format mp3 "Hello"             # Output format (wav, mp3)
+buddy speak --url http://host:8000 "Hello"   # Custom AudioReader URL
+```
+
+**In-chat voice commands:**
+
+| Command | Description |
+|:--------|:------------|
+| `/speak <text>` | Speak text with current TTS provider |
+| `/tts on\|off` | Enable/disable TTS |
+| `/tts auto` | Auto-speak all agent responses |
+| `/tts provider audioreader` | Switch to AudioReader (Kokoro-82M, local, free) |
+| `/tts voice ff_siwis` | Set voice (e.g., `ff_siwis` FR, `af_bella` EN) |
+
+**Supported TTS providers:** Edge TTS, espeak, macOS `say`, Piper, OpenAI, ElevenLabs, AudioReader (Kokoro-82M)
+
+**Infinite voice conversation:** Enable `continuousListening` + `autoSpeak` with AudioReader for a hands-free loop: listen → STT → agent → TTS → listen.
+
 ---
 
 ## Plugin System
@@ -673,8 +699,8 @@ Create `.codebuddy/settings.json`:
 | Canvas A2UI Visual Workspace | HIGH | 🔲 Planned |
 | ClawHub Skills Registry | MEDIUM | 🔲 Planned |
 | OAuth Authentication | MEDIUM | 🔲 Planned |
-| Voice Wake Word Detection | MEDIUM | 🔲 Planned |
-| TTS Providers (OpenAI, ElevenLabs) | MEDIUM | 🔲 Planned |
+| Voice Wake Word Detection | MEDIUM | ✅ Done |
+| TTS Providers (OpenAI, ElevenLabs, AudioReader) | MEDIUM | ✅ Done |
 | Companion Apps (iOS, Android, macOS) | LOW | 🔲 Planned |
 | Tailscale Integration | LOW | 🔲 Planned |
 

@@ -383,7 +383,7 @@ export class CodeBuddyClient {
     // Convert messages to Gemini format
     const contents: Array<{
       role: string;
-      parts: Array<{ text?: string; functionResponse?: { name: string; response: unknown } }>;
+      parts: Array<{ text?: string; functionResponse?: { name: string; response: unknown }; inlineData?: { mimeType: string; data: string } }>;
     }> = [];
 
     let systemInstruction: { parts: Array<{ text: string }> } | undefined;
@@ -393,10 +393,8 @@ export class CodeBuddyClient {
         // Gemini uses systemInstruction instead of system message
         systemInstruction = { parts: [{ text: String(msg.content) }] };
       } else if (msg.role === 'user') {
-        contents.push({
-          role: 'user',
-          parts: [{ text: String(msg.content) }],
-        });
+        const parts = this.convertContentToGeminiParts(msg.content);
+        contents.push({ role: 'user', parts });
       } else if (msg.role === 'assistant') {
         const assistantMsg = msg as { content?: string | null; tool_calls?: CodeBuddyToolCall[] };
         if (assistantMsg.tool_calls && assistantMsg.tool_calls.length > 0) {
@@ -619,6 +617,35 @@ export class CodeBuddyClient {
         total_tokens: data.usageMetadata.totalTokenCount || 0,
       } : undefined,
     };
+  }
+
+  private convertContentToGeminiParts(
+    content: string | Array<{ type: string; text?: string; image_url?: { url: string } }> | null | undefined
+  ): Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> {
+    if (!content) {
+      return [{ text: '' }];
+    }
+    if (typeof content === 'string') {
+      return [{ text: content }];
+    }
+    const parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [];
+    for (const part of content) {
+      if (part.type === 'text' && part.text) {
+        parts.push({ text: part.text });
+      } else if (part.type === 'image_url' && part.image_url) {
+        const { mimeType, data } = this.parseDataUrl(part.image_url.url);
+        parts.push({ inlineData: { mimeType, data } });
+      }
+    }
+    return parts.length > 0 ? parts : [{ text: '' }];
+  }
+
+  private parseDataUrl(url: string): { mimeType: string; data: string } {
+    const match = url.match(/^data:([^;]+);base64,(.+)$/);
+    if (match) {
+      return { mimeType: match[1], data: match[2] };
+    }
+    return { mimeType: 'image/png', data: url };
   }
 
   async chat(

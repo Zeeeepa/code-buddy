@@ -55,7 +55,7 @@ describe('ToolOrchestrator', () => {
 
 ## Architecture Overview
 
-Code Buddy is an open-source multi-provider AI coding agent that runs in the terminal. It supports multiple LLM backends (Grok, Claude, ChatGPT, Gemini, Ollama, LM Studio) via OpenAI-compatible APIs and provider-specific SDKs. The core pattern is an **agentic loop** where the AI autonomously calls tools to complete tasks. It features multi-channel messaging (Telegram, Discord, Slack), a SKILL.md natural language skills system, pipeline workflows, DM pairing security, OpenClaw-inspired concurrency control, daemon mode for 24/7 background operation, DAG-based task planning, screen observation with event triggers, proactive agent communication, and multi-agent orchestration with self-healing.
+Code Buddy is an open-source multi-provider AI coding agent that runs in the terminal. It supports multiple LLM backends (Grok, Claude, ChatGPT, Gemini, Ollama, LM Studio) via OpenAI-compatible APIs and provider-specific SDKs. The core pattern is an **agentic loop** where the AI autonomously calls tools to complete tasks. It features multi-channel messaging (Telegram, Discord, Slack), a SKILL.md natural language skills system, pipeline workflows, DM pairing security, OpenClaw-inspired concurrency control, daemon mode for 24/7 background operation, DAG-based task planning, screen observation with event triggers, proactive agent communication, multi-agent orchestration with self-healing, voice conversation with multi-provider TTS (Edge TTS, OpenAI, ElevenLabs, AudioReader/Kokoro-82M), and Gemini vision support (image_url → inlineData conversion).
 
 ### Core Flow
 
@@ -134,6 +134,11 @@ CodeBuddyAgent
 - `src/codebuddy/client.ts` - LLM API client (multi-provider, OpenAI SDK compatible)
 - `src/codebuddy/tools.ts` - Tool definitions and RAG selection
 - `src/ui/components/ChatInterface.tsx` - React/Ink terminal UI
+- `src/talk-mode/` - TTS manager, providers (OpenAI, ElevenLabs, Edge, AudioReader), speech queue
+- `src/talk-mode/providers/audioreader-tts.ts` - AudioReader/Kokoro-82M local TTS provider
+- `src/input/text-to-speech.ts` - TextToSpeechManager used by voice conversation loop
+- `src/input/voice-control.ts` - Continuous voice conversation (STT → Agent → TTS loop), Porcupine wake word integration
+- `src/voice/wake-word.ts` - Wake word detection via Porcupine (Picovoice) with text-match fallback
 - `src/server/index.ts` - HTTP/WebSocket API server
 
 ### Tool Implementation Pattern
@@ -238,6 +243,7 @@ const safePath = pathResult.value;
 | `GROK_BASE_URL` | Custom API endpoint | - |
 | `GROK_MODEL` | Default model to use | - |
 | `JWT_SECRET` | Secret for API server auth | Required in production |
+| `PICOVOICE_ACCESS_KEY` | Picovoice key for Porcupine wake word detection | Optional (text-match fallback) |
 
 ## HTTP Server
 
