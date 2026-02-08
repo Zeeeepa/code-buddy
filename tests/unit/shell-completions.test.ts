@@ -220,11 +220,30 @@ describe('Shell Completions', () => {
       });
     });
 
+    describe('PowerShell completion', () => {
+      let psCompletion: string;
+
+      beforeAll(() => {
+        psCompletion = generateCompletion('powershell');
+      });
+
+      it('should generate powershell completion script', () => {
+        expect(psCompletion).toBeDefined();
+        expect(typeof psCompletion).toBe('string');
+        expect(psCompletion.length).toBeGreaterThan(0);
+      });
+
+      it('should include PowerShell functions', () => {
+        expect(psCompletion).toContain('function');
+        expect(psCompletion).toContain('Register-ArgumentCompleter');
+      });
+    });
+
     describe('Error handling', () => {
       it('should throw for unsupported shell', () => {
         expect(() => {
-          generateCompletion('powershell' as ShellType);
-        }).toThrow('Unsupported shell: powershell');
+          generateCompletion('ksh' as ShellType);
+        }).toThrow('Unsupported shell: ksh');
       });
     });
   });
@@ -314,10 +333,30 @@ describe('Shell Completions', () => {
       });
     });
 
+    describe('PowerShell instructions', () => {
+      let instructions: string;
+
+      beforeAll(() => {
+        instructions = getInstallInstructions('powershell');
+      });
+
+      it('should include powershell in header', () => {
+        expect(instructions).toContain('PowerShell completion installation');
+      });
+
+      it('should include PowerShell profile', () => {
+        expect(instructions).toContain('$PROFILE');
+      });
+
+      it('should include Set-ExecutionPolicy hint', () => {
+        expect(instructions).toContain('Set-ExecutionPolicy');
+      });
+    });
+
     describe('Unsupported shell', () => {
       it('should return unsupported message', () => {
-        const instructions = getInstallInstructions('powershell' as ShellType);
-        expect(instructions).toContain('Unsupported shell: powershell');
+        const instructions = getInstallInstructions('ksh' as ShellType);
+        expect(instructions).toContain('Unsupported shell: ksh');
       });
     });
   });

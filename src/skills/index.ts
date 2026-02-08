@@ -59,20 +59,12 @@ export type {
 // ============================================================================
 
 import * as path from 'path';
-import { fileURLToPath } from 'url';
 
 /**
  * Get the path to bundled SKILL.md skills
  */
 export function getBundledSkillsPath(): string {
-  try {
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = path.dirname(__filename);
-    return path.join(__dirname, 'bundled');
-  } catch (_err) {
-    // Intentionally ignored: import.meta.url may not be available in all environments, fallback to __dirname
-    return path.join(__dirname, 'bundled');
-  }
+  return path.join(__dirname, 'bundled');
 }
 
 // ============================================================================

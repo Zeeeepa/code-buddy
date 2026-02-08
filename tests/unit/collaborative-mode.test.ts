@@ -237,7 +237,7 @@ describe('CollaborativeSessionManager', () => {
     });
 
     it('should throw when not in session', () => {
-      expect(() => manager.addMessage('Hello')).toThrow('Not in a session');
+      expect(() => manager.addMessage('Hello')).toThrow('Not currently in a collaborative session');
     });
 
     it('should support different message types', () => {
@@ -498,7 +498,7 @@ describe('CollaborativeSessionManager', () => {
     });
 
     it('should throw when not in session', () => {
-      expect(() => manager.generateInviteLink()).toThrow('Not in a session');
+      expect(() => manager.generateInviteLink()).toThrow('Not currently in a collaborative session');
     });
   });
 

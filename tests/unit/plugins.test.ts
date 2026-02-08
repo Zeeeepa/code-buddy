@@ -964,7 +964,7 @@ describe('PluginMarketplace', () => {
       marketplace = new PluginMarketplace({ autoUpdate: false });
 
       await expect(marketplace.install('nonexistent')).rejects.toThrow(
-        'Plugin not found'
+        /plugin.*not found/i
       );
     });
 
@@ -990,7 +990,7 @@ describe('PluginMarketplace', () => {
       marketplace = new PluginMarketplace({ autoUpdate: false });
 
       await expect(marketplace.uninstall('nonexistent')).rejects.toThrow(
-        'Plugin not installed'
+        /plugin.*not installed/i
       );
     });
 
@@ -1018,7 +1018,7 @@ describe('PluginMarketplace', () => {
       marketplace = new PluginMarketplace({ autoUpdate: false });
 
       await expect(marketplace.enable('nonexistent')).rejects.toThrow(
-        'Plugin not installed'
+        /plugin.*not installed/i
       );
     });
   });
@@ -1028,7 +1028,7 @@ describe('PluginMarketplace', () => {
       marketplace = new PluginMarketplace({ autoUpdate: false });
 
       await expect(marketplace.disable('nonexistent')).rejects.toThrow(
-        'Plugin not installed'
+        /plugin.*not installed/i
       );
     });
   });

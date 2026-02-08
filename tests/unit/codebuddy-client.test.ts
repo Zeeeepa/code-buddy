@@ -709,7 +709,8 @@ describe('CodeBuddyClient', () => {
 
     describe('network errors', () => {
       it('should wrap network connection errors', async () => {
-        mockCreate.mockRejectedValueOnce(new Error('ECONNREFUSED'));
+        // Mock retry to fail all attempts
+        mockCreate.mockRejectedValue(new Error('ECONNREFUSED'));
 
         await expect(
           client.chat([{ role: 'user', content: 'Hi' }])
@@ -717,7 +718,8 @@ describe('CodeBuddyClient', () => {
       });
 
       it('should wrap DNS resolution errors', async () => {
-        mockCreate.mockRejectedValueOnce(new Error('ENOTFOUND api.x.ai'));
+        // Mock retry to fail all attempts
+        mockCreate.mockRejectedValue(new Error('ENOTFOUND api.x.ai'));
 
         await expect(
           client.chat([{ role: 'user', content: 'Hi' }])
@@ -725,7 +727,8 @@ describe('CodeBuddyClient', () => {
       });
 
       it('should wrap timeout errors', async () => {
-        mockCreate.mockRejectedValueOnce(new Error('Request timeout after 360000ms'));
+        // Mock retry to fail all attempts
+        mockCreate.mockRejectedValue(new Error('Request timeout after 360000ms'));
 
         await expect(
           client.chat([{ role: 'user', content: 'Hi' }])
@@ -733,7 +736,8 @@ describe('CodeBuddyClient', () => {
       });
 
       it('should wrap socket hang up errors', async () => {
-        mockCreate.mockRejectedValueOnce(new Error('socket hang up'));
+        // Mock retry to fail all attempts
+        mockCreate.mockRejectedValue(new Error('socket hang up'));
 
         await expect(
           client.chat([{ role: 'user', content: 'Hi' }])
@@ -743,7 +747,8 @@ describe('CodeBuddyClient', () => {
 
     describe('API errors', () => {
       it('should wrap rate limit errors', async () => {
-        mockCreate.mockRejectedValueOnce(
+        // Mock retry to fail all attempts
+        mockCreate.mockRejectedValue(
           new Error('Rate limit exceeded. Please retry after 60s.')
         );
 
@@ -781,7 +786,8 @@ describe('CodeBuddyClient', () => {
       });
 
       it('should wrap server errors (500)', async () => {
-        mockCreate.mockRejectedValueOnce(new Error('Internal server error'));
+        // Mock retry to fail all attempts
+        mockCreate.mockRejectedValue(new Error('Internal server error'));
 
         await expect(
           client.chat([{ role: 'user', content: 'Hi' }])
@@ -1758,14 +1764,8 @@ describe('CodeBuddyClient', () => {
     });
 
     it('should handle empty messages array', async () => {
-      mockCreate.mockResolvedValueOnce({
-        choices: [
-          { message: { role: 'assistant', content: '' }, finish_reason: 'stop' },
-        ],
-      });
-
-      const response = await client.chat([]);
-      expect(response).toBeDefined();
+      // Empty messages array now throws error in source
+      await expect(client.chat([])).rejects.toThrow('Messages array cannot be empty');
     });
 
     it('should handle empty content in user message', async () => {
@@ -1804,6 +1804,7 @@ describe('CodeBuddyClient', () => {
       });
 
       const response = await client.chat([{ role: 'user', content: 'Hi' }]);
+      // The mock response is returned as-is
       expect(response.choices[0].message.content).toBeNull();
     });
 
@@ -1835,6 +1836,7 @@ describe('CodeBuddyClient', () => {
         });
 
         const response = await client.chat([{ role: 'user', content: 'Hi' }]);
+        // The mock response is returned as-is
         expect(response.choices[0].finish_reason).toBe(reason);
       }
     });

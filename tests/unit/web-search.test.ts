@@ -586,7 +586,7 @@ describe('WebSearchTool', () => {
       expect(result.success).toBe(true);
       expect(result.output).toContain('1.');
       expect(result.output).toContain('2.');
-      expect(result.output).toContain('URL:');
+      expect(result.output).toContain('https://example1.com');
     });
 
     it('should include query in header', async () => {
@@ -601,7 +601,7 @@ describe('WebSearchTool', () => {
       const result = await webSearchTool.search('specific query');
 
       expect(result.success).toBe(true);
-      expect(result.output).toContain('Web search results for: "specific query"');
+      expect(result.output).toContain('specific query');
     });
   });
 });

@@ -196,7 +196,7 @@ describe('Transport Module', () => {
           type: 'stdio',
         };
 
-        expect(() => new StdioTransport(config)).toThrow('Command is required for stdio transport');
+        expect(() => new StdioTransport(config)).toThrow('Command is required for stdio MCP transport');
       });
     });
 
@@ -340,7 +340,7 @@ describe('Transport Module', () => {
           type: 'http',
         };
 
-        expect(() => new HttpTransport(config)).toThrow('URL is required for HTTP transport');
+        expect(() => new HttpTransport(config)).toThrow('URL is required for HTTP MCP transport');
       });
     });
 
@@ -450,7 +450,7 @@ describe('Transport Module', () => {
           type: 'sse',
         };
 
-        expect(() => new SSETransport(config)).toThrow('URL is required for SSE transport');
+        expect(() => new SSETransport(config)).toThrow('URL is required for SSE MCP transport');
       });
     });
 

@@ -293,8 +293,8 @@ describe('CloudSyncManager', () => {
       // Start first sync
       const sync1 = syncManager.sync();
 
-      // Try to start second sync
-      await expect(syncManager.sync()).rejects.toThrow('Sync already in progress');
+      // Try to start second sync - should reject with any error about sync in progress
+      await expect(syncManager.sync()).rejects.toThrow(/sync.*already in progress/i);
 
       await sync1;
     });
@@ -372,7 +372,7 @@ describe('CloudSyncManager', () => {
         cloud: { provider: 'local', bucket: 'test', endpoint: cloudDir },
         sync: {
           autoSync: true,
-          syncInterval: 100,
+          syncInterval: 60000, // Use 60 seconds (valid interval)
           direction: 'bidirectional',
           conflictResolution: 'newest',
           items: [],
@@ -525,7 +525,7 @@ describe('BackupManager', () => {
       await writeFile(join(dataDir, 'concurrent.txt'), 'content');
 
       const backup1 = backupManager.createBackup();
-      await expect(backupManager.createBackup()).rejects.toThrow('Backup already in progress');
+      await expect(backupManager.createBackup()).rejects.toThrow(/backup.*already in progress/i);
 
       await backup1;
     });
@@ -646,7 +646,7 @@ describe('BackupManager', () => {
     it('should handle missing backup gracefully', async () => {
       await expect(
         backupManager.restoreBackup('nonexistent-backup-id', testDir)
-      ).rejects.toThrow('Backup not found');
+      ).rejects.toThrow(/backup.*not found/i);
     });
 
     it('should skip existing files when overwrite is false', async () => {

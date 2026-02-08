@@ -4,6 +4,7 @@
 
 import path from 'path';
 import fs from 'fs';
+import fsPromises from 'fs/promises';
 import {
   ContextLoader,
   getContextLoader,
@@ -12,11 +13,11 @@ import {
   ContextLoaderOptions,
 } from '../../src/context/context-loader';
 
-// Mock fs module
-jest.mock('fs', () => ({
-  existsSync: jest.fn(),
-  readFileSync: jest.fn(),
-  statSync: jest.fn(),
+// Mock fs/promises module
+jest.mock('fs/promises', () => ({
+  access: jest.fn(),
+  readFile: jest.fn(),
+  stat: jest.fn(),
 }));
 
 // Mock fast-glob
@@ -37,7 +38,7 @@ jest.mock('ignore', () => {
   }));
 });
 
-const mockFs = fs as jest.Mocked<typeof fs>;
+const mockFsPromises = fsPromises as jest.Mocked<typeof fsPromises>;
 const mockFastGlob = require('fast-glob');
 
 describe('ContextLoader', () => {
@@ -47,8 +48,8 @@ describe('ContextLoader', () => {
     jest.clearAllMocks();
     resetContextLoader();
 
-    // Default: no gitignore file
-    mockFs.existsSync.mockReturnValue(false);
+    // Default: no gitignore file (access will reject)
+    mockFsPromises.access.mockRejectedValue(new Error('ENOENT'));
   });
 
   afterEach(() => {
@@ -77,38 +78,42 @@ describe('ContextLoader', () => {
       expect(loader).toBeDefined();
     });
 
-    it('should load gitignore when respectGitignore is true', () => {
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue('node_modules\n*.log');
+    it('should load gitignore when respectGitignore is true', async () => {
+      mockFsPromises.access.mockResolvedValue(undefined);
+      mockFsPromises.readFile.mockResolvedValue('node_modules\n*.log');
 
       const loader = new ContextLoader(testWorkingDir, { respectGitignore: true });
       expect(loader).toBeDefined();
-      expect(mockFs.existsSync).toHaveBeenCalledWith(path.join(testWorkingDir, '.gitignore'));
+      // Gitignore is loaded lazily, so we need to trigger loadFiles
+      await loader.loadFiles();
+      expect(mockFsPromises.access).toHaveBeenCalledWith(path.join(testWorkingDir, '.gitignore'));
     });
 
-    it('should not load gitignore when respectGitignore is false', () => {
+    it('should not load gitignore when respectGitignore is false', async () => {
       const loader = new ContextLoader(testWorkingDir, { respectGitignore: false });
       expect(loader).toBeDefined();
-      // existsSync should only be called if we look for gitignore
-      expect(mockFs.existsSync).not.toHaveBeenCalled();
+      // Load files to trigger gitignore check
+      await loader.loadFiles();
+      // access should not be called if we don't respect gitignore
+      expect(mockFsPromises.access).not.toHaveBeenCalled();
     });
 
-    it('should handle missing gitignore gracefully', () => {
-      mockFs.existsSync.mockReturnValue(false);
+    it('should handle missing gitignore gracefully', async () => {
+      mockFsPromises.access.mockRejectedValue(new Error('ENOENT'));
 
       const loader = new ContextLoader(testWorkingDir, { respectGitignore: true });
       expect(loader).toBeDefined();
+      await loader.loadFiles();
     });
 
-    it('should handle gitignore read errors gracefully', () => {
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockImplementation(() => {
-        throw new Error('Permission denied');
-      });
+    it('should handle gitignore read errors gracefully', async () => {
+      mockFsPromises.access.mockResolvedValue(undefined);
+      mockFsPromises.readFile.mockRejectedValue(new Error('Permission denied'));
 
       // Should not throw
       const loader = new ContextLoader(testWorkingDir, { respectGitignore: true });
       expect(loader).toBeDefined();
+      await expect(loader.loadFiles()).resolves.toBeDefined();
     });
   });
 
@@ -119,11 +124,11 @@ describe('ContextLoader', () => {
 
     it('should load files matching default pattern', async () => {
       mockFastGlob.glob.mockResolvedValue(['src/index.ts']);
-      mockFs.statSync.mockReturnValue({
+      mockFsPromises.stat.mockResolvedValue({
         size: 100,
         mtimeMs: Date.now(),
-      } as fs.Stats);
-      mockFs.readFileSync.mockReturnValue('const x = 1;');
+      } as any);
+      mockFsPromises.readFile.mockResolvedValue('const x = 1;');
 
       const loader = new ContextLoader(testWorkingDir);
       const files = await loader.loadFiles();
@@ -141,11 +146,11 @@ describe('ContextLoader', () => {
 
     it('should load files matching custom patterns', async () => {
       mockFastGlob.glob.mockResolvedValue(['src/app.ts', 'src/lib.ts']);
-      mockFs.statSync.mockReturnValue({
+      mockFsPromises.stat.mockResolvedValue({
         size: 100,
         mtimeMs: Date.now(),
-      } as fs.Stats);
-      mockFs.readFileSync.mockReturnValue('export function test() {}');
+      } as any);
+      mockFsPromises.readFile.mockResolvedValue('export function test() {}');
 
       const loader = new ContextLoader(testWorkingDir);
       const files = await loader.loadFiles(['**/*.ts']);
@@ -159,11 +164,11 @@ describe('ContextLoader', () => {
 
     it('should use patterns from options if no explicit patterns provided', async () => {
       mockFastGlob.glob.mockResolvedValue(['src/test.js']);
-      mockFs.statSync.mockReturnValue({
+      mockFsPromises.stat.mockResolvedValue({
         size: 100,
         mtimeMs: Date.now(),
-      } as fs.Stats);
-      mockFs.readFileSync.mockReturnValue('function test() {}');
+      } as any);
+      mockFsPromises.readFile.mockResolvedValue('function test() {}');
 
       const loader = new ContextLoader(testWorkingDir, { patterns: ['**/*.js'] });
       const files = await loader.loadFiles();
@@ -188,14 +193,14 @@ describe('ContextLoader', () => {
       mockFastGlob.glob.mockResolvedValue(['src/good.ts', 'src/bad.ts']);
 
       let callCount = 0;
-      mockFs.statSync.mockImplementation(() => {
+      mockFsPromises.stat.mockImplementation(() => {
         callCount++;
         if (callCount === 2) {
-          throw new Error('File not found');
+          return Promise.reject(new Error('File not found'));
         }
-        return { size: 100, mtimeMs: Date.now() } as fs.Stats;
+        return Promise.resolve({ size: 100, mtimeMs: Date.now() } as any);
       });
-      mockFs.readFileSync.mockReturnValue('good content');
+      mockFsPromises.readFile.mockResolvedValue('good content');
 
       const loader = new ContextLoader(testWorkingDir);
       const files = await loader.loadFiles();
@@ -206,11 +211,11 @@ describe('ContextLoader', () => {
 
     it('should include hidden files when includeHidden is true', async () => {
       mockFastGlob.glob.mockResolvedValue(['.hidden.ts']);
-      mockFs.statSync.mockReturnValue({
+      mockFsPromises.stat.mockResolvedValue({
         size: 100,
         mtimeMs: Date.now(),
-      } as fs.Stats);
-      mockFs.readFileSync.mockReturnValue('hidden file content');
+      } as any);
+      mockFsPromises.readFile.mockResolvedValue('hidden file content');
 
       const loader = new ContextLoader(testWorkingDir, { includeHidden: true });
       await loader.loadFiles();
@@ -236,11 +241,11 @@ describe('ContextLoader', () => {
 
   describe('File Filtering - Always Exclude Patterns', () => {
     beforeEach(() => {
-      mockFs.statSync.mockReturnValue({
+      mockFsPromises.stat.mockResolvedValue({
         size: 100,
         mtimeMs: Date.now(),
-      } as fs.Stats);
-      mockFs.readFileSync.mockReturnValue('content');
+      } as any);
+      mockFsPromises.readFile.mockResolvedValue('content');
     });
 
     it('should pass ALWAYS_EXCLUDE patterns to fast-glob ignore option', async () => {
@@ -424,14 +429,14 @@ describe('ContextLoader', () => {
         ignores: mockIgnoresFunc,
       });
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue('ignored/\n*.ignored');
+      mockFsPromises.access.mockResolvedValue(undefined);
+      mockFsPromises.readFile.mockResolvedValue('ignored/\n*.ignored');
 
       mockFastGlob.glob.mockResolvedValue(['src/app.ts', 'ignored/file.ts', 'test.ignored']);
-      mockFs.statSync.mockReturnValue({
+      mockFsPromises.stat.mockResolvedValue({
         size: 100,
         mtimeMs: Date.now(),
-      } as fs.Stats);
+      } as any);
 
       const loader = new ContextLoader(testWorkingDir, { respectGitignore: true });
       const files = await loader.loadFiles();
@@ -443,11 +448,11 @@ describe('ContextLoader', () => {
 
   describe('File Filtering - Custom Exclude Patterns', () => {
     beforeEach(() => {
-      mockFs.statSync.mockReturnValue({
+      mockFsPromises.stat.mockResolvedValue({
         size: 100,
         mtimeMs: Date.now(),
-      } as fs.Stats);
-      mockFs.readFileSync.mockReturnValue('content');
+      } as any);
+      mockFsPromises.readFile.mockResolvedValue('content');
     });
 
     it('should exclude files matching custom exclude patterns', async () => {
@@ -487,19 +492,19 @@ describe('ContextLoader', () => {
 
   describe('Context Size Limits', () => {
     beforeEach(() => {
-      mockFs.readFileSync.mockReturnValue('file content');
+      mockFsPromises.readFile.mockResolvedValue('file content');
     });
 
     it('should skip files exceeding maxFileSize', async () => {
       mockFastGlob.glob.mockResolvedValue(['src/small.ts', 'src/large.ts']);
 
       let callCount = 0;
-      mockFs.statSync.mockImplementation(() => {
+      mockFsPromises.stat.mockImplementation(() => {
         callCount++;
-        return {
+        return Promise.resolve({
           size: callCount === 1 ? 100 : 200 * 1024, // Second file is 200KB
           mtimeMs: Date.now(),
-        } as fs.Stats;
+        } as any);
       });
 
       const loader = new ContextLoader(testWorkingDir, { maxFileSize: 100 * 1024 });
@@ -512,11 +517,11 @@ describe('ContextLoader', () => {
     it('should stop loading when maxTotalSize is reached', async () => {
       mockFastGlob.glob.mockResolvedValue(['file1.ts', 'file2.ts', 'file3.ts']);
 
-      mockFs.statSync.mockReturnValue({
+      mockFsPromises.stat.mockResolvedValue({
         size: 500 * 1024, // 500KB per file
         mtimeMs: Date.now(),
-      } as fs.Stats);
-      mockFs.readFileSync.mockReturnValue('x'.repeat(500 * 1024));
+      } as any);
+      mockFsPromises.readFile.mockResolvedValue('x'.repeat(500 * 1024));
 
       const loader = new ContextLoader(testWorkingDir, {
         maxTotalSize: 600 * 1024,
@@ -531,10 +536,10 @@ describe('ContextLoader', () => {
 
     it('should use default size limits', async () => {
       mockFastGlob.glob.mockResolvedValue(['src/file.ts']);
-      mockFs.statSync.mockReturnValue({
+      mockFsPromises.stat.mockResolvedValue({
         size: 50 * 1024,
         mtimeMs: Date.now(),
-      } as fs.Stats);
+      } as any);
 
       const loader = new ContextLoader(testWorkingDir);
       const files = await loader.loadFiles();
@@ -545,11 +550,11 @@ describe('ContextLoader', () => {
 
   describe('File Type Detection', () => {
     beforeEach(() => {
-      mockFs.statSync.mockReturnValue({
+      mockFsPromises.stat.mockResolvedValue({
         size: 100,
         mtimeMs: Date.now(),
-      } as fs.Stats);
-      mockFs.readFileSync.mockReturnValue('content');
+      } as any);
+      mockFsPromises.readFile.mockResolvedValue('content');
     });
 
     it('should detect TypeScript files', async () => {
@@ -684,15 +689,15 @@ describe('ContextLoader', () => {
   describe('Content Processing', () => {
     beforeEach(() => {
       mockFastGlob.glob.mockResolvedValue(['src/app.ts']);
-      mockFs.statSync.mockReturnValue({
+      mockFsPromises.stat.mockResolvedValue({
         size: 100,
         mtimeMs: Date.now(),
-      } as fs.Stats);
+      } as any);
     });
 
     it('should compress whitespace when enabled', async () => {
       const contentWithWhitespace = 'const x = 1;   \nconst y = 2;  \n\n\n\nconst z = 3;';
-      mockFs.readFileSync.mockReturnValue(contentWithWhitespace);
+      mockFsPromises.readFile.mockResolvedValue(contentWithWhitespace);
 
       const loader = new ContextLoader(testWorkingDir, { compressWhitespace: true });
       const files = await loader.loadFiles();
@@ -704,7 +709,7 @@ describe('ContextLoader', () => {
 
     it('should not compress whitespace when disabled', async () => {
       const contentWithWhitespace = 'const x = 1;   \n';
-      mockFs.readFileSync.mockReturnValue(contentWithWhitespace);
+      mockFsPromises.readFile.mockResolvedValue(contentWithWhitespace);
 
       const loader = new ContextLoader(testWorkingDir, { compressWhitespace: false });
       const files = await loader.loadFiles();
@@ -714,11 +719,11 @@ describe('ContextLoader', () => {
 
     it('should replace lock file content with placeholder when removeLockFiles is true', async () => {
       mockFastGlob.glob.mockResolvedValue(['package-lock.json']);
-      mockFs.statSync.mockReturnValue({
+      mockFsPromises.stat.mockResolvedValue({
         size: 50000,
         mtimeMs: Date.now(),
-      } as fs.Stats);
-      mockFs.readFileSync.mockReturnValue('{"lockfileVersion": 2, "dependencies": {...}}');
+      } as any);
+      mockFsPromises.readFile.mockResolvedValue('{"lockfileVersion": 2, "dependencies": {...}}');
 
       const loader = new ContextLoader(testWorkingDir, { removeLockFiles: true });
       const files = await loader.loadFiles();
@@ -988,11 +993,11 @@ describe('ContextLoader', () => {
 
   describe('ContextFile structure', () => {
     beforeEach(() => {
-      mockFs.statSync.mockReturnValue({
+      mockFsPromises.stat.mockResolvedValue({
         size: 1234,
         mtimeMs: 1704067200000, // 2024-01-01
-      } as fs.Stats);
-      mockFs.readFileSync.mockReturnValue('file content');
+      } as any);
+      mockFsPromises.readFile.mockResolvedValue('file content');
     });
 
     it('should include all required fields', async () => {
@@ -1031,11 +1036,11 @@ describe('ContextLoader', () => {
 
   describe('Pattern matching edge cases', () => {
     beforeEach(() => {
-      mockFs.statSync.mockReturnValue({
+      mockFsPromises.stat.mockResolvedValue({
         size: 100,
         mtimeMs: Date.now(),
-      } as fs.Stats);
-      mockFs.readFileSync.mockReturnValue('content');
+      } as any);
+      mockFsPromises.readFile.mockResolvedValue('content');
     });
 
     it('should handle negation patterns in exclude', async () => {
@@ -1109,13 +1114,13 @@ describe('ContextLoader', () => {
   describe('Error handling', () => {
     it('should handle stat errors gracefully', async () => {
       mockFastGlob.glob.mockResolvedValue(['file1.ts', 'file2.ts']);
-      mockFs.statSync.mockImplementation((filePath) => {
+      mockFsPromises.stat.mockImplementation((filePath) => {
         if (String(filePath).includes('file1')) {
-          throw new Error('ENOENT: no such file');
+          return Promise.reject(new Error('ENOENT: no such file'));
         }
-        return { size: 100, mtimeMs: Date.now() } as fs.Stats;
+        return Promise.resolve({ size: 100, mtimeMs: Date.now() } as any);
       });
-      mockFs.readFileSync.mockReturnValue('content');
+      mockFsPromises.readFile.mockResolvedValue('content');
 
       const loader = new ContextLoader(testWorkingDir);
       const files = await loader.loadFiles();
@@ -1127,15 +1132,15 @@ describe('ContextLoader', () => {
 
     it('should handle readFile errors gracefully', async () => {
       mockFastGlob.glob.mockResolvedValue(['file1.ts', 'file2.ts']);
-      mockFs.statSync.mockReturnValue({ size: 100, mtimeMs: Date.now() } as fs.Stats);
+      mockFsPromises.stat.mockResolvedValue({ size: 100, mtimeMs: Date.now() } as any);
 
       let callCount = 0;
-      mockFs.readFileSync.mockImplementation(() => {
+      mockFsPromises.readFile.mockImplementation(() => {
         callCount++;
         if (callCount === 1) {
-          throw new Error('EACCES: permission denied');
+          return Promise.reject(new Error('EACCES: permission denied'));
         }
-        return 'content';
+        return Promise.resolve('content');
       });
 
       const loader = new ContextLoader(testWorkingDir);

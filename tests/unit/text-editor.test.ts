@@ -85,6 +85,17 @@ jest.mock('../../src/utils/fuzzy-match', () => ({
   suggestWhitespaceFixes: (...args: unknown[]) => mockSuggestWhitespaceFixes(...args),
 }));
 
+// Mock workspace isolation to use testDir as workspace root
+const mockValidatePath = jest.fn();
+const mockGetConfig = jest.fn();
+
+jest.mock('../../src/workspace/workspace-isolation', () => ({
+  getWorkspaceIsolation: jest.fn(() => ({
+    validatePath: (...args: unknown[]) => mockValidatePath(...args),
+    getConfig: () => mockGetConfig(),
+  })),
+}));
+
 describe('TextEditorTool', () => {
   let editor: TextEditorTool;
   const testDir = '/test/project';
@@ -107,6 +118,37 @@ describe('TextEditorTool', () => {
     mockRequestConfirmation.mockResolvedValue({ confirmed: true });
     mockWriteFile.mockResolvedValue(undefined);
     mockEnsureDir.mockResolvedValue(undefined);
+
+    // Mock workspace isolation to accept paths within testDir
+    mockGetConfig.mockReturnValue({ enabled: true, workspaceRoot: testDir });
+    mockValidatePath.mockImplementation((filePath: string) => {
+      const resolved = path.resolve(filePath);
+      const normalizedTestDir = path.normalize(testDir);
+      const normalizedResolved = path.normalize(resolved);
+
+      // Check for blocked paths (e.g., /etc/passwd)
+      if (filePath === '/etc/passwd' || resolved === '/etc/passwd') {
+        return {
+          valid: false,
+          resolved,
+          error: `Access to protected path is blocked: ${filePath}`,
+          reason: 'blocked_path',
+        };
+      }
+
+      // Check if path is within testDir
+      if (!normalizedResolved.startsWith(normalizedTestDir + path.sep) &&
+          normalizedResolved !== normalizedTestDir) {
+        return {
+          valid: false,
+          resolved,
+          error: `Path outside workspace not allowed: ${filePath} (workspace: ${testDir})`,
+          reason: 'outside_workspace',
+        };
+      }
+
+      return { valid: true, resolved };
+    });
   });
 
   afterEach(() => {
@@ -118,14 +160,14 @@ describe('TextEditorTool', () => {
       const result = await editor.view('/etc/passwd');
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('Path traversal not allowed');
+      expect(result.error).toContain('Access to protected path is blocked');
     });
 
     it('should reject path traversal attempts', async () => {
       const result = await editor.view(`${testDir}/../../../etc/passwd`);
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('Path traversal not allowed');
+      expect(result.error).toContain('Access to protected path is blocked');
     });
 
     it('should reject symlink traversal attacks', async () => {
@@ -136,6 +178,23 @@ describe('TextEditorTool', () => {
         if (pathStr === path.resolve(filePath)) return '/etc/passwd';
         if (pathStr === path.resolve(testDir)) return testDir;
         return pathStr;
+      });
+
+      // Update mock to detect symlink pointing to blocked path
+      mockValidatePath.mockImplementationOnce((filePath: string) => {
+        const resolved = path.resolve(filePath);
+        if (mockExistsSync(resolved)) {
+          const realPath = mockRealpathSync(resolved) as string;
+          if (realPath === '/etc/passwd') {
+            return {
+              valid: false,
+              resolved,
+              error: 'Symlink traversal not allowed: evil-link points outside project directory',
+              reason: 'symlink_traversal',
+            };
+          }
+        }
+        return { valid: true, resolved };
       });
 
       const result = await editor.view(filePath);
@@ -842,11 +901,31 @@ describe('TextEditorTool', () => {
       const customBase = '/custom/project';
       editor.setBaseDirectory(customBase);
 
+      // Update mock to use new base directory
+      mockGetConfig.mockReturnValue({ enabled: true, workspaceRoot: customBase });
+      mockValidatePath.mockImplementation((filePath: string) => {
+        const resolved = path.resolve(filePath);
+        const normalizedCustomBase = path.normalize(customBase);
+        const normalizedResolved = path.normalize(resolved);
+
+        if (!normalizedResolved.startsWith(normalizedCustomBase + path.sep) &&
+            normalizedResolved !== normalizedCustomBase) {
+          return {
+            valid: false,
+            resolved,
+            error: `Path outside workspace not allowed: ${filePath} (workspace: ${customBase})`,
+            reason: 'outside_workspace',
+          };
+        }
+
+        return { valid: true, resolved };
+      });
+
       // Path outside custom base should be rejected
       const result = await editor.view('/other/path/file.txt');
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('Path traversal not allowed');
+      expect(result.error).toContain('Path outside workspace not allowed');
     });
 
     it('should resolve relative base directory', () => {

@@ -271,6 +271,9 @@ export class FCSParser {
         members.push(this.parseFunctionDeclaration());
       } else if (this.matchKeyword('let', 'const', 'var')) {
         members.push(this.parseVarDeclaration());
+      } else {
+        // Skip unexpected tokens in class body to prevent infinite loop
+        this.advance();
       }
 
       this.skipNewlines();

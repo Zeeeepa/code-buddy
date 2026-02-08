@@ -200,14 +200,11 @@ describe('NodeLlamaCppProvider', () => {
     it('should include model name in error when model not found', async () => {
       mockFsExtra.pathExists.mockResolvedValue(false);
 
-      try {
-        await provider.initialize({});
-        fail('Should have thrown');
-      } catch (error) {
-        // Error message should contain the model name
-        expect((error as Error).message).toContain('llama-3.1-8b-q4_k_m.gguf');
-        expect((error as Error).message).toContain('local-llama');
-      }
+      await expect(provider.initialize({}))
+        .rejects.toThrow(/llama-3\.1-8b-q4_k_m\.gguf/);
+
+      await expect(provider.initialize({}))
+        .rejects.toThrow(/local-llama/);
     });
 
     it('should ensure models directory exists', async () => {
@@ -1501,14 +1498,14 @@ describe('autoConfigureLocalProvider', () => {
   it('should include helpful instructions when no provider available', async () => {
     mockFetch.mockRejectedValue(new Error('Connection refused'));
 
-    try {
-      await autoConfigureLocalProvider();
-      fail('Should have thrown');
-    } catch (error) {
-      expect((error as Error).message).toContain('https://ollama.com');
-      expect((error as Error).message).toContain('npm install node-llama-cpp');
-      expect((error as Error).message).toContain('WebLLM');
-    }
+    await expect(autoConfigureLocalProvider())
+      .rejects.toThrow(/https:\/\/ollama\.com/);
+
+    await expect(autoConfigureLocalProvider())
+      .rejects.toThrow(/npm install node-llama-cpp/);
+
+    await expect(autoConfigureLocalProvider())
+      .rejects.toThrow(/WebLLM/);
   });
 
   it('should return the singleton manager', async () => {

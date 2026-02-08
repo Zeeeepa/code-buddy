@@ -589,7 +589,7 @@ describe('AgentState', () => {
   });
 
   describe('Session Methods', () => {
-    it('should save current session', () => {
+    it('should save current session', async () => {
       const chatHistory = [
         {
           type: 'user' as const,
@@ -598,30 +598,30 @@ describe('AgentState', () => {
         },
       ];
 
-      state.saveCurrentSession(chatHistory);
+      await state.saveCurrentSession(chatHistory);
 
       expect(mockUpdateCurrentSession).toHaveBeenCalledWith(chatHistory);
     });
 
-    it('should get session list', () => {
-      const list = state.getSessionList();
+    it('should get session list', async () => {
+      const list = await state.getSessionList();
 
       expect(mockFormatSessionList).toHaveBeenCalled();
       expect(list).toBe('No saved sessions.');
     });
 
-    it('should export current session', () => {
-      const result = state.exportCurrentSession('/export/path');
+    it('should export current session', async () => {
+      const result = await state.exportCurrentSession('/export/path');
 
       expect(mockGetCurrentSessionId).toHaveBeenCalled();
       expect(mockExportSessionToFile).toHaveBeenCalledWith('session_123', '/export/path');
       expect(result).toBe('/path/to/export.md');
     });
 
-    it('should return null when exporting without current session', () => {
+    it('should return null when exporting without current session', async () => {
       mockGetCurrentSessionId.mockReturnValue(null);
 
-      const result = state.exportCurrentSession();
+      const result = await state.exportCurrentSession();
 
       expect(result).toBeNull();
     });

@@ -546,7 +546,8 @@ describe('Error Formatter', () => {
 
       const formatted = formatError(ctx);
 
-      expect(formatted).toContain('Error: Test error message');
+      expect(formatted).toContain('Erreur: Test error message');
+      expect(formatted).toContain('\u2501'); // Should contain decorative border
     });
 
     it('should include details when provided', () => {
@@ -558,7 +559,8 @@ describe('Error Formatter', () => {
 
       const formatted = formatError(ctx);
 
-      expect(formatted).toContain('Details: Additional details here');
+      expect(formatted).toContain('Details:');
+      expect(formatted).toContain('Additional details here');
     });
 
     it('should include suggestion when provided', () => {
@@ -570,7 +572,8 @@ describe('Error Formatter', () => {
 
       const formatted = formatError(ctx);
 
-      expect(formatted).toContain('Suggestion: Try this fix');
+      expect(formatted).toContain('💡');
+      expect(formatted).toContain('Try this fix');
     });
 
     it('should include documentation URL when provided', () => {
@@ -607,7 +610,8 @@ describe('Error Formatter', () => {
 
       const formatted = formatError(ctx);
 
-      expect(formatted).toContain('Exit Code: 4');
+      expect(formatted).toContain('Exit:');
+      expect(formatted).toContain('4');
     });
 
     it('should include error code in footer', () => {
@@ -618,7 +622,8 @@ describe('Error Formatter', () => {
 
       const formatted = formatError(ctx);
 
-      expect(formatted).toContain('Error Code: CUSTOM_CODE');
+      expect(formatted).toContain('Code:');
+      expect(formatted).toContain('CUSTOM_CODE');
     });
 
     it('should include version in footer', () => {
@@ -711,7 +716,7 @@ describe('Error Formatter', () => {
       const ctx = createErrorContext(error, 'API_KEY_MISSING');
 
       expect(ctx.code).toBe('API_KEY_MISSING');
-      expect(ctx.message).toBe('API key is not configured');
+      expect(ctx.message).toContain('cle API'); // French: "La cle API n'est pas configuree"
       expect(ctx.details).toBe('Some error');
       expect(ctx.cause).toBe(error);
     });
@@ -1054,7 +1059,7 @@ describe('Integration - Formatter Combinations', () => {
     const errorCtx = createErrorContext(error);
 
     const formattedError = formatError(errorCtx);
-    expect(formattedError).toContain('Error:');
+    expect(formattedError).toContain('Erreur:'); // French error message
   });
 
   it('should format multiple languages in sequence', () => {

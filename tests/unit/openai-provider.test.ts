@@ -105,7 +105,7 @@ describe('OpenAIProvider', () => {
       const uninitProvider = new OpenAIProvider();
       await expect(uninitProvider.complete({
         messages: [{ role: 'user', content: 'Hello' }],
-      })).rejects.toThrow('Provider not initialized');
+      })).rejects.toThrow('OpenAI provider not initialized. Call initialize() with a valid API key before making requests.');
       uninitProvider.dispose();
     });
 
@@ -409,7 +409,7 @@ describe('OpenAIProvider', () => {
         for await (const _chunk of stream) {
           // Should throw before yielding
         }
-      }).rejects.toThrow('Provider not initialized');
+      }).rejects.toThrow('OpenAI provider not initialized. Call initialize() with a valid API key before making requests.');
       uninitProvider.dispose();
     });
 

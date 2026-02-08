@@ -88,7 +88,7 @@ describe('StdioTransport', () => {
       };
 
       expect(() => new StdioTransport(config)).toThrow(
-        'Command is required for stdio transport'
+        'Command is required for stdio MCP transport'
       );
     });
   });
@@ -224,7 +224,7 @@ describe('HttpTransport', () => {
       };
 
       expect(() => new HttpTransport(config)).toThrow(
-        'URL is required for HTTP transport'
+        'URL is required for HTTP MCP transport'
       );
     });
 
@@ -458,7 +458,7 @@ describe('SSETransport', () => {
       };
 
       expect(() => new SSETransport(config)).toThrow(
-        'URL is required for SSE transport'
+        'URL is required for SSE MCP transport'
       );
     });
 

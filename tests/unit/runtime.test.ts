@@ -335,7 +335,7 @@ describe('Runtime', () => {
         ],
       };
 
-      await expect(rt.execute(program)).rejects.toThrow('Bash commands disabled');
+      await expect(rt.execute(program)).rejects.toThrow('Bash/shell commands are disabled in the current script configuration');
     });
 
     it('should throw on file operations when disabled', async () => {
@@ -363,7 +363,7 @@ describe('Runtime', () => {
         ],
       };
 
-      await expect(rt.execute(program)).rejects.toThrow('File operations disabled');
+      await expect(rt.execute(program)).rejects.toThrow('File operations are disabled in the current script configuration');
     });
 
     it('should throw on AI operations when disabled', async () => {
@@ -388,7 +388,7 @@ describe('Runtime', () => {
         ],
       };
 
-      await expect(rt.execute(program)).rejects.toThrow('AI operations disabled');
+      await expect(rt.execute(program)).rejects.toThrow('AI operations are disabled in the current script configuration');
     });
 
     it('should handle timeout configuration', async () => {
@@ -416,7 +416,7 @@ describe('Runtime', () => {
         ],
       };
 
-      await expect(rt.execute(program)).rejects.toThrow(/Script timeout/);
+      await expect(rt.execute(program)).rejects.toThrow(/Script execution timed out/);
     });
   });
 
@@ -872,7 +872,7 @@ describe('Runtime', () => {
           ],
         };
 
-        await expect(runtime.execute(program)).rejects.toThrow('for-in requires an iterable');
+        await expect(runtime.execute(program)).rejects.toThrow('for-in loop requires an array or object to iterate over');
       });
     });
 
@@ -1698,7 +1698,7 @@ describe('Runtime', () => {
         ],
       };
 
-      await expect(runtime.execute(program)).rejects.toThrow('Undefined variable');
+      await expect(runtime.execute(program)).rejects.toThrow('Variable "undefinedVar" is not defined');
     });
 
     it('should throw on calling non-function', async () => {
@@ -1741,7 +1741,7 @@ describe('Runtime', () => {
         ],
       };
 
-      await expect(runtime.execute(program)).rejects.toThrow('Unknown binary operator');
+      await expect(runtime.execute(program)).rejects.toThrow('Unsupported binary operator');
     });
   });
 

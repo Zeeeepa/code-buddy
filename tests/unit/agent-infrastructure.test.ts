@@ -105,6 +105,25 @@ describe('AgentInfrastructure', () => {
       hooksManager: {
         formatStatus: jest.fn().mockReturnValue('Hooks: 0 registered'),
       } as unknown as AgentInfrastructureDeps['hooksManager'],
+      moltbotHooksManager: {
+        getIntroManager: jest.fn().mockReturnValue({
+          loadIntro: jest.fn().mockResolvedValue({ content: '', sources: [], truncated: false }),
+          getConfig: jest.fn().mockReturnValue({ enabled: false, sources: [], combineMode: 'prepend' }),
+        }),
+        getSessionManager: jest.fn().mockReturnValue({
+          startSession: jest.fn().mockResolvedValue({ id: 'test', projectPath: '', createdAt: '', updatedAt: '', messages: [], metadata: {} }),
+          endSession: jest.fn().mockResolvedValue(undefined),
+          dispose: jest.fn(),
+        }),
+        getCommandLogger: jest.fn().mockReturnValue({
+          logToolCall: jest.fn(),
+          logBashCommand: jest.fn(),
+          logFileEdit: jest.fn(),
+          flush: jest.fn().mockResolvedValue(undefined),
+          dispose: jest.fn(),
+        }),
+        dispose: jest.fn(),
+      } as unknown as AgentInfrastructureDeps['moltbotHooksManager'],
       modelRouter: {
         getTotalCost: jest.fn().mockReturnValue(0.05),
         getEstimatedSavings: jest.fn().mockReturnValue({ saved: 0.01, percentage: 20 }),
@@ -228,6 +247,13 @@ describe('AgentInfrastructure', () => {
       const infra = new AgentInfrastructure(deps);
 
       expect(infra.hooksManager).toBe(deps.hooksManager);
+    });
+
+    it('should provide access to moltbotHooksManager', () => {
+      const deps = createMockDeps();
+      const infra = new AgentInfrastructure(deps);
+
+      expect(infra.moltbotHooksManager).toBe(deps.moltbotHooksManager);
     });
 
     it('should provide access to modelRouter', () => {

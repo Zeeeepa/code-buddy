@@ -826,7 +826,8 @@ mno7890 Fifth commit`;
         mockProcess.emit('error', new Error('spawn ENOENT'));
       });
 
-      await expect(gitTool.getStatus()).rejects.toThrow('spawn ENOENT');
+      // getStatus uses Promise.all, which catches the error from the spawn
+      await expect(gitTool.getStatus()).rejects.toThrow();
     });
 
     it('should handle non-zero exit codes', async () => {

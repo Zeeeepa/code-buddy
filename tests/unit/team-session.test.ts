@@ -715,7 +715,7 @@ describe('TeamSessionManager', () => {
       member.role = 'viewer';
 
       await expect(manager.inviteMember('test@example.com')).rejects.toThrow(
-        'No permission to invite members'
+        'Permission denied: you do not have permission to invite members'
       );
     });
 
@@ -772,7 +772,7 @@ describe('TeamSessionManager', () => {
       member.role = 'viewer';
 
       await expect(manager.updateMemberRole('member-id', 'editor')).rejects.toThrow(
-        'Insufficient permissions'
+        'Permission denied: only owners and admins can perform this action'
       );
     });
 
@@ -781,7 +781,7 @@ describe('TeamSessionManager', () => {
 
       await expect(
         manager.updateMemberRole(session.owner, 'viewer')
-      ).rejects.toThrow("Cannot change owner's role");
+      ).rejects.toThrow("Cannot change the session owner's role");
     });
 
     it('should throw for non-existent member', async () => {
@@ -847,7 +847,7 @@ describe('TeamSessionManager', () => {
       member.role = 'viewer';
 
       await expect(manager.removeMember('member-id')).rejects.toThrow(
-        'Insufficient permissions'
+        'Permission denied: only owners and admins can perform this action'
       );
     });
 
@@ -855,7 +855,7 @@ describe('TeamSessionManager', () => {
       const session = await manager.createSession('Test Session');
 
       await expect(manager.removeMember(session.owner)).rejects.toThrow(
-        'Cannot remove session owner'
+        'Cannot remove the session owner'
       );
     });
 

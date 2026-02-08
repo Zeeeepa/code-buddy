@@ -163,6 +163,12 @@ jest.mock('../../src/codebuddy/tools', () => ({
     { function: { name: 'file_viewer' } },
     { function: { name: 'git_status' } },
   ],
+  getAllCodeBuddyTools: jest.fn().mockResolvedValue([
+    { function: { name: 'bash' } },
+    { function: { name: 'search' } },
+    { function: { name: 'file_viewer' } },
+    { function: { name: 'git_status' } },
+  ]),
 }));
 
 // Mock interactive setup

@@ -310,7 +310,8 @@ describe('CodeBuddyClient', () => {
     });
 
     it('should handle API errors gracefully', async () => {
-      mockCreate.mockRejectedValueOnce(new Error('API rate limit exceeded'));
+      // Mock retry to fail all attempts
+      mockCreate.mockRejectedValue(new Error('API rate limit exceeded'));
 
       const messages: CodeBuddyMessage[] = [{ role: 'user', content: 'Hi' }];
 
@@ -964,7 +965,8 @@ describe('CodeBuddyClient', () => {
     });
 
     it('should throw wrapped error on API failure', async () => {
-      mockCreate.mockRejectedValueOnce(new Error('Connection timeout'));
+      // Mock retry to fail all attempts
+      mockCreate.mockRejectedValue(new Error('Connection timeout'));
 
       await expect(client.chat([{ role: 'user', content: 'Hi' }])).rejects.toThrow(
         'CodeBuddy API error: Connection timeout'
@@ -983,7 +985,8 @@ describe('CodeBuddyClient', () => {
 
     it('should handle rate limit errors', async () => {
       const rateLimitError = new Error('Rate limit exceeded. Please retry after 60 seconds.');
-      mockCreate.mockRejectedValueOnce(rateLimitError);
+      // Mock retry to fail all attempts
+      mockCreate.mockRejectedValue(rateLimitError);
 
       await expect(client.chat([{ role: 'user', content: 'Hi' }])).rejects.toThrow(
         'CodeBuddy API error: Rate limit exceeded'
@@ -1001,7 +1004,8 @@ describe('CodeBuddyClient', () => {
 
     it('should handle network errors', async () => {
       const networkError = new Error('ENOTFOUND api.x.ai');
-      mockCreate.mockRejectedValueOnce(networkError);
+      // Mock retry to fail all attempts
+      mockCreate.mockRejectedValue(networkError);
 
       await expect(client.chat([{ role: 'user', content: 'Hi' }])).rejects.toThrow(
         'CodeBuddy API error: ENOTFOUND api.x.ai'
@@ -1015,12 +1019,8 @@ describe('CodeBuddyClient', () => {
     });
 
     it('should handle empty messages array', async () => {
-      mockCreate.mockResolvedValueOnce({
-        choices: [{ message: { role: 'assistant', content: '' }, finish_reason: 'stop' }],
-      });
-
-      const response = await client.chat([]);
-      expect(response).toBeDefined();
+      // Empty messages array now throws error in source
+      await expect(client.chat([])).rejects.toThrow('Messages array cannot be empty');
     });
 
     it('should handle empty tools array', async () => {
@@ -1043,6 +1043,7 @@ describe('CodeBuddyClient', () => {
       });
 
       const response = await client.chat([{ role: 'user', content: 'Hi' }]);
+      // The mock response is returned as-is
       expect(response.choices[0].message.content).toBeNull();
     });
 
@@ -1127,7 +1128,8 @@ describe('CodeBuddyClient', () => {
         });
       });
 
-      client = new CodeBuddyClient(mockApiKey, 'totally-unknown-model');
+      // Use model name that doesn't match function calling patterns
+      client = new CodeBuddyClient(mockApiKey, 'custom-gpt-model');
 
       // Call probe concurrently
       const [result1, result2, result3] = await Promise.all([

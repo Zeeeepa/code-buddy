@@ -377,7 +377,7 @@ describe('MCPClient', () => {
       await connectPromise;
 
       await expect(client.connect(testConfig)).rejects.toThrow(
-        'Server test-server is already connected'
+        'MCP server "test-server" is already connected'
       );
     });
 
@@ -810,7 +810,7 @@ describe('MCPClient', () => {
     it('should throw error when calling tool on non-connected server', async () => {
       await expect(
         client.callTool('non-existent', 'some_tool', {})
-      ).rejects.toThrow('Server non-existent is not connected');
+      ).rejects.toThrow('MCP server "non-existent" is not connected');
     });
 
     it('should handle tool call errors', async () => {
@@ -888,7 +888,7 @@ describe('MCPClient', () => {
     it('should throw error when reading resource from non-connected server', async () => {
       await expect(
         client.readResource('non-existent', 'some://uri')
-      ).rejects.toThrow('Server non-existent is not connected');
+      ).rejects.toThrow('MCP server "non-existent" is not connected');
     });
   });
 
@@ -1232,6 +1232,6 @@ describe('Request Timeout', () => {
     // Advance timers to trigger timeout
     jest.advanceTimersByTime(30001);
 
-    await expect(connectPromise).rejects.toThrow('Request timed out');
+    await expect(connectPromise).rejects.toThrow('MCP request timed out after 30 seconds');
   });
 });

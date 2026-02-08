@@ -73,12 +73,13 @@ describe('Database System', () => {
 
     it('should return stats', () => {
       const manager = getDatabaseManager();
-      const stats = manager.getStats();
+      const stats = manager.getDatabaseStats();
 
       expect(stats).toHaveProperty('version');
       expect(stats).toHaveProperty('tables');
       expect(stats).toHaveProperty('memoriesCount');
       expect(stats).toHaveProperty('sessionsCount');
+      expect(stats).toHaveProperty('size');
       expect(Array.isArray(stats.tables)).toBe(true);
     });
 
