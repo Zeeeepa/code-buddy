@@ -1,10 +1,11 @@
 /**
- * Buddy Script - Scripting Language for code-buddy automation
+ * Unified Scripting Module for Code Buddy
  *
- * Inspired by FileCommander Enhanced Script (FCS)
+ * Merges FileCommander Script (FCS) and Buddy Script into a single system.
+ * Extensions: .bs (primary), .fcs (backward-compatible alias)
  *
  * Usage:
- *   grok --script myscript.bs
+ *   buddy --script myscript.bs
  *   /script run myscript.bs
  *   /script new myscript.bs
  */
@@ -18,17 +19,44 @@ import {
   CodeBuddyScriptConfig,
   DEFAULT_SCRIPT_CONFIG,
   ScriptResult,
-  ProgramNode,
+  Program,
 } from './types.js';
 
+// Re-export everything
 export * from './types.js';
-export { Lexer, tokenize } from './lexer.js';
-export { Parser, parse } from './parser.js';
-export { Runtime } from './runtime.js';
-export { createBuiltins } from './builtins.js';
+export { FCSLexer, Lexer, tokenize } from './lexer.js';
+export { FCSParser, Parser, parse } from './parser.js';
+export { FCSRuntime, Runtime, createRuntime } from './runtime.js';
+export { createBuiltins, createFCSBuiltins } from './builtins.js';
+
+// CodeBuddy Bindings
+export { createGrokBindings, setCodeBuddyClient, setMCPManager } from './codebuddy-bindings.js';
+export type { CodeBuddyBindingsConfig } from './codebuddy-bindings.js';
+
+// Script Registry
+export {
+  ScriptRegistry,
+  getScriptRegistry,
+  initScriptRegistry,
+  type ScriptTemplate,
+  type ScriptCategory,
+} from './script-registry.js';
+
+// Sync Bindings
+export {
+  createSyncBindings,
+  getWorkspaceTracker,
+  resetWorkspaceTracker,
+  WorkspaceStateTracker,
+  type WorkspaceSnapshot,
+  type FileState,
+  type SessionContext,
+  type FileDiff,
+  type SyncBindingsConfig,
+} from './sync-bindings.js';
 
 /**
- * Execute a Buddy Script from source code
+ * Execute script from source code
  */
 export async function executeScript(
   source: string,
@@ -37,13 +65,8 @@ export async function executeScript(
   const startTime = Date.now();
 
   try {
-    // Tokenize
     const tokens = tokenize(source);
-
-    // Parse
     const ast = parse(tokens);
-
-    // Execute
     const runtime = new Runtime({ ...DEFAULT_SCRIPT_CONFIG, ...config });
     const result = await runtime.execute(ast);
 
@@ -51,6 +74,7 @@ export async function executeScript(
       success: true,
       output: result.output,
       returnValue: result.returnValue,
+      testResults: result.testResults,
       duration: Date.now() - startTime,
     };
   } catch (error) {
@@ -64,7 +88,7 @@ export async function executeScript(
 }
 
 /**
- * Execute a Buddy Script from a file
+ * Execute script from a file
  */
 export async function executeScriptFile(
   filePath: string,
@@ -84,8 +108,6 @@ export async function executeScriptFile(
   }
 
   const source = fs.readFileSync(fullPath, 'utf-8');
-
-  // Set workdir to script's directory if not specified
   const scriptDir = path.dirname(fullPath);
   const mergedConfig = {
     workdir: scriptDir,
@@ -96,7 +118,7 @@ export async function executeScriptFile(
 }
 
 /**
- * Validate a Buddy Script without executing it
+ * Validate a script without executing it
  */
 export function validateScript(source: string): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
@@ -112,9 +134,9 @@ export function validateScript(source: string): { valid: boolean; errors: string
 }
 
 /**
- * Format/pretty-print a Buddy Script AST
+ * Format/pretty-print a script AST
  */
-export function formatAST(ast: ProgramNode): string {
+export function formatAST(ast: Program): string {
   return JSON.stringify(ast, null, 2);
 }
 
@@ -125,7 +147,7 @@ export function createScriptTemplate(name: string, description: string = ''): st
   return `#!/usr/bin/env buddy-script
 // ============================================
 // ${name}
-// ${description || 'Buddy Script'}
+// ${description || 'Code Buddy Script'}
 // ============================================
 
 // Import code-buddy bindings
@@ -145,7 +167,7 @@ function main() {
     print("")
 
     // Your code here
-    print("Hello from Buddy Script!")
+    print("Hello from Code Buddy Script!")
 
     // Example: File operations
     // let content = file.read("README.md")
@@ -180,24 +202,40 @@ export function getScriptExtension(): string {
 }
 
 /**
- * Check if a file is a Buddy Script
+ * Check if a file is a Code Buddy Script
  */
 export function isBuddyScript(filePath: string): boolean {
   const ext = path.extname(filePath).toLowerCase();
-  return ext === '.bs' || ext === '.codebuddy' || ext === '.codebuddyscript';
+  return ext === '.bs' || ext === '.fcs' || ext === '.codebuddy' || ext === '.codebuddyscript';
 }
+
+/**
+ * Parse source and return AST (for debugging/analysis)
+ */
+export function parseScript(source: string) {
+  const tokens = tokenize(source);
+  return {
+    tokens,
+    ast: parse(tokens),
+  };
+}
+
+// Backward-compatible aliases
+/** @deprecated Use executeScript instead */
+export const executeFCS = executeScript;
+/** @deprecated Use executeScriptFile instead */
+export const executeFCSFile = executeScriptFile;
+/** @deprecated Use parseScript instead */
+export const parseFCS = parseScript;
 
 /**
  * Script Manager - singleton for managing scripts
  */
 class CodeBuddyScriptManager {
-  private scripts: Map<string, ProgramNode> = new Map();
+  private scripts: Map<string, Program> = new Map();
   private history: Array<{ script: string; result: ScriptResult; timestamp: Date }> = [];
 
-  /**
-   * Load and cache a script
-   */
-  async load(filePath: string): Promise<ProgramNode> {
+  async load(filePath: string): Promise<Program> {
     const fullPath = path.resolve(filePath);
 
     if (this.scripts.has(fullPath)) {
@@ -212,9 +250,6 @@ class CodeBuddyScriptManager {
     return ast;
   }
 
-  /**
-   * Execute a cached or new script
-   */
   async execute(
     filePath: string,
     config: Partial<CodeBuddyScriptConfig> = {}
@@ -227,7 +262,6 @@ class CodeBuddyScriptManager {
       timestamp: new Date(),
     });
 
-    // Keep only last 100 executions
     if (this.history.length > 100) {
       this.history = this.history.slice(-100);
     }
@@ -235,23 +269,14 @@ class CodeBuddyScriptManager {
     return result;
   }
 
-  /**
-   * Clear cached scripts
-   */
   clearCache(): void {
     this.scripts.clear();
   }
 
-  /**
-   * Get execution history
-   */
   getHistory(): Array<{ script: string; result: ScriptResult; timestamp: Date }> {
     return [...this.history];
   }
 
-  /**
-   * List available scripts in a directory
-   */
   listScripts(dir: string = process.cwd()): string[] {
     if (!fs.existsSync(dir)) return [];
 
@@ -261,7 +286,6 @@ class CodeBuddyScriptManager {
   }
 }
 
-// Singleton instance
 let scriptManager: CodeBuddyScriptManager | null = null;
 
 export function getScriptManager(): CodeBuddyScriptManager {

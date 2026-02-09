@@ -11,7 +11,7 @@ import {
   resetWorkspaceTracker,
   type FileState,
   type WorkspaceSnapshot,
-} from '../../src/fcs/sync-bindings.js';
+} from '../../src/scripting/sync-bindings.js';
 import { resetSyncManager } from '../../src/sync/index.js';
 
 describe('WorkspaceStateTracker', () => {

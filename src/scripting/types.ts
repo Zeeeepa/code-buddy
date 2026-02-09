@@ -1,336 +1,384 @@
 /**
- * Buddy Script Types
+ * Unified Script Types
  *
- * Type definitions for the Buddy Script language (.bs files)
- * Inspired by FileCommander Script (FCS)
+ * Merged from FileCommander Script (FCS) and Buddy Script
+ * FCS lexer/parser types as the superset, plus Buddy Script runtime types
+ *
+ * Extensions: .bs (primary), .fcs (backward-compatible alias)
  */
 
 // ============================================
-// Token Types
+// Token Types (FCS superset)
 // ============================================
 
 export enum TokenType {
   // Literals
-  NUMBER = 'NUMBER',
-  STRING = 'STRING',
-  BOOLEAN = 'BOOLEAN',
-  NULL = 'NULL',
-  IDENTIFIER = 'IDENTIFIER',
+  Number = 'Number',
+  String = 'String',
+  Boolean = 'Boolean',
+  Null = 'Null',
+  Regex = 'Regex',
 
-  // Keywords
-  LET = 'LET',
-  CONST = 'CONST',
-  FUNCTION = 'FUNCTION',
-  RETURN = 'RETURN',
-  IF = 'IF',
-  ELSE = 'ELSE',
-  WHILE = 'WHILE',
-  FOR = 'FOR',
-  IN = 'IN',
-  BREAK = 'BREAK',
-  CONTINUE = 'CONTINUE',
-  TRY = 'TRY',
-  CATCH = 'CATCH',
-  THROW = 'THROW',
-  IMPORT = 'IMPORT',
-  EXPORT = 'EXPORT',
-  ASYNC = 'ASYNC',
-  AWAIT = 'AWAIT',
+  // Identifiers and Keywords
+  Identifier = 'Identifier',
+  Keyword = 'Keyword',
 
   // Operators
-  PLUS = 'PLUS',
-  MINUS = 'MINUS',
-  MULTIPLY = 'MULTIPLY',
-  DIVIDE = 'DIVIDE',
-  MODULO = 'MODULO',
-  POWER = 'POWER',
-  ASSIGN = 'ASSIGN',
-  PLUS_ASSIGN = 'PLUS_ASSIGN',
-  MINUS_ASSIGN = 'MINUS_ASSIGN',
-  EQUALS = 'EQUALS',
-  NOT_EQUALS = 'NOT_EQUALS',
-  LESS_THAN = 'LESS_THAN',
-  GREATER_THAN = 'GREATER_THAN',
-  LESS_EQUAL = 'LESS_EQUAL',
-  GREATER_EQUAL = 'GREATER_EQUAL',
-  AND = 'AND',
-  OR = 'OR',
-  NOT = 'NOT',
+  Plus = 'Plus',           // +
+  Minus = 'Minus',         // -
+  Multiply = 'Multiply',   // *
+  Divide = 'Divide',       // /
+  Modulo = 'Modulo',       // %
+  Power = 'Power',         // **
+
+  // Comparison
+  Equal = 'Equal',         // ==
+  NotEqual = 'NotEqual',   // !=
+  Less = 'Less',           // <
+  Greater = 'Greater',     // >
+  LessEqual = 'LessEqual', // <=
+  GreaterEqual = 'GreaterEqual', // >=
+
+  // Logical
+  And = 'And',             // &&
+  Or = 'Or',               // ||
+  Not = 'Not',             // !
+
+  // Assignment
+  Assign = 'Assign',       // =
+  PlusAssign = 'PlusAssign',     // +=
+  MinusAssign = 'MinusAssign',   // -=
+  MultiplyAssign = 'MultiplyAssign', // *=
+  DivideAssign = 'DivideAssign', // /=
 
   // Delimiters
-  LPAREN = 'LPAREN',
-  RPAREN = 'RPAREN',
-  LBRACE = 'LBRACE',
-  RBRACE = 'RBRACE',
-  LBRACKET = 'LBRACKET',
-  RBRACKET = 'RBRACKET',
-  COMMA = 'COMMA',
-  DOT = 'DOT',
-  COLON = 'COLON',
-  SEMICOLON = 'SEMICOLON',
-  ARROW = 'ARROW',
-  QUESTION = 'QUESTION',
+  LeftParen = 'LeftParen',     // (
+  RightParen = 'RightParen',   // )
+  LeftBrace = 'LeftBrace',     // {
+  RightBrace = 'RightBrace',   // }
+  LeftBracket = 'LeftBracket', // [
+  RightBracket = 'RightBracket', // ]
+
+  // Punctuation
+  Semicolon = 'Semicolon', // ;
+  Comma = 'Comma',         // ,
+  Dot = 'Dot',             // .
+  Colon = 'Colon',         // :
+  Question = 'Question',   // ? (from Buddy Script - separate from Colon)
+  Arrow = 'Arrow',         // =>
+  Pipeline = 'Pipeline',   // |>
 
   // Special
-  COMMENT = 'COMMENT',
-  NEWLINE = 'NEWLINE',
+  Comment = 'Comment',
+  Newline = 'Newline',
+  Indent = 'Indent',
+  Dedent = 'Dedent',
   EOF = 'EOF',
+
+  // Decorators
+  Decorator = 'Decorator', // @
 }
 
 export interface Token {
   type: TokenType;
-  value: string | number | boolean | null;
+  value: string;
   line: number;
   column: number;
+  position: number;
+  length: number;
 }
 
 // ============================================
-// AST Node Types
+// Keywords (FCS superset + Buddy Script additions)
 // ============================================
 
-export type ASTNode =
-  | ProgramNode
-  | StatementNode
-  | ExpressionNode;
+export const FCS_KEYWORDS = new Set([
+  // Control flow
+  'if', 'else', 'elif', 'while', 'for', 'break', 'continue', 'return',
+  'switch', 'case', 'default', 'do', 'until',
 
-export interface ProgramNode {
+  // Declarations
+  'let', 'const', 'var', 'func', 'function', 'class', 'struct', 'enum', 'namespace',
+
+  // Types
+  'int', 'float', 'string', 'bool', 'array', 'dict', 'set', 'any', 'void',
+
+  // Values
+  'true', 'false', 'null', 'undefined',
+
+  // Operators
+  'in', 'is', 'as', 'typeof', 'sizeof', 'new', 'delete',
+
+  // Exception handling
+  'try', 'catch', 'finally', 'throw',
+
+  // Async
+  'async', 'await', 'promise',
+
+  // Import/Export
+  'import', 'export', 'from',
+
+  // Special
+  'with', 'using', 'global', 'local', 'static', 'public', 'private', 'protected',
+
+  // FileCommander specific
+  'editor', 'file', 'panel', 'command', 'test', 'assert', 'expect',
+  'select', 'cursor', 'view', 'window', 'dialog',
+]);
+
+// ============================================
+// AST Node Types (FCS superset + BS additions)
+// ============================================
+
+export interface AstNode {
+  type: string;
+  line?: number;
+  column?: number;
+}
+
+// Program
+export interface Program extends AstNode {
   type: 'Program';
-  body: StatementNode[];
+  statements: AstNode[];
 }
 
-export type StatementNode =
-  | VariableDeclaration
-  | FunctionDeclaration
-  | ExpressionStatement
-  | IfStatement
-  | WhileStatement
-  | ForStatement
-  | ForInStatement
-  | ReturnStatement
-  | BreakStatement
-  | ContinueStatement
-  | TryStatement
-  | ThrowStatement
-  | ImportStatement
-  | BlockStatement;
-
-export interface VariableDeclaration {
-  type: 'VariableDeclaration';
-  kind: 'let' | 'const';
-  name: string;
-  init: ExpressionNode | null;
-}
-
-export interface FunctionDeclaration {
-  type: 'FunctionDeclaration';
-  name: string;
-  params: ParameterNode[];
-  body: BlockStatement;
-  async: boolean;
-}
-
-export interface ParameterNode {
-  name: string;
-  defaultValue?: ExpressionNode;
-}
-
-export interface ExpressionStatement {
-  type: 'ExpressionStatement';
-  expression: ExpressionNode;
-}
-
-export interface IfStatement {
-  type: 'IfStatement';
-  condition: ExpressionNode;
-  consequent: BlockStatement;
-  alternate: BlockStatement | IfStatement | null;
-}
-
-export interface WhileStatement {
-  type: 'WhileStatement';
-  condition: ExpressionNode;
-  body: BlockStatement;
-}
-
-export interface ForStatement {
-  type: 'ForStatement';
-  init: VariableDeclaration | ExpressionNode | null;
-  test: ExpressionNode | null;
-  update: ExpressionNode | null;
-  body: BlockStatement;
-}
-
-export interface ForInStatement {
-  type: 'ForInStatement';
-  variable: string;
-  iterable: ExpressionNode;
-  body: BlockStatement;
-}
-
-export interface ReturnStatement {
-  type: 'ReturnStatement';
-  argument: ExpressionNode | null;
-}
-
-export interface BreakStatement {
-  type: 'BreakStatement';
-}
-
-export interface ContinueStatement {
-  type: 'ContinueStatement';
-}
-
-export interface TryStatement {
-  type: 'TryStatement';
-  block: BlockStatement;
-  handler: CatchClause | null;
-}
-
-export interface CatchClause {
-  param: string;
-  body: BlockStatement;
-}
-
-export interface ThrowStatement {
-  type: 'ThrowStatement';
-  argument: ExpressionNode;
-}
-
-export interface ImportStatement {
-  type: 'ImportStatement';
-  module: string;
-  alias?: string;
-}
-
-export interface BlockStatement {
-  type: 'BlockStatement';
-  body: StatementNode[];
-}
-
-// ============================================
-// Expression Types
-// ============================================
-
-export type ExpressionNode =
-  | Literal
-  | Identifier
-  | BinaryExpression
-  | UnaryExpression
-  | LogicalExpression
-  | AssignmentExpression
-  | CallExpression
-  | MemberExpression
-  | ArrayExpression
-  | ObjectExpression
-  | ConditionalExpression
-  | ArrowFunction
-  | AwaitExpression
-  | TemplateLiteral;
-
-export interface Literal {
+// Expressions
+export interface LiteralExpr extends AstNode {
   type: 'Literal';
-  value: string | number | boolean | null;
+  value: unknown;
+  tokenType: TokenType;
 }
 
-export interface Identifier {
+export interface IdentifierExpr extends AstNode {
   type: 'Identifier';
   name: string;
 }
 
-export interface BinaryExpression {
-  type: 'BinaryExpression';
-  operator: string;
-  left: ExpressionNode;
-  right: ExpressionNode;
+export interface BinaryExpr extends AstNode {
+  type: 'Binary';
+  left: AstNode;
+  operator: TokenType;
+  right: AstNode;
 }
 
-export interface UnaryExpression {
-  type: 'UnaryExpression';
-  operator: string;
-  argument: ExpressionNode;
-  prefix: boolean;
+export interface UnaryExpr extends AstNode {
+  type: 'Unary';
+  operator: TokenType;
+  operand: AstNode;
 }
 
-export interface LogicalExpression {
-  type: 'LogicalExpression';
-  operator: '&&' | '||';
-  left: ExpressionNode;
-  right: ExpressionNode;
+export interface AssignmentExpr extends AstNode {
+  type: 'Assignment';
+  target: AstNode;
+  operator: TokenType;
+  value: AstNode;
 }
 
-export interface AssignmentExpression {
-  type: 'AssignmentExpression';
-  operator: string;
-  left: Identifier | MemberExpression;
-  right: ExpressionNode;
+export interface CallExpr extends AstNode {
+  type: 'Call';
+  callee: AstNode;
+  arguments: AstNode[];
+  namedArgs?: Record<string, AstNode>;
 }
 
-export interface CallExpression {
-  type: 'CallExpression';
-  callee: ExpressionNode;
-  arguments: ExpressionNode[];
-}
-
-export interface MemberExpression {
-  type: 'MemberExpression';
-  object: ExpressionNode;
-  property: ExpressionNode;
+export interface MemberExpr extends AstNode {
+  type: 'Member';
+  object: AstNode;
+  member: string;
   computed: boolean;
 }
 
-export interface ArrayExpression {
-  type: 'ArrayExpression';
-  elements: ExpressionNode[];
+export interface IndexExpr extends AstNode {
+  type: 'Index';
+  object: AstNode;
+  index: AstNode;
 }
 
-export interface ObjectExpression {
-  type: 'ObjectExpression';
-  properties: PropertyNode[];
+export interface ArrayExpr extends AstNode {
+  type: 'Array';
+  elements: AstNode[];
 }
 
-export interface PropertyNode {
-  key: string | ExpressionNode;
-  value: ExpressionNode;
-  computed: boolean;
+export interface DictExpr extends AstNode {
+  type: 'Dict';
+  elements: Map<string, AstNode>;
 }
 
-export interface ConditionalExpression {
-  type: 'ConditionalExpression';
-  test: ExpressionNode;
-  consequent: ExpressionNode;
-  alternate: ExpressionNode;
+export interface LambdaExpr extends AstNode {
+  type: 'Lambda';
+  parameters: string[];
+  body: AstNode;
 }
 
-export interface ArrowFunction {
-  type: 'ArrowFunction';
-  params: ParameterNode[];
-  body: ExpressionNode | BlockStatement;
-  async: boolean;
+export interface InterpolationExpr extends AstNode {
+  type: 'Interpolation';
+  parts: AstNode[];
 }
 
-export interface AwaitExpression {
-  type: 'AwaitExpression';
-  argument: ExpressionNode;
+export interface PipelineExpr extends AstNode {
+  type: 'Pipeline';
+  left: AstNode;
+  right: AstNode;
 }
 
-export interface TemplateLiteral {
-  type: 'TemplateLiteral';
-  parts: (string | ExpressionNode)[];
+export interface TernaryExpr extends AstNode {
+  type: 'Ternary';
+  condition: AstNode;
+  consequent: AstNode;
+  alternate: AstNode;
+}
+
+// From Buddy Script: AwaitExpression
+export interface AwaitExpr extends AstNode {
+  type: 'Await';
+  argument: AstNode;
+}
+
+// Statements
+export interface BlockStmt extends AstNode {
+  type: 'Block';
+  statements: AstNode[];
+}
+
+export interface ExpressionStmt extends AstNode {
+  type: 'ExpressionStmt';
+  expression: AstNode;
+}
+
+export interface VarDeclaration extends AstNode {
+  type: 'VarDeclaration';
+  name: string;
+  initializer: AstNode | null;
+  isConst: boolean;
+  varType?: string;
+}
+
+export interface FunctionDeclaration extends AstNode {
+  type: 'FunctionDeclaration';
+  name: string;
+  parameters: Parameter[];
+  body: BlockStmt;
+  isAsync: boolean;
+  returnType?: string;
+}
+
+export interface Parameter {
+  name: string;
+  type?: string;
+  defaultValue?: AstNode;
+}
+
+export interface ClassDeclaration extends AstNode {
+  type: 'ClassDeclaration';
+  name: string;
+  baseClass?: string;
+  members: AstNode[];
+}
+
+export interface IfStmt extends AstNode {
+  type: 'If';
+  condition: AstNode;
+  thenBranch: AstNode;
+  elseBranch: AstNode | null;
+}
+
+export interface WhileStmt extends AstNode {
+  type: 'While';
+  condition: AstNode;
+  body: AstNode;
+}
+
+export interface ForStmt extends AstNode {
+  type: 'For';
+  variable: string;
+  iterable: AstNode;
+  body: AstNode;
+}
+
+// From Buddy Script: C-style for loop
+export interface ForCStyleStmt extends AstNode {
+  type: 'ForCStyle';
+  init: AstNode | null;
+  test: AstNode | null;
+  update: AstNode | null;
+  body: AstNode;
+}
+
+export interface ReturnStmt extends AstNode {
+  type: 'Return';
+  value: AstNode | null;
+}
+
+export interface BreakStmt extends AstNode {
+  type: 'Break';
+}
+
+export interface ContinueStmt extends AstNode {
+  type: 'Continue';
+}
+
+export interface TryStmt extends AstNode {
+  type: 'Try';
+  tryBlock: BlockStmt;
+  catchClauses: CatchClause[];
+  finallyBlock: BlockStmt | null;
+}
+
+export interface CatchClause {
+  variable?: string;
+  type?: string;
+  body: BlockStmt;
+}
+
+export interface ThrowStmt extends AstNode {
+  type: 'Throw';
+  expression: AstNode;
+}
+
+export interface ImportStmt extends AstNode {
+  type: 'Import';
+  module: string;
+  names: string[];
+  alias?: string;
+}
+
+// From Buddy Script: export keyword
+export interface ExportStmt extends AstNode {
+  type: 'Export';
+  declaration: AstNode;
+}
+
+// FileCommander specific
+export interface TestDeclaration extends AstNode {
+  type: 'TestDeclaration';
+  name: string;
+  body: BlockStmt;
+  tags: string[];
+}
+
+export interface AssertStmt extends AstNode {
+  type: 'Assert';
+  condition: AstNode;
+  message?: string;
+}
+
+export interface EditorCommand extends AstNode {
+  type: 'EditorCommand';
+  command: string;
+  arguments: AstNode[];
 }
 
 // ============================================
-// Runtime Types
+// Runtime Types (unified)
 // ============================================
 
 /**
- * Primitive types that can be stored in scripting variables
+ * Primitive types that can be stored in script variables
  */
 export type CodeBuddyPrimitive = string | number | boolean | null | undefined;
 
 /**
  * Function type for the scripting runtime.
- * Note: Uses flexible typing to support dynamic scripting scenarios.
- * Implementations should validate arguments at runtime.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Required for dynamic scripting runtime
 export type CodeBuddyFunction = (...args: CodeBuddyValue[]) => CodeBuddyValue | Promise<CodeBuddyValue> | any;
@@ -347,7 +395,6 @@ export type CodeBuddyArray = CodeBuddyValue[];
 
 /**
  * Dynamic value type for the scripting runtime.
- * Uses a union of known types for better type safety.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Required for dynamic scripting where types are determined at runtime
 export type CodeBuddyValue = CodeBuddyPrimitive | CodeBuddyFunction | CodeBuddyObject | CodeBuddyArray | any;
@@ -369,6 +416,7 @@ export interface ScriptResult {
   error?: string;
   returnValue?: CodeBuddyValue;
   duration: number;
+  testResults?: { name: string; passed: boolean; error?: string }[];
 }
 
 // ============================================
@@ -410,3 +458,32 @@ export const DEFAULT_SCRIPT_CONFIG: CodeBuddyScriptConfig = {
   verbose: false,
   dryRun: false,
 };
+
+// ============================================
+// Backward-compatible aliases for FCS
+// ============================================
+
+/** @deprecated Use CodeBuddyScriptConfig instead */
+export type FCSConfig = CodeBuddyScriptConfig;
+/** @deprecated Use CodeBuddyValue instead */
+export type FCSValue = CodeBuddyValue;
+/** @deprecated Use CodeBuddyFunction instead */
+export type FCSFunction = CodeBuddyFunction;
+/** @deprecated Use CodeBuddyPrimitive instead */
+export type FCSPrimitive = CodeBuddyPrimitive;
+/** @deprecated Use CodeBuddyObject instead */
+export type FCSObject = CodeBuddyObject;
+/** @deprecated Use CodeBuddyArray instead */
+export type FCSArray = CodeBuddyArray;
+/** @deprecated Use RuntimeContext instead */
+export type FCSContext = RuntimeContext;
+/** @deprecated Use ScriptResult instead */
+export type FCSResult = ScriptResult;
+/** @deprecated Use DEFAULT_SCRIPT_CONFIG instead */
+export const DEFAULT_FCS_CONFIG = DEFAULT_SCRIPT_CONFIG;
+
+// Backward-compatible aliases for Buddy Script types
+// (for tests that use the old BS AST names)
+
+/** @deprecated Use Program instead */
+export type ProgramNode = Program;

@@ -2,7 +2,7 @@
  * Tests for FCS Script Registry
  */
 
-import { ScriptRegistry } from '../../src/fcs/script-registry.js';
+import { ScriptRegistry } from '../../src/scripting/script-registry.js';
 import * as fs from 'fs';
 
 // Mock fs module
@@ -232,7 +232,7 @@ let targetFile = env("FILE", "")`;
   describe('formatTemplateList', () => {
     it('should format empty registry', () => {
       const output = registry.formatTemplateList();
-      expect(output).toContain('FCS Script Templates');
+      expect(output).toContain('Script Templates');
       expect(output).toContain('Total: 0 templates');
     });
 

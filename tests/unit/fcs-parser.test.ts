@@ -10,9 +10,9 @@
  * - Resource limits (iteration guards, stack overflow prevention)
  */
 
-import { FCSParser, parse } from '../../src/fcs/parser.js';
-import { tokenize } from '../../src/fcs/lexer.js';
-import { TokenType, Token } from '../../src/fcs/types.js';
+import { FCSParser, parse } from '../../src/scripting/parser.js';
+import { tokenize } from '../../src/scripting/lexer.js';
+import { TokenType, Token } from '../../src/scripting/types.js';
 import { LoopTimeoutError } from '../../src/utils/errors.js';
 
 // Helper to parse FCS code and return the AST

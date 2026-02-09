@@ -4,7 +4,7 @@
  * Verifies 100% compatibility with FileCommander Script
  */
 
-import { executeFCS, parseFCS } from '../../src/fcs/index.js';
+import { executeFCS, parseFCS } from '../../src/scripting/index.js';
 
 describe('FCS Compatibility', () => {
   describe('Lexer', () => {

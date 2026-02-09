@@ -8,8 +8,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { ChatEntry } from "../../agent/codebuddy-agent.js";
-import { executeFCS, executeFCSFile, parseFCS, initScriptRegistry } from "../../fcs/index.js";
-import type { FCSConfig as _FCSConfig } from "../../fcs/index.js"; // Type-only import for documentation
+import { executeFCS, executeFCSFile, parseFCS, initScriptRegistry } from "../../scripting/index.js";
+import type { FCSConfig as _FCSConfig } from "../../scripting/index.js"; // Type-only import for documentation
 
 export interface CommandHandlerResult {
   handled: boolean;

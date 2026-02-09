@@ -1,48 +1,71 @@
 /**
- * Buddy Script Parser
+ * Unified Script Parser
  *
- * Parses tokens into an Abstract Syntax Tree (AST)
+ * Based on FCS parser (superset) with Buddy Script additions:
+ * - AwaitExpression in unary parsing
+ * - ForCStyle statement (C-style for loops)
+ * - Export keyword
+ * - Question token for ternary (instead of checking Colon value)
+ * - Arrow functions / lambdas
+ *
+ * Extensions: .bs (primary), .fcs (backward-compatible alias)
  */
 
-import type {
+import {
   Token,
-  ProgramNode,
-  StatementNode,
-  ExpressionNode,
-  VariableDeclaration,
+  TokenType,
+  AstNode,
+  Program,
+  LiteralExpr,
+  IdentifierExpr,
+  BinaryExpr,
+  UnaryExpr,
+  AssignmentExpr,
+  CallExpr,
+  MemberExpr,
+  IndexExpr,
+  ArrayExpr,
+  DictExpr,
+  LambdaExpr,
+  InterpolationExpr,
+  PipelineExpr,
+  TernaryExpr,
+  AwaitExpr,
+  BlockStmt,
+  ExpressionStmt,
+  VarDeclaration,
   FunctionDeclaration,
-  BlockStatement,
-  IfStatement,
-  WhileStatement,
-  ForStatement,
-  ForInStatement,
-  ReturnStatement,
-  TryStatement,
-  ThrowStatement,
-  ImportStatement,
-  ExpressionStatement,
-  ParameterNode,
-  Literal,
-  Identifier,
-  CallExpression,
-  MemberExpression,
-  ArrayExpression,
-  ObjectExpression,
-  ArrowFunction,
+  ClassDeclaration,
+  IfStmt,
+  WhileStmt,
+  ForStmt,
+  ForCStyleStmt,
+  ReturnStmt,
+  BreakStmt,
+  ContinueStmt,
+  TryStmt,
+  ThrowStmt,
+  ImportStmt,
+  ExportStmt,
+  TestDeclaration,
+  AssertStmt,
+  Parameter,
+  CatchClause,
 } from './types.js';
-import { TokenType } from './types.js';
+import { tokenize as lexerTokenize } from './lexer.js';
 import { createLoopGuard, LoopTimeoutError } from '../utils/errors.js';
 
 /** Maximum recursion depth for recursive descent parsing */
 const MAX_RECURSION_DEPTH = 500;
 
-export class Parser {
+export class FCSParser {
   private tokens: Token[];
   private current = 0;
   private recursionDepth = 0;
 
   constructor(tokens: Token[]) {
-    this.tokens = tokens;
+    // Filter out comments
+    this.tokens = tokens.filter(t => t.type !== TokenType.Comment);
   }
 
   /**
@@ -63,41 +86,72 @@ export class Parser {
     this.recursionDepth--;
   }
 
-  parse(): ProgramNode {
-    const body: StatementNode[] = [];
+  parse(): Program {
+    const statements: AstNode[] = [];
     const guard = createLoopGuard({
       maxIterations: 100000,
-      context: 'BuddyScript program parsing',
+      context: 'program parsing',
     });
 
     while (!this.isAtEnd()) {
       guard();
-      const stmt = this.declaration();
+      this.skipNewlines();
+      if (this.isAtEnd()) break;
+
+      const stmt = this.parseDeclaration();
       if (stmt) {
-        body.push(stmt);
+        statements.push(stmt);
       }
+
+      this.skipNewlines();
     }
 
-    return { type: 'Program', body };
+    return { type: 'Program', statements };
   }
 
-  private declaration(): StatementNode | null {
-    this.enterRecursion('declaration');
+  // ============================================
+  // Statement Parsing
+  // ============================================
+
+  private parseDeclaration(): AstNode | null {
+    this.enterRecursion('parseDeclaration');
     try {
-      if (this.match(TokenType.LET, TokenType.CONST)) {
-        return this.variableDeclaration();
+      // Check for decorators
+      const decoratorGuard = createLoopGuard({
+        maxIterations: 1000,
+        context: 'decorator parsing',
+      });
+      while (this.match(TokenType.Decorator)) {
+        decoratorGuard();
+        // Decorators stored but not used yet
+        this.previous().value;
       }
-      if (this.check(TokenType.ASYNC) && this.checkNext(TokenType.FUNCTION)) {
-        this.advance(); // async
-        return this.functionDeclaration(true);
+
+      if (this.matchKeyword('func', 'function') || this.matchKeyword('async')) {
+        return this.parseFunctionDeclaration();
       }
-      if (this.match(TokenType.FUNCTION)) {
-        return this.functionDeclaration(false);
+
+      if (this.matchKeyword('class')) {
+        return this.parseClassDeclaration();
       }
-      if (this.match(TokenType.IMPORT)) {
-        return this.importStatement();
+
+      if (this.matchKeyword('let', 'const', 'var')) {
+        return this.parseVarDeclaration();
       }
-      return this.statement();
+
+      if (this.matchKeyword('import')) {
+        return this.parseImportStatement();
+      }
+
+      if (this.matchKeyword('export')) {
+        return this.parseExportStatement();
+      }
+
+      if (this.matchKeyword('test')) {
+        return this.parseTestDeclaration();
+      }
+
+      return this.parseStatement();
     } catch (error) {
       // Re-throw recursion/loop errors without synchronizing
       if (error instanceof LoopTimeoutError) {
@@ -110,201 +164,254 @@ export class Parser {
     }
   }
 
-  private variableDeclaration(): VariableDeclaration {
-    const kind = this.previous().value === 'const' ? 'const' : 'let';
-    const name = this.consume(TokenType.IDENTIFIER, 'Expected variable name').value as string;
+  private parseStatement(): AstNode {
+    if (this.matchKeyword('if')) return this.parseIfStatement();
+    if (this.matchKeyword('while')) return this.parseWhileStatement();
+    if (this.matchKeyword('for')) return this.parseForStatement();
+    if (this.matchKeyword('return')) return this.parseReturnStatement();
+    if (this.matchKeyword('break')) return this.parseBreakStatement();
+    if (this.matchKeyword('continue')) return this.parseContinueStatement();
+    if (this.matchKeyword('try')) return this.parseTryStatement();
+    if (this.matchKeyword('throw')) return this.parseThrowStatement();
+    if (this.matchKeyword('assert')) return this.parseAssertStatement();
+    if (this.match(TokenType.LeftBrace)) return this.parseBlockStatement();
 
-    let init: ExpressionNode | null = null;
-    if (this.match(TokenType.ASSIGN)) {
-      init = this.expression();
-    }
-
-    this.consumeOptional(TokenType.SEMICOLON);
-
-    return {
-      type: 'VariableDeclaration',
-      kind,
-      name,
-      init,
-    };
+    return this.parseExpressionStatement();
   }
 
-  private functionDeclaration(isAsync: boolean): FunctionDeclaration {
-    const name = this.consume(TokenType.IDENTIFIER, 'Expected function name').value as string;
-    this.consume(TokenType.LPAREN, "Expected '(' after function name");
-
-    const params: ParameterNode[] = [];
-    if (!this.check(TokenType.RPAREN)) {
-      do {
-        const paramName = this.consume(TokenType.IDENTIFIER, 'Expected parameter name').value as string;
-        let defaultValue: ExpressionNode | undefined;
-
-        if (this.match(TokenType.ASSIGN)) {
-          defaultValue = this.expression();
-        }
-
-        params.push({ name: paramName, defaultValue });
-      } while (this.match(TokenType.COMMA));
+  private parseFunctionDeclaration(): FunctionDeclaration {
+    const isAsync = this.previous().value === 'async';
+    if (isAsync) {
+      this.consumeKeyword('func', 'function');
     }
 
-    this.consume(TokenType.RPAREN, "Expected ')' after parameters");
-    this.consume(TokenType.LBRACE, "Expected '{' before function body");
+    const name = this.consume(TokenType.Identifier, "Expected function name").value;
 
-    const body = this.block();
+    this.consume(TokenType.LeftParen, "Expected '(' after function name");
+    const parameters = this.parseParameters();
+    this.consume(TokenType.RightParen, "Expected ')' after parameters");
+
+    let returnType: string | undefined;
+    if (this.match(TokenType.Colon)) {
+      returnType = this.consume(TokenType.Identifier, "Expected return type").value;
+    }
+
+    this.consume(TokenType.LeftBrace, "Expected '{' before function body");
+    const body = this.parseBlockStatement();
 
     return {
       type: 'FunctionDeclaration',
       name,
-      params,
+      parameters,
       body,
-      async: isAsync,
+      isAsync,
+      returnType,
     };
   }
 
-  private importStatement(): ImportStatement {
-    const module = this.consume(TokenType.IDENTIFIER, 'Expected module name').value as string;
+  private parseParameters(): Parameter[] {
+    const parameters: Parameter[] = [];
 
-    this.consumeOptional(TokenType.SEMICOLON);
+    if (!this.check(TokenType.RightParen)) {
+      do {
+        const name = this.consume(TokenType.Identifier, "Expected parameter name").value;
+        let type: string | undefined;
+        let defaultValue: AstNode | undefined;
 
-    return {
-      type: 'ImportStatement',
-      module,
-    };
-  }
+        if (this.match(TokenType.Colon)) {
+          type = this.consume(TokenType.Identifier, "Expected parameter type").value;
+        }
 
-  private statement(): StatementNode {
-    if (this.match(TokenType.IF)) return this.ifStatement();
-    if (this.match(TokenType.WHILE)) return this.whileStatement();
-    if (this.match(TokenType.FOR)) return this.forStatement();
-    if (this.match(TokenType.RETURN)) return this.returnStatement();
-    if (this.match(TokenType.TRY)) return this.tryStatement();
-    if (this.match(TokenType.THROW)) return this.throwStatement();
-    if (this.match(TokenType.BREAK)) return this.breakStatement();
-    if (this.match(TokenType.CONTINUE)) return this.continueStatement();
-    if (this.match(TokenType.LBRACE)) return this.block();
+        if (this.match(TokenType.Assign)) {
+          defaultValue = this.parseExpression();
+        }
 
-    return this.expressionStatement();
-  }
-
-  private ifStatement(): IfStatement {
-    this.consume(TokenType.LPAREN, "Expected '(' after 'if'");
-    const condition = this.expression();
-    this.consume(TokenType.RPAREN, "Expected ')' after condition");
-
-    let consequent: BlockStatement;
-    if (this.match(TokenType.LBRACE)) {
-      consequent = this.block();
-    } else {
-      consequent = {
-        type: 'BlockStatement',
-        body: [this.statement()],
-      };
+        parameters.push({ name, type, defaultValue });
+      } while (this.match(TokenType.Comma));
     }
 
-    let alternate: BlockStatement | IfStatement | null = null;
-    if (this.match(TokenType.ELSE)) {
-      if (this.match(TokenType.IF)) {
-        alternate = this.ifStatement();
-      } else if (this.match(TokenType.LBRACE)) {
-        alternate = this.block();
+    return parameters;
+  }
+
+  private parseVarDeclaration(): VarDeclaration {
+    const keyword = this.previous().value;
+    const isConst = keyword === 'const';
+
+    const name = this.consume(TokenType.Identifier, "Expected variable name").value;
+
+    let varType: string | undefined;
+    if (this.match(TokenType.Colon)) {
+      varType = this.consume(TokenType.Identifier, "Expected type").value;
+    }
+
+    let initializer: AstNode | null = null;
+    if (this.match(TokenType.Assign)) {
+      initializer = this.parseExpression();
+    } else if (isConst) {
+      throw new Error("Const variable must be initialized");
+    }
+
+    this.consumeStatementEnd();
+
+    return {
+      type: 'VarDeclaration',
+      name,
+      initializer,
+      isConst,
+      varType,
+    };
+  }
+
+  private parseClassDeclaration(): ClassDeclaration {
+    const name = this.consume(TokenType.Identifier, "Expected class name").value;
+
+    let baseClass: string | undefined;
+    if (this.match(TokenType.Colon)) {
+      baseClass = this.consume(TokenType.Identifier, "Expected base class name").value;
+    }
+
+    this.consume(TokenType.LeftBrace, "Expected '{' before class body");
+
+    const members: AstNode[] = [];
+    const guard = createLoopGuard({
+      maxIterations: 10000,
+      context: 'class body parsing',
+    });
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      guard();
+      this.skipNewlines();
+      if (this.check(TokenType.RightBrace)) break;
+
+      if (this.matchKeyword('func', 'function', 'async')) {
+        members.push(this.parseFunctionDeclaration());
+      } else if (this.matchKeyword('let', 'const', 'var')) {
+        members.push(this.parseVarDeclaration());
       } else {
-        alternate = {
-          type: 'BlockStatement',
-          body: [this.statement()],
-        };
+        // Skip unexpected tokens in class body to prevent infinite loop
+        this.advance();
+      }
+
+      this.skipNewlines();
+    }
+
+    this.consume(TokenType.RightBrace, "Expected '}' after class body");
+
+    return {
+      type: 'ClassDeclaration',
+      name,
+      baseClass,
+      members,
+    };
+  }
+
+  private parseIfStatement(): IfStmt {
+    // Optional parentheses
+    const hasParen = this.match(TokenType.LeftParen);
+    const condition = this.parseExpression();
+    if (hasParen) {
+      this.consume(TokenType.RightParen, "Expected ')' after condition");
+    }
+
+    const thenBranch = this.match(TokenType.LeftBrace)
+      ? this.parseBlockStatement()
+      : this.parseStatement();
+
+    let elseBranch: AstNode | null = null;
+    if (this.matchKeyword('else')) {
+      if (this.matchKeyword('if')) {
+        elseBranch = this.parseIfStatement();
+      } else {
+        elseBranch = this.match(TokenType.LeftBrace)
+          ? this.parseBlockStatement()
+          : this.parseStatement();
       }
     }
 
     return {
-      type: 'IfStatement',
+      type: 'If',
       condition,
-      consequent,
-      alternate,
+      thenBranch,
+      elseBranch,
     };
   }
 
-  private whileStatement(): WhileStatement {
-    this.consume(TokenType.LPAREN, "Expected '(' after 'while'");
-    const condition = this.expression();
-    this.consume(TokenType.RPAREN, "Expected ')' after condition");
+  private parseWhileStatement(): WhileStmt {
+    const hasParen = this.match(TokenType.LeftParen);
+    const condition = this.parseExpression();
+    if (hasParen) {
+      this.consume(TokenType.RightParen, "Expected ')' after condition");
+    }
 
-    this.consume(TokenType.LBRACE, "Expected '{' before while body");
-    const body = this.block();
+    const body = this.match(TokenType.LeftBrace)
+      ? this.parseBlockStatement()
+      : this.parseStatement();
 
     return {
-      type: 'WhileStatement',
+      type: 'While',
       condition,
       body,
     };
   }
 
-  private forStatement(): ForStatement | ForInStatement {
-    // Check if it's a C-style for loop: for (init; test; update) { }
-    if (this.match(TokenType.LPAREN)) {
-      return this.forCStyleStatement();
+  private parseForStatement(): ForStmt | ForCStyleStmt {
+    // Check for C-style for loop: for (init; test; update) { }
+    if (this.match(TokenType.LeftParen)) {
+      return this.parseForCStyleStatement();
     }
 
-    // Otherwise, for-in loop: for x in iterable { }
-    const variable = this.consume(TokenType.IDENTIFIER, 'Expected variable name').value as string;
-    this.consume(TokenType.IN, "Expected 'in' in for loop");
-    const iterable = this.expression();
+    // For-in loop: for x in iterable { }
+    const variable = this.consume(TokenType.Identifier, "Expected variable name").value;
+    this.consumeKeyword('in');
+    const iterable = this.parseExpression();
 
-    this.consume(TokenType.LBRACE, "Expected '{' before for body");
-    const body = this.block();
+    const body = this.match(TokenType.LeftBrace)
+      ? this.parseBlockStatement()
+      : this.parseStatement();
 
     return {
-      type: 'ForInStatement',
+      type: 'For',
       variable,
       iterable,
       body,
     };
   }
 
-  private forCStyleStatement(): ForStatement {
-    // Parse C-style for: for (init; test; update) { }
-
+  private parseForCStyleStatement(): ForCStyleStmt {
     // Parse init
-    let init: VariableDeclaration | ExpressionNode | null = null;
-    if (!this.check(TokenType.SEMICOLON)) {
-      if (this.match(TokenType.LET) || this.match(TokenType.CONST)) {
-        const kind = this.previous().type === TokenType.LET ? 'let' : 'const';
-        const name = this.consume(TokenType.IDENTIFIER, 'Expected variable name').value as string;
-        let initValue: ExpressionNode | null = null;
-        if (this.match(TokenType.ASSIGN)) {
-          initValue = this.expression();
-        }
-        init = {
-          type: 'VariableDeclaration',
-          kind,
-          name,
-          init: initValue,
-        } as VariableDeclaration;
+    let init: AstNode | null = null;
+    if (!this.check(TokenType.Semicolon)) {
+      if (this.matchKeyword('let', 'const', 'var')) {
+        init = this.parseVarDeclaration();
       } else {
-        init = this.expression();
+        init = this.parseExpression();
+        this.consume(TokenType.Semicolon, "Expected ';' after for init");
       }
+    } else {
+      this.advance(); // skip ;
     }
-    this.consume(TokenType.SEMICOLON, "Expected ';' after for init");
 
+    // If parseVarDeclaration already consumed the semicolon, skip
     // Parse test
-    let test: ExpressionNode | null = null;
-    if (!this.check(TokenType.SEMICOLON)) {
-      test = this.expression();
+    let test: AstNode | null = null;
+    if (!this.check(TokenType.Semicolon)) {
+      test = this.parseExpression();
     }
-    this.consume(TokenType.SEMICOLON, "Expected ';' after for condition");
+    this.consume(TokenType.Semicolon, "Expected ';' after for condition");
 
     // Parse update
-    let update: ExpressionNode | null = null;
-    if (!this.check(TokenType.RPAREN)) {
-      update = this.expression();
+    let update: AstNode | null = null;
+    if (!this.check(TokenType.RightParen)) {
+      update = this.parseExpression();
     }
-    this.consume(TokenType.RPAREN, "Expected ')' after for clauses");
+    this.consume(TokenType.RightParen, "Expected ')' after for clauses");
 
     // Parse body
-    this.consume(TokenType.LBRACE, "Expected '{' before for body");
-    const body = this.block();
+    const body = this.match(TokenType.LeftBrace)
+      ? this.parseBlockStatement()
+      : this.parseStatement();
 
     return {
-      type: 'ForStatement',
+      type: 'ForCStyle',
       init,
       test,
       update,
@@ -312,342 +419,434 @@ export class Parser {
     };
   }
 
-  private returnStatement(): ReturnStatement {
-    let argument: ExpressionNode | null = null;
-
-    if (!this.check(TokenType.SEMICOLON) && !this.check(TokenType.RBRACE) && !this.check(TokenType.EOF)) {
-      argument = this.expression();
-    }
-
-    this.consumeOptional(TokenType.SEMICOLON);
-
-    return {
-      type: 'ReturnStatement',
-      argument,
-    };
-  }
-
-  private tryStatement(): TryStatement {
-    this.consume(TokenType.LBRACE, "Expected '{' after 'try'");
-    const block = this.block();
-
-    let handler = null;
-    if (this.match(TokenType.CATCH)) {
-      this.consume(TokenType.LPAREN, "Expected '(' after 'catch'");
-      const param = this.consume(TokenType.IDENTIFIER, 'Expected error parameter').value as string;
-      this.consume(TokenType.RPAREN, "Expected ')' after catch parameter");
-      this.consume(TokenType.LBRACE, "Expected '{' before catch body");
-      const catchBody = this.block();
-
-      handler = { param, body: catchBody };
-    }
-
-    return {
-      type: 'TryStatement',
-      block,
-      handler,
-    };
-  }
-
-  private throwStatement(): ThrowStatement {
-    const argument = this.expression();
-    this.consumeOptional(TokenType.SEMICOLON);
-
-    return {
-      type: 'ThrowStatement',
-      argument,
-    };
-  }
-
-  private breakStatement(): StatementNode {
-    this.consumeOptional(TokenType.SEMICOLON);
-    return { type: 'BreakStatement' };
-  }
-
-  private continueStatement(): StatementNode {
-    this.consumeOptional(TokenType.SEMICOLON);
-    return { type: 'ContinueStatement' };
-  }
-
-  private block(): BlockStatement {
-    const statements: StatementNode[] = [];
+  private parseBlockStatement(): BlockStmt {
+    const statements: AstNode[] = [];
     const guard = createLoopGuard({
       maxIterations: 100000,
-      context: 'BuddyScript block parsing',
+      context: 'block statement parsing',
     });
 
-    while (!this.check(TokenType.RBRACE) && !this.isAtEnd()) {
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
       guard();
-      const decl = this.declaration();
-      if (decl) statements.push(decl);
-    }
+      this.skipNewlines();
+      if (this.check(TokenType.RightBrace)) break;
 
-    this.consume(TokenType.RBRACE, "Expected '}' after block");
-
-    return {
-      type: 'BlockStatement',
-      body: statements,
-    };
-  }
-
-  private expressionStatement(): ExpressionStatement {
-    const expression = this.expression();
-    this.consumeOptional(TokenType.SEMICOLON);
-
-    return {
-      type: 'ExpressionStatement',
-      expression,
-    };
-  }
-
-  // ============================================
-  // Expression Parsing (Precedence Climbing)
-  // ============================================
-
-  private expression(): ExpressionNode {
-    return this.assignment();
-  }
-
-  private assignment(): ExpressionNode {
-    const expr = this.ternary();
-
-    if (this.match(TokenType.ASSIGN, TokenType.PLUS_ASSIGN, TokenType.MINUS_ASSIGN)) {
-      const operator = this.previous().value as string;
-      const value = this.assignment();
-
-      if (expr.type === 'Identifier' || expr.type === 'MemberExpression') {
-        return {
-          type: 'AssignmentExpression',
-          operator,
-          left: expr as Identifier | MemberExpression,
-          right: value,
-        };
+      const stmt = this.parseDeclaration();
+      if (stmt) {
+        statements.push(stmt);
       }
 
-      throw new Error('Invalid assignment target');
+      this.skipNewlines();
+    }
+
+    this.consume(TokenType.RightBrace, "Expected '}' after block");
+
+    return { type: 'Block', statements };
+  }
+
+  private parseExpressionStatement(): ExpressionStmt {
+    const expression = this.parseExpression();
+    this.consumeStatementEnd();
+    return { type: 'ExpressionStmt', expression };
+  }
+
+  private parseReturnStatement(): ReturnStmt {
+    let value: AstNode | null = null;
+    if (!this.check(TokenType.Newline) && !this.check(TokenType.Semicolon) && !this.check(TokenType.RightBrace)) {
+      value = this.parseExpression();
+    }
+    this.consumeStatementEnd();
+    return { type: 'Return', value };
+  }
+
+  private parseBreakStatement(): BreakStmt {
+    this.consumeStatementEnd();
+    return { type: 'Break' };
+  }
+
+  private parseContinueStatement(): ContinueStmt {
+    this.consumeStatementEnd();
+    return { type: 'Continue' };
+  }
+
+  private parseTryStatement(): TryStmt {
+    this.consume(TokenType.LeftBrace, "Expected '{' after 'try'");
+    const tryBlock = this.parseBlockStatement();
+
+    const catchClauses: CatchClause[] = [];
+    const catchGuard = createLoopGuard({
+      maxIterations: 1000,
+      context: 'catch clause parsing',
+    });
+    while (this.matchKeyword('catch')) {
+      catchGuard();
+      let variable: string | undefined;
+      let type: string | undefined;
+
+      if (this.match(TokenType.LeftParen)) {
+        if (this.match(TokenType.Identifier)) {
+          variable = this.previous().value;
+
+          if (this.match(TokenType.Colon)) {
+            type = this.consume(TokenType.Identifier, "Expected exception type").value;
+          }
+        }
+
+        this.consume(TokenType.RightParen, "Expected ')' after catch parameters");
+      }
+
+      this.consume(TokenType.LeftBrace, "Expected '{' after catch");
+      const body = this.parseBlockStatement();
+      catchClauses.push({ variable, type, body });
+    }
+
+    let finallyBlock: BlockStmt | null = null;
+    if (this.matchKeyword('finally')) {
+      this.consume(TokenType.LeftBrace, "Expected '{' after 'finally'");
+      finallyBlock = this.parseBlockStatement();
+    }
+
+    return {
+      type: 'Try',
+      tryBlock,
+      catchClauses,
+      finallyBlock,
+    };
+  }
+
+  private parseThrowStatement(): ThrowStmt {
+    const expression = this.parseExpression();
+    this.consumeStatementEnd();
+    return { type: 'Throw', expression };
+  }
+
+  private parseImportStatement(): ImportStmt {
+    const names: string[] = [];
+    let module = '';
+    let alias: string | undefined;
+
+    if (this.match(TokenType.LeftBrace)) {
+      // import { name1, name2 } from "module"
+      do {
+        names.push(this.consume(TokenType.Identifier, "Expected import name").value);
+      } while (this.match(TokenType.Comma));
+
+      this.consume(TokenType.RightBrace, "Expected '}' after import names");
+      this.consumeKeyword('from');
+      module = this.consume(TokenType.String, "Expected module name").value;
+    } else if (this.match(TokenType.Multiply)) {
+      // import * as alias from "module"
+      this.consumeKeyword('as');
+      alias = this.consume(TokenType.Identifier, "Expected alias name").value;
+      this.consumeKeyword('from');
+      module = this.consume(TokenType.String, "Expected module name").value;
+    } else if (this.check(TokenType.String)) {
+      // import "module"
+      module = this.consume(TokenType.String, "Expected module name").value;
+    } else if (this.check(TokenType.Identifier)) {
+      // import name OR import name from "module"
+      const firstIdent = this.consume(TokenType.Identifier, "Expected import name").value;
+      if (this.checkKeyword('from')) {
+        names.push(firstIdent);
+        this.consumeKeyword('from');
+        module = this.consume(TokenType.String, "Expected module name").value;
+      } else {
+        // Simple import like: import fc
+        module = firstIdent;
+      }
+    }
+
+    this.consumeStatementEnd();
+
+    return {
+      type: 'Import',
+      module,
+      names,
+      alias,
+    };
+  }
+
+  private parseExportStatement(): ExportStmt {
+    // export let/const/function/class
+    const declaration = this.parseDeclaration();
+    if (!declaration) {
+      throw new Error("Expected declaration after 'export'");
+    }
+    return {
+      type: 'Export',
+      declaration,
+    };
+  }
+
+  private parseTestDeclaration(): TestDeclaration {
+    const name = this.consume(TokenType.String, "Expected test name as string").value;
+
+    const tags: string[] = [];
+    if (this.match(TokenType.LeftBracket)) {
+      do {
+        if (this.match(TokenType.String)) {
+          tags.push(this.previous().value);
+        }
+      } while (this.match(TokenType.Comma));
+
+      this.consume(TokenType.RightBracket, "Expected ']' after tags");
+    }
+
+    this.consume(TokenType.LeftBrace, "Expected '{' before test body");
+    const body = this.parseBlockStatement();
+
+    return {
+      type: 'TestDeclaration',
+      name,
+      body,
+      tags,
+    };
+  }
+
+  private parseAssertStatement(): AssertStmt {
+    const condition = this.parseExpression();
+
+    let message: string | undefined;
+    if (this.match(TokenType.Comma)) {
+      if (this.match(TokenType.String)) {
+        message = this.previous().value;
+      }
+    }
+
+    this.consumeStatementEnd();
+
+    return {
+      type: 'Assert',
+      condition,
+      message,
+    };
+  }
+
+  // ============================================
+  // Expression Parsing
+  // ============================================
+
+  parseExpression(): AstNode {
+    return this.parseAssignment();
+  }
+
+  private parseAssignment(): AstNode {
+    const expr = this.parseTernary();
+
+    if (this.match(TokenType.Assign, TokenType.PlusAssign, TokenType.MinusAssign, TokenType.MultiplyAssign, TokenType.DivideAssign)) {
+      const operator = this.previous().type;
+      const value = this.parseAssignment();
+
+      return {
+        type: 'Assignment',
+        target: expr,
+        operator,
+        value,
+      } as AssignmentExpr;
     }
 
     return expr;
   }
 
-  private ternary(): ExpressionNode {
-    let expr = this.or();
+  private parseTernary(): AstNode {
+    let expr = this.parsePipeline();
 
-    if (this.match(TokenType.QUESTION)) {
-      const consequent = this.expression();
-      this.consume(TokenType.COLON, "Expected ':' in ternary expression");
-      const alternate = this.ternary();
+    // Use dedicated Question token
+    if (this.match(TokenType.Question)) {
+      const consequent = this.parseExpression();
+      this.consume(TokenType.Colon, "Expected ':' in ternary expression");
+      const alternate = this.parseTernary();
 
       return {
-        type: 'ConditionalExpression',
-        test: expr,
+        type: 'Ternary',
+        condition: expr,
         consequent,
         alternate,
-      };
+      } as TernaryExpr;
     }
 
     return expr;
   }
 
-  private or(): ExpressionNode {
-    let expr = this.and();
+  private parsePipeline(): AstNode {
+    let expr = this.parseLogicalOr();
 
     const guard = createLoopGuard({
       maxIterations: 10000,
-      context: 'BuddyScript OR expression parsing',
+      context: 'pipeline expression parsing',
     });
-    while (this.match(TokenType.OR)) {
+    while (this.match(TokenType.Pipeline)) {
       guard();
-      const right = this.and();
-      expr = {
-        type: 'LogicalExpression',
-        operator: '||',
-        left: expr,
-        right,
-      };
+      const right = this.parseLogicalOr();
+
+      // Transform pipeline: expr |> func => func(expr)
+      if (right.type === 'Call') {
+        const call = right as CallExpr;
+        call.arguments.unshift(expr);
+        expr = call;
+      } else if (right.type === 'Identifier') {
+        expr = {
+          type: 'Call',
+          callee: right,
+          arguments: [expr],
+        } as CallExpr;
+      } else {
+        throw new Error("Invalid pipeline target");
+      }
     }
 
     return expr;
   }
 
-  private and(): ExpressionNode {
-    let expr = this.equality();
+  private parseLogicalOr(): AstNode {
+    let expr = this.parseLogicalAnd();
 
     const guard = createLoopGuard({
       maxIterations: 10000,
-      context: 'BuddyScript AND expression parsing',
+      context: 'logical OR expression parsing',
     });
-    while (this.match(TokenType.AND)) {
+    while (this.match(TokenType.Or)) {
       guard();
-      const right = this.equality();
-      expr = {
-        type: 'LogicalExpression',
-        operator: '&&',
-        left: expr,
-        right,
-      };
+      const operator = this.previous().type;
+      const right = this.parseLogicalAnd();
+      expr = { type: 'Binary', left: expr, operator, right } as BinaryExpr;
     }
 
     return expr;
   }
 
-  private equality(): ExpressionNode {
-    let expr = this.comparison();
+  private parseLogicalAnd(): AstNode {
+    let expr = this.parseEquality();
 
     const guard = createLoopGuard({
       maxIterations: 10000,
-      context: 'BuddyScript equality expression parsing',
+      context: 'logical AND expression parsing',
     });
-    while (this.match(TokenType.EQUALS, TokenType.NOT_EQUALS)) {
+    while (this.match(TokenType.And)) {
       guard();
-      const operator = this.previous().value as string;
-      const right = this.comparison();
-      expr = {
-        type: 'BinaryExpression',
-        operator,
-        left: expr,
-        right,
-      };
+      const operator = this.previous().type;
+      const right = this.parseEquality();
+      expr = { type: 'Binary', left: expr, operator, right } as BinaryExpr;
     }
 
     return expr;
   }
 
-  private comparison(): ExpressionNode {
-    let expr = this.term();
+  private parseEquality(): AstNode {
+    let expr = this.parseComparison();
 
     const guard = createLoopGuard({
       maxIterations: 10000,
-      context: 'BuddyScript comparison expression parsing',
+      context: 'equality expression parsing',
     });
-    while (this.match(TokenType.LESS_THAN, TokenType.LESS_EQUAL, TokenType.GREATER_THAN, TokenType.GREATER_EQUAL)) {
+    while (this.match(TokenType.Equal, TokenType.NotEqual)) {
       guard();
-      const operator = this.previous().value as string;
-      const right = this.term();
-      expr = {
-        type: 'BinaryExpression',
-        operator,
-        left: expr,
-        right,
-      };
+      const operator = this.previous().type;
+      const right = this.parseComparison();
+      expr = { type: 'Binary', left: expr, operator, right } as BinaryExpr;
     }
 
     return expr;
   }
 
-  private term(): ExpressionNode {
-    let expr = this.factor();
+  private parseComparison(): AstNode {
+    let expr = this.parseAddition();
 
     const guard = createLoopGuard({
       maxIterations: 10000,
-      context: 'BuddyScript term expression parsing',
+      context: 'comparison expression parsing',
     });
-    while (this.match(TokenType.PLUS, TokenType.MINUS)) {
+    while (this.match(TokenType.Less, TokenType.Greater, TokenType.LessEqual, TokenType.GreaterEqual)) {
       guard();
-      const operator = this.previous().value as string;
-      const right = this.factor();
-      expr = {
-        type: 'BinaryExpression',
-        operator,
-        left: expr,
-        right,
-      };
+      const operator = this.previous().type;
+      const right = this.parseAddition();
+      expr = { type: 'Binary', left: expr, operator, right } as BinaryExpr;
     }
 
     return expr;
   }
 
-  private factor(): ExpressionNode {
-    let expr = this.power();
+  private parseAddition(): AstNode {
+    let expr = this.parseMultiplication();
 
     const guard = createLoopGuard({
       maxIterations: 10000,
-      context: 'BuddyScript factor expression parsing',
+      context: 'addition expression parsing',
     });
-    while (this.match(TokenType.MULTIPLY, TokenType.DIVIDE, TokenType.MODULO)) {
+    while (this.match(TokenType.Plus, TokenType.Minus)) {
       guard();
-      const operator = this.previous().value as string;
-      const right = this.power();
-      expr = {
-        type: 'BinaryExpression',
-        operator,
-        left: expr,
-        right,
-      };
+      const operator = this.previous().type;
+      const right = this.parseMultiplication();
+      expr = { type: 'Binary', left: expr, operator, right } as BinaryExpr;
     }
 
     return expr;
   }
 
-  private power(): ExpressionNode {
-    let expr = this.unary();
+  private parseMultiplication(): AstNode {
+    let expr = this.parsePower();
 
-    if (this.match(TokenType.POWER)) {
-      const right = this.power(); // Right associative
-      expr = {
-        type: 'BinaryExpression',
-        operator: '**',
-        left: expr,
-        right,
-      };
-    }
-
-    return expr;
-  }
-
-  private unary(): ExpressionNode {
-    if (this.match(TokenType.NOT, TokenType.MINUS)) {
-      const operator = this.previous().value as string;
-      const right = this.unary();
-      return {
-        type: 'UnaryExpression',
-        operator,
-        argument: right,
-        prefix: true,
-      };
-    }
-
-    if (this.match(TokenType.AWAIT)) {
-      const argument = this.unary();
-      return {
-        type: 'AwaitExpression',
-        argument,
-      };
-    }
-
-    return this.call();
-  }
-
-  private call(): ExpressionNode {
-    let expr = this.primary();
-
-    // Guard against infinite loops in call/member parsing (deeply nested chains)
     const guard = createLoopGuard({
       maxIterations: 10000,
-      context: 'BuddyScript call expression parsing',
+      context: 'multiplication expression parsing',
+    });
+    while (this.match(TokenType.Multiply, TokenType.Divide, TokenType.Modulo)) {
+      guard();
+      const operator = this.previous().type;
+      const right = this.parsePower();
+      expr = { type: 'Binary', left: expr, operator, right } as BinaryExpr;
+    }
+
+    return expr;
+  }
+
+  private parsePower(): AstNode {
+    let expr = this.parseUnary();
+
+    if (this.match(TokenType.Power)) {
+      const right = this.parsePower(); // Right associative
+      expr = { type: 'Binary', left: expr, operator: TokenType.Power, right } as BinaryExpr;
+    }
+
+    return expr;
+  }
+
+  private parseUnary(): AstNode {
+    if (this.match(TokenType.Not, TokenType.Minus)) {
+      const operator = this.previous().type;
+      const operand = this.parseUnary();
+      return { type: 'Unary', operator, operand } as UnaryExpr;
+    }
+
+    // Await expression (from Buddy Script)
+    if (this.matchKeyword('await')) {
+      const argument = this.parseUnary();
+      return { type: 'Await', argument } as AwaitExpr;
+    }
+
+    return this.parsePostfix();
+  }
+
+  private parsePostfix(): AstNode {
+    let expr = this.parsePrimary();
+
+    // Guard against infinite loops in postfix parsing
+    const guard = createLoopGuard({
+      maxIterations: 10000,
+      context: 'postfix expression parsing',
     });
 
     while (true) {
       guard();
-      if (this.match(TokenType.LPAREN)) {
-        expr = this.finishCall(expr);
-      } else if (this.match(TokenType.DOT)) {
-        const name = this.consume(TokenType.IDENTIFIER, 'Expected property name').value as string;
-        expr = {
-          type: 'MemberExpression',
-          object: expr,
-          property: { type: 'Identifier', name },
-          computed: false,
-        };
-      } else if (this.match(TokenType.LBRACKET)) {
-        const property = this.expression();
-        this.consume(TokenType.RBRACKET, "Expected ']' after index");
-        expr = {
-          type: 'MemberExpression',
-          object: expr,
-          property,
-          computed: true,
-        };
+      if (this.match(TokenType.LeftParen)) {
+        expr = this.parseCall(expr);
+      } else if (this.match(TokenType.LeftBracket)) {
+        const index = this.parseExpression();
+        this.consume(TokenType.RightBracket, "Expected ']' after index");
+        expr = { type: 'Index', object: expr, index } as IndexExpr;
+      } else if (this.match(TokenType.Dot)) {
+        const member = this.consume(TokenType.Identifier, "Expected member name").value;
+        expr = { type: 'Member', object: expr, member, computed: false } as MemberExpr;
       } else {
         break;
       }
@@ -656,149 +855,232 @@ export class Parser {
     return expr;
   }
 
-  private finishCall(callee: ExpressionNode): CallExpression {
-    const args: ExpressionNode[] = [];
+  private parseCall(callee: AstNode): CallExpr {
+    const args: AstNode[] = [];
+    const namedArgs: Record<string, AstNode> = {};
 
-    if (!this.check(TokenType.RPAREN)) {
+    if (!this.check(TokenType.RightParen)) {
       do {
-        // Handle named arguments: name: value
-        if (this.check(TokenType.IDENTIFIER) && this.checkNext(TokenType.COLON)) {
-          const name = this.advance().value as string;
+        // Check for named argument: name: value
+        if (this.check(TokenType.Identifier) && this.checkNext(TokenType.Colon)) {
+          const name = this.advance().value;
           this.advance(); // :
-          const value = this.expression();
-          args.push({
-            type: 'ObjectExpression',
-            properties: [{ key: name, value, computed: false }],
-          });
+          namedArgs[name] = this.parseExpression();
         } else {
-          args.push(this.expression());
+          args.push(this.parseExpression());
         }
-      } while (this.match(TokenType.COMMA));
+      } while (this.match(TokenType.Comma));
     }
 
-    this.consume(TokenType.RPAREN, "Expected ')' after arguments");
+    this.consume(TokenType.RightParen, "Expected ')' after arguments");
 
-    return {
-      type: 'CallExpression',
+    const result: CallExpr = {
+      type: 'Call',
       callee,
       arguments: args,
     };
+
+    if (Object.keys(namedArgs).length > 0) {
+      result.namedArgs = namedArgs;
+    }
+
+    return result;
   }
 
-  private primary(): ExpressionNode {
-    if (this.match(TokenType.NUMBER, TokenType.STRING, TokenType.BOOLEAN, TokenType.NULL)) {
+  private parsePrimary(): AstNode {
+    if (this.match(TokenType.Boolean)) {
       return {
         type: 'Literal',
-        value: this.previous().value,
-      } as Literal;
+        value: this.previous().value === 'true',
+        tokenType: TokenType.Boolean,
+      } as LiteralExpr;
     }
 
-    if (this.match(TokenType.IDENTIFIER)) {
-      return {
-        type: 'Identifier',
-        name: this.previous().value as string,
-      };
+    if (this.match(TokenType.Null)) {
+      return { type: 'Literal', value: null, tokenType: TokenType.Null } as LiteralExpr;
     }
 
-    if (this.match(TokenType.LBRACKET)) {
-      return this.arrayExpression();
+    if (this.match(TokenType.Number)) {
+      const value = this.previous().value;
+      const num = value.includes('.') ? parseFloat(value) : parseInt(value, 10);
+      return { type: 'Literal', value: num, tokenType: TokenType.Number } as LiteralExpr;
     }
 
-    if (this.match(TokenType.LBRACE)) {
-      return this.objectExpression();
+    if (this.match(TokenType.String)) {
+      const value = this.previous().value;
+      // Check for interpolation
+      if (value.includes('${')) {
+        return this.parseStringInterpolation(value);
+      }
+      return { type: 'Literal', value, tokenType: TokenType.String } as LiteralExpr;
     }
 
-    if (this.match(TokenType.LPAREN)) {
-      // Could be grouping or arrow function
-      const expr = this.expression();
-      this.consume(TokenType.RPAREN, "Expected ')' after expression");
+    if (this.match(TokenType.Identifier)) {
+      return { type: 'Identifier', name: this.previous().value } as IdentifierExpr;
+    }
 
-      if (this.match(TokenType.ARROW)) {
-        return this.arrowFunction([expr]);
+    if (this.match(TokenType.LeftParen)) {
+      // Check for lambda / arrow function
+      if (this.check(TokenType.Identifier) || this.check(TokenType.RightParen)) {
+        const checkpoint = this.current;
+        const parameters: string[] = [];
+
+        if (!this.check(TokenType.RightParen)) {
+          do {
+            if (this.match(TokenType.Identifier)) {
+              parameters.push(this.previous().value);
+            } else {
+              this.current = checkpoint;
+              break;
+            }
+          } while (this.match(TokenType.Comma));
+        }
+
+        if (this.current !== checkpoint && this.match(TokenType.RightParen) && this.match(TokenType.Arrow)) {
+          const body = this.match(TokenType.LeftBrace)
+            ? this.parseBlockStatement()
+            : this.parseExpression();
+          return { type: 'Lambda', parameters, body } as LambdaExpr;
+        }
+
+        this.current = checkpoint;
       }
 
+      const expr = this.parseExpression();
+      this.consume(TokenType.RightParen, "Expected ')' after expression");
       return expr;
     }
 
-    throw new Error(`Unexpected token: ${this.peek().type} at line ${this.peek().line}`);
-  }
-
-  private arrayExpression(): ArrayExpression {
-    const elements: ExpressionNode[] = [];
-
-    if (!this.check(TokenType.RBRACKET)) {
-      do {
-        elements.push(this.expression());
-      } while (this.match(TokenType.COMMA));
+    if (this.match(TokenType.LeftBracket)) {
+      return this.parseArrayLiteral();
     }
 
-    this.consume(TokenType.RBRACKET, "Expected ']' after array");
-
-    return {
-      type: 'ArrayExpression',
-      elements,
-    };
-  }
-
-  private objectExpression(): ObjectExpression {
-    const properties: { key: string | ExpressionNode; value: ExpressionNode; computed: boolean }[] = [];
-
-    if (!this.check(TokenType.RBRACE)) {
-      do {
-        let key: string | ExpressionNode;
-        let computed = false;
-
-        if (this.match(TokenType.LBRACKET)) {
-          key = this.expression();
-          this.consume(TokenType.RBRACKET, "Expected ']' after computed property");
-          computed = true;
-        } else if (this.check(TokenType.STRING)) {
-          key = this.advance().value as string;
-        } else {
-          key = this.consume(TokenType.IDENTIFIER, 'Expected property name').value as string;
-        }
-
-        this.consume(TokenType.COLON, "Expected ':' after property name");
-        const value = this.expression();
-
-        properties.push({ key, value, computed });
-      } while (this.match(TokenType.COMMA));
+    if (this.match(TokenType.LeftBrace)) {
+      return this.parseDictLiteral();
     }
 
-    this.consume(TokenType.RBRACE, "Expected '}' after object");
-
-    return {
-      type: 'ObjectExpression',
-      properties,
-    };
+    throw new Error(`Unexpected token: ${this.peek().type} (${this.peek().value}) at line ${this.peek().line}`);
   }
 
-  private arrowFunction(params: ExpressionNode[]): ArrowFunction {
-    const paramNodes: ParameterNode[] = params.map(p => {
-      if (p.type !== 'Identifier') {
-        throw new Error('Arrow function parameters must be identifiers');
-      }
-      return { name: (p as Identifier).name };
+  private parseStringInterpolation(value: string): InterpolationExpr {
+    const parts: AstNode[] = [];
+    let current = 0;
+    const guard = createLoopGuard({
+      maxIterations: 10000,
+      context: 'string interpolation parsing',
     });
 
-    let body: ExpressionNode | BlockStatement;
-    if (this.match(TokenType.LBRACE)) {
-      body = this.block();
-    } else {
-      body = this.expression();
+    while (current < value.length) {
+      guard();
+      const start = value.indexOf('${', current);
+      if (start === -1) {
+        if (current < value.length) {
+          parts.push({
+            type: 'Literal',
+            value: value.substring(current),
+            tokenType: TokenType.String,
+          } as LiteralExpr);
+        }
+        break;
+      }
+
+      if (start > current) {
+        parts.push({
+          type: 'Literal',
+          value: value.substring(current, start),
+          tokenType: TokenType.String,
+        } as LiteralExpr);
+      }
+
+      const end = value.indexOf('}', start + 2);
+      if (end === -1) {
+        throw new Error("Unterminated string interpolation");
+      }
+
+      const exprCode = value.substring(start + 2, end);
+      const tokens = lexerTokenize(exprCode);
+      const parser = new FCSParser(tokens);
+      parts.push(parser.parseExpression());
+
+      current = end + 1;
     }
 
-    return {
-      type: 'ArrowFunction',
-      params: paramNodes,
-      body,
-      async: false,
-    };
+    return { type: 'Interpolation', parts };
+  }
+
+  private parseArrayLiteral(): ArrayExpr {
+    const elements: AstNode[] = [];
+
+    if (!this.check(TokenType.RightBracket)) {
+      do {
+        elements.push(this.parseExpression());
+      } while (this.match(TokenType.Comma));
+    }
+
+    this.consume(TokenType.RightBracket, "Expected ']' after array elements");
+
+    return { type: 'Array', elements };
+  }
+
+  private parseDictLiteral(): DictExpr {
+    const elements = new Map<string, AstNode>();
+
+    if (!this.check(TokenType.RightBrace)) {
+      do {
+        let key: string;
+        if (this.match(TokenType.String)) {
+          key = this.previous().value;
+        } else if (this.match(TokenType.Identifier)) {
+          key = this.previous().value;
+        } else {
+          throw new Error("Expected string or identifier for dict key");
+        }
+
+        this.consume(TokenType.Colon, "Expected ':' after dict key");
+        const value = this.parseExpression();
+        elements.set(key, value);
+      } while (this.match(TokenType.Comma));
+    }
+
+    this.consume(TokenType.RightBrace, "Expected '}' after dict elements");
+
+    return { type: 'Dict', elements };
   }
 
   // ============================================
-  // Utility Methods
+  // Helper Methods
   // ============================================
+
+  private isAtEnd(): boolean {
+    return this.peek().type === TokenType.EOF;
+  }
+
+  private peek(): Token {
+    return this.tokens[Math.min(this.current, this.tokens.length - 1)];
+  }
+
+  private previous(): Token {
+    return this.tokens[this.current - 1];
+  }
+
+  private advance(): Token {
+    if (!this.isAtEnd()) this.current++;
+    return this.previous();
+  }
+
+  private check(type: TokenType): boolean {
+    return this.peek().type === type;
+  }
+
+  private checkNext(type: TokenType): boolean {
+    if (this.current + 1 >= this.tokens.length) return false;
+    return this.tokens[this.current + 1].type === type;
+  }
+
+  private checkKeyword(...keywords: string[]): boolean {
+    if (this.peek().type !== TokenType.Keyword) return false;
+    return keywords.includes(this.peek().value);
+  }
 
   private match(...types: TokenType[]): boolean {
     for (const type of types) {
@@ -810,44 +1092,49 @@ export class Parser {
     return false;
   }
 
-  private check(type: TokenType): boolean {
-    if (this.isAtEnd()) return false;
-    return this.peek().type === type;
-  }
-
-  private checkNext(type: TokenType): boolean {
-    if (this.current + 1 >= this.tokens.length) return false;
-    return this.tokens[this.current + 1].type === type;
-  }
-
-  private advance(): Token {
-    if (!this.isAtEnd()) this.current++;
-    return this.previous();
-  }
-
-  private isAtEnd(): boolean {
-    return this.peek().type === TokenType.EOF;
-  }
-
-  private peek(): Token {
-    return this.tokens[this.current];
-  }
-
-  private previous(): Token {
-    return this.tokens[this.current - 1];
-  }
-
-  private consume(type: TokenType, message: string): Token {
-    if (this.check(type)) return this.advance();
-    throw new Error(`${message}. Got ${this.peek().type} at line ${this.peek().line}`);
-  }
-
-  private consumeOptional(type: TokenType): boolean {
-    if (this.check(type)) {
+  private matchKeyword(...keywords: string[]): boolean {
+    if (this.checkKeyword(...keywords)) {
       this.advance();
       return true;
     }
     return false;
+  }
+
+  private consume(type: TokenType, message: string): Token {
+    if (this.check(type)) return this.advance();
+    throw new Error(`${message} at line ${this.peek().line}, got ${this.peek().type}`);
+  }
+
+  private consumeKeyword(...keywords: string[]): void {
+    if (this.checkKeyword(...keywords)) {
+      this.advance();
+    } else {
+      throw new Error(`Expected one of [${keywords.join(', ')}] at line ${this.peek().line}`);
+    }
+  }
+
+  private consumeStatementEnd(): void {
+    if (this.match(TokenType.Semicolon) || this.match(TokenType.Newline)) {
+      return;
+    }
+
+    if (this.isAtEnd()) return;
+
+    // Allow implicit semicolon before certain tokens
+    if (this.check(TokenType.RightBrace) || this.checkKeyword('else')) {
+      return;
+    }
+  }
+
+  private skipNewlines(): void {
+    const guard = createLoopGuard({
+      maxIterations: 100000,
+      context: 'newline skipping',
+    });
+    while (this.match(TokenType.Newline)) {
+      guard();
+      // Skip
+    }
   }
 
   private synchronize(): void {
@@ -855,22 +1142,15 @@ export class Parser {
 
     const guard = createLoopGuard({
       maxIterations: 100000,
-      context: 'BuddyScript error synchronization',
+      context: 'error synchronization',
     });
     while (!this.isAtEnd()) {
       guard();
-      if (this.previous().type === TokenType.SEMICOLON) return;
+      if (this.previous().type === TokenType.Semicolon) return;
+      if (this.previous().type === TokenType.Newline) return;
 
-      switch (this.peek().type) {
-        case TokenType.FUNCTION:
-        case TokenType.LET:
-        case TokenType.CONST:
-        case TokenType.IF:
-        case TokenType.WHILE:
-        case TokenType.FOR:
-        case TokenType.RETURN:
-        case TokenType.TRY:
-          return;
+      if (this.checkKeyword('if', 'for', 'while', 'let', 'const', 'func', 'function', 'class', 'return')) {
+        return;
       }
 
       this.advance();
@@ -878,6 +1158,9 @@ export class Parser {
   }
 }
 
-export function parse(tokens: Token[]): ProgramNode {
-  return new Parser(tokens).parse();
+/** @deprecated Use FCSParser instead */
+export const Parser = FCSParser;
+
+export function parse(tokens: Token[]): Program {
+  return new FCSParser(tokens).parse();
 }

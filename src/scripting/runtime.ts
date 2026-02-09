@@ -1,56 +1,76 @@
 /**
- * Buddy Script Runtime
+ * Unified Script Runtime
  *
- * Executes parsed AST nodes
+ * Based on FCS runtime (class/test/assert/dict/lambda/interpolation/pipeline/ternary/index)
+ * with Buddy Script additions:
+ * - Async/await native support
+ * - ForCStyle statement execution
+ * - AwaitExpression handling
+ * - Export statement handling
+ * - Timeout enforcement per-statement
+ * - ScriptResult with testResults tracking
+ *
+ * Extensions: .bs (primary), .fcs (backward-compatible alias)
  */
 
 import {
-  ProgramNode,
-  StatementNode,
-  ExpressionNode,
-  CodeBuddyValue,
+  AstNode,
+  Program,
+  TokenType,
   RuntimeContext,
+  CodeBuddyValue,
+  CodeBuddyFunction,
+  ScriptResult,
   CodeBuddyScriptConfig,
   DEFAULT_SCRIPT_CONFIG,
-  CodeBuddyFunction,
-  VariableDeclaration,
+  LiteralExpr,
+  IdentifierExpr,
+  BinaryExpr,
+  UnaryExpr,
+  AssignmentExpr,
+  CallExpr,
+  MemberExpr,
+  IndexExpr,
+  ArrayExpr,
+  DictExpr,
+  LambdaExpr,
+  InterpolationExpr,
+  TernaryExpr,
+  AwaitExpr,
+  BlockStmt,
+  ExpressionStmt,
+  VarDeclaration,
   FunctionDeclaration,
-  BlockStatement,
-  IfStatement,
-  WhileStatement,
-  ForStatement,
-  ForInStatement,
-  ReturnStatement,
-  TryStatement,
-  ThrowStatement,
-  Literal,
-  Identifier,
-  BinaryExpression,
-  UnaryExpression,
-  CallExpression,
-  MemberExpression,
-  ArrayExpression,
-  ObjectExpression,
-  AssignmentExpression,
-  LogicalExpression,
-  ConditionalExpression,
-  AwaitExpression,
+  ClassDeclaration,
+  IfStmt,
+  WhileStmt,
+  ForStmt,
+  ForCStyleStmt,
+  ReturnStmt,
+  TryStmt,
+  ThrowStmt,
+  ImportStmt,
+  ExportStmt,
+  TestDeclaration,
+  AssertStmt,
 } from './types.js';
 import { createBuiltins } from './builtins.js';
+import { createGrokBindings } from './codebuddy-bindings.js';
 
-// Special return value for control flow
-class ReturnValue {
+// Control flow signals
+class ReturnSignal {
   constructor(public value: CodeBuddyValue) {}
 }
 
 class BreakSignal {}
 class ContinueSignal {}
 
-export class Runtime {
+export class FCSRuntime {
   private config: CodeBuddyScriptConfig;
   private globalContext: RuntimeContext;
   private output: string[] = [];
-  private startTime: number = 0;
+  private startTime = 0;
+  private testResults: { name: string; passed: boolean; error?: string }[] = [];
 
   constructor(config: Partial<CodeBuddyScriptConfig> = {}) {
     this.config = { ...DEFAULT_SCRIPT_CONFIG, ...config };
@@ -59,17 +79,28 @@ export class Runtime {
       functions: new Map(),
     };
 
-    // Initialize builtins
     this.initializeBuiltins();
   }
 
   private initializeBuiltins(): void {
-    const builtins = createBuiltins(this.config, (msg: string) => {
+    const printFn = (msg: string) => {
       this.output.push(msg);
-    });
+    };
 
-    for (const [name, fn] of Object.entries(builtins)) {
-      this.globalContext.functions.set(name, fn as CodeBuddyFunction);
+    // Load unified builtins (merged FCS + BS)
+    const builtins = createBuiltins(this.config, printFn);
+
+    for (const [name, value] of Object.entries(builtins)) {
+      this.globalContext.variables.set(name, value as CodeBuddyValue);
+      if (typeof value === 'function') {
+        this.globalContext.functions.set(name, value as CodeBuddyFunction);
+      }
+    }
+
+    // Load codebuddy bindings (grok.*, tool.*, context.*, agent.*, mcp.*, git.*, session.*)
+    const grokBindings = createGrokBindings(this.config as any, printFn);
+    for (const [name, value] of Object.entries(grokBindings)) {
+      this.globalContext.variables.set(name, value as CodeBuddyValue);
     }
 
     // Inject user variables
@@ -80,97 +111,131 @@ export class Runtime {
     }
   }
 
-  async execute(program: ProgramNode): Promise<{ output: string[]; returnValue: CodeBuddyValue; duration: number }> {
+  async execute(program: Program): Promise<ScriptResult> {
     this.startTime = Date.now();
     this.output = [];
+    this.testResults = [];
 
     let returnValue: CodeBuddyValue = null;
+    let error: string | undefined;
 
     try {
-      for (const statement of program.body) {
-        const result = await this.executeStatement(statement, this.globalContext);
-        if (result instanceof ReturnValue) {
+      for (const statement of program.statements) {
+        const result = await this.executeNode(statement, this.globalContext);
+        if (result instanceof ReturnSignal) {
           returnValue = result.value;
           break;
         }
       }
-    } catch (error) {
-      if (error instanceof ReturnValue) {
-        returnValue = error.value;
+    } catch (err) {
+      if (err instanceof ReturnSignal) {
+        returnValue = err.value;
       } else {
-        throw error;
+        error = err instanceof Error ? err.message : String(err);
       }
     }
 
     return {
+      success: !error,
       output: this.output,
+      error,
       returnValue,
       duration: Date.now() - this.startTime,
+      testResults: this.testResults.length > 0 ? this.testResults : undefined,
     };
   }
 
-  private async executeStatement(stmt: StatementNode, ctx: RuntimeContext): Promise<CodeBuddyValue | ReturnValue | BreakSignal | ContinueSignal> {
+  async executeNode(
+    node: AstNode,
+    ctx: RuntimeContext
+  ): Promise<CodeBuddyValue | ReturnSignal | BreakSignal | ContinueSignal> {
     // Check timeout
     if (Date.now() - this.startTime > this.config.timeout) {
-      throw new Error(`Script execution timed out after ${this.config.timeout}ms. Consider breaking the script into smaller parts or increasing the timeout limit.`);
+      throw new Error(`Script timeout after ${this.config.timeout}ms`);
     }
 
-    switch (stmt.type) {
-      case 'VariableDeclaration':
-        return this.executeVariableDeclaration(stmt, ctx);
+    switch (node.type) {
+      // Declarations
+      case 'VarDeclaration':
+        return this.executeVarDeclaration(node as VarDeclaration, ctx);
 
       case 'FunctionDeclaration':
-        return this.executeFunctionDeclaration(stmt, ctx);
+        return this.executeFunctionDeclaration(node as FunctionDeclaration, ctx);
 
-      case 'ExpressionStatement':
-        return this.evaluateExpression(stmt.expression, ctx);
+      case 'ClassDeclaration':
+        return this.executeClassDeclaration(node as ClassDeclaration, ctx);
 
-      case 'IfStatement':
-        return this.executeIfStatement(stmt, ctx);
+      case 'TestDeclaration':
+        return this.executeTestDeclaration(node as TestDeclaration, ctx);
 
-      case 'WhileStatement':
-        return this.executeWhileStatement(stmt, ctx);
+      // Statements
+      case 'Block':
+        return this.executeBlock(node as BlockStmt, ctx);
 
-      case 'ForStatement':
-        return this.executeForStatement(stmt as ForStatement, ctx);
+      case 'ExpressionStmt':
+        return this.evaluate((node as ExpressionStmt).expression, ctx);
 
-      case 'ForInStatement':
-        return this.executeForInStatement(stmt, ctx);
+      case 'If':
+        return this.executeIfStatement(node as IfStmt, ctx);
 
-      case 'ReturnStatement':
-        return this.executeReturnStatement(stmt, ctx);
+      case 'While':
+        return this.executeWhileStatement(node as WhileStmt, ctx);
 
-      case 'TryStatement':
-        return this.executeTryStatement(stmt, ctx);
+      case 'For':
+        return this.executeForStatement(node as ForStmt, ctx);
 
-      case 'ThrowStatement':
-        return this.executeThrowStatement(stmt, ctx);
+      case 'ForCStyle':
+        return this.executeForCStyleStatement(node as ForCStyleStmt, ctx);
 
-      case 'BreakStatement':
+      case 'Return':
+        return this.executeReturnStatement(node as ReturnStmt, ctx);
+
+      case 'Break':
         return new BreakSignal();
 
-      case 'ContinueStatement':
+      case 'Continue':
         return new ContinueSignal();
 
-      case 'BlockStatement':
-        return this.executeBlock(stmt, ctx);
+      case 'Try':
+        return this.executeTryStatement(node as TryStmt, ctx);
 
-      case 'ImportStatement':
-        // Imports are handled at initialization
-        return null;
+      case 'Throw':
+        return this.executeThrowStatement(node as ThrowStmt, ctx);
 
+      case 'Import':
+        return this.executeImportStatement(node as ImportStmt, ctx);
+
+      case 'Export':
+        return this.executeExportStatement(node as ExportStmt, ctx);
+
+      case 'Assert':
+        return this.executeAssertStatement(node as AssertStmt, ctx);
+
+      // Expressions (delegated to evaluate)
       default:
-        throw new Error(`Unsupported statement type "${(stmt as StatementNode).type}". This may be a syntax error or an unsupported feature.`);
+        return this.evaluate(node, ctx);
     }
   }
 
-  private async executeVariableDeclaration(stmt: VariableDeclaration, ctx: RuntimeContext): Promise<null> {
-    const value = stmt.init ? await this.evaluateExpression(stmt.init, ctx) : null;
-    ctx.variables.set(stmt.name, value);
+  // ============================================
+  // Statement Execution
+  // ============================================
+
+  private async executeVarDeclaration(
+    node: VarDeclaration,
+    ctx: RuntimeContext
+  ): Promise<null> {
+    const value = node.initializer
+      ? await this.evaluate(node.initializer, ctx)
+      : null;
+    ctx.variables.set(node.name, value);
     return null;
   }
 
-  private async executeFunctionDeclaration(stmt: FunctionDeclaration, ctx: RuntimeContext): Promise<null> {
+  private async executeFunctionDeclaration(
+    node: FunctionDeclaration,
+    ctx: RuntimeContext
+  ): Promise<null> {
     const fn: CodeBuddyFunction = async (...args: CodeBuddyValue[]) => {
       const localCtx: RuntimeContext = {
         variables: new Map(),
@@ -178,108 +243,175 @@ export class Runtime {
         parent: ctx,
       };
 
-      // Bind parameters
-      for (let i = 0; i < stmt.params.length; i++) {
-        const param = stmt.params[i];
-        const value = args[i] !== undefined ? args[i] : (param.defaultValue ? await this.evaluateExpression(param.defaultValue, ctx) : null);
+      // Bind parameters (with named args support)
+      const lastArg = args.length > 0 ? args[args.length - 1] : null;
+      const hasNamedArgs = lastArg !== null && typeof lastArg === 'object' && lastArg !== null && '__namedArgs' in (lastArg as object);
+      const namedArgs = hasNamedArgs
+        ? (args.pop() as { __namedArgs: Record<string, CodeBuddyValue> }).__namedArgs
+        : {};
+
+      for (let i = 0; i < node.parameters.length; i++) {
+        const param = node.parameters[i];
+        let value: CodeBuddyValue;
+
+        if (namedArgs[param.name] !== undefined) {
+          value = namedArgs[param.name];
+        } else if (args[i] !== undefined) {
+          value = args[i];
+        } else if (param.defaultValue) {
+          value = await this.evaluate(param.defaultValue, ctx);
+        } else {
+          value = null;
+        }
+
         localCtx.variables.set(param.name, value);
       }
 
       try {
-        const result = await this.executeBlock(stmt.body, localCtx);
-        if (result instanceof ReturnValue) {
+        const result = await this.executeBlock(node.body, localCtx);
+        if (result instanceof ReturnSignal) {
           return result.value;
         }
         return null;
-      } catch (error) {
-        if (error instanceof ReturnValue) {
-          return error.value;
+      } catch (err) {
+        if (err instanceof ReturnSignal) {
+          return err.value;
         }
-        throw error;
+        throw err;
       }
     };
 
-    ctx.functions.set(stmt.name, fn);
-    ctx.variables.set(stmt.name, fn);
+    ctx.functions.set(node.name, fn);
+    ctx.variables.set(node.name, fn);
     return null;
   }
 
-  private async executeIfStatement(stmt: IfStatement, ctx: RuntimeContext): Promise<CodeBuddyValue | ReturnValue | BreakSignal | ContinueSignal> {
-    const condition = await this.evaluateExpression(stmt.condition, ctx);
+  private async executeClassDeclaration(
+    node: ClassDeclaration,
+    ctx: RuntimeContext
+  ): Promise<null> {
+    const classConstructor: CodeBuddyFunction = async (...args: CodeBuddyValue[]) => {
+      const instance: Record<string, CodeBuddyValue> = {};
 
-    if (this.isTruthy(condition)) {
-      return this.executeBlock(stmt.consequent, ctx);
-    } else if (stmt.alternate) {
-      if (stmt.alternate.type === 'IfStatement') {
-        return this.executeIfStatement(stmt.alternate, ctx);
-      } else {
-        return this.executeBlock(stmt.alternate, ctx);
+      for (const member of node.members) {
+        if (member.type === 'VarDeclaration') {
+          const varDecl = member as VarDeclaration;
+          instance[varDecl.name] = varDecl.initializer
+            ? await this.evaluate(varDecl.initializer, ctx)
+            : null;
+        } else if (member.type === 'FunctionDeclaration') {
+          const fnDecl = member as FunctionDeclaration;
+          instance[fnDecl.name] = async (...methodArgs: CodeBuddyValue[]) => {
+            const methodCtx: RuntimeContext = {
+              variables: new Map([['this', instance]]),
+              functions: new Map(ctx.functions),
+              parent: ctx,
+            };
+
+            for (let i = 0; i < fnDecl.parameters.length; i++) {
+              methodCtx.variables.set(fnDecl.parameters[i].name, methodArgs[i]);
+            }
+
+            const result = await this.executeBlock(fnDecl.body, methodCtx);
+            if (result instanceof ReturnSignal) {
+              return result.value;
+            }
+            return null;
+          };
+        }
       }
+
+      if (instance.constructor && typeof instance.constructor === 'function') {
+        await instance.constructor(...args);
+      }
+
+      return instance;
+    };
+
+    ctx.variables.set(node.name, classConstructor);
+    return null;
+  }
+
+  private async executeTestDeclaration(
+    node: TestDeclaration,
+    ctx: RuntimeContext
+  ): Promise<null> {
+    if (!this.config.verbose) {
+      return null;
+    }
+
+    try {
+      await this.executeBlock(node.body, ctx);
+      this.testResults.push({ name: node.name, passed: true });
+      this.output.push(`✓ ${node.name}`);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      this.testResults.push({ name: node.name, passed: false, error: errorMsg });
+      this.output.push(`✗ ${node.name}: ${errorMsg}`);
     }
 
     return null;
   }
 
-  private async executeWhileStatement(stmt: WhileStatement, ctx: RuntimeContext): Promise<CodeBuddyValue | ReturnValue> {
-    while (this.isTruthy(await this.evaluateExpression(stmt.condition, ctx))) {
-      const result = await this.executeBlock(stmt.body, ctx);
-      if (result instanceof ReturnValue) return result;
+  private async executeBlock(
+    node: BlockStmt,
+    ctx: RuntimeContext
+  ): Promise<CodeBuddyValue | ReturnSignal | BreakSignal | ContinueSignal> {
+    for (const stmt of node.statements) {
+      const result = await this.executeNode(stmt, ctx);
+      if (
+        result instanceof ReturnSignal ||
+        result instanceof BreakSignal ||
+        result instanceof ContinueSignal
+      ) {
+        return result;
+      }
+    }
+    return null;
+  }
+
+  private async executeIfStatement(
+    node: IfStmt,
+    ctx: RuntimeContext
+  ): Promise<CodeBuddyValue | ReturnSignal | BreakSignal | ContinueSignal> {
+    const condition = await this.evaluate(node.condition, ctx);
+
+    if (this.isTruthy(condition)) {
+      return this.executeNode(node.thenBranch, ctx);
+    } else if (node.elseBranch) {
+      return this.executeNode(node.elseBranch, ctx);
+    }
+
+    return null;
+  }
+
+  private async executeWhileStatement(
+    node: WhileStmt,
+    ctx: RuntimeContext
+  ): Promise<CodeBuddyValue | ReturnSignal> {
+    while (this.isTruthy(await this.evaluate(node.condition, ctx))) {
+      const result = await this.executeNode(node.body, ctx);
+      if (result instanceof ReturnSignal) return result;
       if (result instanceof BreakSignal) break;
       if (result instanceof ContinueSignal) continue;
     }
     return null;
   }
 
-  private async executeForStatement(stmt: ForStatement, ctx: RuntimeContext): Promise<CodeBuddyValue | ReturnValue> {
-    // Create local context for loop-scoped variables (like the init var)
-    // Use empty map - only loop variables go here, parent lookup for outer vars
-    const localCtx: RuntimeContext = {
-      variables: new Map(),
-      functions: ctx.functions,
-      parent: ctx,
-    };
-
-    // Execute init
-    if (stmt.init) {
-      if (stmt.init.type === 'VariableDeclaration') {
-        await this.executeVariableDeclaration(stmt.init as VariableDeclaration, localCtx);
-      } else {
-        await this.evaluateExpression(stmt.init as ExpressionNode, localCtx);
-      }
-    }
-
-    // Loop while test is true
-    while (stmt.test === null || this.isTruthy(await this.evaluateExpression(stmt.test, localCtx))) {
-      const result = await this.executeBlock(stmt.body, localCtx);
-      if (result instanceof ReturnValue) return result;
-      if (result instanceof BreakSignal) break;
-      if (result instanceof ContinueSignal) {
-        // Still run the update on continue
-        if (stmt.update) {
-          await this.evaluateExpression(stmt.update, localCtx);
-        }
-        continue;
-      }
-
-      // Execute update
-      if (stmt.update) {
-        await this.evaluateExpression(stmt.update, localCtx);
-      }
-    }
-
-    return null;
-  }
-
-  private async executeForInStatement(stmt: ForInStatement, ctx: RuntimeContext): Promise<CodeBuddyValue | ReturnValue> {
-    const iterable = await this.evaluateExpression(stmt.iterable, ctx);
+  private async executeForStatement(
+    node: ForStmt,
+    ctx: RuntimeContext
+  ): Promise<CodeBuddyValue | ReturnSignal> {
+    const iterable = await this.evaluate(node.iterable, ctx);
 
     if (!Array.isArray(iterable) && typeof iterable !== 'object') {
-      throw new Error('for-in loop requires an array or object to iterate over. Got: ' + (typeof iterable));
+      throw new Error('for-in requires an iterable (array or object)');
     }
 
-    const items = Array.isArray(iterable) ? iterable : Object.entries(iterable as Record<string, CodeBuddyValue>);
+    const items = Array.isArray(iterable)
+      ? iterable
+      : Object.entries(iterable as Record<string, CodeBuddyValue>);
 
-    // Create local context with only the loop variable - parent lookup for outer vars
     const localCtx: RuntimeContext = {
       variables: new Map(),
       functions: ctx.functions,
@@ -287,10 +419,10 @@ export class Runtime {
     };
 
     for (const item of items) {
-      localCtx.variables.set(stmt.variable, item);
+      localCtx.variables.set(node.variable, item);
 
-      const result = await this.executeBlock(stmt.body, localCtx);
-      if (result instanceof ReturnValue) return result;
+      const result = await this.executeNode(node.body, localCtx);
+      if (result instanceof ReturnSignal) return result;
       if (result instanceof BreakSignal) break;
       if (result instanceof ContinueSignal) continue;
     }
@@ -298,51 +430,121 @@ export class Runtime {
     return null;
   }
 
-  private async executeReturnStatement(stmt: ReturnStatement, ctx: RuntimeContext): Promise<ReturnValue> {
-    const value = stmt.argument ? await this.evaluateExpression(stmt.argument, ctx) : null;
-    return new ReturnValue(value);
+  private async executeForCStyleStatement(
+    node: ForCStyleStmt,
+    ctx: RuntimeContext
+  ): Promise<CodeBuddyValue | ReturnSignal> {
+    const localCtx: RuntimeContext = {
+      variables: new Map(),
+      functions: ctx.functions,
+      parent: ctx,
+    };
+
+    // Execute init
+    if (node.init) {
+      if (node.init.type === 'VarDeclaration') {
+        await this.executeVarDeclaration(node.init as VarDeclaration, localCtx);
+      } else {
+        await this.evaluate(node.init, localCtx);
+      }
+    }
+
+    // Loop while test is true
+    while (node.test === null || this.isTruthy(await this.evaluate(node.test, localCtx))) {
+      const result = await this.executeNode(node.body, localCtx);
+      if (result instanceof ReturnSignal) return result;
+      if (result instanceof BreakSignal) break;
+      if (result instanceof ContinueSignal) {
+        if (node.update) {
+          await this.evaluate(node.update, localCtx);
+        }
+        continue;
+      }
+
+      if (node.update) {
+        await this.evaluate(node.update, localCtx);
+      }
+    }
+
+    return null;
   }
 
-  private async executeTryStatement(stmt: TryStatement, ctx: RuntimeContext): Promise<CodeBuddyValue | ReturnValue> {
+  private async executeReturnStatement(
+    node: ReturnStmt,
+    ctx: RuntimeContext
+  ): Promise<ReturnSignal> {
+    const value = node.value ? await this.evaluate(node.value, ctx) : null;
+    return new ReturnSignal(value);
+  }
+
+  private async executeTryStatement(
+    node: TryStmt,
+    ctx: RuntimeContext
+  ): Promise<CodeBuddyValue | ReturnSignal> {
     try {
-      return await this.executeBlock(stmt.block, ctx);
-    } catch (error) {
-      if (stmt.handler) {
+      return await this.executeBlock(node.tryBlock, ctx);
+    } catch (err) {
+      for (const clause of node.catchClauses) {
         const localCtx: RuntimeContext = {
           variables: new Map(ctx.variables),
           functions: ctx.functions,
           parent: ctx,
         };
 
-        const errorValue = error instanceof Error ? {
-          message: error.message,
-          stack: error.stack,
-        } : error;
+        if (clause.variable) {
+          const errorValue =
+            err instanceof Error
+              ? { message: err.message, stack: err.stack }
+              : err;
+          localCtx.variables.set(clause.variable, errorValue as CodeBuddyValue);
+        }
 
-        localCtx.variables.set(stmt.handler.param, errorValue as CodeBuddyValue);
-        return this.executeBlock(stmt.handler.body, localCtx);
+        return this.executeBlock(clause.body, localCtx);
       }
-      throw error;
+      throw err;
+    } finally {
+      if (node.finallyBlock) {
+        await this.executeBlock(node.finallyBlock, ctx);
+      }
     }
   }
 
-  private async executeThrowStatement(stmt: ThrowStatement, ctx: RuntimeContext): Promise<never> {
-    const value = await this.evaluateExpression(stmt.argument, ctx);
+  private async executeThrowStatement(
+    node: ThrowStmt,
+    ctx: RuntimeContext
+  ): Promise<never> {
+    const value = await this.evaluate(node.expression, ctx);
     if (typeof value === 'string') {
       throw new Error(value);
     }
     throw value;
   }
 
-  private async executeBlock(block: BlockStatement, ctx: RuntimeContext): Promise<CodeBuddyValue | ReturnValue | BreakSignal | ContinueSignal> {
-    // Use the same context - don't create a new scope for blocks
-    // New variables declared inside will still be added to this context
-    // but assignments to existing variables will propagate up via setVariable
-    for (const stmt of block.body) {
-      const result = await this.executeStatement(stmt, ctx);
-      if (result instanceof ReturnValue || result instanceof BreakSignal || result instanceof ContinueSignal) {
-        return result;
-      }
+  private async executeImportStatement(
+    _node: ImportStmt,
+    _ctx: RuntimeContext
+  ): Promise<null> {
+    // Imports are handled at initialization or by module system
+    return null;
+  }
+
+  private async executeExportStatement(
+    node: ExportStmt,
+    ctx: RuntimeContext
+  ): Promise<CodeBuddyValue | ReturnSignal | BreakSignal | ContinueSignal> {
+    // Execute the declaration normally - exports don't change runtime behavior
+    return this.executeNode(node.declaration, ctx);
+  }
+
+  private async executeAssertStatement(
+    node: AssertStmt,
+    ctx: RuntimeContext
+  ): Promise<null> {
+    const condition = await this.evaluate(node.condition, ctx);
+
+    if (!this.isTruthy(condition)) {
+      const message = node.message || 'Assertion failed';
+      throw new Error(message);
     }
 
     return null;
@@ -352,49 +554,53 @@ export class Runtime {
   // Expression Evaluation
   // ============================================
 
-  private async evaluateExpression(expr: ExpressionNode, ctx: RuntimeContext): Promise<CodeBuddyValue> {
-    switch (expr.type) {
+  private async evaluate(node: AstNode, ctx: RuntimeContext): Promise<CodeBuddyValue> {
+    switch (node.type) {
       case 'Literal':
-        return (expr as Literal).value;
+        return (node as LiteralExpr).value as CodeBuddyValue;
 
       case 'Identifier':
-        return this.lookupVariable((expr as Identifier).name, ctx);
+        return this.lookupVariable((node as IdentifierExpr).name, ctx);
 
-      case 'BinaryExpression':
-        return this.evaluateBinaryExpression(expr as BinaryExpression, ctx);
+      case 'Binary':
+        return this.evaluateBinary(node as BinaryExpr, ctx);
 
-      case 'UnaryExpression':
-        return this.evaluateUnaryExpression(expr as UnaryExpression, ctx);
+      case 'Unary':
+        return this.evaluateUnary(node as UnaryExpr, ctx);
 
-      case 'LogicalExpression':
-        return this.evaluateLogicalExpression(expr as LogicalExpression, ctx);
+      case 'Assignment':
+        return this.evaluateAssignment(node as AssignmentExpr, ctx);
 
-      case 'AssignmentExpression':
-        return this.evaluateAssignmentExpression(expr as AssignmentExpression, ctx);
+      case 'Call':
+        return this.evaluateCall(node as CallExpr, ctx);
 
-      case 'CallExpression':
-        return this.evaluateCallExpression(expr as CallExpression, ctx);
+      case 'Member':
+        return this.evaluateMember(node as MemberExpr, ctx);
 
-      case 'MemberExpression':
-        return this.evaluateMemberExpression(expr as MemberExpression, ctx);
+      case 'Index':
+        return this.evaluateIndex(node as IndexExpr, ctx);
 
-      case 'ArrayExpression':
-        return this.evaluateArrayExpression(expr as ArrayExpression, ctx);
+      case 'Array':
+        return this.evaluateArray(node as ArrayExpr, ctx);
 
-      case 'ObjectExpression':
-        return this.evaluateObjectExpression(expr as ObjectExpression, ctx);
+      case 'Dict':
+        return this.evaluateDict(node as DictExpr, ctx);
 
-      case 'ConditionalExpression':
-        return this.evaluateConditionalExpression(expr as ConditionalExpression, ctx);
+      case 'Lambda':
+        return this.evaluateLambda(node as LambdaExpr, ctx);
 
-      case 'AwaitExpression':
-        return this.evaluateExpression((expr as AwaitExpression).argument, ctx);
+      case 'Interpolation':
+        return this.evaluateInterpolation(node as InterpolationExpr, ctx);
 
-      case 'ArrowFunction':
-        return this.createArrowFunction(expr, ctx);
+      case 'Ternary':
+        return this.evaluateTernary(node as TernaryExpr, ctx);
+
+      case 'Await':
+        // Await just evaluates the argument (our runtime is already async)
+        return this.evaluate((node as AwaitExpr).argument, ctx);
 
       default:
-        throw new Error(`Unsupported expression type "${(expr as ExpressionNode).type}". Check syntax or upgrade to a newer version.`);
+        throw new Error(`Unknown expression type: ${node.type}`);
     }
   }
 
@@ -403,102 +609,15 @@ export class Runtime {
       return ctx.variables.get(name)!;
     }
     if (ctx.functions.has(name)) {
-      return ctx.functions.get(name)! as CodeBuddyValue;
+      return ctx.functions.get(name)!;
     }
     if (ctx.parent) {
       return this.lookupVariable(name, ctx.parent);
     }
-    throw new Error(`Variable "${name}" is not defined. Check the variable name or define it before use.`);
-  }
-
-  private async evaluateBinaryExpression(expr: BinaryExpression, ctx: RuntimeContext): Promise<CodeBuddyValue> {
-    const left = await this.evaluateExpression(expr.left, ctx);
-    const right = await this.evaluateExpression(expr.right, ctx);
-
-    switch (expr.operator) {
-      case '+':
-        if (typeof left === 'string' || typeof right === 'string') {
-          return String(left) + String(right);
-        }
-        return (left as number) + (right as number);
-      case '-': return (left as number) - (right as number);
-      case '*':
-        // Support string repetition: "x" * 3 = "xxx"
-        if (typeof left === 'string' && typeof right === 'number') {
-          return left.repeat(right);
-        }
-        return (left as number) * (right as number);
-      case '/': return (left as number) / (right as number);
-      case '%': return (left as number) % (right as number);
-      case '**': return Math.pow(left as number, right as number);
-      case '==':
-      case '===': return left === right;
-      case '!=':
-      case '!==': return left !== right;
-      case '<': return (left as number) < (right as number);
-      case '<=': return (left as number) <= (right as number);
-      case '>': return (left as number) > (right as number);
-      case '>=': return (left as number) >= (right as number);
-      default:
-        throw new Error(`Unsupported binary operator "${expr.operator}". Valid operators: +, -, *, /, %, **, ==, !=, <, <=, >, >=`);
-    }
-  }
-
-  private async evaluateUnaryExpression(expr: UnaryExpression, ctx: RuntimeContext): Promise<CodeBuddyValue> {
-    const argument = await this.evaluateExpression(expr.argument, ctx);
-
-    switch (expr.operator) {
-      case '-': return -(argument as number);
-      case '!': return !this.isTruthy(argument);
-      default:
-        throw new Error(`Unsupported unary operator "${expr.operator}". Valid operators: -, !`);
-    }
-  }
-
-  private async evaluateLogicalExpression(expr: LogicalExpression, ctx: RuntimeContext): Promise<CodeBuddyValue> {
-    const left = await this.evaluateExpression(expr.left, ctx);
-
-    if (expr.operator === '&&') {
-      if (!this.isTruthy(left)) return left;
-      return this.evaluateExpression(expr.right, ctx);
-    } else {
-      if (this.isTruthy(left)) return left;
-      return this.evaluateExpression(expr.right, ctx);
-    }
-  }
-
-  private async evaluateAssignmentExpression(expr: AssignmentExpression, ctx: RuntimeContext): Promise<CodeBuddyValue> {
-    let value = await this.evaluateExpression(expr.right, ctx);
-
-    if (expr.operator === '+=') {
-      const current = await this.evaluateExpression(expr.left, ctx);
-      if (typeof current === 'string' || typeof value === 'string') {
-        value = String(current) + String(value);
-      } else {
-        value = (current as number) + (value as number);
-      }
-    } else if (expr.operator === '-=') {
-      const current = await this.evaluateExpression(expr.left, ctx);
-      value = (current as number) - (value as number);
-    }
-
-    if (expr.left.type === 'Identifier') {
-      this.setVariable((expr.left as Identifier).name, value, ctx);
-    } else if (expr.left.type === 'MemberExpression') {
-      const member = expr.left as MemberExpression;
-      const object = await this.evaluateExpression(member.object, ctx);
-      const property = member.computed
-        ? await this.evaluateExpression(member.property, ctx)
-        : (member.property as Identifier).name;
-
-      (object as Record<string, CodeBuddyValue>)[property as string] = value;
-    }
-
-    return value;
+    throw new Error(`Undefined variable: ${name}`);
   }
 
   private setVariable(name: string, value: CodeBuddyValue, ctx: RuntimeContext): void {
-    // Find where the variable is defined
     let current: RuntimeContext | undefined = ctx;
     while (current) {
       if (current.variables.has(name)) {
@@ -507,40 +626,177 @@ export class Runtime {
       }
       current = current.parent;
     }
-    // If not found, create in current context
     ctx.variables.set(name, value);
   }
 
-  private async evaluateCallExpression(expr: CallExpression, ctx: RuntimeContext): Promise<CodeBuddyValue> {
-    const callee = await this.evaluateExpression(expr.callee, ctx);
+  private async evaluateBinary(
+    node: BinaryExpr,
+    ctx: RuntimeContext
+  ): Promise<CodeBuddyValue> {
+    const left = await this.evaluate(node.left, ctx);
+    const right = await this.evaluate(node.right, ctx);
+
+    switch (node.operator) {
+      case TokenType.Plus:
+        if (typeof left === 'string' || typeof right === 'string') {
+          return String(left) + String(right);
+        }
+        return (left as number) + (right as number);
+
+      case TokenType.Minus:
+        return (left as number) - (right as number);
+
+      case TokenType.Multiply:
+        if (typeof left === 'string' && typeof right === 'number') {
+          return left.repeat(right);
+        }
+        return (left as number) * (right as number);
+
+      case TokenType.Divide:
+        return (left as number) / (right as number);
+
+      case TokenType.Modulo:
+        return (left as number) % (right as number);
+
+      case TokenType.Power:
+        return Math.pow(left as number, right as number);
+
+      case TokenType.Equal:
+        return left === right;
+
+      case TokenType.NotEqual:
+        return left !== right;
+
+      case TokenType.Less:
+        return (left as number) < (right as number);
+
+      case TokenType.LessEqual:
+        return (left as number) <= (right as number);
+
+      case TokenType.Greater:
+        return (left as number) > (right as number);
+
+      case TokenType.GreaterEqual:
+        return (left as number) >= (right as number);
+
+      case TokenType.And:
+        return this.isTruthy(left) && this.isTruthy(right);
+
+      case TokenType.Or:
+        return this.isTruthy(left) || this.isTruthy(right);
+
+      default:
+        throw new Error(`Unknown binary operator: ${node.operator}`);
+    }
+  }
+
+  private async evaluateUnary(
+    node: UnaryExpr,
+    ctx: RuntimeContext
+  ): Promise<CodeBuddyValue> {
+    const operand = await this.evaluate(node.operand, ctx);
+
+    switch (node.operator) {
+      case TokenType.Minus:
+        return -(operand as number);
+
+      case TokenType.Not:
+        return !this.isTruthy(operand);
+
+      default:
+        throw new Error(`Unknown unary operator: ${node.operator}`);
+    }
+  }
+
+  private async evaluateAssignment(
+    node: AssignmentExpr,
+    ctx: RuntimeContext
+  ): Promise<CodeBuddyValue> {
+    let value = await this.evaluate(node.value, ctx);
+
+    if (node.operator !== TokenType.Assign) {
+      const current = await this.evaluate(node.target, ctx);
+
+      switch (node.operator) {
+        case TokenType.PlusAssign:
+          if (typeof current === 'string' || typeof value === 'string') {
+            value = String(current) + String(value);
+          } else {
+            value = (current as number) + (value as number);
+          }
+          break;
+
+        case TokenType.MinusAssign:
+          value = (current as number) - (value as number);
+          break;
+
+        case TokenType.MultiplyAssign:
+          value = (current as number) * (value as number);
+          break;
+
+        case TokenType.DivideAssign:
+          value = (current as number) / (value as number);
+          break;
+      }
+    }
+
+    if (node.target.type === 'Identifier') {
+      this.setVariable((node.target as IdentifierExpr).name, value, ctx);
+    } else if (node.target.type === 'Member') {
+      const member = node.target as MemberExpr;
+      const object = await this.evaluate(member.object, ctx);
+      (object as Record<string, CodeBuddyValue>)[member.member] = value;
+    } else if (node.target.type === 'Index') {
+      const index = node.target as IndexExpr;
+      const object = await this.evaluate(index.object, ctx);
+      const key = await this.evaluate(index.index, ctx);
+      (object as Record<string, CodeBuddyValue>)[key as string | number] = value;
+    }
+
+    return value;
+  }
+
+  private async evaluateCall(
+    node: CallExpr,
+    ctx: RuntimeContext
+  ): Promise<CodeBuddyValue> {
+    const callee = await this.evaluate(node.callee, ctx);
 
     if (typeof callee !== 'function') {
-      throw new Error(`Cannot call ${JSON.stringify(callee)}: it is not a function. Check if the function name is correct.`);
+      throw new Error(`${JSON.stringify(callee)} is not a function`);
     }
 
     const args: CodeBuddyValue[] = [];
-    for (const arg of expr.arguments) {
-      args.push(await this.evaluateExpression(arg, ctx));
+    for (const arg of node.arguments) {
+      args.push(await this.evaluate(arg, ctx));
     }
 
-    return callee(...args);
+    // Handle named arguments
+    if (node.namedArgs && Object.keys(node.namedArgs).length > 0) {
+      const namedValues: Record<string, CodeBuddyValue> = {};
+      for (const [name, expr] of Object.entries(node.namedArgs)) {
+        namedValues[name] = await this.evaluate(expr, ctx);
+      }
+      args.push({ __namedArgs: namedValues } as CodeBuddyValue);
+    }
+
+    const result = callee(...args);
+    return result instanceof Promise ? await result : result;
   }
 
-  private async evaluateMemberExpression(expr: MemberExpression, ctx: RuntimeContext): Promise<CodeBuddyValue> {
-    const object = await this.evaluateExpression(expr.object, ctx);
+  private async evaluateMember(
+    node: MemberExpr,
+    ctx: RuntimeContext
+  ): Promise<CodeBuddyValue> {
+    const object = await this.evaluate(node.object, ctx);
 
     if (object === null || object === undefined) {
-      throw new Error('Cannot read property of null or undefined. Ensure the object exists before accessing its properties.');
+      throw new Error('Cannot read property of null or undefined');
     }
 
-    const property = expr.computed
-      ? await this.evaluateExpression(expr.property, ctx)
-      : (expr.property as Identifier).name;
-
     const obj = object as Record<string, CodeBuddyValue>;
-    const value = obj[property as string];
+    const value = obj[node.member];
 
-    // Bind methods
     if (typeof value === 'function') {
       return value.bind(obj);
     }
@@ -548,58 +804,96 @@ export class Runtime {
     return value;
   }
 
-  private async evaluateArrayExpression(expr: ArrayExpression, ctx: RuntimeContext): Promise<CodeBuddyValue[]> {
+  private async evaluateIndex(
+    node: IndexExpr,
+    ctx: RuntimeContext
+  ): Promise<CodeBuddyValue> {
+    const object = await this.evaluate(node.object, ctx);
+    const index = await this.evaluate(node.index, ctx);
+
+    if (object === null || object === undefined) {
+      throw new Error('Cannot index null or undefined');
+    }
+
+    return (object as Record<string | number, CodeBuddyValue>)[index as string | number];
+  }
+
+  private async evaluateArray(
+    node: ArrayExpr,
+    ctx: RuntimeContext
+  ): Promise<CodeBuddyValue[]> {
     const elements: CodeBuddyValue[] = [];
-    for (const element of expr.elements) {
-      elements.push(await this.evaluateExpression(element, ctx));
+    for (const element of node.elements) {
+      elements.push(await this.evaluate(element, ctx));
     }
     return elements;
   }
 
-  private async evaluateObjectExpression(expr: ObjectExpression, ctx: RuntimeContext): Promise<Record<string, CodeBuddyValue>> {
-    const obj: Record<string, CodeBuddyValue> = {};
-    for (const prop of expr.properties) {
-      const key = typeof prop.key === 'string'
-        ? prop.key
-        : await this.evaluateExpression(prop.key as ExpressionNode, ctx);
-      obj[key as string] = await this.evaluateExpression(prop.value, ctx);
+  private async evaluateDict(
+    node: DictExpr,
+    ctx: RuntimeContext
+  ): Promise<Record<string, CodeBuddyValue>> {
+    const dict: Record<string, CodeBuddyValue> = {};
+    for (const [key, valueNode] of node.elements) {
+      dict[key] = await this.evaluate(valueNode, ctx);
     }
-    return obj;
+    return dict;
   }
 
-  private async evaluateConditionalExpression(expr: ConditionalExpression, ctx: RuntimeContext): Promise<CodeBuddyValue> {
-    const test = await this.evaluateExpression(expr.test, ctx);
-    if (this.isTruthy(test)) {
-      return this.evaluateExpression(expr.consequent, ctx);
-    }
-    return this.evaluateExpression(expr.alternate, ctx);
-  }
-
-  private createArrowFunction(expr: ExpressionNode, ctx: RuntimeContext): CodeBuddyFunction {
-    const arrow = expr as import('./types.js').ArrowFunction;
-
+  private evaluateLambda(node: LambdaExpr, ctx: RuntimeContext): CodeBuddyFunction {
     return async (...args: CodeBuddyValue[]): Promise<CodeBuddyValue> => {
       const localCtx: RuntimeContext = {
-        variables: new Map(ctx.variables),
+        variables: new Map(),
         functions: ctx.functions,
         parent: ctx,
       };
 
-      for (let i = 0; i < arrow.params.length; i++) {
-        localCtx.variables.set(arrow.params[i].name, args[i]);
+      for (let i = 0; i < node.parameters.length; i++) {
+        localCtx.variables.set(node.parameters[i], args[i]);
       }
 
-      if (arrow.body.type === 'BlockStatement') {
-        const result = await this.executeBlock(arrow.body as BlockStatement, localCtx);
-        if (result instanceof ReturnValue) {
+      if (node.body.type === 'Block') {
+        const result = await this.executeBlock(node.body as BlockStmt, localCtx);
+        if (result instanceof ReturnSignal) {
           return result.value;
         }
         return null;
       }
 
-      return this.evaluateExpression(arrow.body as ExpressionNode, localCtx);
+      return this.evaluate(node.body, localCtx);
     };
   }
+
+  private async evaluateInterpolation(
+    node: InterpolationExpr,
+    ctx: RuntimeContext
+  ): Promise<string> {
+    let result = '';
+
+    for (const part of node.parts) {
+      const value = await this.evaluate(part, ctx);
+      result += String(value);
+    }
+
+    return result;
+  }
+
+  private async evaluateTernary(
+    node: TernaryExpr,
+    ctx: RuntimeContext
+  ): Promise<CodeBuddyValue> {
+    const condition = await this.evaluate(node.condition, ctx);
+
+    if (this.isTruthy(condition)) {
+      return this.evaluate(node.consequent, ctx);
+    }
+
+    return this.evaluate(node.alternate, ctx);
+  }
+
+  // ============================================
+  // Helpers
+  // ============================================
 
   private isTruthy(value: CodeBuddyValue): boolean {
     if (value === null || value === undefined || value === false || value === 0 || value === '') {
@@ -607,4 +901,19 @@ export class Runtime {
     }
     return true;
   }
+
+  getTestResults(): { name: string; passed: boolean; error?: string }[] {
+    return this.testResults;
+  }
+
+  getOutput(): string[] {
+    return this.output;
+  }
+}
+
+/** @deprecated Use FCSRuntime instead */
+export const Runtime = FCSRuntime;
+
+export function createRuntime(config: Partial<CodeBuddyScriptConfig> = {}): FCSRuntime {
+  return new FCSRuntime(config);
 }

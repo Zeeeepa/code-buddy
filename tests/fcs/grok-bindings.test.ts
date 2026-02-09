@@ -4,7 +4,7 @@
  * Tests for the FCS code-buddy integration bindings
  */
 
-import { executeFCS } from '../../src/fcs/index.js';
+import { executeFCS } from '../../src/scripting/index.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
