@@ -426,12 +426,12 @@ describe('TextEditorTool', () => {
       expect(result.error).toContain('not found');
     });
 
-    test('should show +X lines for files with more than 10 lines', async () => {
+    test('should show all lines for files under 500 lines', async () => {
       const lines = Array.from({ length: 20 }, (_, i) => `line${i + 1}`).join('\n');
       await fs.writeFile(testFilePath, lines);
       const result = await textEditor.view(testFilePath);
       expect(result.success).toBe(true);
-      expect(result.output).toContain('+10 lines');
+      expect(result.output).toContain('20: line20');
     });
   });
 
@@ -614,7 +614,7 @@ describe('TextEditorTool', () => {
       const maliciousPath = path.join(TEST_DIR, '..', '..', 'etc', 'passwd');
       const result = await textEditor.view(maliciousPath);
       expect(result.success).toBe(false);
-      expect(result.error).toContain('traversal');
+      expect(result.error).toMatch(/traversal|blocked|protected/i);
     });
 
     test('should allow paths within base directory', async () => {

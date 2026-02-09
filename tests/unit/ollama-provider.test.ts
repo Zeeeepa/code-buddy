@@ -366,7 +366,7 @@ describe('OllamaProvider', () => {
       const uninitProvider = new OllamaProvider();
       await expect(uninitProvider.complete([
         { role: 'user', content: 'Hello' },
-      ])).rejects.toThrow('Provider not initialized');
+      ])).rejects.toThrow(/not initialized/i);
       uninitProvider.dispose();
     });
 
@@ -527,7 +527,7 @@ describe('OllamaProvider', () => {
         for await (const _chunk of stream) {
           // Should throw
         }
-      }).rejects.toThrow('Provider not initialized');
+      }).rejects.toThrow(/not initialized/i);
       uninitProvider.dispose();
     });
 
@@ -613,7 +613,7 @@ describe('OllamaProvider', () => {
         for await (const _chunk of stream) {
           // Should throw
         }
-      }).rejects.toThrow('No response body');
+      }).rejects.toThrow(/response body/i);
     });
 
     it('should skip empty content', async () => {

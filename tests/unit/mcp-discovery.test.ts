@@ -436,8 +436,10 @@ describe('getMCPServer', () => {
 });
 
 describe('PREDEFINED_SERVERS', () => {
-  it('should be an empty object by default', () => {
-    expect(PREDEFINED_SERVERS).toEqual({});
+  it('should have all predefined servers disabled by default', () => {
+    for (const server of Object.values(PREDEFINED_SERVERS)) {
+      expect(server.enabled).toBe(false);
+    }
   });
 
   it('should be a Record type', () => {

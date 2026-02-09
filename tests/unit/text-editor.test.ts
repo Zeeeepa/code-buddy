@@ -248,7 +248,7 @@ describe('TextEditorTool', () => {
         expect(result.output).toContain('3: third');
       });
 
-      it('should truncate files with more than 10 lines by default', async () => {
+      it('should show all lines for files under 500 lines', async () => {
         const filePath = `${testDir}/long-file.txt`;
         const lines = Array.from({ length: 20 }, (_, i) => `line${i + 1}`);
         mockPathExists.mockResolvedValue(true);
@@ -258,9 +258,25 @@ describe('TextEditorTool', () => {
         const result = await editor.view(filePath);
 
         expect(result.success).toBe(true);
-        expect(result.output).toContain('... +10 lines');
-        expect(result.output).toContain('10: line10');
-        expect(result.output).not.toContain('11: line11');
+        expect(result.output).toContain('20: line20');
+        expect(result.output).toContain('1: line1');
+      });
+
+      it('should truncate files with more than 500 lines using head+tail', async () => {
+        const filePath = `${testDir}/very-long-file.txt`;
+        const lines = Array.from({ length: 600 }, (_, i) => `line${i + 1}`);
+        mockPathExists.mockResolvedValue(true);
+        mockStat.mockResolvedValue({ isDirectory: () => false });
+        mockReadFile.mockResolvedValue(lines.join('\n'));
+
+        const result = await editor.view(filePath);
+
+        expect(result.success).toBe(true);
+        expect(result.output).toContain('lines omitted');
+        expect(result.output).toContain('1: line1');
+        expect(result.output).toContain('400: line400');
+        expect(result.output).toContain('600: line600');
+        expect(result.output).not.toContain('450: line450');
       });
 
       it('should support viewing specific line ranges', async () => {
