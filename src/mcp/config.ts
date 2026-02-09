@@ -51,7 +51,13 @@ export function loadMCPConfig(): MCPConfig {
 
       for (const [name, config] of Object.entries(mcpServers)) {
         if (!seenServers.has(name)) {
-          servers.push(resolveServerEnv({ ...(config as MCPServerConfig), name }));
+          const serverConfig = resolveServerEnv({ ...(config as MCPServerConfig), name });
+          // Skip disabled servers at load time
+          if (serverConfig.enabled === false) {
+            seenServers.add(name);
+            continue;
+          }
+          servers.push(serverConfig);
           seenServers.add(name);
         }
       }
@@ -138,7 +144,7 @@ export const PREDEFINED_SERVERS: Record<string, MCPServerConfig> = {
     transport: {
       type: 'stdio',
       command: 'npx',
-      args: ['-y', '@anthropics/mcp-server-brave-search'],
+      args: ['-y', '@modelcontextprotocol/server-brave-search'],
       env: { BRAVE_API_KEY: process.env.BRAVE_API_KEY || '' },
     },
     enabled: false,
@@ -148,7 +154,7 @@ export const PREDEFINED_SERVERS: Record<string, MCPServerConfig> = {
     transport: {
       type: 'stdio',
       command: 'npx',
-      args: ['-y', '@anthropics/mcp-server-playwright'],
+      args: ['-y', '@playwright/mcp@latest'],
     },
     enabled: false,
   },
@@ -216,7 +222,7 @@ export function createMCPConfigTemplate(): string {
         "name": "brave-search",
         "type": "stdio",
         "command": "npx",
-        "args": ["-y", "@anthropics/mcp-server-brave-search"],
+        "args": ["-y", "@modelcontextprotocol/server-brave-search"],
         "env": { "BRAVE_API_KEY": "" },
         "enabled": false
       },
@@ -224,7 +230,7 @@ export function createMCPConfigTemplate(): string {
         "name": "playwright",
         "type": "stdio",
         "command": "npx",
-        "args": ["-y", "@anthropics/mcp-server-playwright"],
+        "args": ["-y", "@playwright/mcp@latest"],
         "enabled": false
       },
       "exa-search": {

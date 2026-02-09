@@ -101,16 +101,32 @@ export class TextEditorTool implements Disposable {
         }
 
         const totalLines = lines.length;
-        const displayLines = totalLines > 10 ? lines.slice(0, 10) : lines;
-        const numberedLines = displayLines
+        const maxDisplayLines = 500;
+
+        if (totalLines <= maxDisplayLines) {
+          const numberedLines = lines
+            .map((line, idx) => `${idx + 1}: ${line}`)
+            .join("\n");
+          return {
+            success: true,
+            output: `Contents of ${filePath}:\n${numberedLines}`,
+          };
+        }
+
+        // For large files: show first 400 lines + last 50 lines
+        const headCount = 400;
+        const tailCount = 50;
+        const headLines = lines.slice(0, headCount)
           .map((line, idx) => `${idx + 1}: ${line}`)
           .join("\n");
-        const additionalLinesMessage =
-          totalLines > 10 ? `\n... +${totalLines - 10} lines` : "";
+        const tailLines = lines.slice(-tailCount)
+          .map((line, idx) => `${totalLines - tailCount + idx + 1}: ${line}`)
+          .join("\n");
+        const omitted = totalLines - headCount - tailCount;
 
         return {
           success: true,
-          output: `Contents of ${filePath}:\n${numberedLines}${additionalLinesMessage}`,
+          output: `Contents of ${filePath} (${totalLines} lines):\n${headLines}\n\n... [${omitted} lines omitted — use start_line/end_line to view specific sections] ...\n\n${tailLines}`,
         };
       } else {
         return {

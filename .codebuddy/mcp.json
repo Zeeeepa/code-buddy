@@ -5,19 +5,19 @@
       "transport": {
         "type": "stdio",
         "command": "npx",
-        "args": ["-y", "@anthropics/mcp-server-brave-search"],
+        "args": ["-y", "@modelcontextprotocol/server-brave-search"],
         "env": {
           "BRAVE_API_KEY": "${BRAVE_API_KEY}"
         }
       },
-      "enabled": true
+      "enabled": false
     },
     "playwright": {
       "name": "playwright",
       "transport": {
         "type": "stdio",
         "command": "npx",
-        "args": ["-y", "@anthropics/mcp-server-playwright"]
+        "args": ["-y", "@playwright/mcp@latest"]
       },
       "enabled": false
     },
@@ -31,7 +31,7 @@
           "EXA_API_KEY": "${EXA_API_KEY}"
         }
       },
-      "enabled": true
+      "enabled": false
     }
   }
 }
