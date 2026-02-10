@@ -18,6 +18,7 @@ import fs from 'fs-extra';
 import * as path from 'path';
 import * as os from 'os';
 import { WakeWordDetector } from '../voice/wake-word.js';
+import { logger } from '../utils/logger.js';
 
 export interface VoiceControlConfig {
   enabled: boolean;
@@ -440,13 +441,17 @@ export class VoiceControl extends EventEmitter {
     });
 
     vadProcess.on('close', async () => {
-      if (this.audioBuffer.length > 0) {
-        await this.processAudioBuffer();
-      }
+      try {
+        if (this.audioBuffer.length > 0) {
+          await this.processAudioBuffer();
+        }
 
-      // Restart if still in continuous mode
-      if (this.state.isListening && this.config.continuousListening) {
-        setTimeout(() => this.startContinuousListening(), 100);
+        // Restart if still in continuous mode
+        if (this.state.isListening && this.config.continuousListening) {
+          setTimeout(() => this.startContinuousListening(), 100);
+        }
+      } catch (error) {
+        logger.error('Error processing audio buffer on VAD close:', { error: String(error) });
       }
     });
 

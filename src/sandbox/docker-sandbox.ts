@@ -5,7 +5,7 @@
  * Provides filesystem isolation, network restrictions, and resource limits.
  */
 
-import { execSync, spawn, ChildProcess } from 'child_process';
+import { execSync, spawn, spawnSync, ChildProcess } from 'child_process';
 import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
 
@@ -110,7 +110,7 @@ export class DockerSandbox extends EventEmitter {
         killed = true;
         // Kill the container on timeout
         try {
-          execSync(`docker kill ${containerName}`, { stdio: 'pipe', timeout: 5000 });
+          spawnSync('docker', ['kill', containerName], { stdio: 'pipe', timeout: 5000 });
         } catch {
           // Container may already be gone
         }
@@ -184,7 +184,7 @@ export class DockerSandbox extends EventEmitter {
     const timer = setTimeout(() => {
       timedOut = true;
       try {
-        execSync(`docker kill ${containerName}`, { stdio: 'pipe', timeout: 5000 });
+        spawnSync('docker', ['kill', containerName], { stdio: 'pipe', timeout: 5000 });
       } catch {
         // Container may already be gone
       }
@@ -266,7 +266,7 @@ export class DockerSandbox extends EventEmitter {
    */
   async kill(containerId: string): Promise<boolean> {
     try {
-      execSync(`docker kill ${containerId}`, { stdio: 'pipe', timeout: 10000 });
+      spawnSync('docker', ['kill', containerId], { stdio: 'pipe', timeout: 10000 });
       this.activeContainers.delete(containerId);
       return true;
     } catch {
@@ -341,6 +341,9 @@ export class DockerSandbox extends EventEmitter {
     }
 
     if (config.workspaceMount) {
+      if (config.workspaceMount.includes('..') || config.workspaceMount.includes('\0')) {
+        throw new Error('Invalid workspace mount path');
+      }
       args.push('-v', `${config.workspaceMount}:/workspace`, '-w', '/workspace');
     }
 

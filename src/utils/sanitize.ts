@@ -365,6 +365,30 @@ export function sanitizeLLMOutput(content: string): string {
 }
 
 /**
+ * Sanitize tool result content before sending back to the LLM.
+ * Strips patterns that could be interpreted as system prompts or role overrides.
+ */
+export function sanitizeToolResult(content: string): string {
+  if (!content || typeof content !== 'string') {
+    return '';
+  }
+
+  let sanitized = content;
+
+  // Strip fake role/system markers that could trick the LLM
+  sanitized = sanitized.replace(/\[SYSTEM\][^\n]*/gi, '[filtered]');
+  sanitized = sanitized.replace(/\[INST\][^\n]*/gi, '[filtered]');
+  sanitized = sanitized.replace(/\[\/INST\][^\n]*/gi, '[filtered]');
+  sanitized = sanitized.replace(/<\|im_start\|>[^\n]*/gi, '[filtered]');
+  sanitized = sanitized.replace(/<\|im_end\|>[^\n]*/gi, '[filtered]');
+
+  // Strip control tokens (same as LLM output sanitization)
+  sanitized = sanitized.replace(/<\|[^|>]+\|>/g, '');
+
+  return sanitized;
+}
+
+/**
  * Tool call extracted from commentary format
  */
 export interface ExtractedToolCall {

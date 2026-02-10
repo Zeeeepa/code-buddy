@@ -362,7 +362,16 @@ class MCPServerConnection extends EventEmitter {
   }
 
   async stop(): Promise<void> {
+    // Reject all pending requests
+    for (const [id, pending] of this.pendingRequests) {
+      pending.reject(new Error('MCP server connection closed'));
+    }
+    this.pendingRequests.clear();
+
     if (this.process) {
+      this.process.removeAllListeners();
+      this.process.stdout?.removeAllListeners();
+      this.process.stderr?.removeAllListeners();
       this.process.kill();
       this.process = null;
     }

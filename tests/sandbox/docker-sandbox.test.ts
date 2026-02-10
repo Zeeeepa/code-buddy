@@ -9,10 +9,12 @@ import { EventEmitter } from 'events';
 // Mock child_process before importing the module
 const mockExecSync = jest.fn();
 const mockSpawn = jest.fn();
+const mockSpawnSync = jest.fn().mockReturnValue({ status: 0, stdout: Buffer.from(''), stderr: Buffer.from('') });
 
 jest.mock('child_process', () => ({
   execSync: mockExecSync,
   spawn: mockSpawn,
+  spawnSync: mockSpawnSync,
 }));
 
 import { DockerSandbox, type SandboxConfig, type SandboxResult } from '../../src/sandbox/docker-sandbox.js';
@@ -243,20 +245,21 @@ describe('DockerSandbox', () => {
 
   describe('kill', () => {
     it('should kill a container and return true on success', async () => {
-      mockExecSync.mockReturnValue(Buffer.from(''));
+      mockSpawnSync.mockReturnValue({ status: 0, stdout: Buffer.from(''), stderr: Buffer.from('') });
 
       const sandbox = new DockerSandbox();
       const result = await sandbox.kill('codebuddy-sandbox-abc12345');
 
       expect(result).toBe(true);
-      expect(mockExecSync).toHaveBeenCalledWith(
-        'docker kill codebuddy-sandbox-abc12345',
+      expect(mockSpawnSync).toHaveBeenCalledWith(
+        'docker',
+        ['kill', 'codebuddy-sandbox-abc12345'],
         expect.objectContaining({ stdio: 'pipe' }),
       );
     });
 
     it('should return false when kill fails', async () => {
-      mockExecSync.mockImplementation(() => { throw new Error('no such container'); });
+      mockSpawnSync.mockImplementation(() => { throw new Error('no such container'); });
 
       const sandbox = new DockerSandbox();
       const result = await sandbox.kill('nonexistent');

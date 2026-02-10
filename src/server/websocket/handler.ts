@@ -26,6 +26,7 @@ interface ConnectionState {
   scopes: string[];
   lastActivity: number;
   agent?: AgentInstance;
+  agentInitializing?: Promise<void>;
   streaming: boolean;
 }
 
@@ -162,14 +163,19 @@ messageHandlers.set('chat', async (ws, state, payload) => {
   }
 
   try {
-    // Lazy load agent
+    // Lazy load agent (with mutex to prevent duplicate creation)
     if (!state.agent) {
-      const { CodeBuddyAgent } = await import('../../agent/codebuddy-agent.js');
-      state.agent = new CodeBuddyAgent(
-        process.env.GROK_API_KEY || '',
-        process.env.GROK_BASE_URL,
-        model || process.env.GROK_MODEL || 'grok-3-latest'
-      );
+      if (!state.agentInitializing) {
+        state.agentInitializing = (async () => {
+          const { CodeBuddyAgent } = await import('../../agent/codebuddy-agent.js');
+          state.agent = new CodeBuddyAgent(
+            process.env.GROK_API_KEY || '',
+            process.env.GROK_BASE_URL,
+            model || process.env.GROK_MODEL || 'grok-3-latest'
+          );
+        })();
+      }
+      await state.agentInitializing;
     }
 
     if (stream) {
@@ -285,12 +291,17 @@ messageHandlers.set('execute_tool', async (ws, state, payload) => {
 
   try {
     if (!state.agent) {
-      const { CodeBuddyAgent } = await import('../../agent/codebuddy-agent.js');
-      state.agent = new CodeBuddyAgent(
-        process.env.GROK_API_KEY || '',
-        process.env.GROK_BASE_URL,
-        process.env.GROK_MODEL || 'grok-3-latest'
-      );
+      if (!state.agentInitializing) {
+        state.agentInitializing = (async () => {
+          const { CodeBuddyAgent } = await import('../../agent/codebuddy-agent.js');
+          state.agent = new CodeBuddyAgent(
+            process.env.GROK_API_KEY || '',
+            process.env.GROK_BASE_URL,
+            process.env.GROK_MODEL || 'grok-3-latest'
+          );
+        })();
+      }
+      await state.agentInitializing;
     }
 
     const result = await state.agent.executeTool(name, parameters || {});

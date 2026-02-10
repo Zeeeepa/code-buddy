@@ -140,6 +140,11 @@ export class CheckpointVersioning extends EventEmitter {
 
     this.versions.set(version.id, version);
 
+    // Auto-prune if versions exceed limit
+    if (this.versions.size > 100) {
+      this.prune(50);
+    }
+
     // Update branch head
     branch.headVersionId = version.id;
 
@@ -168,7 +173,20 @@ export class CheckpointVersioning extends EventEmitter {
     });
 
     const hash = crypto.createHash('sha256').update(content).digest('hex');
-    return `v_${hash.slice(0, 12)}`;
+    const baseId = `v_${hash.slice(0, 12)}`;
+    if (!this.versions.has(baseId)) {
+      return baseId;
+    }
+
+    // Avoid collisions (e.g. identical content/timestamp or mocked hash functions in tests).
+    let suffix = 1;
+    let candidate = `${baseId}_${suffix.toString(36)}`;
+    while (this.versions.has(candidate)) {
+      suffix++;
+      candidate = `${baseId}_${suffix.toString(36)}`;
+    }
+
+    return candidate;
   }
 
   /**
@@ -273,12 +291,20 @@ export class CheckpointVersioning extends EventEmitter {
 
     const history: Version[] = [];
     let currentId = this.branches.get(branchName)?.headVersionId;
+    const visited = new Set<string>();
 
     while (currentId && history.length < limit) {
+      if (visited.has(currentId)) {
+        break;
+      }
+      visited.add(currentId);
+
       const version = this.versions.get(currentId);
       if (!version) break;
 
-      history.push(version);
+      if (version.branchName === branchName) {
+        history.push(version);
+      }
       currentId = version.parentId ?? undefined;
     }
 
@@ -301,6 +327,22 @@ export class CheckpointVersioning extends EventEmitter {
     const restored: string[] = [];
     const errors: string[] = [];
 
+    // Snapshot current state of affected files for rollback
+    const rollbackData: Array<{ path: string; existed: boolean; content?: string }> = [];
+    for (const snapshot of version.checkpoint.files) {
+      try {
+        if (await fs.pathExists(snapshot.path)) {
+          const content = await fs.readFile(snapshot.path, 'utf-8');
+          rollbackData.push({ path: snapshot.path, existed: true, content });
+        } else {
+          rollbackData.push({ path: snapshot.path, existed: false });
+        }
+      } catch {
+        rollbackData.push({ path: snapshot.path, existed: false });
+      }
+    }
+
+    // Apply restore
     for (const snapshot of version.checkpoint.files) {
       try {
         if (snapshot.existed) {
@@ -314,6 +356,20 @@ export class CheckpointVersioning extends EventEmitter {
         }
       } catch (error) {
         errors.push(`Failed to restore ${snapshot.path}: ${String(error)}`);
+        // Rollback all previously restored files
+        for (const rb of rollbackData) {
+          try {
+            if (rb.existed && rb.content !== undefined) {
+              await fs.writeFile(rb.path, rb.content, 'utf-8');
+            } else if (!rb.existed && await fs.pathExists(rb.path)) {
+              await fs.unlink(rb.path);
+            }
+          } catch {
+            // Best effort rollback
+          }
+        }
+        this.emit('checkout', version, restored, errors);
+        return { success: false, restored, errors: [...errors, 'Rolled back due to failure'] };
       }
     }
 
@@ -464,9 +520,13 @@ export class CheckpointVersioning extends EventEmitter {
   findCommonAncestor(versionId1: string, versionId2: string): Version | undefined {
     const ancestors1 = new Set<string>();
     let current: string | null | undefined = versionId1;
+    const visited1 = new Set<string>();
 
     // Collect all ancestors of version 1
     while (current) {
+      if (visited1.has(current)) break;
+      visited1.add(current);
+
       ancestors1.add(current);
       const version = this.versions.get(current);
       current = version?.parentId;
@@ -474,7 +534,11 @@ export class CheckpointVersioning extends EventEmitter {
 
     // Find first ancestor of version 2 that's also an ancestor of version 1
     current = versionId2;
+    const visited2 = new Set<string>();
     while (current) {
+      if (visited2.has(current)) break;
+      visited2.add(current);
+
       if (ancestors1.has(current)) {
         return this.versions.get(current);
       }
@@ -611,29 +675,29 @@ export class CheckpointVersioning extends EventEmitter {
    */
   prune(keepCount: number = 50): number {
     const branchVersions = new Map<string, Version[]>();
+    const taggedVersionIds = new Set(this.tags.values());
+    const unlimited = Number.MAX_SAFE_INTEGER;
 
-    // Group versions by branch
-    for (const version of this.versions.values()) {
-      const versions = branchVersions.get(version.branchName) || [];
-      versions.push(version);
-      branchVersions.set(version.branchName, versions);
+    // Build ordered branch histories from ancestry to avoid timestamp tie issues.
+    for (const branchName of this.branches.keys()) {
+      branchVersions.set(
+        branchName,
+        this.getVersionHistory({ branch: branchName, limit: unlimited })
+      );
     }
 
     let pruned = 0;
 
     // Prune each branch
     for (const [branchName, versions] of branchVersions) {
-      // Sort by date (newest first)
-      versions.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      const keepIds = new Set(versions.slice(0, keepCount).map((v) => v.id));
 
-      // Keep only the most recent
-      const toDelete = versions.slice(keepCount);
+      for (const version of versions) {
+        if (keepIds.has(version.id) || taggedVersionIds.has(version.id)) {
+          continue;
+        }
 
-      for (const version of toDelete) {
-        // Don't delete tagged versions
-        const isTagged = Array.from(this.tags.values()).includes(version.id);
-        if (!isTagged) {
-          this.versions.delete(version.id);
+        if (this.versions.delete(version.id)) {
           pruned++;
         }
       }
@@ -641,10 +705,8 @@ export class CheckpointVersioning extends EventEmitter {
       // Update branch head if needed
       const branch = this.branches.get(branchName);
       if (branch && !this.versions.has(branch.headVersionId)) {
-        const remaining = versions.filter((v) => this.versions.has(v.id));
-        if (remaining.length > 0) {
-          branch.headVersionId = remaining[0].id;
-        }
+        const remainingHead = versions.find((v) => this.versions.has(v.id));
+        branch.headVersionId = remainingHead?.id || '';
       }
     }
 

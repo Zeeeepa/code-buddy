@@ -95,12 +95,13 @@ export function repairMessageHistory(messages: LLMMessage[]): RepairResult {
   }
   result = fixed;
 
-  // Pass 3: Fill missing tool results
+  // Pass 3: Fill missing tool results (idempotent - won't duplicate synthetic results)
+  const SYNTHETIC_MARKER = '[No result recorded]';
   for (let i = 0; i < result.length; i++) {
     const msg = result[i];
     if (msg.role === 'assistant' && msg.tool_calls) {
       for (const tc of msg.tool_calls) {
-        // Check if there's a corresponding tool result after this message
+        // Check if there's a corresponding tool result after this message (real or synthetic)
         const hasResult = result.slice(i + 1).some(
           m => m.role === 'tool' && m.tool_call_id === tc.id
         );
@@ -114,7 +115,7 @@ export function repairMessageHistory(messages: LLMMessage[]): RepairResult {
 
           result.splice(insertIdx, 0, {
             role: 'tool',
-            content: '[No result recorded]',
+            content: SYNTHETIC_MARKER,
             tool_call_id: tc.id,
             name: tc.function.name,
           });

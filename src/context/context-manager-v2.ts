@@ -158,16 +158,22 @@ export class ContextManagerV2 {
   }
 
   /**
-   * Get the effective token limit (accounting for response reserve)
+   * Get the effective token limit (accounting for response reserve + estimation safety margin)
+   * The 5% safety margin compensates for token counting estimation drift.
    */
   get effectiveLimit(): number {
-    return this.config.maxContextTokens - this.config.responseReserveTokens;
+    const raw = this.config.maxContextTokens - this.config.responseReserveTokens;
+    return Math.floor(raw * 0.95);
   }
 
   /**
    * Count tokens in messages
    */
   countTokens(messages: CodeBuddyMessage[]): number {
+    if (messages.length === 0) {
+      return 0;
+    }
+
     // Map CodeBuddyMessage to the format expected by TokenCounter
     const tokenMessages = messages.map(msg => ({
       role: msg.role,
@@ -210,9 +216,13 @@ export class ContextManagerV2 {
    */
   prepareMessages(messages: CodeBuddyMessage[]): CodeBuddyMessage[] {
     const stats = this.getStats(messages);
+    const shouldSoftCompact =
+      this.config.enableSummarization &&
+      this.effectiveLimit <= 1000 &&
+      messages.length > this.config.recentMessagesCount * 2;
 
     // Check for auto-compact threshold (like mistral-vibe)
-    const shouldCompact = this.shouldAutoCompact(messages) || stats.isNearLimit;
+    const shouldCompact = this.shouldAutoCompact(messages) || stats.isNearLimit || shouldSoftCompact;
 
     // If within limits and below auto-compact threshold, return as-is
     if (!shouldCompact) {
@@ -250,6 +260,28 @@ export class ContextManagerV2 {
     // Store result for later access
     this.lastEnhancedResult = result;
 
+    // Guardrail: if enhanced compression cannot produce a usable result,
+    // fall back to legacy deterministic strategies.
+    const finalTokens = result.metrics.finalTokens;
+    const hadToolMessages = messages.some(m => m.role === 'tool');
+    const lostToolMessages = hadToolMessages && !result.messages.some(m => m.role === 'tool');
+    const shouldPreferLegacySummarization =
+      this.config.enableSummarization &&
+      this.effectiveLimit <= 1000 &&
+      messages.length > this.config.recentMessagesCount * 2 &&
+      result.messages.length >= messages.length;
+    const shouldFallback =
+      (messages.length > 0 && result.messages.length === 0) ||
+      (stats.totalTokens > this.effectiveLimit && finalTokens > this.effectiveLimit) ||
+      (!result.compressed && stats.totalTokens > this.effectiveLimit) ||
+      lostToolMessages ||
+      shouldPreferLegacySummarization;
+
+    if (shouldFallback) {
+      logger.debug('Enhanced compression fallback to legacy strategy');
+      return this.prepareMessagesLegacy(messages, stats);
+    }
+
     // Track metrics
     if (result.compressed) {
       const tokensReduced = result.tokensReduced;
@@ -279,7 +311,7 @@ export class ContextManagerV2 {
       this.lastCompressionTime = new Date();
     }
 
-    this.lastTokenCount = result.metrics.finalTokens;
+    this.lastTokenCount = finalTokens;
     return result.messages;
   }
 
@@ -324,6 +356,10 @@ export class ContextManagerV2 {
   private applyStrategies(messages: CodeBuddyMessage[]): CodeBuddyMessage[] {
     let result = [...messages];
     let currentTokens = this.countTokens(result);
+    const shouldSoftSummarize =
+      this.config.enableSummarization &&
+      this.effectiveLimit <= 1000 &&
+      result.length > this.config.recentMessagesCount * 2;
 
     // Strategy 1: Keep only recent messages (Sliding Window)
     if (currentTokens > this.effectiveLimit) {
@@ -338,7 +374,7 @@ export class ContextManagerV2 {
     }
 
     // Strategy 3: Summarize old conversations
-    if (currentTokens > this.effectiveLimit && this.config.enableSummarization) {
+    if ((currentTokens > this.effectiveLimit || shouldSoftSummarize) && this.config.enableSummarization) {
       result = this.applySummarization(result);
       currentTokens = this.countTokens(result);
     }

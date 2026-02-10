@@ -17,6 +17,7 @@ import { ContextManagerV2 } from "../../context/context-manager-v2.js";
 import { TokenCounter } from "../../utils/token-counter.js";
 import { logger } from "../../utils/logger.js";
 import { getErrorMessage } from "../../errors/index.js";
+import { sanitizeToolResult } from "../../utils/sanitize.js";
 import type { LaneQueue } from "../../concurrency/lane-queue.js";
 import type { MiddlewarePipeline, MiddlewareContext } from "../middleware/index.js";
 
@@ -56,10 +57,10 @@ export interface ExecutorConfig {
   recordSessionCost: (input: number, output: number) => void;
   /** Returns true if session cost limit has been reached */
   isSessionCostLimitReached: () => boolean;
-  /** Current accumulated session cost in USD */
-  sessionCost: number;
-  /** Maximum allowed session cost in USD */
-  sessionCostLimit: number;
+  /** Returns current accumulated session cost in USD */
+  getSessionCost: () => number;
+  /** Returns maximum allowed session cost in USD */
+  getSessionCostLimit: () => number;
 }
 
 /**
@@ -96,8 +97,8 @@ export class AgentExecutor {
     return {
       toolRound,
       maxToolRounds: this.config.maxToolRounds,
-      sessionCost: this.config.sessionCost,
-      sessionCostLimit: this.config.sessionCostLimit,
+      sessionCost: this.config.getSessionCost(),
+      sessionCostLimit: this.config.getSessionCostLimit(),
       inputTokens,
       outputTokens,
       history,
@@ -216,6 +217,22 @@ export class AgentExecutor {
             tool_calls: assistantMessage.tool_calls,
           });
 
+          // Pre-check cost limit before executing tools
+          this.config.recordSessionCost(inputTokens, totalOutputTokens);
+          if (this.config.isSessionCostLimitReached()) {
+            const sessionCost = this.config.getSessionCost();
+            const sessionCostLimit = this.config.getSessionCostLimit();
+            const costEntry: ChatEntry = {
+              type: "assistant",
+              content: `Session cost limit reached ($${sessionCost.toFixed(2)} / $${sessionCostLimit.toFixed(2)}). Stopping before tool execution.`,
+              timestamp: new Date(),
+            };
+            history.push(costEntry);
+            messages.push({ role: "assistant", content: costEntry.content });
+            newEntries.push(costEntry);
+            break;
+          }
+
           // Execute tool calls
           for (const toolCall of assistantMessage.tool_calls) {
             const toolCallEntry: ChatEntry = {
@@ -247,7 +264,7 @@ export class AgentExecutor {
             // Note: 'name' is required for Gemini API to match functionResponse with functionCall
             messages.push({
               role: "tool",
-              content: result.success ? result.output || "Success" : result.error || "Error",
+              content: sanitizeToolResult(result.success ? result.output || "Success" : result.error || "Error"),
               tool_call_id: toolCall.id,
               name: toolCall.function.name,
             } as CodeBuddyMessage);
@@ -294,9 +311,11 @@ export class AgentExecutor {
       // Record session cost
       this.config.recordSessionCost(inputTokens, totalOutputTokens);
       if (this.config.isSessionCostLimitReached()) {
+        const sessionCost = this.config.getSessionCost();
+        const sessionCostLimit = this.config.getSessionCostLimit();
         const costEntry: ChatEntry = {
           type: "assistant",
-          content: `💸 Session cost limit reached ($${this.config.sessionCost.toFixed(2)} / $${this.config.sessionCostLimit.toFixed(2)}). Please start a new session.`, 
+          content: `💸 Session cost limit reached ($${sessionCost.toFixed(2)} / $${sessionCostLimit.toFixed(2)}). Please start a new session.`,
           timestamp: new Date(),
         };
         history.push(costEntry);
@@ -448,6 +467,16 @@ export class AgentExecutor {
         if (toolCalls && toolCalls.length > 0) {
           toolRounds++;
 
+          // Pre-check cost limit before executing tools
+          this.config.recordSessionCost(inputTokens, totalOutputTokens);
+          if (this.config.isSessionCostLimitReached()) {
+            const sessionCost = this.config.getSessionCost();
+            const sessionCostLimit = this.config.getSessionCostLimit();
+            yield { type: "content", content: `\n\nSession cost limit reached ($${sessionCost.toFixed(2)} / $${sessionCostLimit.toFixed(2)}). Stopping before tool execution.` };
+            yield { type: "done" };
+            return;
+          }
+
           if (!this.deps.streamingHandler.hasYieldedToolCalls()) {
             yield { type: "tool_calls", toolCalls: toolCalls };
           }
@@ -493,7 +522,7 @@ export class AgentExecutor {
             // Note: 'name' is required for Gemini API to match functionResponse with functionCall
             messages.push({
               role: "tool",
-              content: result.success ? result.output || "Success" : result.error || "Error",
+              content: sanitizeToolResult(result.success ? result.output || "Success" : result.error || "Error"),
               tool_call_id: toolCall.id,
               name: toolCall.function.name,
             } as CodeBuddyMessage);
@@ -522,9 +551,11 @@ export class AgentExecutor {
             // Legacy inline cost check when no pipeline
             this.config.recordSessionCost(inputTokens, totalOutputTokens);
             if (this.config.isSessionCostLimitReached()) {
+              const sessionCost = this.config.getSessionCost();
+              const sessionCostLimit = this.config.getSessionCostLimit();
               yield {
                 type: "content",
-                content: `\n\n💸 Session cost limit reached ($${this.config.sessionCost.toFixed(2)} / $${this.config.sessionCostLimit.toFixed(2)}).`,
+                content: `\n\n💸 Session cost limit reached ($${sessionCost.toFixed(2)} / $${sessionCostLimit.toFixed(2)}).`,
               };
               yield { type: "done" };
               return;
@@ -541,7 +572,12 @@ export class AgentExecutor {
 
       this.config.recordSessionCost(inputTokens, totalOutputTokens);
       if (this.config.isSessionCostLimitReached()) {
-        yield { type: "content", content: `\n\n💸 Session cost limit reached ($${this.config.sessionCost.toFixed(2)} / $${this.config.sessionCostLimit.toFixed(2)}).` };
+        const sessionCost = this.config.getSessionCost();
+        const sessionCostLimit = this.config.getSessionCostLimit();
+        yield {
+          type: "content",
+          content: `\n\n💸 Session cost limit reached ($${sessionCost.toFixed(2)} / $${sessionCostLimit.toFixed(2)}).`,
+        };
       }
 
       yield { type: "done" };

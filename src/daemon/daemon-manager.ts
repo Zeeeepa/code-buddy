@@ -102,32 +102,34 @@ export class DaemonManager extends EventEmitter {
   private async startDetached(): Promise<void> {
     const logFd = fsSync.openSync(this.config.logFile, 'a');
 
-    // Resolve the entry point for the forked daemon process
-    const entryPoint = path.resolve(__dirname, '..', 'index.js');
+    try {
+      // Resolve the entry point for the forked daemon process
+      const entryPoint = path.resolve(__dirname, '..', 'index.js');
 
-    const child = fork(
-      entryPoint,
-      ['daemon', '__run__', '--port', String(this.config.port)],
-      {
-        detached: true,
-        stdio: ['ignore', logFd, logFd, 'ipc'],
-        env: {
-          ...process.env,
-          CODEBUDDY_DAEMON: 'true',
-          CODEBUDDY_DAEMON_CONFIG: JSON.stringify(this.config),
-        },
+      const child = fork(
+        entryPoint,
+        ['daemon', '__run__', '--port', String(this.config.port)],
+        {
+          detached: true,
+          stdio: ['ignore', logFd, logFd, 'ipc'],
+          env: {
+            ...process.env,
+            CODEBUDDY_DAEMON: 'true',
+            CODEBUDDY_DAEMON_CONFIG: JSON.stringify(this.config),
+          },
+        }
+      );
+
+      if (child.pid) {
+        await this.writePid(child.pid);
+        this.startedAt = new Date();
+        child.unref();
+        logger.info(`Daemon started (PID: ${child.pid})`);
+        this.emit('started', { pid: child.pid, detached: true });
       }
-    );
-
-    if (child.pid) {
-      await this.writePid(child.pid);
-      this.startedAt = new Date();
-      child.unref();
-      logger.info(`Daemon started (PID: ${child.pid})`);
-      this.emit('started', { pid: child.pid, detached: true });
+    } finally {
+      fsSync.closeSync(logFd);
     }
-
-    fsSync.closeSync(logFd);
   }
 
   /**

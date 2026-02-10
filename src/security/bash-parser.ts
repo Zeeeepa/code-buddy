@@ -44,14 +44,15 @@ type QuoteState = 'none' | 'single' | 'double' | 'backtick';
  * Parse bash commands using a state-machine approach.
  * Handles quotes, escapes, pipelines, chains, subshells.
  */
-function fallbackParse(input: string): ParseResult {
+function fallbackParse(input: string, depth: number = 0): ParseResult {
+  if (depth > 10) { return { commands: [{ command: input, args: [], raw: input, connector: null, isSubshell: false }], usedTreeSitter: false, warnings: ['Parse depth limit exceeded'] }; }
   const commands: ParsedCommand[] = [];
   const warnings: string[] = [];
 
   // First, handle `bash -c "..."` and `sh -c "..."` wrapper
   const bashCMatch = input.match(/^(bash|sh|zsh)\s+(-[a-z]*c)\s+(['"])([\s\S]*?)\3\s*$/);
   if (bashCMatch) {
-    const innerResult = fallbackParse(bashCMatch[4]);
+    const innerResult = fallbackParse(bashCMatch[4], depth + 1);
     // Also add the outer shell command
     return {
       commands: [
@@ -151,14 +152,14 @@ function fallbackParse(input: string): ParseResult {
     // Handle command substitution $(...) recursively
     const subCmdMatch = seg.text.match(/\$\((.+)\)/);
     if (subCmdMatch) {
-      const innerResult = fallbackParse(subCmdMatch[1]);
+      const innerResult = fallbackParse(subCmdMatch[1], depth + 1);
       commands.push(...innerResult.commands.map(c => ({ ...c, isSubshell: true })));
     }
 
     // Handle subshell (...)
     const subshellMatch = seg.text.match(/^\((.+)\)$/);
     if (subshellMatch) {
-      const innerResult = fallbackParse(subshellMatch[1]);
+      const innerResult = fallbackParse(subshellMatch[1], depth + 1);
       commands.push(...innerResult.commands.map(c => ({ ...c, isSubshell: true })));
       continue;
     }

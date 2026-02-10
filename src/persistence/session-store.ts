@@ -5,6 +5,7 @@ import os from 'os';
 import type { ChatEntry } from '../agent/types.js';
 import { getSessionRepository, SessionRepository } from '../database/repositories/session-repository.js';
 import type { Message as DBMessage } from '../database/schema.js';
+import { withSessionLock } from './session-lock.js';
 
 /** Metadata for chat sessions */
 export interface SessionMetadata {
@@ -39,7 +40,8 @@ export interface SessionMessage {
   taskState?: Record<string, unknown>;
 }
 
-const SESSIONS_DIR = path.join(os.homedir(), '.codebuddy', 'sessions');
+const DEFAULT_SESSIONS_DIR = path.join(os.homedir(), '.codebuddy', 'sessions');
+const FALLBACK_SESSIONS_DIR = path.join(os.tmpdir(), 'codebuddy', 'sessions');
 const MAX_SESSIONS = 50;
 
 export interface SessionStoreConfig {
@@ -59,9 +61,12 @@ export class SessionStore {
   private autoSave: boolean = true;
   private config: SessionStoreConfig;
   private dbRepository: SessionRepository | null = null;
+  private sessionsDir: string;
+  private sessionsDirVerified: boolean = false;
 
   constructor(config: Partial<SessionStoreConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.sessionsDir = path.resolve(process.env.CODEBUDDY_SESSIONS_DIR || DEFAULT_SESSIONS_DIR);
 
     // Initialize SQLite repository if enabled
     if (this.config.useSQLite) {
@@ -79,10 +84,44 @@ export class SessionStore {
    * Ensure the sessions directory exists
    */
   private async ensureSessionsDirectory(): Promise<void> {
+    if (this.sessionsDirVerified) {
+      return;
+    }
+
+    const canUsePreferredDir = await this.ensureWritableDirectory(this.sessionsDir);
+    if (canUsePreferredDir) {
+      this.sessionsDirVerified = true;
+      return;
+    }
+
+    if (this.sessionsDir !== FALLBACK_SESSIONS_DIR) {
+      const canUseFallbackDir = await this.ensureWritableDirectory(FALLBACK_SESSIONS_DIR);
+      if (canUseFallbackDir) {
+        this.sessionsDir = FALLBACK_SESSIONS_DIR;
+        this.sessionsDirVerified = true;
+        return;
+      }
+    }
+
+    throw new Error(`Unable to access writable sessions directory: ${this.sessionsDir}`);
+  }
+
+  /**
+   * Ensure a directory exists and is writable.
+   */
+  private async ensureWritableDirectory(dir: string): Promise<boolean> {
+    const probeFile = path.join(dir, `.codebuddy-write-test-${process.pid}-${Date.now()}`);
+
     try {
-      await fsPromises.access(SESSIONS_DIR);
+      await fsPromises.mkdir(dir, { recursive: true });
+      // Validate actual write capability (sandbox policies may still block writes
+      // even when access checks pass).
+      await fsPromises.writeFile(probeFile, '');
+      await fsPromises.unlink(probeFile);
+      return true;
     } catch {
-      await fsPromises.mkdir(SESSIONS_DIR, { recursive: true });
+      await fsPromises.unlink(probeFile).catch(() => {});
+      return false;
     }
   }
 
@@ -117,7 +156,7 @@ export class SessionStore {
   }
 
   /**
-   * Save a session to disk
+   * Save a session to disk (with file locking to prevent concurrent write corruption)
    */
   async saveSession(session: Session): Promise<void> {
     await this.ensureSessionsDirectory();
@@ -129,7 +168,9 @@ export class SessionStore {
       lastAccessedAt: new Date().toISOString()
     };
 
-    await fsPromises.writeFile(filePath, JSON.stringify(data, null, 2));
+    await withSessionLock(filePath, async () => {
+      await fsPromises.writeFile(filePath, JSON.stringify(data, null, 2));
+    });
   }
 
   /**
@@ -240,22 +281,8 @@ export class SessionStore {
   /**
    * List all saved sessions
    */
-  async listSessions(): Promise<Session[]> {
-    await this.ensureSessionsDirectory();
-
-    const fileNames = await fsPromises.readdir(SESSIONS_DIR);
-    const jsonFiles = fileNames.filter(f => f.endsWith('.json'));
-
-    const sessions: Session[] = [];
-    for (const f of jsonFiles) {
-      const sessionId = f.replace('.json', '');
-      const session = await this.loadSession(sessionId);
-      if (session) {
-        sessions.push(session);
-      }
-    }
-
-    return sessions.sort((a, b) => b.lastAccessedAt.getTime() - a.lastAccessedAt.getTime());
+  listSessions(): Session[] {
+    return this.readSessionsFromDiskSync();
   }
 
   /**
@@ -768,8 +795,8 @@ export class SessionStore {
   /**
    * Format session list for display
    */
-  async formatSessionList(): Promise<string> {
-    const sessions = await this.getRecentSessions(10);
+  formatSessionList(): string {
+    const sessions = this.getRecentSessionsSync(10);
 
     if (sessions.length === 0) {
       return 'No saved sessions.';
@@ -784,10 +811,59 @@ export class SessionStore {
   }
 
   /**
+   * Synchronous recent session listing for legacy call sites that expect
+   * immediate string output.
+   */
+  private getRecentSessionsSync(count: number): Session[] {
+    return this.readSessionsFromDiskSync().slice(0, count);
+  }
+
+  /**
+   * Synchronous session loading from disk.
+   */
+  private readSessionsFromDiskSync(): Session[] {
+    const sessionsDir = this.sessionsDir;
+
+    try {
+      if (!_fs.existsSync(sessionsDir)) {
+        _fs.mkdirSync(sessionsDir, { recursive: true });
+        return [];
+      }
+
+      const fileNames = _fs.readdirSync(sessionsDir);
+      const sessions: Session[] = [];
+
+      for (const fileName of fileNames) {
+        if (!fileName.endsWith('.json')) {
+          continue;
+        }
+
+        const filePath = path.join(sessionsDir, fileName);
+
+        try {
+          const raw = _fs.readFileSync(filePath, 'utf-8');
+          const data = JSON.parse(raw);
+          sessions.push({
+            ...data,
+            createdAt: new Date(data.createdAt),
+            lastAccessedAt: new Date(data.lastAccessedAt),
+          });
+        } catch {
+          // Skip malformed or inaccessible session files
+        }
+      }
+
+      return sessions.sort((a, b) => b.lastAccessedAt.getTime() - a.lastAccessedAt.getTime());
+    } catch {
+      return [];
+    }
+  }
+
+  /**
    * Get session file path
    */
   private getSessionFilePath(sessionId: string): string {
-    return path.join(SESSIONS_DIR, `${sessionId}.json`);
+    return path.join(this.sessionsDir, `${sessionId}.json`);
   }
 
   /**

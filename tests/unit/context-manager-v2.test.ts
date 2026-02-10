@@ -72,10 +72,9 @@ describe('ContextManagerV2', () => {
   describe('Constructor and Configuration', () => {
     it('should create with default config', () => {
       const defaultManager = new ContextManagerV2();
-      expect(defaultManager.effectiveLimit).toBe(
-        ContextManagerV2.DEFAULT_CONFIG.maxContextTokens -
-          ContextManagerV2.DEFAULT_CONFIG.responseReserveTokens
-      );
+      const raw = ContextManagerV2.DEFAULT_CONFIG.maxContextTokens -
+          ContextManagerV2.DEFAULT_CONFIG.responseReserveTokens;
+      expect(defaultManager.effectiveLimit).toBe(Math.floor(raw * 0.95));
       defaultManager.dispose();
     });
 
@@ -90,8 +89,8 @@ describe('ContextManagerV2', () => {
     });
 
     it('should calculate effective limit correctly', () => {
-      // 1000 - 100 = 900
-      expect(manager.effectiveLimit).toBe(900);
+      // (1000 - 100) * 0.95 = 855
+      expect(manager.effectiveLimit).toBe(855);
     });
 
     it('should return a copy of config', () => {
@@ -158,7 +157,7 @@ describe('ContextManagerV2', () => {
 
       expect(stats.messageCount).toBe(3);
       expect(stats.totalTokens).toBeGreaterThan(0);
-      expect(stats.maxTokens).toBe(900);
+      expect(stats.maxTokens).toBe(855);
       expect(stats.usagePercent).toBeGreaterThan(0);
       expect(stats.summarizedSessions).toBe(0);
     });
@@ -632,7 +631,7 @@ describe('ContextManagerV2', () => {
       const config = manager.getConfig();
       expect(config.maxContextTokens).toBe(2000);
       expect(config.responseReserveTokens).toBe(200);
-      expect(manager.effectiveLimit).toBe(1800);
+      expect(manager.effectiveLimit).toBe(Math.floor(1800 * 0.95));
     });
 
     it('should update token counter when model changes', () => {

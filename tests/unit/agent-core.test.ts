@@ -287,6 +287,7 @@ jest.mock("../../src/context/context-manager-v2.js", () => ({
 // Mock sanitize
 jest.mock("../../src/utils/sanitize.js", () => ({
   sanitizeLLMOutput: jest.fn().mockImplementation((text) => text),
+  sanitizeToolResult: jest.fn().mockImplementation((text) => text),
   extractCommentaryToolCalls: jest.fn().mockReturnValue({
     toolCalls: [],
     remainingContent: "",
@@ -737,7 +738,7 @@ describe("Agent Core Module Tests", () => {
           },
         });
         expect(result.success).toBe(false);
-        expect(result.error).toContain("Tool execution error");
+        expect(result.error).toContain("Unexpected error");
       });
 
       it("should return error when edit_file used without morph editor", async () => {
