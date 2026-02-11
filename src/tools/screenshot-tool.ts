@@ -1,7 +1,11 @@
 import { UnifiedVfsRouter } from '../services/vfs/unified-vfs-router.js';
 import path from 'path';
 import { spawn, execSync } from 'child_process';
+import { promisify } from 'util';
 import { ToolResult, getErrorMessage } from '../types/index.js';
+import { logger } from '../utils/logger.js';
+
+const execAsync = promisify(require('child_process').exec);
 
 export interface ScreenshotOptions {
   fullscreen?: boolean;
@@ -11,6 +15,15 @@ export interface ScreenshotOptions {
   format?: 'png' | 'jpg';
   quality?: number; // 1-100 for jpg
   outputPath?: string;
+  /** Auto-normalize the screenshot for LLM consumption (resize + compress) */
+  forLLM?: boolean;
+}
+
+export interface NormalizedImage {
+  base64: string;
+  contentType: 'image/jpeg' | 'image/png';
+  width: number;
+  height: number;
 }
 
 export interface ScreenshotResult {
@@ -64,6 +77,20 @@ export class ScreenshotTool {
           success: false,
           error: `Unsupported platform: ${platform}`
         };
+      }
+
+      // If forLLM, normalize the screenshot for LLM consumption
+      if (options.forLLM) {
+        try {
+          const normalized = await this.normalizeForLLM(result.path);
+          return {
+            success: true,
+            output: this.formatResult(result) + `\n   Normalized: ${normalized.width}x${normalized.height} ${normalized.contentType}`,
+            data: { ...result, ...normalized },
+          };
+        } catch (normErr) {
+          logger.debug('LLM normalization failed, returning raw screenshot', { error: normErr });
+        }
       }
 
       return {
@@ -297,7 +324,7 @@ Write-Output 'ok'
       // Ensure C:\Temp exists
       try {
         execSync('mkdir -p /mnt/c/Temp', { stdio: 'ignore' });
-      } catch { /* ignore */ }
+      } catch (_e) { /* ignore */ }
 
       const ps = spawn('powershell.exe', ['-NoProfile', '-Command', script]);
 
@@ -311,7 +338,7 @@ Write-Output 'ok'
           if (existsSync(wslTempFile)) {
             copyFileSync(wslTempFile, outputPath);
           }
-        } catch { /* ignore copy errors */ }
+        } catch (_e) { /* ignore copy errors */ }
 
         if (code === 0 && await this.vfs.exists(outputPath)) {
           const stats = await this.vfs.stat(outputPath);
@@ -345,6 +372,117 @@ Write-Output 'ok'
         }
       });
     });
+  }
+
+  /**
+   * Normalize a screenshot for LLM consumption.
+   * Iterates sizes × qualities to find smallest JPEG under maxBytes.
+   * Uses sharp if available, falls back to ffmpeg.
+   */
+  async normalizeForLLM(imagePath: string, maxBytes: number = 1024 * 1024): Promise<NormalizedImage> {
+    const sizes = [2000, 1600, 1200, 1000, 800];
+    const qualities = [85, 70, 55, 40];
+
+    // Try sharp first
+    try {
+      const sharp = (await import('sharp')).default;
+      const metadata = await sharp(imagePath).metadata();
+      const origWidth = metadata.width || 1920;
+      const origHeight = metadata.height || 1080;
+      const aspect = origHeight / origWidth;
+
+      for (const targetWidth of sizes) {
+        if (targetWidth > origWidth) continue;
+        for (const quality of qualities) {
+          const targetHeight = Math.round(targetWidth * aspect);
+          const buffer = await sharp(imagePath)
+            .resize(targetWidth, targetHeight, { fit: 'inside' })
+            .jpeg({ quality })
+            .toBuffer();
+
+          if (buffer.length <= maxBytes) {
+            return {
+              base64: buffer.toString('base64'),
+              contentType: 'image/jpeg',
+              width: targetWidth,
+              height: targetHeight,
+            };
+          }
+        }
+      }
+
+      // If nothing fit under maxBytes, use smallest settings
+      const smallWidth = sizes[sizes.length - 1];
+      const smallHeight = Math.round(smallWidth * aspect);
+      const buffer = await sharp(imagePath)
+        .resize(smallWidth, smallHeight, { fit: 'inside' })
+        .jpeg({ quality: qualities[qualities.length - 1] })
+        .toBuffer();
+
+      return {
+        base64: buffer.toString('base64'),
+        contentType: 'image/jpeg',
+        width: smallWidth,
+        height: smallHeight,
+      };
+    } catch (_sharpErr) {
+      // sharp not available, try ffmpeg
+    }
+
+    // Fallback: ffmpeg
+    const { mkdtempSync, readFileSync, unlinkSync } = await import('fs');
+    const os = await import('os');
+    const tmpDir = mkdtempSync(path.join(os.tmpdir(), 'cb-norm-'));
+
+    for (const targetWidth of sizes) {
+      for (const quality of qualities) {
+        const outPath = path.join(tmpDir, `norm_${targetWidth}_${quality}.jpg`);
+        try {
+          await execAsync(
+            `ffmpeg -y -i "${imagePath}" -vf "scale=${targetWidth}:-1" -q:v ${Math.round((100 - quality) / 3 + 1)} "${outPath}"`,
+            { timeout: 10000 }
+          );
+          const buf = readFileSync(outPath);
+          try { unlinkSync(outPath); } catch (_e) { /* ignore */ }
+
+          if (buf.length <= maxBytes) {
+            // Get dimensions from ffmpeg probe
+            let width = targetWidth;
+            let height = 0;
+            try {
+              const { stdout: probeOut } = await execAsync(
+                `ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 "${outPath}"`,
+                { timeout: 5000 }
+              );
+              const parts = probeOut.trim().split(',');
+              if (parts.length === 2) {
+                width = parseInt(parts[0], 10);
+                height = parseInt(parts[1], 10);
+              }
+            } catch (_e) { /* use estimated */ }
+
+            return {
+              base64: buf.toString('base64'),
+              contentType: 'image/jpeg',
+              width,
+              height: height || Math.round(targetWidth * 0.5625),
+            };
+          }
+        } catch (_e) { /* try next combination */ }
+      }
+    }
+
+    // Last resort: read original as-is
+    const { readFileSync: readFs } = await import('fs');
+    const origBuf = readFs(imagePath);
+    const ext = path.extname(imagePath).toLowerCase();
+
+    return {
+      base64: origBuf.toString('base64'),
+      contentType: ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 'image/png',
+      width: 0,
+      height: 0,
+    };
   }
 
   /**

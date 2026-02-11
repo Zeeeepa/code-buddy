@@ -28,6 +28,7 @@ WORKFLOW:
 
 ACTIONS:
 - snapshot: Take UI snapshot, returns element list with refs
+- snapshot_with_screenshot: Take snapshot + capture normalized screenshot (returns text + base64 image)
 - get_element: Get details of element by ref
 - find_elements: Search elements by role/name
 - click: Click at position or element ref
@@ -59,6 +60,7 @@ ACTIONS:
           type: 'string',
           enum: [
             'snapshot',
+            'snapshot_with_screenshot',
             'get_element',
             'find_elements',
             'click',

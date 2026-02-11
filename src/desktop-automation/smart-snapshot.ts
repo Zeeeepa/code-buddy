@@ -168,7 +168,8 @@ const DEFAULT_CONFIG: SmartSnapshotConfig = {
 export class SmartSnapshotManager extends EventEmitter {
   private config: SmartSnapshotConfig;
   private currentSnapshot: Snapshot | null = null;
-  private snapshotHistory: Snapshot[] = [];
+  private snapshotCache: Map<string, Snapshot> = new Map();
+  private static readonly MAX_CACHE_SIZE = 20;
   private nextRef: number = 1;
 
   constructor(config: Partial<SmartSnapshotConfig> = {}) {
@@ -184,7 +185,7 @@ export class SmartSnapshotManager extends EventEmitter {
    * Take a snapshot of the current screen/window
    */
   async takeSnapshot(options: SnapshotOptions = {}): Promise<Snapshot> {
-    this.nextRef = 1;
+    // Don't reset nextRef — continuous counter for globally unique refs
 
     const elements: UIElement[] = [];
     const ttl = options.ttl ?? this.config.defaultTtl;
@@ -234,13 +235,16 @@ export class SmartSnapshotManager extends EventEmitter {
         this.emit('snapshot-expired', { id: snapshot.id });
       }, ttl);
 
-      // Store snapshot
+      // Store snapshot in LRU cache
       this.currentSnapshot = snapshot;
-      this.snapshotHistory.push(snapshot);
+      this.snapshotCache.set(snapshot.id, snapshot);
 
-      // Keep history limited
-      if (this.snapshotHistory.length > 10) {
-        this.snapshotHistory.shift();
+      // Evict oldest entry when limit exceeded
+      if (this.snapshotCache.size > SmartSnapshotManager.MAX_CACHE_SIZE) {
+        const oldestKey = this.snapshotCache.keys().next().value;
+        if (oldestKey) {
+          this.snapshotCache.delete(oldestKey);
+        }
       }
 
       this.emit('snapshot-taken', { snapshot });
@@ -276,6 +280,13 @@ export class SmartSnapshotManager extends EventEmitter {
       return null;
     }
     return this.currentSnapshot;
+  }
+
+  /**
+   * Get a snapshot by ID from the cache
+   */
+  getSnapshotById(id: string): Snapshot | undefined {
+    return this.snapshotCache.get(id);
   }
 
   /**
@@ -394,17 +405,146 @@ export class SmartSnapshotManager extends EventEmitter {
   }
 
   /**
-   * Generate annotated screenshot
+   * Generate annotated screenshot with ref badges overlaid on each element
    */
   async toAnnotatedScreenshot(): Promise<AnnotatedScreenshot | null> {
     if (!this.currentSnapshot?.valid) {
       return null;
     }
 
-    // For now, return a placeholder - actual annotation would require
-    // image manipulation library like Sharp or Canvas
-    logger.info('Annotated screenshot generation not yet implemented');
-    return null;
+    try {
+      // Capture a screenshot first
+      const { ScreenshotTool } = await import('../tools/screenshot-tool.js');
+      const screenshotTool = new ScreenshotTool();
+      const captureResult = await screenshotTool.capture({ fullscreen: true, format: 'png' });
+
+      const captureData = captureResult.data as Record<string, unknown> | undefined;
+      if (!captureResult.success || !captureData?.path) {
+        logger.warn('Failed to capture screenshot for annotation');
+        return null;
+      }
+
+      const screenshotPath: string = captureData.path as string;
+      const elements = this.currentSnapshot.elements;
+
+      // Try sharp first for compositing ref badges
+      try {
+        const annotatedResult = await this.annotateWithSharp(screenshotPath, elements);
+        if (annotatedResult) return annotatedResult;
+      } catch (err) {
+        logger.debug('sharp annotation failed, trying ffmpeg fallback', { error: err });
+      }
+
+      // Fallback: ffmpeg drawtext filter
+      try {
+        const annotatedResult = await this.annotateWithFFmpeg(screenshotPath, elements);
+        if (annotatedResult) return annotatedResult;
+      } catch (err) {
+        logger.debug('ffmpeg annotation also failed', { error: err });
+      }
+
+      // Last resort: return un-annotated screenshot
+      const { readFileSync } = await import('fs');
+      const buf = readFileSync(screenshotPath);
+      return {
+        image: buf.toString('base64'),
+        format: 'png',
+        width: this.currentSnapshot.screenSize.width,
+        height: this.currentSnapshot.screenSize.height,
+        snapshot: this.currentSnapshot,
+      };
+    } catch (error) {
+      logger.error('Annotated screenshot generation failed', { error });
+      return null;
+    }
+  }
+
+  private async annotateWithSharp(
+    screenshotPath: string,
+    elements: UIElement[]
+  ): Promise<AnnotatedScreenshot | null> {
+    const sharp = (await import('sharp')).default;
+    const image = sharp(screenshotPath);
+    const metadata = await image.metadata();
+    const imgWidth = metadata.width || 1920;
+    const imgHeight = metadata.height || 1080;
+
+    // Build SVG overlay with ref badges
+    const badgeSize = 20;
+    const svgParts: string[] = [];
+    svgParts.push(`<svg width="${imgWidth}" height="${imgHeight}" xmlns="http://www.w3.org/2000/svg">`);
+
+    for (const elem of elements) {
+      if (!elem.visible || elem.bounds.width === 0) continue;
+      const bx = Math.max(0, Math.min(elem.bounds.x, imgWidth - badgeSize));
+      const by = Math.max(0, Math.min(elem.bounds.y, imgHeight - badgeSize));
+      const textLen = String(elem.ref).length;
+      const pillWidth = Math.max(badgeSize, 10 + textLen * 8);
+
+      svgParts.push(
+        `<rect x="${bx}" y="${by}" width="${pillWidth}" height="${badgeSize}" rx="4" fill="#FF6B6B"/>`,
+        `<text x="${bx + pillWidth / 2}" y="${by + 15}" font-size="13" font-family="monospace" fill="white" text-anchor="middle">${elem.ref}</text>`
+      );
+    }
+
+    svgParts.push('</svg>');
+    const svgOverlay = Buffer.from(svgParts.join('\n'));
+
+    const outputBuffer = await image
+      .composite([{ input: svgOverlay, top: 0, left: 0 }])
+      .png()
+      .toBuffer();
+
+    return {
+      image: outputBuffer.toString('base64'),
+      format: 'png',
+      width: imgWidth,
+      height: imgHeight,
+      snapshot: this.currentSnapshot!,
+    };
+  }
+
+  private async annotateWithFFmpeg(
+    screenshotPath: string,
+    elements: UIElement[]
+  ): Promise<AnnotatedScreenshot | null> {
+    const { mkdtempSync, readFileSync, unlinkSync } = await import('fs');
+    const { join } = await import('path');
+    const tmpDir = mkdtempSync(join(require('os').tmpdir(), 'cb-annotate-'));
+    const outputPath = join(tmpDir, 'annotated.png');
+
+    // Build drawtext filter chain
+    const filters = elements
+      .filter(e => e.visible && e.bounds.width > 0)
+      .slice(0, 50) // Limit filter complexity
+      .map(e => {
+        const bx = Math.max(0, e.bounds.x);
+        const by = Math.max(0, e.bounds.y);
+        return `drawtext=text='[${e.ref}]':x=${bx}:y=${by}:fontsize=14:fontcolor=white:box=1:boxcolor=#FF6B6B@0.9:boxborderw=3`;
+      })
+      .join(',');
+
+    if (!filters) return null;
+
+    try {
+      await execAsync(
+        `ffmpeg -y -i "${screenshotPath}" -vf "${filters}" "${outputPath}"`,
+        { timeout: 15000 }
+      );
+
+      const buf = readFileSync(outputPath);
+      try { unlinkSync(outputPath); } catch (_e) { /* ignore */ }
+
+      return {
+        image: buf.toString('base64'),
+        format: 'png',
+        width: this.currentSnapshot!.screenSize.width,
+        height: this.currentSnapshot!.screenSize.height,
+        snapshot: this.currentSnapshot!,
+      };
+    } catch (_err) {
+      return null;
+    }
   }
 
   // ============================================================================
@@ -482,7 +622,123 @@ export class SmartSnapshotManager extends EventEmitter {
     return elements;
   }
 
+  /**
+   * Detect if running inside WSL2
+   */
+  private isWSL(): boolean {
+    try {
+      const release = execSync('uname -r', { encoding: 'utf-8' });
+      return /microsoft|wsl/i.test(release);
+    } catch (_err) {
+      return false;
+    }
+  }
+
   private async detectLinuxElements(options: SnapshotOptions): Promise<UIElement[]> {
+    // WSL2: use PowerShell UIAutomation for real Windows desktop elements
+    if (this.isWSL()) {
+      try {
+        const wslElements = await this.detectWSLElements(options);
+        if (wslElements.length > 0) {
+          return wslElements;
+        }
+      } catch (err) {
+        logger.debug('WSL2 PowerShell UIAutomation failed, trying AT-SPI', { error: err });
+      }
+    }
+
+    // Native Linux: try AT-SPI
+    return this.detectLinuxATSPIElements(options);
+  }
+
+  /**
+   * Detect elements on WSL2 via PowerShell UIAutomation (same script as detectWindowsElements)
+   */
+  private async detectWSLElements(options: SnapshotOptions): Promise<UIElement[]> {
+    const elements: UIElement[] = [];
+
+    // Check powershell.exe is available
+    execSync('which powershell.exe', { stdio: 'ignore' });
+
+    const script = `
+Add-Type -AssemblyName UIAutomationClient
+$automation = [System.Windows.Automation.AutomationElement]::RootElement
+$condition = [System.Windows.Automation.Condition]::TrueCondition
+$walker = [System.Windows.Automation.TreeWalker]::RawViewWalker
+
+function Get-Elements($element, $depth) {
+    if ($depth -gt 5) { return @() }
+    $results = @()
+
+    try {
+        $name = $element.Current.Name
+        $role = $element.Current.ControlType.ProgrammaticName
+        $rect = $element.Current.BoundingRectangle
+
+        $results += @{
+            name = $name
+            role = $role
+            x = [int]$rect.X
+            y = [int]$rect.Y
+            width = [int]$rect.Width
+            height = [int]$rect.Height
+        }
+
+        $child = $walker.GetFirstChild($element)
+        while ($child -ne $null) {
+            $results += Get-Elements $child ($depth + 1)
+            $child = $walker.GetNextSibling($child)
+        }
+    } catch {}
+
+    return $results
+}
+
+$focused = [System.Windows.Automation.AutomationElement]::FocusedElement
+if ($focused) {
+    $parent = $walker.GetParent($focused)
+    while ($parent -ne $null -and $parent.Current.ControlType.ProgrammaticName -ne "ControlType.Window") {
+        $parent = $walker.GetParent($parent)
+    }
+    if ($parent) {
+        Get-Elements $parent 0 | ConvertTo-Json -Depth 10
+    }
+}
+    `;
+
+    const { stdout } = await execAsync(
+      `powershell.exe -NoProfile -Command "${script.replace(/\n/g, '; ')}"`,
+      { timeout: 15000 }
+    );
+
+    const parsed = JSON.parse(stdout);
+    const items = Array.isArray(parsed) ? parsed : [parsed];
+
+    for (const item of items.slice(0, this.config.maxElements)) {
+      const role = this.mapWindowsRole(item.role);
+      elements.push({
+        ref: this.nextRef++,
+        role,
+        name: item.name || 'Unknown',
+        bounds: { x: item.x, y: item.y, width: item.width, height: item.height },
+        center: {
+          x: item.x + item.width / 2,
+          y: item.y + item.height / 2,
+        },
+        interactive: this.isInteractiveRole(role),
+        focused: false,
+        enabled: true,
+        visible: item.width > 0 && item.height > 0,
+      });
+    }
+
+    return elements;
+  }
+
+  /**
+   * Detect elements on native Linux via AT-SPI
+   */
+  private async detectLinuxATSPIElements(options: SnapshotOptions): Promise<UIElement[]> {
     const elements: UIElement[] = [];
 
     try {

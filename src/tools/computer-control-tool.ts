@@ -30,6 +30,7 @@ import {
 export type ComputerAction =
   // Snapshot actions
   | 'snapshot'
+  | 'snapshot_with_screenshot'
   | 'get_element'
   | 'find_elements'
   // Mouse actions
@@ -125,6 +126,8 @@ export class ComputerControlTool {
         // Snapshot actions
         case 'snapshot':
           return this.takeSnapshot(input);
+        case 'snapshot_with_screenshot':
+          return this.snapshotWithScreenshot(input);
         case 'get_element':
           return this.getElement(input);
         case 'find_elements':
@@ -205,7 +208,7 @@ export class ComputerControlTool {
       logger.error('Computer control error', { action, error: errorMessage });
       return {
         success: false,
-        error: errorMessage,
+        error: this.toAIFriendlyError(errorMessage, action),
       };
     }
   }
@@ -228,6 +231,58 @@ export class ComputerControlTool {
         snapshotId: snapshot.id,
         elementCount: snapshot.elements.length,
         validUntil: new Date(snapshot.timestamp.getTime() + snapshot.ttl).toISOString(),
+      },
+    };
+  }
+
+  private async snapshotWithScreenshot(input: ComputerControlInput): Promise<ToolResult> {
+    // Take snapshot first
+    const snapshot = await this.snapshotManager.takeSnapshot({
+      interactiveOnly: input.interactiveOnly ?? true,
+    });
+
+    const textRepresentation = this.snapshotManager.toTextRepresentation(snapshot);
+
+    // Capture and normalize screenshot for LLM
+    let screenshotData: { base64?: string; contentType?: string; width?: number; height?: number } = {};
+    try {
+      const { ScreenshotTool } = await import('./screenshot-tool.js');
+      const screenshotTool = new ScreenshotTool();
+      const captureResult = await screenshotTool.capture({ fullscreen: true, format: 'png' });
+
+      const captureData = captureResult.data as Record<string, unknown> | undefined;
+      if (captureResult.success && captureData?.path) {
+        const filePath = captureData.path as string;
+        try {
+          const normalized = await screenshotTool.normalizeForLLM(filePath);
+          screenshotData = normalized;
+        } catch {
+          // Fall back to raw base64
+          const result = await screenshotTool.toBase64(filePath);
+          const resultData = result.data as Record<string, unknown> | undefined;
+          if (result.success && resultData) {
+            screenshotData = {
+              base64: resultData.base64 as string,
+              contentType: resultData.mediaType as string,
+            };
+          }
+        }
+      }
+    } catch (err) {
+      logger.debug('Screenshot capture failed in snapshot_with_screenshot', { error: err });
+    }
+
+    return {
+      success: true,
+      output: textRepresentation,
+      data: {
+        snapshotId: snapshot.id,
+        elementCount: snapshot.elements.length,
+        validUntil: new Date(snapshot.timestamp.getTime() + snapshot.ttl).toISOString(),
+        screenshot: screenshotData.base64 || null,
+        screenshotContentType: screenshotData.contentType || null,
+        screenshotWidth: screenshotData.width || null,
+        screenshotHeight: screenshotData.height || null,
       },
     };
   }
@@ -712,6 +767,58 @@ export class ComputerControlTool {
     }
 
     return null;
+  }
+
+  /**
+   * Translate technical errors into AI-friendly messages (OpenClaw-inspired)
+   */
+  private toAIFriendlyError(error: string, action: ComputerAction): string {
+    const lower = error.toLowerCase();
+
+    // Snapshot expired or invalid
+    if (lower.includes('snapshot expired') || lower.includes('snapshot') && lower.includes('invalid')
+        || lower.includes('no valid snapshot')) {
+      return 'Take a new snapshot before interacting — the UI may have changed.';
+    }
+
+    // Element not found
+    const elemMatch = error.match(/element\s*\[?(\d+)\]?\s*not found/i);
+    if (elemMatch) {
+      return `Element [${elemMatch[1]}] not found. Take a new snapshot to get updated refs.`;
+    }
+    if (lower.includes('not found') && lower.includes('element')) {
+      return 'Element not found. Take a new snapshot to get updated refs.';
+    }
+
+    // Automation not initialized
+    if (lower.includes('not initialized') || lower.includes('automation') && lower.includes('init')) {
+      return 'Call snapshot first to initialize desktop automation.';
+    }
+
+    // Permission errors
+    if (lower.includes('permission') || lower.includes('access denied') || lower.includes('not permitted')
+        || lower.includes('eacces')) {
+      const platform = process.platform;
+      if (platform === 'darwin') {
+        return `Permission denied. Grant accessibility access in System Preferences → Security & Privacy → Privacy → Accessibility.`;
+      } else if (platform === 'linux') {
+        return `Permission denied. Ensure AT-SPI is enabled and the user has accessibility permissions. Try: gsettings set org.gnome.desktop.interface toolkit-accessibility true`;
+      }
+      return `Permission denied for action "${action}". Check that the required accessibility/screen permissions are granted.`;
+    }
+
+    // Timeout errors
+    if (lower.includes('timeout') || lower.includes('timed out') || lower.includes('etimedout')) {
+      return `Action "${action}" timed out. The element may not be interactable — try scrolling or closing overlays.`;
+    }
+
+    // Connection/process errors
+    if (lower.includes('econnrefused') || lower.includes('enoent') || lower.includes('spawn')) {
+      return `Failed to execute action "${action}". A required system tool may not be installed or available.`;
+    }
+
+    // Return original if no match
+    return error;
   }
 
   private formatBytes(bytes: number): string {
