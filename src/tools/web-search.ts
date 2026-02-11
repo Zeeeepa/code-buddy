@@ -107,7 +107,7 @@ const PERPLEXITY_DIRECT_BASE_URL = 'https://api.perplexity.ai';
 const DEFAULT_PERPLEXITY_MODEL = 'perplexity/sonar-pro';
 const DEFAULT_SEARCH_COUNT = 5;
 const MAX_SEARCH_COUNT = 10;
-const DEFAULT_TIMEOUT_MS = 10000;
+const DEFAULT_TIMEOUT_MS = 20000;
 
 const BRAVE_FRESHNESS_SHORTCUTS = new Set(['pd', 'pw', 'pm', 'py']);
 const BRAVE_FRESHNESS_RANGE = /^(\d{4}-\d{2}-\d{2})to(\d{4}-\d{2}-\d{2})$/;

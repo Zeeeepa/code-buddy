@@ -315,9 +315,29 @@ export class ToolHandler {
         // Dispatch through registry for all other tools
         result = await this.executeRegistryTool(toolName, modifiedArgs);
       } else {
+        // Suggest common alternatives for hallucinated tool names
+        const suggestions: Record<string, string> = {
+          git: 'Use the "bash" tool with git commands (e.g., bash with command "git status")',
+          npm: 'Use the "bash" tool with npm commands (e.g., bash with command "npm install")',
+          node: 'Use the "bash" tool with node commands (e.g., bash with command "node script.js")',
+          python: 'Use the "bash" tool with python commands',
+          pip: 'Use the "bash" tool with pip commands',
+          curl: 'Use the "bash" tool with curl commands',
+          docker: 'Use the "bash" tool with docker commands',
+          cat: 'Use the "view_file" tool to read files',
+          grep: 'Use the "search" tool to search files',
+          sed: 'Use the "str_replace_editor" tool to edit files',
+          mv: 'Use the "bash" tool with mv commands',
+          cp: 'Use the "bash" tool with cp commands',
+          mkdir: 'Use the "bash" tool with mkdir commands',
+          write: 'Use the "create_file" or "str_replace_editor" tool',
+          edit: 'Use the "str_replace_editor" tool to edit files',
+          read: 'Use the "view_file" tool to read files',
+        };
+        const suggestion = suggestions[toolName.toLowerCase()];
         result = {
           success: false,
-          error: `Unknown tool: ${toolName}`,
+          error: `Unknown tool: ${toolName}.${suggestion ? ` ${suggestion}.` : ' Use "bash" for shell commands, "view_file" to read files, "str_replace_editor" to edit files, or "create_file" to create new files.'}`,
         };
       }
 

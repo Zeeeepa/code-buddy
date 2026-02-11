@@ -589,6 +589,32 @@ export class CodeBuddyClient {
 
     // Convert response to CodeBuddy format
     const candidate = data.candidates?.[0];
+
+    // Handle MALFORMED_FUNCTION_CALL: Gemini sometimes generates Python-style
+    // calls instead of JSON. Return a recovery message so the agent can retry.
+    if (candidate && !candidate.content && candidate.finishReason === 'MALFORMED_FUNCTION_CALL') {
+      const finishMsg = (candidate as { finishMessage?: string }).finishMessage || '';
+      logger.warn('Gemini returned MALFORMED_FUNCTION_CALL, requesting retry', {
+        source: 'CodeBuddyClient',
+        snippet: finishMsg.substring(0, 200),
+      });
+      return {
+        choices: [{
+          message: {
+            role: 'assistant',
+            content: 'I generated a malformed function call. Let me retry with the correct tool format. I need to use proper JSON arguments, not Python syntax.',
+            tool_calls: undefined,
+          },
+          finish_reason: 'stop',
+        }],
+        usage: {
+          prompt_tokens: data.usageMetadata?.promptTokenCount ?? 0,
+          completion_tokens: 0,
+          total_tokens: data.usageMetadata?.totalTokenCount ?? 0,
+        },
+      };
+    }
+
     if (!candidate || !candidate.content) {
       logger.error('Gemini response missing candidate or content', {
         source: 'CodeBuddyClient',
