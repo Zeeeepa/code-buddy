@@ -6,11 +6,14 @@
  */
 
 import { Router, Request, Response } from 'express';
+import { createRequire } from 'module';
 import { asyncHandler } from '../middleware/index.js';
 import { getRequestStats } from '../middleware/logging.js';
 import { getDatabaseManager } from '../../database/database-manager.js';
 import { getConnectionStats } from '../websocket/handler.js';
 import type { ServerStats } from '../types.js';
+
+const require = createRequire(import.meta.url);
 
 const router = Router();
 
@@ -21,8 +24,14 @@ const serverStartTime = Date.now();
 let lastApiHeartbeat: Date | null = null;
 let lastApiLatency: number | null = null;
 
-// Version info (would normally come from package.json)
-const VERSION = process.env.npm_package_version || '1.0.0';
+// Version info from package.json
+let VERSION = '0.0.0';
+try {
+  const pkg = require('../../../package.json');
+  VERSION = pkg.version || VERSION;
+} catch {
+  VERSION = process.env.npm_package_version || '0.0.0';
+}
 
 // Memory threshold (500MB)
 const MEMORY_THRESHOLD = 500 * 1024 * 1024;

@@ -10,9 +10,16 @@
  */
 
 import crypto from 'crypto';
+import { createRequire } from 'module';
 import express, { Application } from 'express';
 import cors from 'cors';
 import { createServer, Server as HttpServer } from 'http';
+
+const _require = createRequire(import.meta.url);
+let SERVER_VERSION = '0.0.0';
+try {
+  SERVER_VERSION = _require('../../package.json').version || SERVER_VERSION;
+} catch { /* ignore */ }
 import type { ServerConfig } from './types.js';
 import {
   createAuthMiddleware,
@@ -308,7 +315,7 @@ function createApp(config: ServerConfig): Application {
   app.get('/', (_req, res) => {
     res.json({
       name: 'Code Buddy API',
-      version: process.env.npm_package_version || '1.0.0',
+      version: SERVER_VERSION,
       docs: '/api/docs',
       health: '/api/health',
       metrics: '/api/metrics',
@@ -322,7 +329,7 @@ function createApp(config: ServerConfig): Application {
       openapi: '3.0.0',
       info: {
         title: 'Code Buddy API',
-        version: '1.0.0',
+        version: SERVER_VERSION,
         description: 'REST API for Code Buddy AI agent',
       },
       servers: [
