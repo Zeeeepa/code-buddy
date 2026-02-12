@@ -364,14 +364,13 @@ export class WebSocketGateway extends GatewayServer {
 
     this.heartbeatInterval = setInterval(() => {
       const now = Date.now();
+      const deadClients: string[] = [];
 
       for (const [clientId, client] of this.wsClients) {
         // Check if client responded to last ping
         if (!client.isAlive) {
-          // Client didn't respond, terminate connection
           client.socket.terminate();
-          this.wsClients.delete(clientId);
-          this.onDisconnect(clientId);
+          deadClients.push(clientId);
           continue;
         }
 
@@ -384,6 +383,12 @@ export class WebSocketGateway extends GatewayServer {
         // Send ping
         client.isAlive = false;
         client.socket.ping();
+      }
+
+      // Remove dead clients after iteration
+      for (const clientId of deadClients) {
+        this.wsClients.delete(clientId);
+        this.onDisconnect(clientId);
       }
     }, this.wsConfig.heartbeatInterval);
   }

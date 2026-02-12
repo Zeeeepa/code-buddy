@@ -650,31 +650,39 @@ export class Orchestrator extends EventEmitter {
       const checkInterval = 100;
       const maxWait = timeout || this.config.defaultTimeout;
       let waited = 0;
+      let settled = false;
 
       const check = () => {
+        if (settled) return;
+
         const task = this.tasks.get(taskId);
         if (!task) {
+          settled = true;
           reject(new Error(`Task '${taskId}' not found`));
           return;
         }
 
         if (task.status === 'completed') {
+          settled = true;
           resolve();
           return;
         }
 
         if (task.status === 'failed') {
+          settled = true;
           reject(new Error(task.error || 'Task failed'));
           return;
         }
 
         if (task.status === 'cancelled') {
+          settled = true;
           reject(new Error('Task cancelled'));
           return;
         }
 
         waited += checkInterval;
         if (waited >= maxWait) {
+          settled = true;
           reject(new Error('Task timeout'));
           return;
         }

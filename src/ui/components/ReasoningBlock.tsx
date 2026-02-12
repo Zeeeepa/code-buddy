@@ -36,7 +36,7 @@ export function ReasoningBlock({ content, isStreaming = false }: ReasoningBlockP
       </Box>
       {!collapsed && (
         <Box paddingLeft={2} flexDirection="column">
-          {(collapsed ? [] : lines).map((line, idx) => (
+          {lines.map((line, idx) => (
             <Text key={idx} dimColor color="gray">{line}</Text>
           ))}
           {isStreaming && <Text dimColor color="gray">█</Text>}
