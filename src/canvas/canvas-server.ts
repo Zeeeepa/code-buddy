@@ -141,24 +141,29 @@ export class CanvasServer extends EventEmitter {
     }
 
     const message = JSON.stringify(entry);
-    for (const client of Array.from(this.clients)) {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(message);
-      }
-    }
+    this.broadcastMessage(message);
 
     this.emit('push', entry);
+  }
+
+  private broadcastMessage(message: string): void {
+    for (const client of Array.from(this.clients)) {
+      if (client.readyState === WebSocket.OPEN) {
+        try {
+          client.send(message);
+        } catch {
+          // Remove dead client
+          this.clients.delete(client);
+        }
+      }
+    }
   }
 
   reset(): void {
     this.history = [];
 
     const message = JSON.stringify({ type: 'reset' });
-    for (const client of Array.from(this.clients)) {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(message);
-      }
-    }
+    this.broadcastMessage(message);
 
     this.emit('reset');
   }

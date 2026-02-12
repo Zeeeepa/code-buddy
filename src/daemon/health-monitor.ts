@@ -138,6 +138,7 @@ export class HealthMonitor extends EventEmitter {
       this.unhealthyCount++;
     } else if (metrics.memory.percentage >= this.config.memoryWarningThreshold) {
       this.emit('warning', { type: 'memory', metrics });
+      this.unhealthyCount++;
     } else {
       this.unhealthyCount = 0;
     }

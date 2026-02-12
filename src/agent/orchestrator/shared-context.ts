@@ -17,7 +17,8 @@ export interface ContextEntry {
 
 export class SharedContext extends EventEmitter {
   private store: Map<string, ContextEntry> = new Map();
-  private locks: Map<string, string> = new Map(); // key -> agentId
+  private locks: Map<string, { agentId: string; acquiredAt: number }> = new Map();
+  private lockTtlMs = 60_000; // Lock expires after 60s
 
   /**
    * Get a value
@@ -40,9 +41,13 @@ export class SharedContext extends EventEmitter {
 
     // Lock check
     const lockHolder = this.locks.get(key);
-    if (lockHolder && lockHolder !== agentId) {
-      this.emit('lock-blocked', { key, agentId, lockHolder });
-      return false;
+    if (lockHolder && lockHolder.agentId !== agentId) {
+      // Check if lock is stale
+      if (Date.now() - lockHolder.acquiredAt <= this.lockTtlMs) {
+        this.emit('lock-blocked', { key, agentId, lockHolder: lockHolder.agentId });
+        return false;
+      }
+      this.locks.delete(key); // Stale lock
     }
 
     const entry: ContextEntry = {
@@ -62,8 +67,16 @@ export class SharedContext extends EventEmitter {
    * Lock a key for exclusive access
    */
   lock(key: string, agentId: string): boolean {
-    if (this.locks.has(key)) return false;
-    this.locks.set(key, agentId);
+    const existing = this.locks.get(key);
+    if (existing) {
+      // Allow stale lock to be reclaimed
+      if (Date.now() - existing.acquiredAt > this.lockTtlMs) {
+        this.locks.delete(key);
+      } else {
+        return false;
+      }
+    }
+    this.locks.set(key, { agentId, acquiredAt: Date.now() });
     return true;
   }
 
@@ -71,7 +84,8 @@ export class SharedContext extends EventEmitter {
    * Unlock a key
    */
   unlock(key: string, agentId: string): boolean {
-    if (this.locks.get(key) !== agentId) return false;
+    const existing = this.locks.get(key);
+    if (!existing || existing.agentId !== agentId) return false;
     this.locks.delete(key);
     return true;
   }
