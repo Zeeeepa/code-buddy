@@ -25,8 +25,14 @@ export class ModelFailoverChain {
   private chain: FailoverEntry[];
   private config: FailoverConfig;
 
-  constructor(chain?: FailoverEntry[], config?: Partial<FailoverConfig>) {
-    this.chain = chain ?? [];
+  constructor(chain?: Partial<FailoverEntry>[], config?: Partial<FailoverConfig>) {
+    this.chain = (chain ?? []).map(e => ({
+      healthy: true,
+      consecutiveFailures: 0,
+      ...e,
+      provider: e.provider ?? '',
+      model: e.model ?? '',
+    }));
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
 
