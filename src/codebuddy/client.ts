@@ -385,7 +385,7 @@ export class CodeBuddyClient {
     opts?: ChatOptions
   ): Promise<CodeBuddyResponse> {
     const model = opts?.model || this.currentModel;
-    const url = `${this.baseURL}/models/${model}:generateContent?key=${this.apiKey}`;
+    const url = `${this.baseURL}/models/${model}:generateContent`;
 
     // Convert messages to Gemini format
     const contents: Array<{
@@ -557,7 +557,10 @@ export class CodeBuddyClient {
       async () => {
         const res = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': this.apiKey,
+          },
           body: JSON.stringify(body),
         });
 

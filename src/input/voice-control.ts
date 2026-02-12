@@ -856,12 +856,14 @@ print(json.dumps({"text": text.strip()}))
     const freq = frequencies[type] || [440, 100];
 
     if (process.platform === 'darwin') {
-      // Generate beep with afplay
-      spawn('afplay', ['/System/Library/Sounds/Pop.aiff']);
+      // Generate beep with afplay (unref to avoid process handle leak)
+      const p = spawn('afplay', ['/System/Library/Sounds/Pop.aiff'], { stdio: 'ignore' });
+      p.unref?.();
     } else if (process.platform === 'linux') {
       // Use beep or speaker-test
       for (let i = 0; i < freq.length; i += 2) {
-        spawn('beep', ['-f', String(freq[i]), '-l', String(freq[i + 1])]);
+        const p = spawn('beep', ['-f', String(freq[i]), '-l', String(freq[i + 1])], { stdio: 'ignore' });
+        p.unref?.();
       }
     }
   }

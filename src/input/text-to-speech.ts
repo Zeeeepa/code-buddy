@@ -167,9 +167,11 @@ export class TextToSpeechManager extends EventEmitter {
       return;
     }
 
-    // Add to queue if already speaking
+    // Add to queue if already speaking (cap to prevent unbounded growth)
     if (this.state.isSpeaking) {
-      this.state.queue.push(text);
+      if (this.state.queue.length < 100) {
+        this.state.queue.push(text);
+      }
       return;
     }
 

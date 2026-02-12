@@ -441,6 +441,12 @@ export class SlackChannel extends BaseChannel {
     this.reconnecting = true;
 
     try {
+      // Clear ping interval before reconnecting to prevent duplicates
+      if (this.pingInterval) {
+        clearInterval(this.pingInterval);
+        this.pingInterval = null;
+      }
+
       if (this.ws) {
         this.ws.removeAllListeners();
         if (this.ws.readyState === WebSocket.OPEN) {

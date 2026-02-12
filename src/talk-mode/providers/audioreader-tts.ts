@@ -109,6 +109,7 @@ export class AudioReaderTTSProvider implements ITTSProvider {
         speed: Math.max(0.25, Math.min(4.0, speed)),
         response_format: format,
       }),
+      signal: AbortSignal.timeout(30000),
     });
 
     if (!response.ok) {
