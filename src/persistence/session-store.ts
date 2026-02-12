@@ -260,12 +260,12 @@ export class SessionStore {
    * Convert SessionMessage array back to ChatEntry array
    */
   convertMessagesToChatEntries(messages: SessionMessage[]): ChatEntry[] {
-    return messages.map(msg => ({
+    return messages.map((msg, idx) => ({
       type: msg.type,
       content: msg.content,
       timestamp: new Date(msg.timestamp),
       toolCall: msg.toolCallName ? {
-        id: `restored_${Date.now()}`,
+        id: `restored_${Date.now()}_${idx}`,
         type: 'function' as const,
         function: {
           name: msg.toolCallName,
