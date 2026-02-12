@@ -132,22 +132,27 @@ export class HealthMonitor extends EventEmitter {
 
     this.lastMetrics = metrics;
 
-    // Check thresholds
+    // Check thresholds — increment unhealthyCount at most once per check cycle
+    let isUnhealthy = false;
     if (metrics.memory.percentage >= this.config.memoryCriticalThreshold) {
       this.emit('critical', { type: 'memory', metrics });
-      this.unhealthyCount++;
+      isUnhealthy = true;
     } else if (metrics.memory.percentage >= this.config.memoryWarningThreshold) {
       this.emit('warning', { type: 'memory', metrics });
-      this.unhealthyCount++;
-    } else {
-      this.unhealthyCount = 0;
+      isUnhealthy = true;
     }
 
     // Check for unhealthy services
     const unhealthyServices = services.filter(s => !s.healthy);
     if (unhealthyServices.length > 0) {
-      this.unhealthyCount++;
       this.emit('service:unhealthy', { services: unhealthyServices });
+      isUnhealthy = true;
+    }
+
+    if (isUnhealthy) {
+      this.unhealthyCount++;
+    } else {
+      this.unhealthyCount = 0;
     }
 
     // Auto-recovery trigger

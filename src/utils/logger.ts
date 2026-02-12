@@ -171,10 +171,25 @@ export class Logger {
   /**
    * Format log entry for output
    */
+  /** Safe JSON.stringify that handles circular references and Error objects */
+  private safeStringify(obj: unknown): string {
+    const seen = new WeakSet();
+    return JSON.stringify(obj, (_key, value) => {
+      if (value instanceof Error) {
+        return { name: value.name, message: value.message, stack: value.stack };
+      }
+      if (typeof value === 'object' && value !== null) {
+        if (seen.has(value)) return '[Circular]';
+        seen.add(value);
+      }
+      return value;
+    });
+  }
+
   private formatEntry(entry: LogEntry): string {
     // JSON format
     if (this.options.format === 'json') {
-      return JSON.stringify({
+      return this.safeStringify({
         timestamp: entry.timestamp,
         level: entry.level,
         source: entry.source,
@@ -206,7 +221,7 @@ export class Logger {
 
     // Context
     if (entry.context && Object.keys(entry.context).length > 0) {
-      const contextStr = JSON.stringify(entry.context);
+      const contextStr = this.safeStringify(entry.context);
       parts.push(chalk.gray(contextStr));
     }
 
@@ -245,7 +260,7 @@ export class Logger {
 
     // Output to file (always JSON for easy parsing)
     if (this.fileStream) {
-      const jsonEntry = JSON.stringify({
+      const jsonEntry = this.safeStringify({
         timestamp: entry.timestamp,
         level: entry.level,
         source: entry.source,

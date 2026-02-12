@@ -166,6 +166,7 @@ function parseField(field: string, min: number, max: number): number[] {
     } else if (part.includes('/')) {
       const [range, stepStr] = part.split('/');
       const step = parseInt(stepStr, 10);
+      if (!Number.isFinite(step) || step <= 0) continue;
       let start = min;
       let end = max;
 
