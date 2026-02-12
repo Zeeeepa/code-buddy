@@ -85,7 +85,7 @@ router.get(
   '/history',
   asyncHandler(async (req: Request, res: Response) => {
     const metrics = ensureMetrics();
-    const limit = parseInt(req.query.limit as string) || 100;
+    const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
     const history = metrics.getHistory(limit);
 
     res.json({

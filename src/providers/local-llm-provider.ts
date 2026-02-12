@@ -646,6 +646,7 @@ export class OllamaProvider extends EventEmitter implements LocalLLMProvider {
         });
 
         if (!res.ok) {
+          try { await res.text(); } catch { /* drain body */ }
           const error = new Error(`Ollama API error: ${res.statusText}`);
           (error as Error & { status: number }).status = res.status;
           throw error;
@@ -708,6 +709,7 @@ export class OllamaProvider extends EventEmitter implements LocalLLMProvider {
         });
 
         if (!res.ok) {
+          try { await res.text(); } catch { /* drain body */ }
           const error = new Error(`Ollama API error: ${res.statusText}`);
           (error as Error & { status: number }).status = res.status;
           throw error;

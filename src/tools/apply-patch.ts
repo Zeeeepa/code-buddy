@@ -205,13 +205,21 @@ function applyFilePatch(
 ): PatchResult {
   const cwd = options.cwd || process.cwd();
   const fuzz = options.fuzz ?? 2;
-  const filePath = path.resolve(cwd, patch.isNew ? patch.newPath : patch.oldPath);
+  const patchPath = patch.isNew ? patch.newPath : patch.oldPath;
+  const filePath = path.resolve(cwd, patchPath);
   const result: PatchResult = {
-    file: patch.isNew ? patch.newPath : patch.oldPath,
+    file: patchPath,
     applied: false,
     hunksApplied: 0,
     hunksTotal: patch.hunks.length,
   };
+
+  // Prevent path traversal outside working directory
+  const relativeToCwd = path.relative(cwd, filePath);
+  if (relativeToCwd.startsWith('..') || path.isAbsolute(relativeToCwd)) {
+    result.error = `Path traversal blocked: ${patchPath}`;
+    return result;
+  }
 
   try {
     // Handle deletion

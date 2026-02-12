@@ -365,11 +365,15 @@ router.post(
       throw ApiServerError.badRequest('Entries must be an array');
     }
 
+    if (entries.length > 1000) {
+      throw ApiServerError.badRequest('Maximum 1000 entries per import');
+    }
+
     let imported = 0;
     let skipped = 0;
 
     for (const entry of entries) {
-      if (!entry.content) {
+      if (!entry.content || (typeof entry.content === 'string' && entry.content.length > 100_000)) {
         skipped++;
         continue;
       }
