@@ -98,6 +98,7 @@ export class OpenTelemetryIntegration extends EventEmitter {
   private activeSpans: Map<string, SpanContext> = new Map();
   private spanStack: string[] = [];
   private metrics: Metric[] = [];
+  private static readonly MAX_METRICS = 1000;
   private exportInterval: NodeJS.Timeout | null = null;
   private initialized: boolean = false;
   private metricsCollector: MetricsCollector | null = null;
@@ -357,6 +358,9 @@ export class OpenTelemetryIntegration extends EventEmitter {
       attributes,
       timestamp: Date.now(),
     });
+    if (this.metrics.length > OpenTelemetryIntegration.MAX_METRICS) {
+      this.metrics.splice(0, this.metrics.length - 500);
+    }
   }
 
   /**
@@ -382,6 +386,9 @@ export class OpenTelemetryIntegration extends EventEmitter {
       attributes,
       timestamp: Date.now(),
     });
+    if (this.metrics.length > OpenTelemetryIntegration.MAX_METRICS) {
+      this.metrics.splice(0, this.metrics.length - 500);
+    }
   }
 
   /**
@@ -407,6 +414,9 @@ export class OpenTelemetryIntegration extends EventEmitter {
       attributes,
       timestamp: Date.now(),
     });
+    if (this.metrics.length > OpenTelemetryIntegration.MAX_METRICS) {
+      this.metrics.splice(0, this.metrics.length - 500);
+    }
   }
 
   /**

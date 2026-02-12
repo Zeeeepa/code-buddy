@@ -744,11 +744,11 @@ export class SmartContextPreloader extends EventEmitter {
       let stderr = '';
 
       proc.stdout.on('data', (data: Buffer) => {
-        stdout += data.toString();
+        if (stdout.length < 1_000_000) stdout += data.toString();
       });
 
       proc.stderr.on('data', (data: Buffer) => {
-        stderr += data.toString();
+        if (stderr.length < 100_000) stderr += data.toString();
       });
 
       proc.on('close', (code) => {

@@ -204,6 +204,9 @@ export class SentryIntegration extends EventEmitter {
     const processedEvent = this.config.beforeSend(event);
     if (processedEvent) {
       this.eventQueue.push(processedEvent);
+      if (this.eventQueue.length > 1000) {
+        this.eventQueue.splice(0, this.eventQueue.length - 500);
+      }
       this.emit('exception', { eventId, error });
     }
 
@@ -242,6 +245,9 @@ export class SentryIntegration extends EventEmitter {
     const processedEvent = this.config.beforeSend(event);
     if (processedEvent) {
       this.eventQueue.push(processedEvent);
+      if (this.eventQueue.length > 1000) {
+        this.eventQueue.splice(0, this.eventQueue.length - 500);
+      }
       this.emit('message', { eventId, message, level });
     }
 

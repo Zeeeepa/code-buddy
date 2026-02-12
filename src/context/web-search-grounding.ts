@@ -603,11 +603,13 @@ export class WebSearchManager extends EventEmitter {
 
         // Handle redirects
         if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          res.resume(); // Drain the response to free resources
           this.httpGet(res.headers.location, headers).then(resolve).catch(reject);
           return;
         }
 
         if (res.statusCode && res.statusCode >= 400) {
+          res.resume();
           reject(new Error(`HTTP ${res.statusCode}`));
           return;
         }
@@ -619,6 +621,8 @@ export class WebSearchManager extends EventEmitter {
         res.on('end', () => {
           resolve(data);
         });
+
+        res.on('error', reject);
       });
 
       req.on('error', reject);
