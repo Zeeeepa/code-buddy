@@ -216,12 +216,17 @@ export class InMemoryVectorStore implements VectorStore {
   /**
    * Start auto-save interval
    */
+  private saveInProgress = false;
+
   private startAutoSave(): void {
     if (this.autoSaveInterval) return;
 
     this.autoSaveInterval = setInterval(() => {
-      if (this.dirty) {
-        this.saveToDisk().catch(err => logger.error("Failed to save vector store", { error: err }));
+      if (this.dirty && !this.saveInProgress) {
+        this.saveInProgress = true;
+        this.saveToDisk()
+          .catch(err => logger.error("Failed to save vector store", { error: err }))
+          .finally(() => { this.saveInProgress = false; });
       }
     }, 30000); // Save every 30 seconds if dirty
   }

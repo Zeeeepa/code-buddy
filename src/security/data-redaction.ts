@@ -538,8 +538,11 @@ export class DataRedactionEngine extends EventEmitter {
     const potentialSecrets = text.match(/[a-zA-Z0-9_-]{16,64}/g) || [];
 
     let result = text;
+    const seen = new Set<string>();
     for (const potential of potentialSecrets) {
-      // Skip if already redacted
+      // Skip duplicates and already-redacted strings
+      if (seen.has(potential)) continue;
+      seen.add(potential);
       if (potential.includes('[REDACTED')) continue;
 
       // Check entropy
@@ -547,13 +550,14 @@ export class DataRedactionEngine extends EventEmitter {
       if (entropy >= this.config.entropyThreshold) {
         // High entropy string - likely a secret
         const replacement = '[REDACTED:HIGH_ENTROPY]';
+        const pos = result.indexOf(potential);
         result = result.replaceAll(potential, replacement);
 
         redactions.push({
           pattern: 'High Entropy String',
           category: 'custom',
           severity: 'medium',
-          position: { start: text.indexOf(potential), end: text.indexOf(potential) + potential.length },
+          position: { start: pos >= 0 ? pos : 0, end: pos >= 0 ? pos + potential.length : potential.length },
           preview: this.createPreview(potential),
         });
       }

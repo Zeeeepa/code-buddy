@@ -437,7 +437,7 @@ export class CodeChunker {
           currentChunk.length
         );
         currentChunk = currentChunk.slice(-overlapLines);
-        startLine = i + 1 - overlapLines;
+        startLine = Math.max(0, i + 1 - overlapLines);
         currentTokens = currentChunk.reduce(
           (sum, l) => sum + this.estimateTokens(l),
           0

@@ -343,6 +343,10 @@ export class Queue<T = unknown> extends EventEmitter {
       const result = await this.processor(item.data);
       const processingTime = Date.now() - startTime;
       this.processingTimes.push(processingTime);
+      // Trim processingTimes to prevent unbounded memory growth
+      if (this.processingTimes.length > 1000) {
+        this.processingTimes = this.processingTimes.slice(-500);
+      }
       this.processedCount++;
 
       this.emit('processed', item, result);

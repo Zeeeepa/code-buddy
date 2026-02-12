@@ -83,8 +83,12 @@ export class ConversationBranchManager extends EventEmitter {
       fs.ensureDirSync(this.storagePath);
       const filePath = path.join(this.storagePath, `${branch.id}.json`);
       fs.writeJsonSync(filePath, branch, { spaces: 2 });
-    } catch (_error) {
-      // Ignore save errors
+    } catch (error) {
+      // Log save errors instead of silently swallowing
+      const errMsg = error instanceof Error ? error.message : String(error);
+      if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'test') {
+        console.warn(`[ConversationBranches] Failed to save branch ${branch.id}: ${errMsg}`);
+      }
     }
   }
 
