@@ -145,6 +145,7 @@ export class ModelRoutingFacade {
    * Add to session cost
    */
   addSessionCost(cost: number): void {
+    if (!isFinite(cost) || cost < 0) return;
     this.sessionCost += cost;
   }
 
@@ -152,6 +153,7 @@ export class ModelRoutingFacade {
    * Set session cost directly
    */
   setSessionCost(cost: number): void {
+    if (!isFinite(cost) || cost < 0) return;
     this.sessionCost = cost;
   }
 

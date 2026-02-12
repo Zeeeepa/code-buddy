@@ -438,7 +438,7 @@ export class TTSManager extends EventEmitter {
 
     // Pre-synthesize if enabled
     if (this.config.queueConfig.preSynthesize) {
-      this.preSynthesize(item);
+      this.preSynthesize(item).catch(() => { /* synthesis will retry at playback */ });
     }
 
     // Auto-play if enabled and not already playing

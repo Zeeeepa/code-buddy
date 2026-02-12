@@ -349,8 +349,9 @@ export class VoiceControl extends EventEmitter {
   private async checkCommand(command: string): Promise<boolean> {
     return new Promise((resolve) => {
       const check = spawn('which', [command]);
-      check.on('close', (code) => resolve(code === 0));
-      check.on('error', () => resolve(false));
+      const timeout = setTimeout(() => { check.kill(); resolve(false); }, 5000);
+      check.on('close', (code) => { clearTimeout(timeout); resolve(code === 0); });
+      check.on('error', () => { clearTimeout(timeout); resolve(false); });
     });
   }
 
@@ -360,8 +361,9 @@ export class VoiceControl extends EventEmitter {
   private async checkPythonModule(module: string): Promise<boolean> {
     return new Promise((resolve) => {
       const check = spawn('python3', ['-c', `import ${module}`]);
-      check.on('close', (code) => resolve(code === 0));
-      check.on('error', () => resolve(false));
+      const timeout = setTimeout(() => { check.kill(); resolve(false); }, 10000);
+      check.on('close', (code) => { clearTimeout(timeout); resolve(code === 0); });
+      check.on('error', () => { clearTimeout(timeout); resolve(false); });
     });
   }
 
@@ -618,12 +620,19 @@ export class VoiceControl extends EventEmitter {
         '--output_dir', this.tempDir,
       ]);
 
+      // Kill whisper if it takes too long (120s)
+      const timeout = setTimeout(() => {
+        whisper.kill();
+        resolve({ success: false, error: 'Whisper transcription timed out' });
+      }, 120_000);
+
       let stderr = '';
       whisper.stderr.on('data', (data) => {
         stderr += data.toString();
       });
 
       whisper.on('close', async (code) => {
+        clearTimeout(timeout);
         if (code === 0) {
           const jsonFile = audioFile.replace('.wav', '.json');
           if (await fs.pathExists(jsonFile)) {
