@@ -796,6 +796,26 @@ program
     "--ephemeral",
     "skip session persistence (do not save session to disk)"
   )
+  .option(
+    "--system-prompt-override <text>",
+    "replace the entire system prompt with this text"
+  )
+  .option(
+    "--system-prompt-file <path>",
+    "replace the entire system prompt with contents of a file"
+  )
+  .option(
+    "--append-system-prompt <text>",
+    "append text to the default system prompt"
+  )
+  .option(
+    "--append-system-prompt-file <path>",
+    "append file contents to the default system prompt"
+  )
+  .option(
+    "--fallback-model <model>",
+    "auto-fallback model when default is overloaded"
+  )
   .action(async (message, options) => {
     // Handle --setup flag (interactive setup wizard)
     if (options.setup) {
