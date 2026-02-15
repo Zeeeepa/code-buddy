@@ -816,6 +816,10 @@ program
     "--fallback-model <model>",
     "auto-fallback model when default is overloaded"
   )
+  .option(
+    "--from-pr <pr>",
+    "link session to a GitHub pull request (number or URL)"
+  )
   .action(async (message, options) => {
     // Handle --setup flag (interactive setup wizard)
     if (options.setup) {

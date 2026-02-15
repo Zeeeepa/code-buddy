@@ -1,0 +1,24 @@
+name: 'Code Buddy AI'
+description: 'AI-powered code review, issue triage, and implementation'
+inputs:
+  anthropic_api_key:
+    description: 'API key for the AI provider'
+    required: true
+  model:
+    description: 'Model to use for AI tasks'
+    required: false
+    default: 'grok-3-mini'
+  max_turns:
+    description: 'Maximum number of agent turns'
+    required: false
+    default: '10'
+  mode:
+    description: 'Operation mode: review, triage, or implement'
+    required: false
+    default: 'review'
+runs:
+  using: 'node20'
+  main: 'dist/action/index.js'
+branding:
+  icon: 'cpu'
+  color: 'blue'
