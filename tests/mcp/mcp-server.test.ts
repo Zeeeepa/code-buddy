@@ -67,15 +67,25 @@ jest.mock('../../src/utils/confirmation-service', () => {
 // Mock the MCP SDK to avoid actual stdio transport
 jest.mock('@modelcontextprotocol/sdk/server/mcp.js', () => {
   const registeredTools = new Map<string, { description: string; schema: unknown; handler: Function }>();
+  const registeredResources = new Map<string, { uri: string; options: unknown; handler: Function }>();
+  const registeredPrompts = new Map<string, { description: string; schema: unknown; handler: Function }>();
 
   return {
     McpServer: jest.fn().mockImplementation(() => ({
       tool: jest.fn((name: string, description: string, schema: unknown, handler: Function) => {
         registeredTools.set(name, { description, schema, handler });
       }),
+      resource: jest.fn((name: string, uri: string, options: unknown, handler: Function) => {
+        registeredResources.set(name, { uri, options, handler });
+      }),
+      prompt: jest.fn((name: string, description: string, schema: unknown, handler: Function) => {
+        registeredPrompts.set(name, { description, schema, handler });
+      }),
       connect: jest.fn().mockResolvedValue(undefined),
       close: jest.fn().mockResolvedValue(undefined),
       _registeredTools: registeredTools,
+      _registeredResources: registeredResources,
+      _registeredPrompts: registeredPrompts,
     })),
   };
 });
@@ -109,14 +119,15 @@ describe('CodeBuddyMCPServer', () => {
   // =========================================================================
 
   describe('getToolDefinitions', () => {
-    it('should return all 7 tool definitions', () => {
+    it('should return all 15 tool definitions', () => {
       const tools = CodeBuddyMCPServer.getToolDefinitions();
-      expect(tools).toHaveLength(7);
+      expect(tools).toHaveLength(15);
     });
 
     it('should include all expected tool names', () => {
       const tools = CodeBuddyMCPServer.getToolDefinitions();
       const names = tools.map((t: MCPToolDefinition) => t.name);
+      // Original 7 tools
       expect(names).toContain('read_file');
       expect(names).toContain('write_file');
       expect(names).toContain('edit_file');
@@ -124,6 +135,15 @@ describe('CodeBuddyMCPServer', () => {
       expect(names).toContain('search_files');
       expect(names).toContain('list_files');
       expect(names).toContain('git');
+      // Agent intelligence tools (8 new)
+      expect(names).toContain('agent_chat');
+      expect(names).toContain('agent_task');
+      expect(names).toContain('agent_plan');
+      expect(names).toContain('memory_search');
+      expect(names).toContain('memory_save');
+      expect(names).toContain('session_list');
+      expect(names).toContain('session_resume');
+      expect(names).toContain('web_search');
     });
 
     it('should have descriptions for all tools', () => {
@@ -208,8 +228,8 @@ describe('CodeBuddyMCPServer', () => {
 
     it('should register all tools with the MCP server', () => {
       const mcpServer = (server as unknown as { mcpServer: { tool: jest.Mock } }).mcpServer;
-      // 7 tools should be registered
-      expect(mcpServer.tool).toHaveBeenCalledTimes(7);
+      // 7 original + 3 agent + 2 memory + 3 session = 15 tools
+      expect(mcpServer.tool).toHaveBeenCalledTimes(15);
     });
 
     it('should map read_file to TextEditorTool.view', async () => {

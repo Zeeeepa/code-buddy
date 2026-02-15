@@ -4,7 +4,7 @@
  * Allows Code Buddy to act as a tool provider for other AI agents
  * (VS Code, Cursor, Claude Desktop, etc.) over stdio transport.
  *
- * Exposed tools:
+ * Exposed tools (15 total):
  * - read_file: Read file contents
  * - write_file: Write/create a file
  * - edit_file: String replacement editing
@@ -12,6 +12,23 @@
  * - search_files: Search file contents (ripgrep-based)
  * - list_files: List directory contents
  * - git: Git operations (status, diff, log, add, commit, etc.)
+ * - agent_chat: AI-powered chat with tool execution
+ * - agent_task: Autonomous task execution
+ * - agent_plan: Create execution plan
+ * - memory_search: Search semantic memory
+ * - memory_save: Save persistent memory
+ * - session_list: List recent sessions
+ * - session_resume: Resume previous session
+ * - web_search: Web search via configured providers
+ *
+ * Resources (4):
+ * - codebuddy://project/context
+ * - codebuddy://project/instructions
+ * - codebuddy://sessions/latest
+ * - codebuddy://memory/all
+ *
+ * Prompts (5):
+ * - code_review, explain_code, generate_tests, refactor, fix_bugs
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -20,6 +37,11 @@ import { z } from 'zod';
 import * as path from 'path';
 import * as fs from 'fs';
 import type { ToolResult } from '../types/index.js';
+import { registerAgentTools } from './mcp-agent-tools.js';
+import { registerMemoryTools } from './mcp-memory-tools.js';
+import { registerSessionTools } from './mcp-session-tools.js';
+import { registerResources } from './mcp-resources.js';
+import { registerPrompts } from './mcp-prompts.js';
 
 // Read version from package.json (avoid import.meta.url for ts-jest compat)
 let packageVersion = '0.1.0';
@@ -59,6 +81,10 @@ export class CodeBuddyMCPServer {
   private gitTool: InstanceType<typeof import('../tools/git-tool.js').GitTool> | null = null;
   private bashTool: InstanceType<typeof import('../tools/bash/index.js').BashTool> | null = null;
 
+  // Lazily initialized agent instance
+  private agent: import('../agent/codebuddy-agent.js').CodeBuddyAgent | null = null;
+  private agentInitPromise: Promise<import('../agent/codebuddy-agent.js').CodeBuddyAgent> | null = null;
+
   constructor() {
     this.mcpServer = new McpServer(
       {
@@ -68,11 +94,64 @@ export class CodeBuddyMCPServer {
       {
         capabilities: {
           tools: {},
+          resources: {},
+          prompts: {},
         },
       }
     );
 
     this.registerTools();
+    this.registerAgentLayer();
+  }
+
+  /**
+   * Lazily initialize the CodeBuddyAgent on first use.
+   */
+  private async ensureAgent(): Promise<import('../agent/codebuddy-agent.js').CodeBuddyAgent> {
+    if (this.agent) return this.agent;
+    if (this.agentInitPromise) return this.agentInitPromise;
+
+    this.agentInitPromise = (async () => {
+      // Resolve API key from env
+      const apiKey = process.env.GROK_API_KEY
+        || process.env.OPENAI_API_KEY
+        || process.env.ANTHROPIC_API_KEY
+        || '';
+
+      if (!apiKey) {
+        throw new Error('No API key found. Set GROK_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY.');
+      }
+
+      const { CodeBuddyAgent } = await import('../agent/codebuddy-agent.js');
+      const baseURL = process.env.GROK_BASE_URL;
+      const model = process.env.GROK_MODEL;
+
+      this.agent = new CodeBuddyAgent(apiKey, baseURL, model);
+
+      // Enable auto-approve for MCP server mode
+      const { ConfirmationService } = await import('../utils/confirmation-service.js');
+      const confirmService = ConfirmationService.getInstance();
+      confirmService.setSessionFlag('allOperations', true);
+
+      return this.agent;
+    })();
+
+    return this.agentInitPromise;
+  }
+
+  /**
+   * Register agent intelligence tools, resources, and prompts.
+   * Registration modules are lightweight (just Zod schemas + handler stubs).
+   * Heavy dependencies (agent, memory, sessions) are lazy-loaded inside handlers.
+   */
+  private registerAgentLayer(): void {
+    const getAgent = () => this.ensureAgent();
+
+    registerAgentTools(this.mcpServer, getAgent);
+    registerMemoryTools(this.mcpServer);
+    registerSessionTools(this.mcpServer, getAgent);
+    registerResources(this.mcpServer);
+    registerPrompts(this.mcpServer);
   }
 
   /**
@@ -180,6 +259,105 @@ export class CodeBuddyMCPServer {
             },
           },
           required: ['subcommand'],
+        },
+      },
+      // Agent intelligence tools
+      {
+        name: 'agent_chat',
+        description: 'Send a message to the Code Buddy AI agent and get a response with tool call results.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            message: { type: 'string', description: 'The message to send to the agent' },
+            mode: { type: 'string', description: 'Agent mode: code, ask, plan, architect', enum: ['code', 'ask', 'plan', 'architect'] },
+          },
+          required: ['message'],
+        },
+      },
+      {
+        name: 'agent_task',
+        description: 'Execute an autonomous task using Code Buddy agent with DAG-based planning for complex tasks.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            task: { type: 'string', description: 'The task to execute autonomously' },
+            working_directory: { type: 'string', description: 'Working directory for task execution' },
+          },
+          required: ['task'],
+        },
+      },
+      {
+        name: 'agent_plan',
+        description: 'Create an execution plan for a task without executing it.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            task: { type: 'string', description: 'The task to plan' },
+          },
+          required: ['task'],
+        },
+      },
+      // Memory tools
+      {
+        name: 'memory_search',
+        description: 'Search Code Buddy\'s semantic memory for relevant stored knowledge.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string', description: 'The search query' },
+            max_results: { type: 'number', description: 'Maximum results to return (default: 5)' },
+          },
+          required: ['query'],
+        },
+      },
+      {
+        name: 'memory_save',
+        description: 'Save a piece of knowledge to Code Buddy\'s persistent memory.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            key: { type: 'string', description: 'A short key/name for the memory entry' },
+            value: { type: 'string', description: 'The content to remember' },
+            category: { type: 'string', description: 'Memory category', enum: ['project', 'preferences', 'decisions', 'patterns', 'context', 'custom'] },
+            scope: { type: 'string', description: 'Memory scope', enum: ['project', 'user'] },
+          },
+          required: ['key', 'value'],
+        },
+      },
+      // Session tools
+      {
+        name: 'session_list',
+        description: 'List recent Code Buddy chat sessions.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            count: { type: 'number', description: 'Number of recent sessions to return (default: 10)' },
+          },
+          required: [],
+        },
+      },
+      {
+        name: 'session_resume',
+        description: 'Resume a previous Code Buddy session by ID.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            session_id: { type: 'string', description: 'The session ID to resume' },
+          },
+          required: ['session_id'],
+        },
+      },
+      {
+        name: 'web_search',
+        description: 'Search the web using Code Buddy\'s configured search providers.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string', description: 'The search query' },
+            max_results: { type: 'number', description: 'Maximum results to return (default: 5)' },
+            provider: { type: 'string', description: 'Search provider', enum: ['brave', 'perplexity', 'serper', 'duckduckgo', 'brave-mcp'] },
+          },
+          required: ['query'],
         },
       },
     ];
@@ -437,6 +615,17 @@ export class CodeBuddyMCPServer {
    */
   async stop(): Promise<void> {
     if (!this.running) return;
+
+    // Dispose agent if initialized
+    if (this.agent) {
+      try {
+        this.agent.dispose();
+      } catch {
+        // Ignore disposal errors
+      }
+      this.agent = null;
+      this.agentInitPromise = null;
+    }
 
     await this.mcpServer.close();
     this.transport = null;
