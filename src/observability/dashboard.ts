@@ -1,7 +1,7 @@
 /**
  * Observability Dashboard
  *
- * Real-time monitoring and analytics for Grok CLI:
+ * Real-time monitoring and analytics for Code Buddy:
  * - Token usage and costs
  * - Tool execution metrics
  * - Response times and latency
@@ -546,7 +546,7 @@ export class TerminalDashboard {
 
     // Header
     lines.push('╔══════════════════════════════════════════════════════════════════╗');
-    lines.push('║                    GROK CLI OBSERVABILITY                        ║');
+    lines.push('║                    CODE BUDDY OBSERVABILITY                        ║');
     lines.push('╚══════════════════════════════════════════════════════════════════╝');
     lines.push('');
 

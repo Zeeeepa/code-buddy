@@ -9,7 +9,7 @@
  * - Automatic checkpoints before dangerous operations
  * - Git integration for version control
  *
- * Allows reverting changes made by Grok CLI.
+ * Allows reverting changes made by Code Buddy.
  */
 
 import fs from 'fs-extra';

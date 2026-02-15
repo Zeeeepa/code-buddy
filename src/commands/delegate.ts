@@ -274,13 +274,13 @@ ${config.task}
 
 ## Status
 
-This PR was created by Grok CLI using \`/delegate\`.
+This PR was created by Code Buddy using \`/delegate\`.
 
 The agent is working on this task in the background.
 
 ---
 
-Generated with [Grok CLI](https://github.com/phuetz/code-buddy)`;
+Generated with [Code Buddy](https://github.com/phuetz/code-buddy)`;
 
     // Create PR
     console.log('Creating pull request...');

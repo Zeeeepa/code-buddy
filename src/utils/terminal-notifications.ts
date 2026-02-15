@@ -240,7 +240,7 @@ export async function notifyTaskComplete(task: string = 'Task completed'): Promi
  */
 export async function notifyError(error: string): Promise<void> {
   await notify({
-    title: 'Grok CLI - Error',
+    title: 'Code Buddy - Error',
     message: error,
     urgent: true,
     sound: true,

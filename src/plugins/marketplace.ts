@@ -9,7 +9,7 @@
  * - Version compatibility checking
  * - Plugin ratings and reviews
  *
- * Allows extending Grok CLI with community plugins.
+ * Allows extending Code Buddy with community plugins.
  */
 
 import { EventEmitter } from 'events';

@@ -2,7 +2,7 @@
  * GROK_HOME - Centralized configuration directory management
  *
  * Supports the GROK_HOME environment variable to customize the location
- * of Grok CLI configuration files and data (like VIBE_HOME in Mistral Vibe).
+ * of Code Buddy configuration files and data (like VIBE_HOME in Mistral Vibe).
  *
  * Default: ~/.codebuddy/
  *

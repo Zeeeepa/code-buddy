@@ -243,7 +243,7 @@ function exportToMarkdown(data: ConversationExport, options: ExportOptions): str
 
   // Footer
   lines.push('');
-  lines.push(`*Exported from Grok CLI on ${formatDate(new Date())}*`);
+  lines.push(`*Exported from Code Buddy on ${formatDate(new Date())}*`);
 
   return lines.join('\n');
 }
@@ -343,7 +343,7 @@ function exportToHtml(data: ConversationExport, options: ExportOptions): string 
   }
 
   // Footer
-  lines.push(`  <footer><p><em>Exported from Grok CLI on ${formatDate(new Date())}</em></p></footer>`);
+  lines.push(`  <footer><p><em>Exported from Code Buddy on ${formatDate(new Date())}</em></p></footer>`);
   lines.push('</body>');
   lines.push('</html>');
 
@@ -406,7 +406,7 @@ function exportToText(data: ConversationExport, options: ExportOptions): string 
 
   // Footer
   lines.push('');
-  lines.push(`Exported from Grok CLI on ${formatDate(new Date())}`);
+  lines.push(`Exported from Code Buddy on ${formatDate(new Date())}`);
 
   return lines.join('\n');
 }

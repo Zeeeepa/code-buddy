@@ -116,7 +116,7 @@ export function formatAsText(result: HeadlessResult): string {
  * Format result as Markdown
  */
 export function formatAsMarkdown(result: HeadlessResult): string {
-  let output = '# Grok CLI Result\n\n';
+  let output = '# Code Buddy Result\n\n';
 
   output += '## Conversation\n\n';
 

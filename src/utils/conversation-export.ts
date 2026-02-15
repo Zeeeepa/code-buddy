@@ -54,7 +54,7 @@ export class ConversationExporter {
     const now = new Date();
 
     // Header
-    lines.push('# Grok CLI Conversation');
+    lines.push('# Code Buddy Conversation');
     lines.push('');
     lines.push(`**Date:** ${now.toLocaleDateString()}`);
     lines.push(`**Time:** ${now.toLocaleTimeString()}`);
@@ -138,7 +138,7 @@ export class ConversationExporter {
     // Footer
     lines.push('---');
     lines.push('');
-    lines.push(`*Exported from Grok CLI on ${now.toLocaleString()}*`);
+    lines.push(`*Exported from Code Buddy on ${now.toLocaleString()}*`);
 
     return lines.join('\n');
   }
@@ -173,7 +173,7 @@ export class ConversationExporter {
     const lines: string[] = [];
     const now = new Date();
 
-    lines.push('GROK CLI CONVERSATION');
+    lines.push('CODE BUDDY CONVERSATION');
     lines.push('='.repeat(50));
     lines.push(`Date: ${now.toLocaleString()}`);
     lines.push(`Directory: ${process.cwd()}`);

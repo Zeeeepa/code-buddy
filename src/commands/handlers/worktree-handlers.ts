@@ -1,7 +1,7 @@
 /**
  * Git Worktree Handlers
  *
- * Manage git worktrees for parallel Grok CLI instances.
+ * Manage git worktrees for parallel Code Buddy instances.
  * Inspired by Claude Code's git worktree workflow.
  *
  * Git worktrees allow running multiple instances on different branches
@@ -145,7 +145,7 @@ Remove it first or choose a different path.`;
 📁 Path: ${resolvedPath}
 🌿 Branch: ${branchName}
 
-To start a new Grok CLI instance:
+To start a new Code Buddy instance:
   cd ${resolvedPath} && grok
 
 💡 Tips:

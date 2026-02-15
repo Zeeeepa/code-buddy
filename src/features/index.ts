@@ -1,5 +1,5 @@
 /**
- * Grok CLI Enhanced Features
+ * Code Buddy Enhanced Features
  *
  * This module exports all the enhanced features inspired by:
  * - Claude Code (slash commands, hooks, MCP config)
@@ -207,7 +207,7 @@ export function getFeatureStatusSummary(): string {
   const checkpointStats = checkpoints.getStats();
   const taskStats = tasks.getStats();
 
-  let output = '🌟 Grok CLI Enhanced Features\n' + '═'.repeat(60) + '\n\n';
+  let output = '🌟 Code Buddy Enhanced Features\n' + '═'.repeat(60) + '\n\n';
 
   output += '📸 Persistent Checkpoints\n';
   output += `   • ${checkpointStats.count} checkpoints stored\n`;

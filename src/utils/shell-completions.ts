@@ -93,7 +93,7 @@ function generateBashCompletion(): string {
   const themes = THEMES.join(' ');
 
   return `#!/bin/bash
-# Grok CLI Bash Completion
+# Code Buddy Bash Completion
 # Source this file or add to ~/.bashrc
 
 _codebuddy_completions() {
@@ -161,7 +161,7 @@ _codebuddy_theme_completions() {
     COMPREPLY=( $(compgen -W "\${themes}" -- "\${COMP_WORDS[COMP_CWORD]}") )
 }
 
-echo "Grok CLI bash completions loaded"
+echo "Code Buddy bash completions loaded"
 `;
 }
 
@@ -188,7 +188,7 @@ function generateZshCompletion(): string {
   const themes = THEMES.join(' ');
 
   return `#compdef grok code-buddy
-# Grok CLI Zsh Completion
+# Code Buddy Zsh Completion
 # Save to ~/.zsh/completions/_codebuddy or /usr/local/share/zsh/site-functions/_codebuddy
 
 _codebuddy() {
@@ -275,7 +275,7 @@ function generateFishCompletion(): string {
     return `complete -c grok -n '__fish_codebuddy_in_prompt' -a '${c.name}' -d '${desc}'`;
   }).join('\n');
 
-  return `# Grok CLI Fish Completion
+  return `# Code Buddy Fish Completion
 # Save to ~/.config/fish/completions/grok.fish
 
 # Helper function to detect if we're in the prompt context
@@ -328,7 +328,7 @@ function generatePowerShellCompletion(): string {
   const modes = APPROVAL_MODES.map(m => `'${m}'`).join(', ');
   const themes = THEMES.map(t => `'${t}'`).join(', ');
 
-  return `# Grok CLI PowerShell Completion
+  return `# Code Buddy PowerShell Completion
 # Save to $PROFILE or run: grok --completions powershell | Out-File -Append $PROFILE
 
 $_codebuddyOptions = @(${CLI_OPTIONS.map(o => `'${o.name}'`).join(', ')})
@@ -410,7 +410,7 @@ Register-ArgumentCompleter -Native -CommandName grok, code-buddy -ScriptBlock {
         }
 }
 
-Write-Host "Grok CLI PowerShell completions loaded" -ForegroundColor Green
+Write-Host "Code Buddy PowerShell completions loaded" -ForegroundColor Green
 `;
 }
 

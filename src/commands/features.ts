@@ -1,7 +1,7 @@
 /**
  * /features Command - Display research-based features
  *
- * Shows a styled table of all research-based features implemented in Grok CLI
+ * Shows a styled table of all research-based features implemented in Code Buddy
  */
 
 import chalk from 'chalk';

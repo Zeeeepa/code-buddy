@@ -386,7 +386,7 @@ export class HookSystem extends EventEmitter {
         },
         {
           type: 'on-session-start',
-          command: 'echo "Grok CLI session started"',
+          command: 'echo "Code Buddy session started"',
           enabled: false,
           timeout: 5000,
           continueOnError: true,

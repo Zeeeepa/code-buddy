@@ -1,5 +1,5 @@
 /**
- * Theme system exports for Grok CLI
+ * Theme system exports for Code Buddy
  */
 
 // Types and interfaces

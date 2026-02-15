@@ -493,7 +493,7 @@ export function HelpSystem({
 }
 
 /**
- * Default help configuration for Grok CLI
+ * Default help configuration for Code Buddy
  */
 export const DEFAULT_HELP_CONFIG: HelpConfig = {
   appName: "CodeBuddy CLI",

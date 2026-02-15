@@ -52,7 +52,7 @@ export async function handleHelp(): Promise<CommandHandlerResult> {
   // Build help text
   const lines: string[] = [];
   lines.push('╔══════════════════════════════════════════════════════════════════╗');
-  lines.push('║                      📚 GROK CLI COMMANDS                        ║');
+  lines.push('║                      📚 CODE BUDDY COMMANDS                        ║');
   lines.push('╚══════════════════════════════════════════════════════════════════╝');
   lines.push('');
 

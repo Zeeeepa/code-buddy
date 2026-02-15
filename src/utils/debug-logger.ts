@@ -1,5 +1,5 @@
 /**
- * Enhanced Debug Logger for Grok CLI
+ * Enhanced Debug Logger for Code Buddy
  *
  * Provides comprehensive debugging capabilities:
  * - Verbose API call logging with full request/response dumps

@@ -1,5 +1,5 @@
 /**
- * Theme Manager for Grok CLI
+ * Theme Manager for Code Buddy
  * Handles loading, saving, and managing themes and avatars
  */
 

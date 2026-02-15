@@ -6,7 +6,7 @@
  * - WebLLM: Browser-based LLM with WebGPU
  * - Ollama: HTTP API to local Ollama server
  *
- * These providers allow Grok CLI to function without cloud API dependencies.
+ * These providers allow Code Buddy to function without cloud API dependencies.
  */
 
 import { EventEmitter } from 'events';

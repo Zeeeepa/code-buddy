@@ -1,9 +1,9 @@
 /**
- * Custom error classes for Grok CLI
+ * Custom error classes for Code Buddy
  */
 
 /**
- * Base error class for all Grok CLI errors
+ * Base error class for all Code Buddy errors
  */
 export class CodeBuddyError extends Error {
   constructor(message: string, public code?: string, public details?: unknown) {

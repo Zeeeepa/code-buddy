@@ -401,7 +401,7 @@ export function parseTOML(content: string): Record<string, unknown> {
  */
 export function serializeTOML(config: CodeBuddyConfig): string {
   const lines: string[] = [
-    '# Grok CLI Configuration',
+    '# Code Buddy Configuration',
     '# See https://github.com/phuetz/code-buddy for documentation',
     '',
   ];

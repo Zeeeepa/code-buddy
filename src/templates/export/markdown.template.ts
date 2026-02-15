@@ -151,7 +151,7 @@ export function markdownTemplate(data: SessionData, options: ExportOptions): str
 
   // Footer
   lines.push('');
-  lines.push(`*Exported from Grok CLI on ${new Date().toLocaleString()}*`);
+  lines.push(`*Exported from Code Buddy on ${new Date().toLocaleString()}*`);
 
   return lines.join('\n');
 }

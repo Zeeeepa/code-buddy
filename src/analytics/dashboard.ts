@@ -713,7 +713,7 @@ export class AnalyticsDashboard extends EventEmitter {
     performance: PerformanceMetrics;
     tools: ToolMetrics[];
   }): string {
-    let md = '# Grok CLI Analytics Report\n\n';
+    let md = '# Code Buddy Analytics Report\n\n';
     md += `**Generated:** ${data.exportedAt}\n\n`;
 
     md += '## Usage Summary\n\n';

@@ -328,7 +328,7 @@ const WORKFLOW_TEMPLATES: Record<string, WorkflowConfig> = {
         steps: [
           { uses: 'actions/checkout@v4', with: { 'fetch-depth': 0 } },
           {
-            name: 'Install Grok CLI',
+            name: 'Install Code Buddy',
             run: 'npm install -g code-buddy',
           },
           {

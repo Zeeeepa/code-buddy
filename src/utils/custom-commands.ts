@@ -202,7 +202,7 @@ Or use {{0}}, {{1}}, etc.
 Use $ARGS or {{args}} to get all arguments as a string.
 
 ## Your prompt here
-Replace this with instructions for Grok when this command is invoked.
+Replace this with instructions for Code Buddy when this command is invoked.
 `;
 
   fs.writeFileSync(filePath, sampleContent);

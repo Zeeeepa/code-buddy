@@ -1,5 +1,5 @@
 /**
- * Prompts module - exports all system prompts for Grok CLI
+ * Prompts module - exports all system prompts for Code Buddy
  */
 
 export {

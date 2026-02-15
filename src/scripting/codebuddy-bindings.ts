@@ -67,7 +67,7 @@ export function createGrokBindings(
 
   const askFn = async (prompt: string): Promise<string> => {
     if (!codebuddyClientInstance) {
-      print('[grok.ask] No Grok client available - returning mock response');
+      print('[buddy.ask] No Code Buddy client available - returning mock response');
       return `[Mock AI Response to: ${prompt}]`;
     }
 

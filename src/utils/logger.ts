@@ -1,5 +1,5 @@
 /**
- * Structured Logger for Grok CLI
+ * Structured Logger for Code Buddy
  * Provides consistent logging across the application with levels and context
  *
  * Environment Variables:

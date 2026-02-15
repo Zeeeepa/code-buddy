@@ -1,5 +1,5 @@
 /**
- * Structured Error Types for Grok CLI
+ * Structured Error Types for Code Buddy
  *
  * @deprecated This module is deprecated. Use src/errors/index.ts instead.
  * This re-export exists only for backward compatibility and will be removed in a future version.

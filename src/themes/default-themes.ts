@@ -1,5 +1,5 @@
 /**
- * Built-in themes for Grok CLI
+ * Built-in themes for Code Buddy
  */
 
 import { Theme, DEFAULT_AVATARS, EMOJI_AVATARS, HACKER_AVATARS, SPACE_AVATARS, MINIMAL_AVATARS } from './theme.js';

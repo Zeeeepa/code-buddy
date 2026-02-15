@@ -391,10 +391,10 @@ Use /checkpoints to see available checkpoint IDs.`,
 
 export function handleFeatures(): CommandHandlerResult {
   const features = `
-Research-Based Features in Grok CLI
+Research-Based Features in Code Buddy
 ════════════════════════════════════════════════════════════════════
 
-Based on extensive analysis of AI coding assistants, Grok CLI implements
+Based on extensive analysis of AI coding assistants, Code Buddy implements
 the following research-backed features:
 
 CONTEXT MANAGEMENT
@@ -473,7 +473,7 @@ export async function handleInitGrok(_args: string[]): Promise<CommandHandlerRes
   const codebuddyDir = path.join(cwd, '.codebuddy');
 
   const lines: string[] = [];
-  lines.push('Initializing Grok CLI Configuration');
+  lines.push('Initializing Code Buddy Configuration');
   lines.push('='.repeat(50));
   lines.push('');
 
@@ -501,12 +501,13 @@ export async function handleInitGrok(_args: string[]): Promise<CommandHandlerRes
       lines.push('[+] Created .codebuddy/commands/ directory');
     }
 
-    // Create GROK.md if it doesn't exist
-    const grokMd = path.join(cwd, 'GROK.md');
-    if (!await fs.pathExists(grokMd)) {
-      const grokMdContent = `# GROK.md
+    // Create CODEBUDDY.md if it doesn't exist
+    const codebuddyMd = path.join(cwd, 'CODEBUDDY.md');
+    const legacyGrokMd = path.join(cwd, 'GROK.md');
+    if (!await fs.pathExists(codebuddyMd) && !await fs.pathExists(legacyGrokMd)) {
+      const codebuddyMdContent = `# CODEBUDDY.md
 
-This file provides custom instructions for Grok CLI when working in this repository.
+This file provides custom instructions for Code Buddy when working in this repository.
 
 ## Project Overview
 
@@ -542,10 +543,10 @@ Deploy the application using the following steps:
 
 Then use \`/deploy\` to run it.
 `;
-      await fs.writeFile(grokMd, grokMdContent);
-      lines.push('[+] Created GROK.md template');
+      await fs.writeFile(codebuddyMd, codebuddyMdContent);
+      lines.push('[+] Created CODEBUDDY.md template');
     } else {
-      lines.push('[=] GROK.md already exists');
+      lines.push('[=] CODEBUDDY.md already exists');
     }
 
     // Create .gitignore additions
@@ -565,16 +566,16 @@ Then use \`/deploy\` to run it.
     }
 
     if (newIgnores.length > 0) {
-      const addition = `\n# Grok CLI\n${newIgnores.join('\n')}\n`;
+      const addition = `\n# Code Buddy\n${newIgnores.join('\n')}\n`;
       await fs.appendFile(gitignore, addition);
-      lines.push('[+] Added Grok paths to .gitignore');
+      lines.push('[+] Added Code Buddy paths to .gitignore');
     }
 
     lines.push('');
     lines.push('Initialization complete!');
     lines.push('');
     lines.push('Next steps:');
-    lines.push('  1. Edit GROK.md to add project-specific instructions');
+    lines.push('  1. Edit CODEBUDDY.md to add project-specific instructions');
     lines.push('  2. Create custom commands in .codebuddy/commands/');
     lines.push('  3. Use /help to see all available commands');
 

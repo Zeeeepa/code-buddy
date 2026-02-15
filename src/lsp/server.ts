@@ -42,7 +42,7 @@ const connection = createConnection(ProposedFeatures.all);
 // Document manager
 const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
 
-// Grok client
+// Code Buddy client
 let codebuddyClient: CodeBuddyClient | null = null;
 
 // Settings
@@ -99,11 +99,11 @@ connection.onInitialize((_params: InitializeParams): InitializeResult => {
 connection.onInitialized(() => {
   logger.info('Code Buddy LSP server initialized');
 
-  // Initialize Grok client with API key
+  // Initialize Code Buddy client with API key
   const apiKey = process.env.GROK_API_KEY || globalSettings.apiKey;
   if (apiKey) {
     codebuddyClient = new CodeBuddyClient(apiKey, globalSettings.model);
-    logger.info('Grok client initialized');
+    logger.info('Code Buddy client initialized');
   } else {
     logger.warn('No API key configured');
   }

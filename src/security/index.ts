@@ -1,7 +1,7 @@
 /**
  * Security Module
  *
- * Unified security layer for Grok CLI:
+ * Unified security layer for Code Buddy:
  * - Tool policies (hierarchical tool grouping and profiles)
  * - Approval modes (read-only, auto, full-access)
  * - Sandbox execution for commands

@@ -1,5 +1,5 @@
 /**
- * Centralized configuration constants for Grok CLI
+ * Centralized configuration constants for Code Buddy
  */
 
 export const AGENT_CONFIG = {
@@ -91,7 +91,7 @@ export const PATHS = {
   /** User settings file name */
   SETTINGS_FILE: 'user-settings.json',
   /** Custom instructions file name */
-  CUSTOM_INSTRUCTIONS_FILE: 'GROK.md',
+  CUSTOM_INSTRUCTIONS_FILE: 'CODEBUDDY.md',
   /** Cache directory name */
   CACHE_DIR: '.cache',
 } as const;

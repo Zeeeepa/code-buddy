@@ -61,7 +61,7 @@ function DashboardHeader({
       {/* Title */}
       <Box justifyContent="space-between">
         <Text bold color={colors.primary}>
-          ╔═══ GROK CLI OBSERVABILITY DASHBOARD ═══╗
+          ╔═══ CODE BUDDY OBSERVABILITY DASHBOARD ═══╗
         </Text>
         <Text dimColor>Press [q] to quit • [r] to refresh</Text>
       </Box>

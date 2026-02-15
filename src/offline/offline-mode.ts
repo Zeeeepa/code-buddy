@@ -9,7 +9,7 @@
  * - Automatic sync when back online
  * - Offline-capable tools
  *
- * Allows Grok CLI to function without internet connectivity.
+ * Allows Code Buddy to function without internet connectivity.
  */
 
 import { EventEmitter } from 'events';

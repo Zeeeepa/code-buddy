@@ -1,5 +1,5 @@
 /**
- * Theme Context for Grok CLI
+ * Theme Context for Code Buddy
  * Provides theme and avatar information to all UI components
  */
 

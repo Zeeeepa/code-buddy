@@ -1,5 +1,5 @@
 /**
- * Theme system for Grok CLI
+ * Theme system for Code Buddy
  * Provides customizable color themes and visual styling
  */
 

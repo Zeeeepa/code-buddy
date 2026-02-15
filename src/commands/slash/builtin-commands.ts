@@ -52,7 +52,7 @@ const coreCommands: SlashCommand[] = [
   },
   {
     name: 'features',
-    description: 'Display research-based features implemented in Grok CLI',
+    description: 'Display research-based features implemented in Code Buddy',
     prompt: '__FEATURES__',
     filePath: '',
     isBuiltin: true

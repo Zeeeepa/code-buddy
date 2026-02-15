@@ -149,7 +149,7 @@ export async function initContextFile(
 
   const template = `# Project Context
 
-This file is automatically loaded by Grok CLI to provide project context.
+This file is automatically loaded by Code Buddy to provide project context.
 
 ## Project Overview
 
