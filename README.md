@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Tests-23%2C500%2B-00d26a?style=flat-square&logo=jest" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-23%2C700%2B-00d26a?style=flat-square&logo=jest" alt="Tests"/>
   <img src="https://img.shields.io/badge/Coverage-85%25-48dbfb?style=flat-square" alt="Coverage"/>
   <img src="https://img.shields.io/badge/Build-passing-00d26a?style=flat-square" alt="Build"/>
 </p>
@@ -136,6 +136,14 @@ Code Buddy incorporates advanced patterns from the [OpenClaw](https://github.com
 | **Auto-Sandbox Router** | ✅ 100% | Automatic Docker routing for dangerous commands (npm, pip, cargo, make) |
 | **Security Audit Logging** | ✅ 100% | JSONL audit trail for all code generation security decisions |
 | **Copilot Proxy Hardening** | ✅ 100% | Per-IP rate limiting, token clamping, auth bypass fix, sanitized error messages |
+
+### Phase 8 — OpenClaw Parity (Final)
+
+| Module | Status | Description |
+|:-------|:------:|:------------|
+| **Skills Auto-Discovery** | ✅ 100% | Agent auto-finds/installs skills from hub when tool confidence is low |
+| **Device Node Connectors** | ✅ 100% | Real SSH, ADB, and local transports with platform-specific commands |
+| **Canvas Bidirectional Events** | ✅ 100% | Browser→agent event routing, data binding observers, state queries |
 
 ---
 
@@ -839,6 +847,18 @@ buddy auth-profile remove <id>            # Remove a profile
 buddy auth-profile reset                  # Reset all cooldowns
 ```
 
+### Device Commands
+
+```bash
+buddy device list                         # List paired devices
+buddy device pair --id <id> --name <name> --transport <ssh|adb|local>  # Pair a device
+buddy device remove <id>                  # Remove a paired device
+buddy device snap <id> [-o output.png]    # Take a screenshot on device
+buddy device screenshot <id> [-o out.png] # Alias for snap
+buddy device record <id> [-d 10] [-o out] # Record screen (duration in seconds)
+buddy device run <id> -- <command>        # Run a command on device
+```
+
 ### Config Commands
 
 ```bash
@@ -1000,7 +1020,7 @@ npm run build
 ### Test Coverage
 
 ```
-23,500+ tests across 549+ suites covering:
+23,700+ tests across 554+ suites covering:
 - Core: Tool Policy, Bash Allowlist, Context Window Guard, Compaction
 - Agent: Middleware Pipeline, Profiles, Reasoning, Streaming
 - Autonomy: Daemon, Cron Bridge, Task Planner, Delegation Engine

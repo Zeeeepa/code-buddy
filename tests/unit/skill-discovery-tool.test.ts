@@ -27,7 +27,7 @@ import { SkillDiscoveryTool } from '../../src/tools/skill-discovery-tool.js';
 
 // Get the mock hub for assertions
 const getMockHub = () => {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+   
   const mod = require('../../src/skills/hub.js');
   return mod.__mockHub;
 };
