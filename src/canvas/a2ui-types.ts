@@ -506,9 +506,28 @@ export interface ErrorMessage {
 }
 
 /**
+ * canvasEvent: Sent by browser when user interacts with rendered components
+ * (click, submit, input_change, select)
+ */
+export interface CanvasEventMessage {
+  canvasEvent: {
+    /** Source surface ID */
+    surfaceId: string;
+    /** Component that triggered the event */
+    componentId: string;
+    /** Event type */
+    eventType: 'click' | 'submit' | 'input_change' | 'select';
+    /** Event value (input value, selected option, etc.) */
+    value?: unknown;
+    /** Event timestamp */
+    timestamp: number;
+  };
+}
+
+/**
  * Union of client messages
  */
-export type A2UIClientMessage = UserActionMessage | ErrorMessage;
+export type A2UIClientMessage = UserActionMessage | ErrorMessage | CanvasEventMessage;
 
 // ============================================================================
 // Canvas Control Messages

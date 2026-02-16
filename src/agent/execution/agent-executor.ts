@@ -64,6 +64,10 @@ export interface ExecutorConfig {
   getSessionCost: () => number;
   /** Returns maximum allowed session cost in USD */
   getSessionCostLimit: () => number;
+  /** Enable auto-discovery hint when tool confidence is low */
+  enableAutoDiscovery?: boolean;
+  /** Confidence threshold below which the auto-discovery hint is injected (default: 0.3) */
+  skillDiscoveryThreshold?: number;
 }
 
 /**
@@ -177,6 +181,19 @@ export class AgentExecutor {
       const selectionResult = await this.deps.toolSelectionStrategy.selectToolsForQuery(message);
       const tools = selectionResult.tools;
       this.deps.toolSelectionStrategy.cacheTools(tools);
+
+      // Auto-discovery hint: if confidence is low, nudge agent to discover skills
+      const enableAutoDiscovery = this.config.enableAutoDiscovery ?? true;
+      const threshold = this.config.skillDiscoveryThreshold ?? 0.3;
+      if (enableAutoDiscovery && selectionResult.confidence !== undefined && selectionResult.confidence < threshold) {
+        const lastMsg = messages[messages.length - 1];
+        if (lastMsg && lastMsg.role === 'user' && typeof lastMsg.content === 'string') {
+          messages.push({
+            role: 'system' as const,
+            content: 'Low tool confidence for this query. Consider using the `skill_discover` tool to search the Skills Hub for relevant capabilities.',
+          });
+        }
+      }
 
       // Apply context management
       const preparedMessages = this.deps.contextManager.prepareMessages(messages);

@@ -167,7 +167,7 @@ describe('Shell Completions', () => {
       });
 
       it('should include fish completion header', () => {
-        expect(fishCompletion).toContain('# Grok CLI Fish Completion');
+        expect(fishCompletion).toContain('# Code Buddy Fish Completion');
       });
 
       it('should include helper function', () => {

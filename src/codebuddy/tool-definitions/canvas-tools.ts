@@ -69,6 +69,9 @@ EXAMPLE - Simple Form:
             'start_server',
             'stop_server',
             'server_status',
+            'get_data',
+            'get_component_state',
+            'canvas_snapshot',
           ],
           description: 'The action to perform',
         },
@@ -143,6 +146,10 @@ EXAMPLE - Simple Form:
         host: {
           type: 'string',
           description: 'Server host (default: 127.0.0.1)',
+        },
+        componentId: {
+          type: 'string',
+          description: 'Component ID (for get_component_state action)',
         },
       },
       required: ['action'],

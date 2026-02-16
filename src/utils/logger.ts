@@ -13,6 +13,7 @@
 import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
+import { homedir } from 'os';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 export type LogFormat = 'text' | 'json';
@@ -370,11 +371,22 @@ export class Logger {
 let defaultLogger: Logger | null = null;
 
 /**
+ * Get the default log file path (~/.codebuddy/logs/codebuddy.log)
+ * Returns undefined in test environment to avoid file I/O
+ */
+function getDefaultLogFile(): string | undefined {
+  if (process.env.NODE_ENV === 'test') return undefined;
+  // Respect explicit LOG_FILE env var (including empty string to disable)
+  if (process.env.LOG_FILE !== undefined) return process.env.LOG_FILE || undefined;
+  return path.join(homedir(), '.codebuddy', 'logs', 'codebuddy.log');
+}
+
+/**
  * Get the default logger instance
  */
 export function getLogger(): Logger {
   if (!defaultLogger) {
-    defaultLogger = new Logger();
+    defaultLogger = new Logger({ logFile: getDefaultLogFile() });
   }
   return defaultLogger;
 }

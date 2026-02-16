@@ -527,8 +527,34 @@ async function processPromptHeadless(
     const confirmationService = ConfirmationService.getInstance();
     confirmationService.setSessionFlag("allOperations", true);
 
+    // Initialize interaction logger for headless session tracking
+    let interactionLogger: import('./logging/interaction-logger.js').InteractionLogger | null = null;
+    try {
+      const { getInteractionLogger } = await import('./logging/interaction-logger.js');
+      const il = getInteractionLogger();
+      il.startSession({
+        model: model || 'unknown',
+        provider: baseURL?.includes('localhost') ? 'local' : 'xai',
+        cwd: process.cwd(),
+        tags: ['headless'],
+      });
+      interactionLogger = il;
+    } catch (_err) {}
+
     // Process the user message
     const chatEntries = await agent.processUserMessage(prompt);
+
+    // Log entries to interaction logger
+    if (interactionLogger) {
+      for (const entry of chatEntries) {
+        if (entry.type === 'user' || entry.type === 'assistant') {
+          interactionLogger.logMessage({ role: entry.type, content: entry.content });
+        } else if (entry.type === 'tool_result' && entry.toolCall) {
+          interactionLogger.logMessage({ role: 'tool', content: entry.content });
+        }
+      }
+      interactionLogger.endSession();
+    }
 
     // Convert chat entries to OpenAI compatible message objects
     const messages: ChatCompletionMessageParam[] = [];
@@ -1249,6 +1275,31 @@ program
 
       console.log("🤖 Starting Code Buddy Conversational Assistant...\n");
 
+      // Initialize interaction logger for session tracking
+      try {
+        const { getInteractionLogger } = await import('./logging/interaction-logger.js');
+        const interactionLogger = getInteractionLogger();
+        const currentModel = agent.getCurrentModel?.() || model || 'unknown';
+        interactionLogger.startSession({
+          model: currentModel,
+          provider: baseURL?.includes('localhost') ? 'local' : 'xai',
+          cwd: process.cwd(),
+          tags: ['interactive'],
+        });
+        // Store logger on agent for use in message handlers
+        (agent as unknown as Record<string, unknown>).__interactionLogger = interactionLogger;
+
+        // End session on process exit
+        const cleanup = () => {
+          try { interactionLogger.endSession(); } catch (_err) {}
+        };
+        process.on('exit', cleanup);
+        process.on('SIGINT', () => { cleanup(); process.exit(0); });
+        process.on('SIGTERM', () => { cleanup(); process.exit(0); });
+      } catch (err) {
+        logger.warn('Failed to initialize interaction logger', { error: String(err) });
+      }
+
       await ensureUserSettingsDirectory();
 
       // Support variadic positional arguments for multi-word initial message
@@ -1577,6 +1628,11 @@ addLazyCommandGroup(program, 'heartbeat', 'Manage the heartbeat engine (periodic
 addLazyCommandGroup(program, 'hub', 'Skills marketplace (search, install, publish)', async () => {
   const { registerHubCommands } = await import('./commands/cli/openclaw-commands.js');
   registerHubCommands(program);
+});
+
+addLazyCommandGroup(program, 'device', 'Manage paired device nodes (SSH, ADB, local)', async () => {
+  const { registerDeviceCommands } = await import('./commands/cli/device-commands.js');
+  registerDeviceCommands(program);
 });
 
 addLazyCommandGroup(program, 'identity', 'Manage agent identity files (SOUL.md, USER.md, etc.)', async () => {

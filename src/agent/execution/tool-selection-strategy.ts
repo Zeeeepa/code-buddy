@@ -80,6 +80,8 @@ export interface SelectionResult {
   query: string;
   /** Selection timestamp */
   timestamp: Date;
+  /** Confidence score (0-1) based on best match score ratio */
+  confidence?: number;
 }
 
 /**
@@ -211,12 +213,21 @@ export class ToolSelectionStrategy {
     const promptCacheManager = getPromptCacheManager();
     promptCacheManager.cacheTools(tools);
 
+    // Compute confidence from selection scores
+    let confidence: number | undefined;
+    if (selection && selection.scores) {
+      const scoreValues = Array.from(selection.scores.values());
+      const maxScore = scoreValues.length > 0 ? Math.max(...scoreValues) : 0;
+      confidence = Math.min(1, maxScore / 10);
+    }
+
     return {
       tools,
       selection,
       fromCache: false,
       query,
       timestamp: new Date(),
+      confidence,
     };
   }
 

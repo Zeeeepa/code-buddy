@@ -19,6 +19,9 @@ import { ClientCommandDispatcher, ClientCommandContext } from "../commands/clien
 // Import file autocomplete
 import { extractFileReference, getFileSuggestions, FileSuggestion } from "../ui/components/FileAutocomplete.js";
 
+// Import interaction logger for session tracking
+import { getInteractionLogger } from "../logging/interaction-logger.js";
+
 // Import history manager for persistent command history
 import { getHistoryManager } from "../utils/history-manager.js";
 
@@ -578,6 +581,14 @@ export function useInputHandler({
     };
     setChatHistory((prev) => [...prev, userEntry]);
 
+    // Log user message to interaction logger
+    try {
+      const il = getInteractionLogger();
+      if (il.getCurrentSessionId()) {
+        il.logMessage({ role: 'user', content: userInput });
+      }
+    } catch (_err) {}
+
     setIsProcessing(true);
     clearInput();
 
@@ -634,6 +645,18 @@ export function useInputHandler({
               );
               streamingEntry = null;
 
+              // Log tool calls to interaction logger
+              try {
+                const il = getInteractionLogger();
+                if (il.getCurrentSessionId()) {
+                  il.logToolCalls(chunk.toolCalls.map(tc => ({
+                    id: tc.id,
+                    name: tc.function.name,
+                    arguments: JSON.parse(tc.function.arguments || '{}'),
+                  })));
+                }
+              } catch (_err) {}
+
               // Add individual tool call entries to show tools are being executed
               chunk.toolCalls.forEach((toolCall) => {
                 const toolCallEntry: ChatEntry = {
@@ -649,6 +672,18 @@ export function useInputHandler({
 
           case "tool_result":
             if (chunk.toolCall && chunk.toolResult) {
+              // Log tool result to interaction logger
+              try {
+                const il = getInteractionLogger();
+                if (il.getCurrentSessionId()) {
+                  il.logToolResult(chunk.toolCall.id, {
+                    success: chunk.toolResult.success,
+                    output: chunk.toolResult.output?.substring(0, 500),
+                    error: chunk.toolResult.error,
+                  });
+                }
+              } catch (_err) {}
+
               setChatHistory((prev) =>
                 prev.map((entry) => {
                   if (entry.isStreaming) {
@@ -684,6 +719,16 @@ export function useInputHandler({
               );
             }
             setIsStreaming(false);
+
+            // Log assistant response to interaction logger
+            if (fullResponseContent) {
+              try {
+                const il = getInteractionLogger();
+                if (il.getCurrentSessionId()) {
+                  il.logMessage({ role: 'assistant', content: fullResponseContent });
+                }
+              } catch (_err) {}
+            }
 
             // Auto-speak the response if enabled
             const ttsManager = getTTSManager();

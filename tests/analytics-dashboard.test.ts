@@ -173,7 +173,7 @@ describe('AnalyticsDashboard', () => {
     it('should export as markdown', async () => {
       const data = await dashboard.exportData('markdown');
 
-      expect(data).toContain('# Grok CLI Analytics Report');
+      expect(data).toContain('# Code Buddy Analytics Report');
       expect(data).toContain('## Usage Summary');
     });
   });

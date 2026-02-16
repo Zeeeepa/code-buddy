@@ -46,6 +46,7 @@ export interface A2UIManagerEvents {
 
 export class A2UIManager extends EventEmitter {
   private surfaces: Map<string, Surface> = new Map();
+  private dataObservers: Map<string, Map<string, Array<(value: unknown) => void>>> = new Map();
 
   constructor() {
     super();
@@ -142,6 +143,7 @@ export class A2UIManager extends EventEmitter {
 
     surface.updatedAt = new Date();
     this.emit('data:updated', surfaceId, path);
+    this.notifyDataObservers(surfaceId, path);
   }
 
   /**
@@ -1229,51 +1231,192 @@ export class A2UIManager extends EventEmitter {
       const surface = document.querySelector('[data-surface-id="${surfaceId}"]');
       if (!surface) return;
 
+      function sendCanvasEvent(componentId, eventType, value) {
+        const event = {
+          canvasEvent: {
+            surfaceId: '${surfaceId}',
+            componentId: componentId,
+            eventType: eventType,
+            value: value,
+            timestamp: Date.now()
+          }
+        };
+        if (window.a2uiSocket && window.a2uiSocket.readyState === 1) {
+          window.a2uiSocket.send(JSON.stringify(event));
+        }
+        document.dispatchEvent(new CustomEvent('a2ui:canvasEvent', { detail: event }));
+      }
+
       // Handle button clicks
       surface.addEventListener('click', function(e) {
         const button = e.target.closest('[data-action]');
         if (button && button.dataset.action) {
-          const action = {
+          const componentId = button.dataset.componentId || '';
+          sendCanvasEvent(componentId, 'click', button.dataset.action);
+          // Also emit legacy userAction
+          var action = {
             userAction: {
               name: button.dataset.action,
               surfaceId: '${surfaceId}',
-              componentId: button.dataset.componentId,
+              componentId: componentId,
               context: {}
             }
           };
-          console.log('A2UI Action:', action);
-          // Emit via WebSocket if connected
-          if (window.a2uiSocket) {
+          if (window.a2uiSocket && window.a2uiSocket.readyState === 1) {
             window.a2uiSocket.send(JSON.stringify(action));
           }
-          // Dispatch custom event
           document.dispatchEvent(new CustomEvent('a2ui:action', { detail: action }));
         }
       });
 
       // Handle input changes
       surface.addEventListener('change', function(e) {
-        const input = e.target;
-        if (input.dataset.componentId) {
-          const action = {
-            userAction: {
-              name: 'change',
-              surfaceId: '${surfaceId}',
-              componentId: input.dataset.componentId,
-              context: {
-                value: input.type === 'checkbox' ? input.checked : input.value
-              }
-            }
-          };
-          console.log('A2UI Change:', action);
-          if (window.a2uiSocket) {
-            window.a2uiSocket.send(JSON.stringify(action));
-          }
-          document.dispatchEvent(new CustomEvent('a2ui:action', { detail: action }));
+        var input = e.target;
+        if (input.dataset && input.dataset.componentId) {
+          var value = input.type === 'checkbox' ? input.checked : input.value;
+          sendCanvasEvent(input.dataset.componentId, 'input_change', value);
         }
+      });
+
+      // Handle select changes
+      surface.addEventListener('change', function(e) {
+        var select = e.target;
+        if (select.tagName === 'SELECT' && select.dataset && select.dataset.componentId) {
+          sendCanvasEvent(select.dataset.componentId, 'select', select.value);
+        }
+      });
+
+      // Handle form submissions
+      surface.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var form = e.target;
+        var formData = {};
+        var inputs = form.querySelectorAll('[data-component-id]');
+        inputs.forEach(function(input) {
+          formData[input.dataset.componentId] = input.type === 'checkbox' ? input.checked : input.value;
+        });
+        var surfaceEl = form.closest('[data-surface-id]');
+        var surfaceId = surfaceEl ? surfaceEl.dataset.surfaceId : '${surfaceId}';
+        sendCanvasEvent(form.dataset.componentId || 'form', 'submit', formData);
       });
     })();
     `;
+  }
+
+  // ==========================================================================
+  // Data Observers (reactive binding)
+  // ==========================================================================
+
+  /**
+   * Observe changes to a data path in a surface.
+   * The callback fires whenever processDataModelUpdate touches the observed path.
+   */
+  observeDataPath(surfaceId: string, dataPath: string, callback: (value: unknown) => void): void {
+    if (!this.dataObservers.has(surfaceId)) {
+      this.dataObservers.set(surfaceId, new Map());
+    }
+    const surfaceObservers = this.dataObservers.get(surfaceId)!;
+    if (!surfaceObservers.has(dataPath)) {
+      surfaceObservers.set(dataPath, []);
+    }
+    surfaceObservers.get(dataPath)!.push(callback);
+  }
+
+  /**
+   * Remove all observers for a surface.
+   */
+  removeDataObservers(surfaceId: string): void {
+    this.dataObservers.delete(surfaceId);
+  }
+
+  /**
+   * Notify data observers when data changes.
+   * Called from processDataModelUpdate.
+   */
+  private notifyDataObservers(surfaceId: string, updatedPath: string | undefined): void {
+    const surfaceObservers = this.dataObservers.get(surfaceId);
+    if (!surfaceObservers) return;
+
+    const surface = this.surfaces.get(surfaceId);
+    if (!surface) return;
+
+    for (const [observedPath, callbacks] of surfaceObservers) {
+      // Fire if the update is at the root or matches/overlaps the observed path
+      const shouldFire = !updatedPath ||
+        observedPath.startsWith(updatedPath) ||
+        updatedPath.startsWith(observedPath);
+
+      if (shouldFire) {
+        const value = this.getNestedValue(surface.dataModel, observedPath);
+        for (const cb of callbacks) {
+          try {
+            cb(value);
+          } catch {
+            // Ignore observer errors
+          }
+        }
+      }
+    }
+  }
+
+  // ==========================================================================
+  // State Queries (for agent access)
+  // ==========================================================================
+
+  /**
+   * Get a value from a surface's data model by dot-path.
+   */
+  getDataValue(surfaceId: string, dataPath: string): unknown {
+    const surface = this.surfaces.get(surfaceId);
+    if (!surface) return undefined;
+    return this.getNestedValue(surface.dataModel, dataPath);
+  }
+
+  /**
+   * Get the full data model for a surface.
+   */
+  getDataModel(surfaceId: string): Record<string, unknown> | undefined {
+    return this.surfaces.get(surfaceId)?.dataModel;
+  }
+
+  /**
+   * Get a component by ID from a surface.
+   */
+  getComponent(surfaceId: string, componentId: string): A2UIComponent | undefined {
+    return this.surfaces.get(surfaceId)?.components.get(componentId);
+  }
+
+  /**
+   * Get a full snapshot of a surface (components, data, state).
+   */
+  getSurfaceSnapshot(surfaceId: string): {
+    id: string;
+    visible: boolean;
+    root?: string;
+    componentCount: number;
+    components: Array<{ id: string; type: string }>;
+    dataModel: Record<string, unknown>;
+    createdAt: string;
+    updatedAt: string;
+  } | null {
+    const surface = this.surfaces.get(surfaceId);
+    if (!surface) return null;
+
+    const components = Array.from(surface.components.values()).map(c => ({
+      id: c.id,
+      type: Object.keys(c.component)[0],
+    }));
+
+    return {
+      id: surface.id,
+      visible: surface.visible,
+      root: surface.root,
+      componentCount: components.length,
+      components,
+      dataModel: { ...surface.dataModel },
+      createdAt: surface.createdAt.toISOString(),
+      updatedAt: surface.updatedAt.toISOString(),
+    };
   }
 
   // ==========================================================================

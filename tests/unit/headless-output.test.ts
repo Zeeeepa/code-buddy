@@ -300,7 +300,7 @@ describe('Headless Output', () => {
     it('should include main header', () => {
       const md = formatAsMarkdown(sampleResult);
 
-      expect(md).toContain('# Grok CLI Result');
+      expect(md).toContain('# Code Buddy Result');
     });
 
     it('should include conversation section', () => {
@@ -764,7 +764,7 @@ describe('Headless Output', () => {
     it('should format as markdown', () => {
       const output = formatOutput(sampleResult, 'markdown');
 
-      expect(output).toContain('# Grok CLI Result');
+      expect(output).toContain('# Code Buddy Result');
       expect(output).toContain('## Summary');
     });
 

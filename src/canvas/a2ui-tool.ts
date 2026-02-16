@@ -32,7 +32,10 @@ export type A2UIAction =
   | 'list_surfaces'
   | 'start_server'
   | 'stop_server'
-  | 'server_status';
+  | 'server_status'
+  | 'get_data'
+  | 'get_component_state'
+  | 'canvas_snapshot';
 
 export interface A2UIToolInput {
   /** Action to perform */
@@ -72,6 +75,9 @@ export interface A2UIToolInput {
 
   /** Server host */
   host?: string;
+
+  /** Component ID (for get_component_state) */
+  componentId?: string;
 }
 
 export interface A2UIToolResult {
@@ -137,6 +143,15 @@ export class A2UITool {
 
         case 'server_status':
           return this.serverStatus();
+
+        case 'get_data':
+          return this.getData(input);
+
+        case 'get_component_state':
+          return this.getComponentState(input);
+
+        case 'canvas_snapshot':
+          return this.canvasSnapshot(input);
 
         default:
           return {
@@ -422,6 +437,88 @@ export class A2UITool {
       success: true,
       output: `${surfaces.length} surface(s) found`,
       data: { surfaces },
+    };
+  }
+
+  // ==========================================================================
+  // State Query Actions
+  // ==========================================================================
+
+  /**
+   * Get data from a surface's data model
+   */
+  private getData(input: A2UIToolInput): A2UIToolResult {
+    if (!input.surfaceId) {
+      return { success: false, error: 'surfaceId is required' };
+    }
+
+    if (input.dataPath) {
+      const value = this.manager.getDataValue(input.surfaceId, input.dataPath);
+      return {
+        success: true,
+        output: `Data at '${input.dataPath}': ${JSON.stringify(value)}`,
+        data: { path: input.dataPath, value },
+      };
+    }
+
+    const model = this.manager.getDataModel(input.surfaceId);
+    if (!model) {
+      return { success: false, error: `Surface '${input.surfaceId}' not found` };
+    }
+
+    return {
+      success: true,
+      output: `Data model for '${input.surfaceId}' (${Object.keys(model).length} keys)`,
+      data: model,
+    };
+  }
+
+  /**
+   * Get component state from a surface
+   */
+  private getComponentState(input: A2UIToolInput): A2UIToolResult {
+    if (!input.surfaceId) {
+      return { success: false, error: 'surfaceId is required' };
+    }
+    if (!input.componentId) {
+      return { success: false, error: 'componentId is required' };
+    }
+
+    const component = this.manager.getComponent(input.surfaceId, input.componentId);
+    if (!component) {
+      return {
+        success: false,
+        error: `Component '${input.componentId}' not found in surface '${input.surfaceId}'`,
+      };
+    }
+
+    const type = Object.keys(component.component)[0];
+    const props = (component.component as Record<string, unknown>)[type];
+
+    return {
+      success: true,
+      output: `Component '${input.componentId}' (${type})`,
+      data: { id: component.id, type, props },
+    };
+  }
+
+  /**
+   * Get a full snapshot of a surface's state
+   */
+  private canvasSnapshot(input: A2UIToolInput): A2UIToolResult {
+    if (!input.surfaceId) {
+      return { success: false, error: 'surfaceId is required' };
+    }
+
+    const snapshot = this.manager.getSurfaceSnapshot(input.surfaceId);
+    if (!snapshot) {
+      return { success: false, error: `Surface '${input.surfaceId}' not found` };
+    }
+
+    return {
+      success: true,
+      output: `Snapshot of '${input.surfaceId}': ${snapshot.componentCount} components, visible=${snapshot.visible}`,
+      data: snapshot,
     };
   }
 

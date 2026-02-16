@@ -62,6 +62,8 @@ export interface ToolSelectionResult {
   reducedTokens: number;
   /** Estimated token count if all tools were included */
   originalTokens: number;
+  /** Overall confidence in tool selection (0-1), based on best match score ratio */
+  confidence?: number;
 }
 
 /**

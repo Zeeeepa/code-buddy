@@ -12,6 +12,8 @@
 import type { ToolResult } from '../../types/index.js';
 import type { ITool, ToolSchema, IToolMetadata, IValidationResult, ToolCategoryType } from './types.js';
 import { ReasoningTool } from '../index.js';
+import { SkillDiscoveryTool } from '../skill-discovery-tool.js';
+import { DeviceTool } from '../device-tool.js';
 
 // Lazy-loaded browser-automation module (accessibility + refs)
 import type { BrowserTool as BrowserAutomationTool, BrowserToolInput } from '../../browser-automation/index.js';
@@ -438,6 +440,187 @@ export class ReasoningExecuteTool implements ITool {
 }
 
 // ============================================================================
+// SkillDiscoveryExecuteTool
+// ============================================================================
+
+let skillDiscoveryInstance: SkillDiscoveryTool | null = null;
+
+function getSkillDiscovery(): SkillDiscoveryTool {
+  if (!skillDiscoveryInstance) {
+    skillDiscoveryInstance = new SkillDiscoveryTool();
+  }
+  return skillDiscoveryInstance;
+}
+
+/**
+ * SkillDiscoveryExecuteTool - ITool adapter for skill auto-discovery
+ */
+export class SkillDiscoveryExecuteTool implements ITool {
+  readonly name = 'skill_discover';
+  readonly description = 'Search the Skills Hub for capabilities matching a query. Optionally auto-install the top result to expand the agent toolset at runtime.';
+
+  async execute(input: Record<string, unknown>): Promise<ToolResult> {
+    return await getSkillDiscovery().execute({
+      query: input.query as string,
+      tags: input.tags as string[] | undefined,
+      auto_install: input.auto_install as boolean | undefined,
+      limit: input.limit as number | undefined,
+    });
+  }
+
+  getSchema(): ToolSchema {
+    return {
+      name: this.name,
+      description: this.description,
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'Search query to find relevant skills',
+          },
+          tags: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Tags to filter by',
+          },
+          auto_install: {
+            type: 'boolean',
+            description: 'Automatically install the top matching skill (default: false)',
+          },
+          limit: {
+            type: 'number',
+            description: 'Maximum number of results to return (default: 5)',
+          },
+        },
+        required: ['query'],
+      },
+    };
+  }
+
+  validate(input: unknown): IValidationResult {
+    if (typeof input !== 'object' || input === null) {
+      return { valid: false, errors: ['Input must be an object'] };
+    }
+
+    const data = input as Record<string, unknown>;
+    if (typeof data.query !== 'string' || data.query.trim() === '') {
+      return { valid: false, errors: ['query must be a non-empty string'] };
+    }
+
+    return { valid: true };
+  }
+
+  getMetadata(): IToolMetadata {
+    return {
+      name: this.name,
+      description: this.description,
+      category: 'utility' as ToolCategoryType,
+      keywords: ['skill', 'discover', 'install', 'capability', 'hub', 'search', 'plugin'],
+      priority: 3,
+      requiresConfirmation: false,
+      modifiesFiles: false,
+      makesNetworkRequests: true,
+    };
+  }
+
+  isAvailable(): boolean {
+    return true;
+  }
+}
+
+// ============================================================================
+// DeviceExecuteTool
+// ============================================================================
+
+let deviceToolInstance: DeviceTool | null = null;
+
+function getDeviceTool(): DeviceTool {
+  if (!deviceToolInstance) {
+    deviceToolInstance = new DeviceTool();
+  }
+  return deviceToolInstance;
+}
+
+/**
+ * DeviceExecuteTool - ITool adapter for device management
+ */
+export class DeviceExecuteTool implements ITool {
+  readonly name = 'device_manage';
+  readonly description = 'Manage paired devices (SSH/ADB/local). List, pair, remove, screenshot, camera snap, screen record, get location, run commands.';
+
+  async execute(input: Record<string, unknown>): Promise<ToolResult> {
+    return await getDeviceTool().execute({
+      action: input.action as 'list' | 'pair' | 'remove' | 'snap' | 'screenshot' | 'record' | 'location' | 'run',
+      deviceId: input.deviceId as string | undefined,
+      name: input.name as string | undefined,
+      transport: input.transport as 'ssh' | 'adb' | 'local' | undefined,
+      address: input.address as string | undefined,
+      port: input.port as number | undefined,
+      username: input.username as string | undefined,
+      keyPath: input.keyPath as string | undefined,
+      command: input.command as string | undefined,
+      duration: input.duration as number | undefined,
+    });
+  }
+
+  getSchema(): ToolSchema {
+    return {
+      name: this.name,
+      description: this.description,
+      parameters: {
+        type: 'object',
+        properties: {
+          action: {
+            type: 'string',
+            enum: ['list', 'pair', 'remove', 'snap', 'screenshot', 'record', 'location', 'run'],
+            description: 'Device action to perform',
+          },
+          deviceId: { type: 'string', description: 'Device identifier' },
+          name: { type: 'string', description: 'Display name for pairing' },
+          transport: { type: 'string', enum: ['ssh', 'adb', 'local'], description: 'Transport type for pairing' },
+          address: { type: 'string', description: 'Connection address (host/IP)' },
+          port: { type: 'number', description: 'Connection port' },
+          username: { type: 'string', description: 'SSH username' },
+          keyPath: { type: 'string', description: 'Path to SSH key' },
+          command: { type: 'string', description: 'Command to run (for run action)' },
+          duration: { type: 'number', description: 'Recording duration in seconds (for record action)' },
+        },
+        required: ['action'],
+      },
+    };
+  }
+
+  validate(input: unknown): IValidationResult {
+    if (typeof input !== 'object' || input === null) {
+      return { valid: false, errors: ['Input must be an object'] };
+    }
+    const data = input as Record<string, unknown>;
+    if (typeof data.action !== 'string' || data.action.trim() === '') {
+      return { valid: false, errors: ['action must be a non-empty string'] };
+    }
+    return { valid: true };
+  }
+
+  getMetadata(): IToolMetadata {
+    return {
+      name: this.name,
+      description: this.description,
+      category: 'utility' as ToolCategoryType,
+      keywords: ['device', 'ssh', 'adb', 'android', 'remote', 'screenshot', 'camera', 'screen', 'record'],
+      priority: 4,
+      requiresConfirmation: true,
+      modifiesFiles: false,
+      makesNetworkRequests: true,
+    };
+  }
+
+  isAvailable(): boolean {
+    return true;
+  }
+}
+
+// ============================================================================
 // Factory Function
 // ============================================================================
 
@@ -450,5 +633,7 @@ export function createMiscTools(): ITool[] {
     new ComputerControlExecuteTool(),
     new ScreenshotExecuteTool(),
     new ReasoningExecuteTool(),
+    new SkillDiscoveryExecuteTool(),
+    new DeviceExecuteTool(),
   ];
 }

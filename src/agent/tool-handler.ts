@@ -625,6 +625,24 @@ export class ToolHandler {
     }
   }
 
+  /**
+   * Refresh tools from skills directories.
+   * Called after auto-installing a skill via SkillDiscoveryTool
+   * to make newly installed skill tools available to the agent.
+   */
+  public async refreshToolsFromSkills(): Promise<void> {
+    try {
+      const { SkillRegistry } = await import('../skills/skill-registry.js');
+      const registry = new SkillRegistry();
+      await registry.refresh();
+      logger.info('Tool registry refreshed from skills');
+    } catch (err) {
+      logger.warn('Failed to refresh tools from skills', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   private async executePluginTool(toolCall: CodeBuddyToolCall): Promise<ToolResult> {
     try {
       const args = JSON.parse(toolCall.function.arguments);

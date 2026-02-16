@@ -923,7 +923,7 @@ describe('Output Formatter (Headless)', () => {
     it('should include header', () => {
       const md = formatAsMarkdown(sampleResult);
 
-      expect(md).toContain('# Grok CLI Result');
+      expect(md).toContain('# Code Buddy Result');
     });
 
     it('should include conversation section', () => {
@@ -957,7 +957,7 @@ describe('Output Formatter (Headless)', () => {
 
       expect(() => JSON.parse(json)).not.toThrow();
       expect(text).toContain('> Test message');
-      expect(md).toContain('# Grok CLI Result');
+      expect(md).toContain('# Code Buddy Result');
     });
 
     it('should handle stream-json format', () => {

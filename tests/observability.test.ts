@@ -369,7 +369,7 @@ describe('TerminalDashboard', () => {
   it('should render dashboard', () => {
     const output = dashboard.render();
 
-    expect(output).toContain('GROK CLI OBSERVABILITY');
+    expect(output).toContain('CODE BUDDY OBSERVABILITY');
     expect(output).toContain('Overview');
     expect(output).toContain('Uptime');
   });

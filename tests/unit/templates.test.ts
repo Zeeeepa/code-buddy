@@ -1171,7 +1171,7 @@ describe('Markdown Template', () => {
 
     const result = markdownTemplate(data, options);
 
-    expect(result).toContain('Exported from Grok CLI');
+    expect(result).toContain('Exported from Code Buddy');
   });
 });
 
@@ -1407,7 +1407,7 @@ describe('HTML Template', () => {
 
     expect(result).toContain('<footer>');
     expect(result).toContain('Exported on');
-    expect(result).toContain('Grok CLI');
+    expect(result).toContain('Code Buddy');
   });
 
   it('should include print-friendly styles', () => {

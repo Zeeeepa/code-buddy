@@ -155,7 +155,7 @@ describe('Core Handlers', () => {
       expect(result.handled).toBe(true);
       expect(result.entry).toBeDefined();
       expect(result.entry?.type).toBe('assistant');
-      expect(result.entry?.content).toContain('GROK CLI COMMANDS');
+      expect(result.entry?.content).toContain('CODE BUDDY COMMANDS');
     });
 
     test('should categorize commands', async () => {

@@ -12,6 +12,7 @@ import type {
   A2UIMessage,
   A2UIClientMessage,
   UserActionMessage,
+  CanvasEventMessage,
   ErrorMessage,
   CanvasCommand,
 } from './a2ui-types.js';
@@ -283,6 +284,8 @@ export class A2UIServer extends EventEmitter {
       this.handleSubscribe(clientId, message.subscribe);
     } else if (message.unsubscribe && typeof message.unsubscribe === 'string') {
       this.handleUnsubscribe(clientId, message.unsubscribe);
+    } else if (message.canvasEvent) {
+      this.handleCanvasEvent(clientId, message as unknown as CanvasEventMessage);
     } else if (message.userAction) {
       this.handleUserAction(clientId, message as unknown as UserActionMessage);
     } else if (message.ping) {
@@ -383,6 +386,32 @@ export class A2UIServer extends EventEmitter {
     this.sendToClient(clientId, {
       unsubscribed: surfaceId,
     });
+  }
+
+  /**
+   * Handle canvas event from browser client.
+   * Converts to a user action and routes through the existing event system.
+   */
+  private handleCanvasEvent(clientId: string, event: CanvasEventMessage): void {
+    const { surfaceId, componentId, eventType, value, timestamp } = event.canvasEvent;
+
+    // Convert canvas event to user action for unified handling
+    const userAction: UserActionMessage = {
+      userAction: {
+        name: eventType,
+        surfaceId,
+        componentId,
+        context: {
+          eventType,
+          value,
+          timestamp,
+          source: 'canvas',
+        },
+      },
+    };
+
+    this.emit('user:action', userAction, clientId);
+    this.manager.handleUserAction(userAction);
   }
 
   /**

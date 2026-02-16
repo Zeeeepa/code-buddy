@@ -132,7 +132,7 @@ describe('Help Command Handler', () => {
     it('should have title header', async () => {
       const result = await handleHelp();
 
-      expect(result.entry?.content).toContain('GROK CLI COMMANDS');
+      expect(result.entry?.content).toContain('CODE BUDDY COMMANDS');
     });
 
     it('should include Core category', async () => {

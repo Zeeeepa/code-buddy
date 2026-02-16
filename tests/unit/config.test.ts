@@ -274,7 +274,7 @@ denylist = ["rm -rf /", "sudo .*"]
       it('should include header comment', () => {
         const toml = serializeTOML(DEFAULT_CONFIG);
 
-        expect(toml).toContain('# Grok CLI Configuration');
+        expect(toml).toContain('# Code Buddy Configuration');
       });
 
       it('should serialize provider configurations', () => {

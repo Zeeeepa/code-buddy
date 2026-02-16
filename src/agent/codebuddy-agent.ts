@@ -987,6 +987,24 @@ export class CodeBuddyAgent extends BaseAgent {
   }
 
   /**
+   * Handle a canvas event from the A2UI server.
+   * Converts the event into a user message and processes it through the agent.
+   */
+  async onCanvasEvent(event: {
+    surfaceId: string;
+    componentId?: string;
+    name: string;
+    context?: Record<string, unknown>;
+  }): Promise<void> {
+    const message = `[Canvas Event] ${event.name} on component "${event.componentId || 'unknown'}" in surface "${event.surfaceId}"${event.context ? `: ${JSON.stringify(event.context)}` : ''}`;
+    try {
+      await this.processUserMessage(message);
+    } catch (err) {
+      this.emit('error', err instanceof Error ? err : new Error(String(err)));
+    }
+  }
+
+  /**
    * Clean up all resources
    * Should be called when the agent is no longer needed
    */
