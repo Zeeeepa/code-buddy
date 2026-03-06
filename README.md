@@ -51,7 +51,7 @@ It works as two things at once:
 **Key highlights:**
 - 6 AI providers with automatic failover
 - 40 bundled skills (PR workflow, DevOps, creative tools, smart home, media)
-- 11 messaging channels (Terminal, Telegram, Discord, Slack, WhatsApp, Signal, Teams, Matrix, Google Chat, WebChat, HTTP API)
+- 22+ messaging channels (Terminal, Telegram, Discord, Slack, WhatsApp, Signal, Teams, Matrix, Google Chat, WebChat, IRC, Feishu/Lark, Synology Chat, LINE, Nostr, Zalo, Mattermost, Nextcloud Talk, Twilio Voice, iMessage, Twitch, Gmail)
 - Daemon mode for 24/7 background operation
 - Multi-agent orchestration with self-healing
 - Voice conversation with wake word detection
@@ -74,6 +74,16 @@ It works as two things at once:
 - Per-channel streaming policies (Telegram, Discord, Slack, WhatsApp each get their own chunking/format rules)
 - SSRF guard on all outbound fetches (IPv4 + IPv6 bypass vector blocking)
 - Tool prefix naming convention (`shell_exec`, `file_read`, `browser_search`, … — Codex-style canonical aliases)
+- Gateway WebSocket protocol (connect/hello-ok handshake, device identity, presence, session patching)
+- Lobster typed workflow engine (DAG pipelines with approval gates, pause/resume tokens)
+- Send policy engine (rule-based deny/allow per channel, chat type, peer)
+- Message preprocessing pipeline (media detection → audio transcription → link extraction → content enrichment)
+- Companion app node system (device pairing, platform capabilities, remote invocation)
+- Encrypted secrets vault (AES-256-GCM with scrypt key derivation)
+- Cross-platform service installer (launchd, systemd, Task Scheduler)
+- Cloud deployment configs (Fly.io, Railway, Render, Hetzner, Northflank, GCP) + Nix flake
+- Self-update CLI (`buddy update --channel stable|beta|dev`)
+- Canvas HTTP serving with A2UI host page
 
 ---
 
@@ -288,15 +298,37 @@ Code Buddy is an evolution of the **OpenClaw** architecture, modernized for the 
 |:---|:---|:---|:---|
 | **Language** | Python | **TypeScript / Node.js** | Python |
 | **Philosophy** | Tool-Based | **Hybrid (Tool + CodeAct)** | Pure CodeAct |
-| **Messaging** | Multi-channel | **11+ Channels (Telegram focus)** | Web Interface |
+| **Messaging** | Multi-channel | **22+ Channels (Telegram focus)** | Web Interface |
 | **Task State** | Heartbeat | **Persistent PLAN.md + Workspace** | Transient Session |
 | **Concurrency** | Lane Queue | **Advanced Lane Queue + DAG** | Sequential |
 | **Extensibility** | SKILL.md | **Skills Hub + Plugins + MCP** | Custom Scripts |
+| **Gateway** | WebSocket | **WebSocket (connect/hello-ok, presence)** | HTTP |
+| **Workflows** | — | **Lobster DAG engine + approval gates** | Sequential |
+| **Deployment** | Docker | **6 cloud platforms + Nix + OS services** | Docker |
+| **Secrets** | Env vars | **AES-256-GCM encrypted vault** | Env vars |
+| **Nodes** | — | **Companion app pairing + invocation** | — |
 
 **Why Code Buddy?**
 It combines the **industrial-grade reliability** of OpenClaw (concurrency control, security policies, multi-channel messaging) with the **infinite flexibility** of Open Manus (dynamic script generation and execution).
 
 > **Manus AI influence:** Wide Research (parallel sub-agent research workers), Knowledge Base injection, **todo.md attention bias** (task list at end of context each turn), and **restorable context compression** (identifier-based content recovery) are all inspired by Manus AI's context engineering research. The **pre-compaction NO_REPLY flush** pattern is from OpenClaw's compaction documentation.
+
+#### Where Code Buddy Surpasses OpenClaw
+
+| Capability | Code Buddy | OpenClaw |
+|:-----------|:-----------|:---------|
+| **Reasoning** | Tree-of-Thought + MCTS (4 depth levels), auto-escalation, `reason` tool | Provider-level thinking only |
+| **Auto-Repair** | `FaultLocalizer` → `IterativeRepair` → `RepairTemplates` (3-pass, AST-based) | No equivalent |
+| **Tool Selection** | RAG embedding filter (~110 tools, top-K per query) | All tools sent every turn |
+| **Context Engineering** | 5 exclusive techniques: pre-compaction flush, restorable compression, observation variator, importance-weighted sliding window, tool result compaction | Basic sliding window |
+| **Specialized Agents** | 7 built-in (PDF, Excel, DataAnalysis, SQL, Archive, CodeGuardian, SecurityReview) | Community skills only |
+| **Desktop Automation** | 3 native OS providers (Windows, macOS, Linux) + smart snapshots | Browser-only automation |
+| **Vision / OCR** | Tesseract.js OCR + Sharp image processing (native, offline) | Model-dependent only |
+| **Middleware Pipeline** | 11 composable before/after hooks with priorities | No middleware system |
+| **Observability** | OpenTelemetry + Sentry + Prometheus + JSONL RunStore | Skill-based only |
+| **Plugin Isolation** | Worker thread sandboxing with conflict detection | In-process execution |
+| **GPU Monitoring** | Built-in for local LLM deployments (Ollama, LM Studio) | Not available |
+| **Security Track Record** | No known CVEs | CVE-2026-25253 (RCE via tool_call) |
 
 ### Code Safety
 
@@ -502,7 +534,7 @@ buddy trigger remove <id>      # Remove a trigger
 
 ## Multi-Channel Messaging
 
-Code Buddy supports 11 messaging channels:
+Code Buddy supports 22+ messaging channels:
 
 | Channel | Features |
 |:--------|:---------|
@@ -517,6 +549,18 @@ Code Buddy supports 11 messaging channels:
 | **Google Chat** | Workspace API (JWT auth, webhook events) |
 | **Microsoft Teams** | Bot Framework (OAuth2, adaptive cards) |
 | **Matrix** | matrix-js-sdk (E2EE, threads, media) |
+| **IRC** | SASL auth, TLS, multi-channel, notices, actions |
+| **Feishu/Lark** | Text, card, image messages, group chat |
+| **Synology Chat** | Incoming/outgoing webhooks |
+| **LINE** | Messaging API, rich messages |
+| **Nostr** | Decentralized relay protocol |
+| **Zalo** | OA API (Vietnam) |
+| **Mattermost** | Self-hosted Slack alternative |
+| **Nextcloud Talk** | On-premise collaboration |
+| **Twilio Voice** | Voice calls via TwiML |
+| **iMessage** | macOS-only applescript bridge |
+| **Twitch** | IRC-based chat integration |
+| **Gmail** | Pub/Sub webhook notifications |
 
 ### Telegram (Deep Dive)
 
@@ -657,6 +701,25 @@ await signal.connect();
 // Matrix (E2EE, threads)
 const matrix = new MatrixChannel({ homeserverUrl: 'https://matrix.org', accessToken: '...' });
 await matrix.connect();
+
+// IRC (SASL, TLS, multi-channel)
+const irc = new IRCChannel({
+  server: 'irc.libera.chat', port: 6697, nick: 'codebuddy',
+  channels: ['#dev'], useTLS: true, sasl: { username: '...', password: '...' },
+});
+await irc.connect();
+
+// Feishu/Lark (Enterprise)
+const feishu = new FeishuChannel({
+  appId: '...', appSecret: '...', encryptKey: '...',
+});
+await feishu.connect();
+
+// Synology Chat (self-hosted)
+const synology = new SynologyChatChannel({
+  baseUrl: 'https://nas.local:5001', incomingWebhookUrl: '...', outgoingToken: '...',
+});
+await synology.connect();
 ```
 
 ---
@@ -668,11 +731,13 @@ await matrix.connect();
 Run Code Buddy 24/7 in the background:
 
 ```bash
-buddy daemon start [--detach]  # Start background daemon
-buddy daemon stop              # Stop daemon
-buddy daemon restart           # Restart daemon
-buddy daemon status            # Show daemon status and services
-buddy daemon logs [--lines N]  # View daemon logs
+buddy daemon start [--detach]       # Start background daemon
+buddy daemon start --install-daemon # Install as OS service (launchd/systemd/Task Scheduler)
+buddy daemon start --foreground     # Run in foreground (no detach)
+buddy daemon stop                   # Stop daemon
+buddy daemon restart                # Restart daemon
+buddy daemon status                 # Show daemon status and services
+buddy daemon logs [--lines N]       # View daemon logs
 ```
 
 Features:
@@ -680,6 +745,9 @@ Features:
 - Auto-restart on crash (max 3 retries)
 - Service registry and health monitoring (CPU, memory)
 - **Heartbeat engine** — periodic agent wake with HEARTBEAT.md checklist, smart suppression, active hours
+- **Daily session reset** — automatic context boundary at configurable time (default 04:00), idle timeout, per-channel/per-type overrides
+- **Session maintenance** — auto-prune sessions older than N days, rotate store files exceeding size limits, cap max entries
+- **Cross-platform service installer** — `launchd` plist (macOS), `systemd` user service (Linux), Task Scheduler XML (Windows)
 
 ```bash
 buddy heartbeat start          # Start the heartbeat engine
@@ -769,6 +837,11 @@ Code Buddy supports multiple AI providers with automatic failover:
 | **Gemini** (Google) | gemini-2.0-flash (+ vision) | 2M | `GOOGLE_API_KEY` |
 | **LM Studio** | Any local model | Varies | `--base-url http://localhost:1234/v1` |
 | **Ollama** | llama3, codellama, etc. | Varies | `--base-url http://localhost:11434/v1` |
+| **Mistral** | mistral-large, codestral | 128K | `MISTRAL_API_KEY` |
+| **Deepgram** | Speech-to-text | — | `DEEPGRAM_API_KEY` |
+| **MiniMax** | abab-series | 128K | `MINIMAX_API_KEY` |
+| **Moonshot** | moonshot-v1 | 128K | `MOONSHOT_API_KEY` |
+| **Venice AI** | Open models | Varies | `VENICE_API_KEY` |
 
 **Model failover chain** — cascading provider fallback with health tracking and cooldown periods.
 
@@ -981,9 +1054,29 @@ CodeBuddyAgent
     │       - Push notifications with priority levels
     │       - Rate limiting and quiet hours
     │
-    └── DaemonManager           # Background process lifecycle
-            - PID file management, auto-restart
-            - Service registry, health monitoring
+    ├── DaemonManager           # Background process lifecycle
+    │       - PID file management, auto-restart
+    │       - Service registry, health monitoring
+    │       - Daily session reset + idle timeout
+    │       - Cross-platform service installer
+    │
+    ├── LobsterEngine           # Typed workflow engine
+    │       - DAG-based pipeline execution
+    │       - Approval gates with pause/resume tokens
+    │       - Variable resolution + cycle detection
+    │
+    ├── NodeManager             # Companion app system
+    │       - Device pairing with short codes
+    │       - Platform capability maps (20+ capabilities)
+    │       - Remote invocation (camera, location, clipboard, etc.)
+    │
+    ├── SendPolicyEngine        # Message send policy
+    │       - Rule-based deny/allow per channel/chatType/peer
+    │       - Runtime overrides via /send on|off|inherit
+    │
+    └── MessagePreprocessor     # Inbound message pipeline
+            - Media detection → audio transcription
+            - Link extraction → content enrichment
 ```
 
 ### Core Flow
@@ -1055,6 +1148,36 @@ ws.send(JSON.stringify({
   payload: { messages: [{ role: 'user', content: 'Hello' }] }
 }));
 ```
+
+### Gateway WebSocket Protocol
+
+The gateway server (`src/gateway/`) provides a centralized WebSocket control plane for multi-client communication:
+
+```
+Client → connect (deviceId, role, protocolVersion)
+Server → hello_ok (paired, uptime, stateVersion, presence[], health, authRequired)
+Client → auth (token or password)
+Server → auth_success
+Client → chat / session_create / session_join / session_patch / presence
+```
+
+**Auth modes:** `token` (JWT), `password`, `none`
+**Bind modes:** `loopback` (127.0.0.1), `all` (0.0.0.0), `tailscale` (Tailscale Serve handles exposure)
+
+**Features:**
+- Device identity with challenge nonce verification
+- Presence tracking (online/offline/away/typing)
+- Per-session config patching (thinking level, verbose, model, activation)
+- Session management (create, join, leave, broadcast)
+- Ping/pong heartbeat with connection timeout
+
+### Canvas & A2UI
+
+Canvas HTTP serving at `/__codebuddy__/canvas/` and `/__codebuddy__/a2ui/` for rich interactive output:
+
+- Push arbitrary content (HTML, Markdown, JSON, SVGs) to a named canvas
+- A2UI host page for agent-generated UI components
+- Eval endpoint for dynamic content execution
 
 ### MCP Servers
 
@@ -1253,8 +1376,9 @@ buddy groups status|list|block|unblock
 # Auth Profiles
 buddy auth-profile list|add|remove|reset
 
-# Devices
+# Devices & Nodes
 buddy device list|pair|remove|snap|screenshot|record|run
+buddy nodes list|pair|approve|describe|remove|invoke|pending
 
 # Config
 buddy config show|validate|get
@@ -1270,6 +1394,18 @@ buddy knowledge list|show|search|add|remove|context
 
 # DM Pairing
 buddy pairing status|list|pending|approve <code>|add <id>|revoke <id>
+
+# Encrypted Secrets Vault
+buddy secrets list|set|get|remove|rotate|audit|import-env
+
+# Approvals
+buddy approvals list|approve|deny|policy
+
+# Cloud Deployment
+buddy deploy platforms|init|nix
+
+# Self-Update
+buddy update [--channel stable|beta|dev] [--check] [--force]
 
 # Wide Research
 buddy research "<topic>" [--workers N] [--rounds N] [--output file.md]
@@ -1323,6 +1459,14 @@ buddy doctor           # Environment diagnostics
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token (from @BotFather) | - |
 | `DISCORD_TOKEN` | Discord bot token | - |
 | `SLACK_BOT_TOKEN` | Slack bot token | - |
+| `MISTRAL_API_KEY` | Mistral AI API key | - |
+| `MINIMAX_API_KEY` | MiniMax API key | - |
+| `MOONSHOT_API_KEY` | Moonshot (Kimi) API key | - |
+| `VENICE_API_KEY` | Venice AI API key | - |
+| `DEEPGRAM_API_KEY` | Deepgram speech-to-text | - |
+| `IRC_SERVER` | IRC server hostname | - |
+| `FEISHU_APP_ID` | Feishu/Lark app ID | - |
+| `FEISHU_APP_SECRET` | Feishu/Lark app secret | - |
 
 **Optional Rust tools:**
 
@@ -1389,6 +1533,10 @@ npm run build
 - Middleware: Auto-Repair, Quality Gates, Reasoning, Workflow Guard
 - Voice: Wake Word, TTS Providers, Voice Control Loop
 - UI: ChatHistory, ChatInterface, TabbedQuestion
+- Channels: IRC, Feishu, Synology Chat, Gmail Pub/Sub, Twitch, Tlon
+- Gateway: WebSocket transport, connect/hello-ok handshake, session patching, presence
+- Workflows: Lobster DAG engine, approval gates, resume tokens, cycle detection
+- Daemon: Daily reset, idle timeout, session maintenance, service installer
 ```
 
 ---
@@ -1463,7 +1611,7 @@ Code Buddy's architecture draws from these open-source projects:
 | **[RTK](https://github.com/rtk-ai/rtk)** | Command proxy for 60-90% token reduction | `src/utils/rtk-compressor.ts` |
 | **[ICM](https://github.com/rtk-ai/icm)** | Persistent cross-session memory via MCP | `src/memory/icm-bridge.ts` |
 | **[Manus AI](https://manus.im)** | Wide Research (parallel sub-agent research workers), Knowledge Base injection, todo.md attention bias, restorable context compression, pre-compaction NO_REPLY flush, inline web-search citations, observation variator (anti-repetition), structured prompt variation, tool result compaction guard, disk-backed tool results, response prefill modes (tool_choice control), WebSearchMode + domain policy, message queue debounce/cap/overflow | `src/agent/wide-research.ts`, `src/context/observation-variator.ts`, `src/agent/response-constraint.ts`, `src/tools/web-search.ts`, `src/agent/message-queue.ts` |
-| **[OpenClaw](https://github.com/openclaw/openclaw)** | Multi-channel messaging, DM pairing, lane queue concurrency, memory lifecycle, tool policy, skills system, heartbeat, identity system, group security, hub marketplace, daily session reset, per-channel streaming policies | `src/channels/streaming-policy.ts`, `src/channels/`, `src/skills/`, `src/daemon/daily-reset.ts` |
+| **[OpenClaw](https://github.com/openclaw/openclaw)** | Multi-channel messaging, DM pairing, lane queue concurrency, memory lifecycle, tool policy, skills system, heartbeat, identity system, group security, hub marketplace, daily session reset, per-channel streaming policies, gateway WebSocket handshake (connect/hello-ok), device presence tracking, session patching, send policy engine, message preprocessing pipeline, approval gates, companion app nodes, encrypted secrets vault, cloud deployment configs, service installer | `src/channels/`, `src/skills/`, `src/daemon/`, `src/gateway/`, `src/channels/send-policy.ts`, `src/channels/message-preprocessing.ts`, `src/nodes/`, `src/deploy/`, `src/commands/cli/secrets-command.ts` |
 
 **Other influences:** Rust (Result<T, E> pattern), AutoGPT, MetaGPT, CrewAI, ChatDev (role-based multi-agent), ReAct (reasoning + acting paradigm), Qodo/PR-Agent (RAG for code repos).
 

@@ -1,7 +1,7 @@
 # Architecture Documentation - Code Buddy
 
-> **Version**: 2.6.0
-> **Last Updated**: 2026-02-21
+> **Version**: 2.7.0
+> **Last Updated**: 2026-03-06
 
 This document provides a comprehensive overview of the Code Buddy architecture, design patterns, and technical decisions.
 
@@ -128,7 +128,7 @@ class CodeBuddyAgent {
 - Error handling and recovery
 
 **Key Features**:
-- Agentic loop (max 30 rounds)
+- Agentic loop (max 50 rounds, 400 in YOLO mode)
 - Abort controller for cancellation
 - Token counting integration
 - Custom instructions support
@@ -1062,6 +1062,166 @@ class WebhookManager extends EventEmitter {
 
 ---
 
+## Gateway WebSocket Protocol (`src/gateway/`)
+
+Centralized WebSocket server for multi-client communication, inspired by OpenClaw's gateway architecture.
+
+### Handshake Flow
+
+```
+Client → connect { deviceId, deviceName, role, protocolVersion }
+Server → hello_ok { paired, uptime, stateVersion, presence[], health, authRequired }
+Client → auth { token | password }
+Server → auth_success { clientId, userId }
+```
+
+### Message Types
+
+| Type | Direction | Purpose |
+|:-----|:----------|:--------|
+| `connect` / `hello_ok` | C→S / S→C | Device handshake with presence snapshot |
+| `auth` / `auth_success` | C→S / S→C | Authentication (token, password, or none) |
+| `chat` / `chat_stream` / `chat_complete` | Both | Message exchange |
+| `tool_start` / `tool_update` / `tool_result` | S→C | Tool execution progress |
+| `session_create` / `session_join` / `session_leave` | C→S | Session management |
+| `session_patch` | C→S | Per-session config (thinkingLevel, verbose, model) |
+| `presence` | Both | Online/offline/away/typing status |
+| `ping` / `pong` | Both | Connection health check |
+
+### Configuration
+
+- **Auth modes:** `token` (JWT), `password`, `none`
+- **Bind modes:** `loopback` (127.0.0.1), `all` (0.0.0.0), `tailscale`
+- **Tailscale config:** `off`, `serve`, `funnel` with optional `resetOnExit`
+- Default port: 3001, ping every 30s, timeout 60s, max 1MB messages, 10 clients/session
+
+---
+
+## Lobster Workflow Engine (`src/workflows/lobster-engine.ts`)
+
+DAG-based typed workflow engine with approval gate support. **Fully compatible with OpenClaw workflow format.**
+
+### Workflow Structure
+
+```typescript
+interface LobsterWorkflow {
+  name: string;
+  version: string;
+  steps: LobsterStep[];      // DAG nodes with dependsOn[]
+  variables?: Record<string, string>;
+  env?: Record<string, string>;           // OpenClaw alias for variables
+  args?: Record<string, { default?: string }>; // OpenClaw args with defaults
+}
+
+interface LobsterStep {
+  id: string;
+  name: string;
+  command: string;
+  dependsOn?: string[];
+  stdin?: string;                          // OpenClaw: pipe prior step output
+  condition?: string;                      // OpenClaw: conditional execution
+  approval?: 'required' | 'optional';      // OpenClaw: approval checkpoint
+}
+```
+
+### Key Features
+
+- **DAG validation** — cycle detection, dependency resolution, topological execution order
+- **Variable resolution** — `${var}`, `$step.stdout`, `$step.json`, `$step.approved`, `$step.exitCode` interpolation
+- **Approval gates** — Steps with `command: 'approve'` or `approval: 'required'` pause execution and return a `resumeToken`
+- **Resume workflow** — `resumeWorkflow(workflow, token, approved)` continues from the paused point
+- **Resume tokens** — Base64-encoded list of completed step IDs
+- **Conditional execution** — `evaluateCondition()` supports `==`, `!=`, and truthy/falsy checks
+
+### OpenClaw Compatibility
+
+The engine normalizes OpenClaw-specific fields into the unified internal format via `normalizeOpenClawFormat()`:
+
+1. **`env` → `variables`** — Merges `env` map into `variables` (env values as defaults, variables override)
+2. **`args` defaults → `variables`** — Resolves `args[key].default` into `variables` when not already set
+3. **Implicit dependencies** — Scans `stdin` and `command` fields for `$stepId.(stdout|json|approved|exitCode)` references and adds them to `dependsOn[]` automatically
+4. **Approval field** — Detects `approval: 'required' | 'optional'` in addition to command-based approval gates
+5. **Condition evaluation** — Skips steps when `condition` resolves to falsy (`''`, `'false'`, `'0'`)
+
+---
+
+## Companion App / Node System (`src/nodes/`)
+
+Device pairing and remote invocation for companion apps (iOS, Android, macOS, Linux, Windows).
+
+### Pairing Flow
+
+```
+1. Device generates short code (6 chars, 15-min expiry)
+2. User sees code on companion app → enters in CLI: buddy nodes approve <code>
+3. Device added to persistent registry with capabilities
+```
+
+### Platform Capabilities (20+)
+
+`cameraSnap`, `getLocation`, `clipboard`, `notifications`, `contacts`, `calendar`, `screenCapture`, `audioRecord`, `browserOpen`, `fileSystem`, `batteryStatus`, `networkInfo`, `sensorData`, `appLaunch`, `siri`, `biometricAuth`, `hapticFeedback`, `nfc`, `bluetooth`, `wifi`, `healthKit`, `homeKit`
+
+---
+
+## Send Policy Engine (`src/channels/send-policy.ts`)
+
+Rule-based message delivery control — deny/allow matching on channel, chatType, keyPrefix, peerId.
+
+### Rule Structure
+
+```typescript
+interface SendPolicyRule {
+  channel?: string;
+  chatType?: 'direct' | 'group' | 'thread';
+  keyPrefix?: string;
+  peerId?: string;
+  action: 'deny' | 'allow';
+}
+```
+
+Runtime overrides via `/send on|off|inherit`.
+
+---
+
+## Message Preprocessing Pipeline (`src/channels/message-preprocessing.ts`)
+
+4-stage inbound message pipeline:
+
+1. **Media detection** — Identify attached media (images, audio, video, documents)
+2. **Audio transcription** — STT for voice messages
+3. **Link extraction** — Parse and understand embedded URLs
+4. **Content enrichment** — Augment message with metadata
+
+Emits events: `message:received`, `message:transcribed`, `message:preprocessed`
+
+---
+
+## Encrypted Secrets Vault (`src/commands/cli/secrets-command.ts`)
+
+AES-256-GCM encrypted storage with scrypt key derivation for API keys and credentials.
+
+**Commands:** `list`, `set`, `get`, `remove`, `rotate`, `audit`, `import-env`
+
+Well-known secrets auto-detected: `GROK_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `TELEGRAM_BOT_TOKEN`, `DISCORD_TOKEN`, `SLACK_BOT_TOKEN`, etc.
+
+---
+
+## Cloud Deployment (`src/deploy/`)
+
+Config generators for 6 cloud platforms + Nix package manager:
+
+| Platform | Output |
+|:---------|:-------|
+| **Fly.io** | `fly.toml` |
+| **Railway** | `railway.json` |
+| **Render** | `render.yaml` |
+| **Hetzner** | `hetzner.yaml` |
+| **Northflank** | `northflank.json` |
+| **GCP** | `app.yaml` |
+| **Nix** | `flake.nix` + `default.nix` |
+
+---
+
 ## Future Architecture Considerations
 
 ### Planned Improvements
@@ -1083,8 +1243,11 @@ class WebhookManager extends EventEmitter {
 
 4. **Multi-Agent Support**
    - Parallel agent execution
-   - Agent specialization
+   - Agent specialization (`OrchestratorAgent`, `TeamManager`)
    - Agent communication
+
+5. **Optimization**
+   - `PromptCacheBreakpoints`: Located in `src/optimization/cache-breakpoints.ts` to manage cost-efficient prompt caching.
 
 ---
 
