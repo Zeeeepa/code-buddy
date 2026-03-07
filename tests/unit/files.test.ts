@@ -9,61 +9,109 @@
  * - Context file loading and path handling
  */
 
-import * as path from 'path';
-import * as os from 'os';
 
 // ============================================================
 // MOCKS
 // ============================================================
 
 // Mock fs-extra
-const mockFsExtra = {
-  pathExists: jest.fn(),
-  stat: jest.fn(),
-  readFile: jest.fn(),
-  writeFile: jest.fn(),
-  readdir: jest.fn(),
-  ensureDir: jest.fn(),
-  remove: jest.fn(),
-  realpathSync: jest.fn(),
-  existsSync: jest.fn(),
-};
-jest.mock('fs-extra', () => mockFsExtra);
+
+import * as path from 'path';
+import * as os from 'os';
+import { TextEditorTool } from '../../src/tools/text-editor';
+import { MultiFileEditor, createMultiFileEditor, resetMultiFileEditor } from '../../src/tools/advanced/multi-file-editor';
+
+const { mockFsExtra, mockFsPromises, mockFsWatch, mockFsExistsSync, mockFsRealpathSync, mockVfs } = vi.hoisted(() => {
+  const _mockFsExistsSync = vi.fn<boolean, [string]>(() => true);
+  const _mockFsRealpathSync = vi.fn<string, [string]>((p: string) => p);
+  return {
+    mockFsExtra: {
+      pathExists: vi.fn(),
+      stat: vi.fn(),
+      readFile: vi.fn(),
+      writeFile: vi.fn(),
+      readdir: vi.fn(),
+      ensureDir: vi.fn(),
+      remove: vi.fn(),
+      realpathSync: vi.fn(),
+      existsSync: vi.fn(),
+    },
+    mockFsPromises: {
+      writeFile: vi.fn(),
+      readFile: vi.fn(),
+      mkdir: vi.fn(),
+      unlink: vi.fn(),
+      rename: vi.fn(),
+    },
+    mockFsWatch: vi.fn(),
+    mockFsExistsSync: _mockFsExistsSync,
+    mockFsRealpathSync: _mockFsRealpathSync,
+    mockVfs: {
+      exists: vi.fn(),
+      readFile: vi.fn(),
+      writeFile: vi.fn(),
+      ensureDir: vi.fn(),
+      readdir: vi.fn(),
+      stat: vi.fn(),
+      lstat: vi.fn(),
+      unlink: vi.fn(),
+      remove: vi.fn(),
+      mkdir: vi.fn(),
+      resolvePath: vi.fn((filePath: string, baseDir: string) => {
+        const path = require('path');
+        const resolved = path.resolve(filePath);
+        const normalizedBase = path.normalize(baseDir);
+        const normalizedResolved = path.normalize(resolved);
+        if (!normalizedResolved.startsWith(normalizedBase)) {
+          return { valid: false, resolved, error: `Path traversal not allowed: ${filePath} resolves outside project directory` };
+        }
+        try {
+          if (_mockFsExistsSync(resolved)) {
+            const realPath = _mockFsRealpathSync(resolved);
+            const realBase = _mockFsRealpathSync(baseDir);
+            if (!realPath.startsWith(realBase)) {
+              return { valid: false, resolved, error: `Symlink traversal not allowed: ${filePath} points outside project directory` };
+            }
+          }
+        } catch {
+          // If realpath fails, allow the operation (file may not exist yet)
+        }
+        return { valid: true, resolved };
+      }),
+      isSymlink: vi.fn(() => Promise.resolve(false)),
+      realpath: vi.fn((p: string) => Promise.resolve(p)),
+    },
+  };
+});
+jest.mock('fs-extra', () => ({ ...mockFsExtra, default: mockFsExtra }));
 
 // Mock fs/promises
-const mockFsPromises = {
-  writeFile: jest.fn(),
-  readFile: jest.fn(),
-  mkdir: jest.fn(),
-  unlink: jest.fn(),
-  rename: jest.fn(),
-};
 jest.mock('fs/promises', () => mockFsPromises);
 
 // Mock fs for watch and symlink detection
-const mockFsWatch = jest.fn();
-const mockFsExistsSync = jest.fn<boolean, [string]>(() => true);
-const mockFsRealpathSync = jest.fn<string, [string]>((p: string) => p);
-jest.mock('fs', () => ({
+jest.mock('fs', () => {
+  const impl = {
   watch: mockFsWatch,
   existsSync: (p: string) => mockFsExistsSync(p),
   realpathSync: (p: string) => mockFsRealpathSync(p),
   promises: {
-    readFile: jest.fn(),
-    writeFile: jest.fn(),
-    mkdir: jest.fn(),
-    unlink: jest.fn(),
-    rename: jest.fn(),
+    readFile: vi.fn(),
+    writeFile: vi.fn(),
+    mkdir: vi.fn(),
+    unlink: vi.fn(),
+    rename: vi.fn(),
   },
-}));
+};
+  return { ...impl, default: impl };
+});
 
 // Mock confirmation service
 jest.mock('../../src/utils/confirmation-service', () => ({
   ConfirmationService: {
-    getInstance: jest.fn(() => ({
-      getSessionFlags: jest.fn(() => ({ fileOperations: true, allOperations: false })),
+    getInstance: jest.fn(function() { return {
+      getSessionFlags: jest.fn(function() { return { fileOperations: true, allOperations: false }; }),
       requestConfirmation: jest.fn(() => Promise.resolve({ confirmed: true })),
-    })),
+    }; }),
   },
 }));
 
@@ -92,45 +140,6 @@ jest.mock('../../src/utils/fuzzy-match', () => ({
 
 // Mock VFS (UnifiedVfsRouter)
 // Note: resolvePath uses fs.existsSync and fs.realpathSync internally for symlink detection
-const mockVfs = {
-  exists: jest.fn(),
-  readFile: jest.fn(),
-  writeFile: jest.fn(),
-  ensureDir: jest.fn(),
-  readdir: jest.fn(),
-  stat: jest.fn(),
-  lstat: jest.fn(),
-  unlink: jest.fn(),
-  remove: jest.fn(),
-  mkdir: jest.fn(),
-  resolvePath: jest.fn((filePath: string, baseDir: string) => {
-    const resolved = path.resolve(filePath);
-    const normalizedBase = path.normalize(baseDir);
-    const normalizedResolved = path.normalize(resolved);
-
-    // First check: normalized path must be within base directory
-    if (!normalizedResolved.startsWith(normalizedBase)) {
-      return { valid: false, resolved, error: `Path traversal not allowed: ${filePath} resolves outside project directory` };
-    }
-
-    // Second check: if file exists, resolve symlinks and verify real path
-    try {
-      if (mockFsExistsSync(resolved)) {
-        const realPath = mockFsRealpathSync(resolved);
-        const realBase = mockFsRealpathSync(baseDir);
-        if (!realPath.startsWith(realBase)) {
-          return { valid: false, resolved, error: `Symlink traversal not allowed: ${filePath} points outside project directory` };
-        }
-      }
-    } catch {
-      // If realpath fails, allow the operation (file may not exist yet)
-    }
-
-    return { valid: true, resolved };
-  }),
-  isSymlink: jest.fn(() => Promise.resolve(false)),
-  realpath: jest.fn((p: string) => Promise.resolve(p)),
-};
 jest.mock('../../src/services/vfs/unified-vfs-router.js', () => ({
   UnifiedVfsRouter: {
     Instance: mockVfs,
@@ -138,8 +147,6 @@ jest.mock('../../src/services/vfs/unified-vfs-router.js', () => ({
 }));
 
 // Import modules after mocks
-import { TextEditorTool } from '../../src/tools/text-editor';
-import { MultiFileEditor, createMultiFileEditor, resetMultiFileEditor } from '../../src/tools/advanced/multi-file-editor';
 import {
   WatchModeManager,
   extractAIComments,
@@ -1291,7 +1298,7 @@ describe('Error Handling', () => {
 
   describe('WatchModeManager Error Cases', () => {
     it('should emit error on watch failure', async () => {
-      mockFsWatch.mockImplementation(() => {
+      mockFsWatch.mockImplementation(function() {
         throw new Error('Watch failed');
       });
 

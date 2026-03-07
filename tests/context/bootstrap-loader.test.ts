@@ -11,17 +11,21 @@ import type { BootstrapResult } from '../../src/context/bootstrap-loader.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
-jest.mock('fs/promises');
-jest.mock('../../src/utils/logger.js', () => ({
-  logger: {
-    warn: jest.fn(),
-    info: jest.fn(),
-    debug: jest.fn(),
-    error: jest.fn(),
+const { mockLogger } = vi.hoisted(() => ({
+  mockLogger: {
+    warn: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+    error: vi.fn(),
   },
 }));
 
-const mockReadFile = fs.readFile as jest.MockedFunction<typeof fs.readFile>;
+vi.mock('fs/promises');
+vi.mock('../../src/utils/logger.js', () => ({
+  logger: mockLogger,
+}));
+
+const mockReadFile = fs.readFile as unknown as ReturnType<typeof vi.fn>;
 
 describe('BootstrapLoader', () => {
   const CWD = '/home/user/project';
@@ -351,7 +355,7 @@ describe('BootstrapLoader', () => {
   // ==========================================================================
 
   describe('security pattern rejection', () => {
-    const { logger } = require('../../src/utils/logger.js');
+    const logger = mockLogger;
 
     const dangerousPatterns = [
       { name: 'eval()', content: 'Run this: eval("malicious code")' },

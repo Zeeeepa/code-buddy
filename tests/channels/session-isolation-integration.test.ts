@@ -7,12 +7,12 @@
 
 import {
   SessionIsolator,
-  getSessionIsolator,
   resetSessionIsolator,
   getSessionKey,
   type InboundMessage,
   type ChannelType,
 } from '../../src/channels/index.js';
+import { getSessionIsolator } from '../../src/channels/session-isolation.js';
 
 /**
  * Helper to create a minimal InboundMessage for testing

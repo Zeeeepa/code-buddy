@@ -4,9 +4,9 @@
  * Tests for the REST API server endpoints.
  */
 
-import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 
 // Mock express
+
 const mockApp = {
   use: jest.fn(),
   get: jest.fn(),
@@ -17,18 +17,18 @@ const mockApp = {
   listen: jest.fn(),
 };
 
-jest.unstable_mockModule('express', () => ({
-  default: jest.fn(() => mockApp),
-  Router: jest.fn(() => ({
+jest.mock('express', () => ({
+  default: jest.fn(function() { return mockApp; }),
+  Router: jest.fn(function() { return {
     get: jest.fn(),
     post: jest.fn(),
     put: jest.fn(),
     delete: jest.fn(),
     use: jest.fn(),
-  })),
+  }; }),
 }));
 
-jest.unstable_mockModule('cors', () => ({
+jest.mock('cors', () => ({
   default: jest.fn(() => (req: any, res: any, next: any) => next()),
 }));
 

@@ -9,12 +9,11 @@
  * - BenchmarkSuite (benchmarking, profiling)
  */
 
-import { EventEmitter } from 'events';
 
 // Mock dependencies before imports
-jest.mock('../../src/utils/semantic-cache', () => {
-  const EventEmitter = require('events').EventEmitter;
 
+jest.mock('../../src/utils/semantic-cache', () => {
+  const { EventEmitter } = require('events');
   class MockSemanticCache extends EventEmitter {
     private cache = new Map<string, { response: unknown; expiresAt: number }>();
     private stats = {

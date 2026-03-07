@@ -2,23 +2,26 @@ import { OperatingModeManager } from '../../../src/agent/operating-modes.js';
 import type { AgentProfile } from '../../../src/agent/profiles/index.js';
 
 // Mock the profile loader to avoid filesystem access
-jest.mock('../../../src/agent/profiles/profile-loader.js', () => ({
-  loadAgentProfiles: () => ({
-    profiles: [
-      {
-        id: 'reviewer',
-        name: 'Code Reviewer',
-        description: 'Read-only code review profile',
-        extends: 'balanced',
-        allowedTools: ['view_file', 'search', 'grep'],
-        maxToolRounds: 10,
-        systemPromptAddition: 'You are reviewing code. Do not make changes.',
-      },
-    ],
-    errors: [],
-  }),
-  mergeProfileWithMode: jest.requireActual('../../../src/agent/profiles/profile-loader.js').mergeProfileWithMode,
-}));
+vi.mock('../../../src/agent/profiles/profile-loader.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/agent/profiles/profile-loader.js')>();
+  return {
+    ...actual,
+    loadAgentProfiles: () => ({
+      profiles: [
+        {
+          id: 'reviewer',
+          name: 'Code Reviewer',
+          description: 'Read-only code review profile',
+          extends: 'balanced',
+          allowedTools: ['view_file', 'search', 'grep'],
+          maxToolRounds: 10,
+          systemPromptAddition: 'You are reviewing code. Do not make changes.',
+        },
+      ],
+      errors: [],
+    }),
+  };
+});
 
 describe('OperatingModeManager with Profiles', () => {
   let manager: OperatingModeManager;

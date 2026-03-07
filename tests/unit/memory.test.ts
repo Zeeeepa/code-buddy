@@ -11,22 +11,40 @@
  * 7. Prospective Memory System
  */
 
-import { EventEmitter } from 'events';
 
 // ============================================================================
 // Mocks
 // ============================================================================
 
 // Mock fs-extra
-const mockEnsureDir = jest.fn().mockResolvedValue(undefined);
-const mockPathExists = jest.fn().mockResolvedValue(false);
-const mockReadJSON = jest.fn().mockResolvedValue([]);
-const mockWriteJSON = jest.fn().mockResolvedValue(undefined);
-const mockWriteFile = jest.fn().mockResolvedValue(undefined);
-const mockReadFile = jest.fn().mockResolvedValue('');
-const mockReaddir = jest.fn().mockResolvedValue([]);
 
-jest.mock('fs-extra', () => ({
+import { EventEmitter } from 'events';
+
+const {
+  mockEnsureDir, mockPathExists, mockReadJSON, mockWriteJSON,
+  mockWriteFile, mockReadFile, mockReaddir,
+  mockDbCreate, mockDbFind, mockDbDelete,
+  mockDbExec, mockDbPrepare,
+} = vi.hoisted(() => ({
+  mockEnsureDir: vi.fn().mockResolvedValue(undefined),
+  mockPathExists: vi.fn().mockResolvedValue(false),
+  mockReadJSON: vi.fn().mockResolvedValue([]),
+  mockWriteJSON: vi.fn().mockResolvedValue(undefined),
+  mockWriteFile: vi.fn().mockResolvedValue(undefined),
+  mockReadFile: vi.fn().mockResolvedValue(''),
+  mockReaddir: vi.fn().mockResolvedValue([]),
+  mockDbCreate: vi.fn(),
+  mockDbFind: vi.fn().mockReturnValue([]),
+  mockDbDelete: vi.fn(),
+  mockDbExec: vi.fn(),
+  mockDbPrepare: vi.fn().mockReturnValue({
+    run: vi.fn(),
+    all: vi.fn().mockReturnValue([]),
+  }),
+}));
+
+jest.mock('fs-extra', () => {
+  const impl = {
   ensureDir: mockEnsureDir,
   pathExists: mockPathExists,
   readJSON: mockReadJSON,
@@ -34,19 +52,17 @@ jest.mock('fs-extra', () => ({
   writeFile: mockWriteFile,
   readFile: mockReadFile,
   readdir: mockReaddir,
-}));
+};
+  return { ...impl, default: impl };
+});
 
 // Mock database repository
-const mockDbCreate = jest.fn();
-const mockDbFind = jest.fn().mockReturnValue([]);
-const mockDbDelete = jest.fn();
-
 jest.mock('../../src/database/repositories/memory-repository', () => ({
-  getMemoryRepository: jest.fn(() => ({
+  getMemoryRepository: jest.fn(function() { return {
     create: mockDbCreate,
     find: mockDbFind,
     delete: mockDbDelete,
-  })),
+  }; }),
   MemoryRepository: jest.fn(),
 }));
 
@@ -67,19 +83,13 @@ jest.mock('../../src/utils/logger', () => ({
 }));
 
 // Mock database manager for prospective memory
-const mockDbExec = jest.fn();
-const mockDbPrepare = jest.fn().mockReturnValue({
-  run: jest.fn(),
-  all: jest.fn().mockReturnValue([]),
-});
-
 jest.mock('../../src/database/database-manager', () => ({
-  getDatabaseManager: jest.fn(() => ({
+  getDatabaseManager: jest.fn(function() { return {
     getDatabase: () => ({
       exec: mockDbExec,
       prepare: mockDbPrepare,
     }),
-  })),
+  }; }),
 }));
 
 // Import modules after mocks are set up

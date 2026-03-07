@@ -17,75 +17,81 @@
  * - download
  */
 
-import { BrowserManager } from '../../src/browser-automation/browser-manager';
+import { vi } from 'vitest';
+
+// Use vi.hoisted to define mock manager before vi.mock factories (which are hoisted)
+const { mockManager, mockGetBrowserManager: _mockGetBrowserManager } = vi.hoisted(() => {
+  const _mockManager: Record<string, any> = {
+    // Drag
+    drag: vi.fn().mockResolvedValue(undefined),
+    // Upload
+    uploadFiles: vi.fn().mockResolvedValue(undefined),
+    // Wait
+    waitForNavigation: vi.fn().mockResolvedValue(undefined),
+    // Storage
+    getLocalStorage: vi.fn().mockResolvedValue({}),
+    setLocalStorage: vi.fn().mockResolvedValue(undefined),
+    getSessionStorage: vi.fn().mockResolvedValue({}),
+    setSessionStorage: vi.fn().mockResolvedValue(undefined),
+    // Route Rules
+    addRouteRule: vi.fn().mockResolvedValue(undefined),
+    removeRouteRule: vi.fn().mockResolvedValue(undefined),
+    clearRouteRules: vi.fn().mockResolvedValue(undefined),
+    // Timezone/Locale
+    setTimezone: vi.fn().mockResolvedValue(undefined),
+    setLocale: vi.fn().mockResolvedValue(undefined),
+    // Download
+    downloadFile: vi.fn().mockResolvedValue({ path: '/tmp/file.pdf', suggestedFilename: 'file.pdf' }),
+    // Other methods that may be called during execute
+    isLaunched: vi.fn().mockReturnValue(true),
+    launch: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn().mockResolvedValue(undefined),
+    getUrl: vi.fn().mockReturnValue('https://example.com'),
+    getTitle: vi.fn().mockResolvedValue('Test Page'),
+    getElement: vi.fn().mockReturnValue(null),
+    getCurrentSnapshot: vi.fn().mockReturnValue(null),
+    navigate: vi.fn().mockResolvedValue(undefined),
+    click: vi.fn().mockResolvedValue(undefined),
+    type: vi.fn().mockResolvedValue(undefined),
+    fill: vi.fn().mockResolvedValue(undefined),
+    select: vi.fn().mockResolvedValue(undefined),
+    press: vi.fn().mockResolvedValue(undefined),
+    hover: vi.fn().mockResolvedValue(undefined),
+    scroll: vi.fn().mockResolvedValue(undefined),
+    screenshot: vi.fn().mockResolvedValue(Buffer.from('fake')),
+    pdf: vi.fn().mockResolvedValue(Buffer.from('fake-pdf')),
+    getCookies: vi.fn().mockResolvedValue([]),
+    setCookies: vi.fn().mockResolvedValue(undefined),
+    clearCookies: vi.fn().mockResolvedValue(undefined),
+    setHeaders: vi.fn().mockResolvedValue(undefined),
+    setOffline: vi.fn().mockResolvedValue(undefined),
+    emulateDevice: vi.fn().mockResolvedValue(undefined),
+    setGeolocation: vi.fn().mockResolvedValue(undefined),
+    evaluate: vi.fn().mockResolvedValue({ success: true, value: 'ok' }),
+    getContent: vi.fn().mockResolvedValue('<html></html>'),
+    getTabs: vi.fn().mockResolvedValue([]),
+    newTab: vi.fn().mockResolvedValue({ id: 'tab-1', targetId: 'tab-1', url: 'about:blank', title: '', active: true, index: 0 }),
+    focusTab: vi.fn().mockResolvedValue(undefined),
+    closeTab: vi.fn().mockResolvedValue(undefined),
+    takeSnapshot: vi.fn().mockResolvedValue({ id: 'snap-1', elements: [], elementMap: new Map(), valid: true }),
+    toTextRepresentation: vi.fn().mockReturnValue('snapshot text'),
+    handleDialog: vi.fn().mockResolvedValue(undefined),
+  };
+
+  const _mockGetBrowserManager = vi.fn().mockReturnValue(_mockManager);
+
+  return { mockManager: _mockManager, mockGetBrowserManager: _mockGetBrowserManager };
+});
+
 import { BrowserTool, BrowserToolInput } from '../../src/browser-automation/browser-tool';
 
 // Mock the browser-manager module so BrowserTool constructor gets our mock
-jest.mock('../../src/browser-automation/browser-manager', () => {
-  const mockManager = {
-    // Drag
-    drag: jest.fn().mockResolvedValue(undefined),
-    // Upload
-    uploadFiles: jest.fn().mockResolvedValue(undefined),
-    // Wait
-    waitForNavigation: jest.fn().mockResolvedValue(undefined),
-    // Storage
-    getLocalStorage: jest.fn().mockResolvedValue({}),
-    setLocalStorage: jest.fn().mockResolvedValue(undefined),
-    getSessionStorage: jest.fn().mockResolvedValue({}),
-    setSessionStorage: jest.fn().mockResolvedValue(undefined),
-    // Route Rules
-    addRouteRule: jest.fn().mockResolvedValue(undefined),
-    removeRouteRule: jest.fn().mockResolvedValue(undefined),
-    clearRouteRules: jest.fn().mockResolvedValue(undefined),
-    // Timezone/Locale
-    setTimezone: jest.fn().mockResolvedValue(undefined),
-    setLocale: jest.fn().mockResolvedValue(undefined),
-    // Download
-    downloadFile: jest.fn().mockResolvedValue({ path: '/tmp/file.pdf', suggestedFilename: 'file.pdf' }),
-    // Other methods that may be called during execute
-    isLaunched: jest.fn().mockReturnValue(true),
-    launch: jest.fn().mockResolvedValue(undefined),
-    close: jest.fn().mockResolvedValue(undefined),
-    getUrl: jest.fn().mockReturnValue('https://example.com'),
-    getTitle: jest.fn().mockResolvedValue('Test Page'),
-    getElement: jest.fn().mockReturnValue(null),
-    getCurrentSnapshot: jest.fn().mockReturnValue(null),
-    navigate: jest.fn().mockResolvedValue(undefined),
-    click: jest.fn().mockResolvedValue(undefined),
-    type: jest.fn().mockResolvedValue(undefined),
-    fill: jest.fn().mockResolvedValue(undefined),
-    select: jest.fn().mockResolvedValue(undefined),
-    press: jest.fn().mockResolvedValue(undefined),
-    hover: jest.fn().mockResolvedValue(undefined),
-    scroll: jest.fn().mockResolvedValue(undefined),
-    screenshot: jest.fn().mockResolvedValue(Buffer.from('fake')),
-    pdf: jest.fn().mockResolvedValue(Buffer.from('fake-pdf')),
-    getCookies: jest.fn().mockResolvedValue([]),
-    setCookies: jest.fn().mockResolvedValue(undefined),
-    clearCookies: jest.fn().mockResolvedValue(undefined),
-    setHeaders: jest.fn().mockResolvedValue(undefined),
-    setOffline: jest.fn().mockResolvedValue(undefined),
-    emulateDevice: jest.fn().mockResolvedValue(undefined),
-    setGeolocation: jest.fn().mockResolvedValue(undefined),
-    evaluate: jest.fn().mockResolvedValue({ success: true, value: 'ok' }),
-    getContent: jest.fn().mockResolvedValue('<html></html>'),
-    getTabs: jest.fn().mockResolvedValue([]),
-    newTab: jest.fn().mockResolvedValue({ id: 'tab-1', targetId: 'tab-1', url: 'about:blank', title: '', active: true, index: 0 }),
-    focusTab: jest.fn().mockResolvedValue(undefined),
-    closeTab: jest.fn().mockResolvedValue(undefined),
-    takeSnapshot: jest.fn().mockResolvedValue({ id: 'snap-1', elements: [], elementMap: new Map(), valid: true }),
-    toTextRepresentation: jest.fn().mockReturnValue('snapshot text'),
-    handleDialog: jest.fn().mockResolvedValue(undefined),
-  };
-
-  return {
-    BrowserManager: jest.fn().mockImplementation(() => mockManager),
-    getBrowserManager: jest.fn().mockReturnValue(mockManager),
-    resetBrowserManager: jest.fn(),
-    __mockManager: mockManager,
-  };
-});
+jest.mock('../../src/browser-automation/browser-manager', () => ({
+  BrowserManager: jest.fn().mockImplementation(function() { return mockManager; }),
+  getBrowserManager: _mockGetBrowserManager,
+  resetBrowserManager: jest.fn(),
+  __mockManager: mockManager,
+}));
 
 // Mock logger to suppress output
 jest.mock('../../src/utils/logger', () => ({
@@ -98,18 +104,17 @@ jest.mock('../../src/utils/logger', () => ({
 }));
 
 // Mock fs and os for screenshot directory
-jest.mock('fs', () => ({
+jest.mock('fs', () => {
+  const impl = {
   promises: {
     mkdir: jest.fn().mockResolvedValue(undefined),
     writeFile: jest.fn().mockResolvedValue(undefined),
   },
-}));
+};
+  return { ...impl, default: impl };
+});
 
-// Get the mock manager and getBrowserManager references
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const browserManagerModule = require('../../src/browser-automation/browser-manager') as any;
-const mockManager = browserManagerModule.__mockManager;
-const mockGetBrowserManager = browserManagerModule.getBrowserManager;
+const mockGetBrowserManager = _mockGetBrowserManager;
 
 describe('BrowserTool - New Browser Actions', () => {
   let tool: BrowserTool;

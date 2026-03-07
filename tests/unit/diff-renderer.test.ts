@@ -13,9 +13,11 @@
  */
 
 // Mock cli-highlight before imports
-const mockHighlight = jest.fn().mockImplementation((code: string) => code);
+const { mockHighlight } = vi.hoisted(() => ({
+  mockHighlight: vi.fn().mockImplementation((code: string) => code),
+}));
 
-jest.mock('cli-highlight', () => ({
+vi.mock('cli-highlight', () => ({
   highlight: mockHighlight,
 }));
 

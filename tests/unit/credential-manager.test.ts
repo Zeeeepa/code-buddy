@@ -9,32 +9,35 @@
  * - Security status
  */
 
-// Mock fs module before imports
-const mockFs = {
-  existsSync: jest.fn(),
-  readFileSync: jest.fn(),
-  writeFileSync: jest.fn(),
-  mkdirSync: jest.fn(),
-  chmodSync: jest.fn(),
-  statSync: jest.fn(),
-};
-jest.mock('fs', () => mockFs);
+// Mock fs module before imports — vi.hoisted ensures availability in factory
+const mockFs = vi.hoisted(() => ({
+  existsSync: vi.fn(),
+  readFileSync: vi.fn(),
+  writeFileSync: vi.fn(),
+  mkdirSync: vi.fn(),
+  chmodSync: vi.fn(),
+  statSync: vi.fn(),
+}));
+vi.mock('fs', () => ({ ...mockFs, default: mockFs }));
 
 // Mock os module
-jest.mock('os', () => ({
-  hostname: jest.fn(() => 'test-hostname'),
-  userInfo: jest.fn(() => ({ username: 'testuser' })),
-  platform: jest.fn(() => 'linux'),
-  homedir: jest.fn(() => '/home/testuser'),
-}));
+vi.mock('os', () => {
+  const impl = {
+    hostname: vi.fn(() => 'test-hostname'),
+    userInfo: vi.fn(function() { return { username: 'testuser' }; }),
+    platform: vi.fn(() => 'linux'),
+    homedir: vi.fn(() => '/home/testuser'),
+  };
+  return { ...impl, default: impl };
+});
 
 // Mock logger
-jest.mock('../../src/utils/logger', () => ({
+vi.mock('../../src/utils/logger', () => ({
   logger: {
-    debug: jest.fn(),
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
   },
 }));
 
@@ -566,7 +569,7 @@ describe('CredentialManager', () => {
   describe('Edge Cases', () => {
     it('should handle read errors gracefully', () => {
       mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockImplementation(() => {
+      mockFs.readFileSync.mockImplementation(function() {
         throw new Error('Read error');
       });
 
@@ -582,7 +585,7 @@ describe('CredentialManager', () => {
     it('should handle write errors gracefully', () => {
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readFileSync.mockReturnValue(JSON.stringify({}));
-      mockFs.writeFileSync.mockImplementation(() => {
+      mockFs.writeFileSync.mockImplementation(function() {
         throw new Error('Write error');
       });
 
@@ -594,7 +597,7 @@ describe('CredentialManager', () => {
     it('should handle chmod errors gracefully', () => {
       mockFs.existsSync.mockReturnValue(false);
       mockFs.statSync.mockReturnValue({ mode: 0o100644 } as unknown);
-      mockFs.chmodSync.mockImplementation(() => {
+      mockFs.chmodSync.mockImplementation(function() {
         throw new Error('chmod error');
       });
 

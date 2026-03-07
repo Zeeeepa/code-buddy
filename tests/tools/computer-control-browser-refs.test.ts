@@ -6,16 +6,21 @@
  * telling the LLM to use the browser tool instead.
  */
 
-// Mock desktop-automation
-const mockGetElement = jest.fn();
-const mockSnapshotManager = {
-  getElement: mockGetElement,
-  takeSnapshot: jest.fn(),
-  getCurrentSnapshot: jest.fn(),
-  toTextRepresentation: jest.fn(),
-  findElements: jest.fn(),
-  toAnnotatedScreenshot: jest.fn(),
-};
+import { vi } from 'vitest';
+
+// Hoist mock variables so they are available inside vi.mock() factories
+const { mockGetElement, mockSnapshotManager } = vi.hoisted(() => {
+  const mockGetElement = vi.fn();
+  const mockSnapshotManager = {
+    getElement: mockGetElement,
+    takeSnapshot: vi.fn(),
+    getCurrentSnapshot: vi.fn(),
+    toTextRepresentation: vi.fn(),
+    findElements: vi.fn(),
+    toAnnotatedScreenshot: vi.fn(),
+  };
+  return { mockGetElement, mockSnapshotManager };
+});
 
 jest.mock('../../src/desktop-automation/index.js', () => ({
   getDesktopAutomation: jest.fn().mockReturnValue({

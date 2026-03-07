@@ -44,6 +44,17 @@ export {
 // Local LLM provider
 export * from './local-llm-provider.js';
 
+// Additional providers (Mistral, Deepgram, MiniMax, Moonshot, Venice, Z.AI)
+export {
+  ADDITIONAL_PROVIDERS,
+  getAdditionalProvider,
+  getProviderForModel,
+  listAvailableProviders,
+  listAllProviders,
+  resolveProviderConfig,
+} from './additional-providers.js';
+export type { ProviderConfig as AdditionalProviderConfig } from './additional-providers.js';
+
 // Fallback chain
 export {
   ProviderFallbackChain,

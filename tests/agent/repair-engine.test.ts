@@ -8,17 +8,20 @@
  * - Learning and statistics
  */
 
+import { EventEmitter } from 'events';
+
 import {
   RepairEngine,
   createRepairEngine,
   getRepairEngine,
   resetRepairEngine,
 } from '../../src/agent/repair/repair-engine';
-import { EventEmitter } from 'events';
+
+import * as faultLocalizationModule from '../../src/agent/repair/fault-localization';
 
 // Mock the CodeBuddyClient
 jest.mock('../../src/codebuddy/client', () => ({
-  CodeBuddyClient: jest.fn().mockImplementation(() => ({
+  CodeBuddyClient: jest.fn().mockImplementation(function() { return {
     chat: jest.fn().mockResolvedValue({
       choices: [{
         message: {
@@ -33,12 +36,12 @@ jest.mock('../../src/codebuddy/client', () => ({
         }
       }]
     })
-  }))
+  }; })
 }));
 
 // Mock fault localization
 jest.mock('../../src/agent/repair/fault-localization', () => ({
-  createFaultLocalizer: jest.fn(() => ({
+  createFaultLocalizer: jest.fn(function() { return {
     localize: jest.fn().mockResolvedValue({
       faults: [{
         id: 'fault-1',
@@ -57,12 +60,12 @@ jest.mock('../../src/agent/repair/fault-localization', () => ({
       confidence: 0.9,
       technique: 'stack_trace'
     })
-  }))
+  }; })
 }));
 
 // Mock template repair engine
 jest.mock('../../src/agent/repair/repair-templates', () => ({
-  createTemplateRepairEngine: jest.fn(() => ({
+  createTemplateRepairEngine: jest.fn(function() { return {
     generatePatches: jest.fn().mockReturnValue([{
       id: 'patch-template-1',
       fault: {
@@ -89,7 +92,7 @@ jest.mock('../../src/agent/repair/repair-templates', () => ({
       validated: false
     }]),
     recordResult: jest.fn()
-  }))
+  }; })
 }));
 
 describe('RepairEngine', () => {
@@ -191,8 +194,8 @@ describe('RepairEngine', () => {
 
     test('should handle errors gracefully', async () => {
       // Mock to throw error
-      const faultLocalizer = require('../../src/agent/repair/fault-localization');
-      faultLocalizer.createFaultLocalizer.mockReturnValueOnce({
+      const mockedFL = vi.mocked(faultLocalizationModule);
+      mockedFL.createFaultLocalizer.mockReturnValueOnce({
         localize: jest.fn().mockRejectedValue(new Error('Localization failed'))
       });
 
@@ -369,8 +372,8 @@ describe('RepairEngine', () => {
   describe('Generic Fault Creation', () => {
     test('should handle error output with file reference', async () => {
       // Mock localization to return empty faults
-      const faultLocalizer = require('../../src/agent/repair/fault-localization');
-      faultLocalizer.createFaultLocalizer.mockReturnValueOnce({
+      const mockedFL = vi.mocked(faultLocalizationModule);
+      mockedFL.createFaultLocalizer.mockReturnValueOnce({
         localize: jest.fn().mockResolvedValue({
           faults: [],
           confidence: 0,
@@ -386,8 +389,8 @@ describe('RepairEngine', () => {
     });
 
     test('should return empty for unparseable errors', async () => {
-      const faultLocalizer = require('../../src/agent/repair/fault-localization');
-      faultLocalizer.createFaultLocalizer.mockReturnValueOnce({
+      const mockedFL = vi.mocked(faultLocalizationModule);
+      mockedFL.createFaultLocalizer.mockReturnValueOnce({
         localize: jest.fn().mockResolvedValue({
           faults: [],
           confidence: 0,

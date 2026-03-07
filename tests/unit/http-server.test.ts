@@ -35,23 +35,29 @@ interface MockResponse {
   headers: Record<string, string>;
 }
 
-// Create mock HTTP module before importing
-const mockServer: MockServer = Object.assign(new EventEmitter(), {
-  listen: jest.fn(),
-  close: jest.fn(),
-});
-
-const mockCreateServer = jest.fn().mockReturnValue(mockServer);
-
-jest.mock('http', () => ({
-  createServer: mockCreateServer,
+// Hoist mock variables so they are available inside vi.mock factories
+const { mockCreateServer } = vi.hoisted(() => ({
+  mockCreateServer: vi.fn(),
 }));
 
+// Create mock HTTP module before importing
+const mockServer: MockServer = Object.assign(new EventEmitter(), {
+  listen: vi.fn(),
+  close: vi.fn(),
+});
+
+mockCreateServer.mockReturnValue(mockServer);
+
+vi.mock('http', () => {
+  const impl = { createServer: mockCreateServer };
+  return { ...impl, default: impl };
+});
+
 // Mock stream helpers
-jest.mock('../../src/utils/stream-helpers', () => ({
-  withStreamTimeout: jest.fn((iterable) => iterable),
-  withMaxIterations: jest.fn((iterable) => iterable),
-  handleStreamError: jest.fn().mockReturnValue({
+vi.mock('../../src/utils/stream-helpers', () => ({
+  withStreamTimeout: vi.fn((iterable: any) => iterable),
+  withMaxIterations: vi.fn((iterable: any) => iterable),
+  handleStreamError: vi.fn().mockReturnValue({
     message: 'Stream error',
     category: 'unknown',
     isRetryable: false,
@@ -59,12 +65,12 @@ jest.mock('../../src/utils/stream-helpers', () => ({
 }));
 
 // Mock logger
-jest.mock('../../src/utils/logger', () => ({
+vi.mock('../../src/utils/logger', () => ({
   logger: {
-    debug: jest.fn(),
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
   },
 }));
 
@@ -591,7 +597,7 @@ describe('HttpServer', () => {
     });
 
     it('should handle model set errors', async () => {
-      mockAgent.setModel.mockImplementation(() => {
+      mockAgent.setModel.mockImplementation(function() {
         throw new Error('Invalid model');
       });
 

@@ -13,14 +13,14 @@ import * as os from 'os';
 // Mocks
 // ============================================================================
 
-// Mock fs-extra
-const mockFsExtra = {
-  pathExists: jest.fn(),
-  readFile: jest.fn(),
-  writeFile: jest.fn(),
-  ensureDir: jest.fn(),
-};
-jest.mock('fs-extra', () => mockFsExtra);
+// Mock fs-extra — vi.hoisted ensures these are available before vi.mock factory runs
+const mockFsExtra = vi.hoisted(() => ({
+  pathExists: vi.fn(),
+  readFile: vi.fn(),
+  writeFile: vi.fn(),
+  ensureDir: vi.fn(),
+}));
+vi.mock('fs-extra', () => ({ ...mockFsExtra, default: mockFsExtra }));
 
 // Import modules after mocks
 import {

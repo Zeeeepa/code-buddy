@@ -1,6 +1,15 @@
 import { CronAgentBridge, resetCronAgentBridge } from '../../src/daemon/cron-agent-bridge.js';
 import type { CronJob } from '../../src/scheduler/cron-scheduler.js';
 
+// Mock the CodeBuddyAgent dynamic import used inside executeJob
+vi.mock('../../src/agent/codebuddy-agent.js', () => ({
+  CodeBuddyAgent: class MockCodeBuddyAgent {
+    async processUserMessage() {
+      return [{ type: 'assistant', content: 'mock response' }];
+    }
+  },
+}));
+
 describe('CronAgentBridge', () => {
   let bridge: CronAgentBridge;
 

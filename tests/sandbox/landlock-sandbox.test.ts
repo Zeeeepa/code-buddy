@@ -1,3 +1,4 @@
+import { EventEmitter } from 'events';
 /**
  * Tests for Landlock + Seccomp Sandbox Support
  */
@@ -6,34 +7,45 @@ import * as os from 'os';
 import * as fs from 'fs';
 import * as child_process from 'child_process';
 
-jest.mock('os', () => {
-  const actual = jest.requireActual('os');
+const { actualOs, actualFs, actualCp } = vi.hoisted(() => {
   return {
-    ...actual,
-    platform: jest.fn(actual.platform),
-    release: jest.fn(actual.release),
-    tmpdir: jest.fn(actual.tmpdir),
+    actualOs: {} as typeof import('os'),
+    actualFs: {} as typeof import('fs'),
+    actualCp: {} as typeof import('child_process'),
   };
 });
 
-jest.mock('fs', () => {
-  const actual = jest.requireActual('fs');
+vi.mock('os', async () => {
+  const actual = await vi.importActual<typeof import('os')>('os');
+  Object.assign(actualOs, actual);
   return {
     ...actual,
-    existsSync: jest.fn(actual.existsSync),
-    writeFileSync: jest.fn(actual.writeFileSync),
-    unlinkSync: jest.fn(actual.unlinkSync),
-    readFileSync: jest.fn(actual.readFileSync),
-    accessSync: jest.fn(actual.accessSync),
+    platform: vi.fn(actual.platform),
+    release: vi.fn(actual.release),
+    tmpdir: vi.fn(actual.tmpdir),
+  };
+});
+
+vi.mock('fs', async () => {
+  const actual = await vi.importActual<typeof import('fs')>('fs');
+  Object.assign(actualFs, actual);
+  return {
+    ...actual,
+    existsSync: vi.fn(actual.existsSync),
+    writeFileSync: vi.fn(actual.writeFileSync),
+    unlinkSync: vi.fn(actual.unlinkSync),
+    readFileSync: vi.fn(actual.readFileSync),
+    accessSync: vi.fn(actual.accessSync),
     constants: actual.constants,
   };
 });
 
-jest.mock('child_process', () => {
-  const actual = jest.requireActual('child_process');
+vi.mock('child_process', async () => {
+  const actual = await vi.importActual<typeof import('child_process')>('child_process');
+  Object.assign(actualCp, actual);
   return {
     ...actual,
-    spawn: jest.fn(actual.spawn),
+    spawn: vi.fn(actual.spawn),
   };
 });
 
@@ -47,7 +59,7 @@ import {
   generateSeccompFilter,
 } from '../../src/sandbox/os-sandbox';
 
-jest.setTimeout(30000);
+vi.setConfig({ testTimeout: 30000 });
 
 const mockPlatform = os.platform as jest.Mock;
 const mockRelease = os.release as jest.Mock;
@@ -58,7 +70,7 @@ const mockAccessSync = fs.accessSync as jest.Mock;
 const mockSpawn = child_process.spawn as jest.Mock;
 
 function createMockProcess(exitCode = 0, stdoutData = '', stderrData = '') {
-  const EventEmitter = require('events');
+  
   const proc = new EventEmitter();
   proc.stdout = new EventEmitter();
   proc.stderr = new EventEmitter();
@@ -79,10 +91,10 @@ describe('Landlock + Seccomp Sandbox', () => {
     resetOSSandbox();
     jest.clearAllMocks();
     // Reset to actual implementations by default
-    mockPlatform.mockReturnValue(jest.requireActual('os').platform());
-    mockRelease.mockReturnValue(jest.requireActual('os').release());
-    mockExistsSync.mockImplementation(jest.requireActual('fs').existsSync);
-    mockSpawn.mockImplementation(jest.requireActual('child_process').spawn);
+    mockPlatform.mockReturnValue(actualOs.platform());
+    mockRelease.mockReturnValue(actualOs.release());
+    mockExistsSync.mockImplementation(actualFs.existsSync);
+    mockSpawn.mockImplementation(actualCp.spawn);
   });
 
   afterEach(() => {
@@ -132,7 +144,7 @@ describe('Landlock + Seccomp Sandbox', () => {
     });
 
     it('should return false when proc check throws and kernel is old', () => {
-      mockExistsSync.mockImplementation(() => {
+      mockExistsSync.mockImplementation(function() {
         throw new Error('Permission denied');
       });
       mockRelease.mockReturnValue('4.15.0');
@@ -141,7 +153,7 @@ describe('Landlock + Seccomp Sandbox', () => {
     });
 
     it('should return true when proc check throws but kernel >= 5.13', () => {
-      mockExistsSync.mockImplementation(() => {
+      mockExistsSync.mockImplementation(function() {
         throw new Error('Permission denied');
       });
       mockRelease.mockReturnValue('5.13.0');
@@ -342,7 +354,7 @@ describe('Landlock + Seccomp Sandbox', () => {
         return false;
       });
 
-      mockSpawn.mockImplementation(() => {
+      mockSpawn.mockImplementation(function() {
         return createMockProcess(1);
       });
 
@@ -359,9 +371,9 @@ describe('Landlock + Seccomp Sandbox', () => {
     it('should execute command via landlock backend', async () => {
       mockPlatform.mockReturnValue('linux');
       mockExistsSync.mockReturnValue(true);
-      mockWriteFileSync.mockImplementation(() => {});
-      mockUnlinkSync.mockImplementation(() => {});
-      mockAccessSync.mockImplementation(() => {});
+      mockWriteFileSync.mockImplementation(function() {});
+      mockUnlinkSync.mockImplementation(function() {});
+      mockAccessSync.mockImplementation(function() {});
 
       let executedViaShell = false;
       mockSpawn.mockImplementation((cmd: string, args: string[]) => {
@@ -389,9 +401,9 @@ describe('Landlock + Seccomp Sandbox', () => {
     it('should include --seccomp flag in bwrap arguments', async () => {
       mockPlatform.mockReturnValue('linux');
       mockExistsSync.mockReturnValue(true);
-      mockWriteFileSync.mockImplementation(() => {});
-      mockUnlinkSync.mockImplementation(() => {});
-      mockAccessSync.mockImplementation(() => {});
+      mockWriteFileSync.mockImplementation(function() {});
+      mockUnlinkSync.mockImplementation(function() {});
+      mockAccessSync.mockImplementation(function() {});
 
       let shellCommand = '';
       mockSpawn.mockImplementation((cmd: string, args: string[]) => {
@@ -417,11 +429,11 @@ describe('Landlock + Seccomp Sandbox', () => {
     it('should clean up seccomp filter file after execution', async () => {
       mockPlatform.mockReturnValue('linux');
       mockExistsSync.mockReturnValue(true);
-      mockWriteFileSync.mockImplementation(() => {});
-      mockUnlinkSync.mockImplementation(() => {});
-      mockAccessSync.mockImplementation(() => {});
+      mockWriteFileSync.mockImplementation(function() {});
+      mockUnlinkSync.mockImplementation(function() {});
+      mockAccessSync.mockImplementation(function() {});
 
-      mockSpawn.mockImplementation(() => {
+      mockSpawn.mockImplementation(function() {
         return createMockProcess(0);
       });
 
@@ -485,13 +497,13 @@ describe('Landlock + Seccomp Sandbox', () => {
     it('should handle seccomp file read failure in execWithSeccomp', async () => {
       mockPlatform.mockReturnValue('linux');
       mockExistsSync.mockReturnValue(true);
-      mockWriteFileSync.mockImplementation(() => {});
-      mockUnlinkSync.mockImplementation(() => {});
-      mockAccessSync.mockImplementation(() => {
+      mockWriteFileSync.mockImplementation(function() {});
+      mockUnlinkSync.mockImplementation(function() {});
+      mockAccessSync.mockImplementation(function() {
         throw new Error('ENOENT');
       });
 
-      mockSpawn.mockImplementation(() => {
+      mockSpawn.mockImplementation(function() {
         return createMockProcess(0);
       });
 
@@ -510,9 +522,9 @@ describe('Landlock + Seccomp Sandbox', () => {
     it('should not include --unshare-net when allowNetwork is true', async () => {
       mockPlatform.mockReturnValue('linux');
       mockExistsSync.mockReturnValue(true);
-      mockWriteFileSync.mockImplementation(() => {});
-      mockUnlinkSync.mockImplementation(() => {});
-      mockAccessSync.mockImplementation(() => {});
+      mockWriteFileSync.mockImplementation(function() {});
+      mockUnlinkSync.mockImplementation(function() {});
+      mockAccessSync.mockImplementation(function() {});
 
       let shellCommand = '';
       mockSpawn.mockImplementation((cmd: string, args: string[]) => {
@@ -537,9 +549,9 @@ describe('Landlock + Seccomp Sandbox', () => {
     it('should include --unshare-net when allowNetwork is false', async () => {
       mockPlatform.mockReturnValue('linux');
       mockExistsSync.mockReturnValue(true);
-      mockWriteFileSync.mockImplementation(() => {});
-      mockUnlinkSync.mockImplementation(() => {});
-      mockAccessSync.mockImplementation(() => {});
+      mockWriteFileSync.mockImplementation(function() {});
+      mockUnlinkSync.mockImplementation(function() {});
+      mockAccessSync.mockImplementation(function() {});
 
       let shellCommand = '';
       mockSpawn.mockImplementation((cmd: string, args: string[]) => {

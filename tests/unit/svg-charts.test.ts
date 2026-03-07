@@ -16,86 +16,106 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-// Mock dependencies before imports
-const mockCreateSVG = jest.fn();
+// Hoist all mock variables so they are available inside vi.mock factories
+const {
+  mockCreateSVG,
+  mockSvgElement,
+  mockD3,
+  mockD3Node,
+  mockResvgRender,
+  mockResvg,
+  mockTerminalImageBuffer,
+} = vi.hoisted(() => {
+  // Create mock scale function that is both callable and has chainable methods
+  const _createMockScale = () => {
+    const scaleFn = vi.fn((x: number) => x * 10) as any;
+    scaleFn.domain = vi.fn().mockReturnValue(scaleFn);
+    scaleFn.range = vi.fn().mockReturnValue(scaleFn);
+    return scaleFn;
+  };
 
-// Create mock scale function that is both callable and has chainable methods
-const createMockScale = () => {
-  const scaleFn = jest.fn((x: number) => x * 10) as any;
-  scaleFn.domain = jest.fn().mockReturnValue(scaleFn);
-  scaleFn.range = jest.fn().mockReturnValue(scaleFn);
-  return scaleFn;
-};
+  // Create mock area/line generator
+  const _createMockGenerator = (pathString = 'M0,0L10,10') => {
+    const genFn = vi.fn().mockReturnValue(pathString) as any;
+    genFn.x = vi.fn().mockReturnValue(genFn);
+    genFn.y = vi.fn().mockReturnValue(genFn);
+    genFn.y0 = vi.fn().mockReturnValue(genFn);
+    genFn.y1 = vi.fn().mockReturnValue(genFn);
+    return genFn;
+  };
 
-// Create mock area/line generator
-const createMockGenerator = (pathString = 'M0,0L10,10') => {
-  const genFn = jest.fn().mockReturnValue(pathString) as any;
-  genFn.x = jest.fn().mockReturnValue(genFn);
-  genFn.y = jest.fn().mockReturnValue(genFn);
-  genFn.y0 = jest.fn().mockReturnValue(genFn);
-  genFn.y1 = jest.fn().mockReturnValue(genFn);
-  return genFn;
-};
+  // Create mock pie generator
+  const _createMockPie = () => {
+    const pieFn = vi.fn().mockReturnValue([
+      { data: { label: 'A', value: 50 }, startAngle: 0, endAngle: Math.PI },
+      { data: { label: 'B', value: 50 }, startAngle: Math.PI, endAngle: Math.PI * 2 },
+    ]) as any;
+    pieFn.value = vi.fn().mockReturnValue(pieFn);
+    pieFn.sort = vi.fn().mockReturnValue(pieFn);
+    return pieFn;
+  };
 
-// Create mock pie generator
-const createMockPie = () => {
-  const pieFn = jest.fn().mockReturnValue([
-    { data: { label: 'A', value: 50 }, startAngle: 0, endAngle: Math.PI },
-    { data: { label: 'B', value: 50 }, startAngle: Math.PI, endAngle: Math.PI * 2 },
-  ]) as any;
-  pieFn.value = jest.fn().mockReturnValue(pieFn);
-  pieFn.sort = jest.fn().mockReturnValue(pieFn);
-  return pieFn;
-};
+  // Create mock arc generator
+  const _createMockArc = () => {
+    const arcFn = vi.fn().mockReturnValue('M0,0A10,10,0,0,1,10,10') as any;
+    arcFn.innerRadius = vi.fn().mockReturnValue(arcFn);
+    arcFn.outerRadius = vi.fn().mockReturnValue(arcFn);
+    arcFn.startAngle = vi.fn().mockReturnValue(arcFn);
+    arcFn.endAngle = vi.fn().mockReturnValue(arcFn);
+    arcFn.centroid = vi.fn().mockReturnValue([5, 5]);
+    return arcFn;
+  };
 
-// Create mock arc generator
-const createMockArc = () => {
-  const arcFn = jest.fn().mockReturnValue('M0,0A10,10,0,0,1,10,10') as any;
-  arcFn.innerRadius = jest.fn().mockReturnValue(arcFn);
-  arcFn.outerRadius = jest.fn().mockReturnValue(arcFn);
-  arcFn.startAngle = jest.fn().mockReturnValue(arcFn);
-  arcFn.endAngle = jest.fn().mockReturnValue(arcFn);
-  arcFn.centroid = jest.fn().mockReturnValue([5, 5]);
-  return arcFn;
-};
+  const _mockCreateSVG = vi.fn();
 
-const mockD3 = {
-  scaleLinear: jest.fn(() => createMockScale()),
-  area: jest.fn(() => createMockGenerator()),
-  line: jest.fn(() => createMockGenerator()),
-  pie: jest.fn(() => createMockPie()),
-  arc: jest.fn(() => createMockArc()),
-};
+  const _mockD3 = {
+    scaleLinear: vi.fn(() => _createMockScale()),
+    area: vi.fn(() => _createMockGenerator()),
+    line: vi.fn(() => _createMockGenerator()),
+    pie: vi.fn(() => _createMockPie()),
+    arc: vi.fn(() => _createMockArc()),
+  };
 
-const mockSvgElement = {
-  append: jest.fn().mockReturnThis(),
-  attr: jest.fn().mockReturnThis(),
-  datum: jest.fn().mockReturnThis(),
-  text: jest.fn().mockReturnThis(),
-};
+  const _mockSvgElement = {
+    append: vi.fn().mockReturnThis(),
+    attr: vi.fn().mockReturnThis(),
+    datum: vi.fn().mockReturnThis(),
+    text: vi.fn().mockReturnThis(),
+  };
 
-const mockD3Node = jest.fn().mockImplementation(() => ({
-  d3: mockD3,
-  createSVG: mockCreateSVG.mockReturnValue(mockSvgElement),
-  svgString: jest.fn().mockReturnValue('<svg></svg>'),
-}));
+  const _mockD3Node = vi.fn().mockImplementation(function() { return {
+    d3: _mockD3,
+    createSVG: _mockCreateSVG.mockReturnValue(_mockSvgElement),
+    svgString: vi.fn().mockReturnValue('<svg></svg>'),
+  }; });
 
-jest.mock('d3-node', () => mockD3Node);
+  const _mockResvgRender = vi.fn().mockReturnValue({
+    asPng: vi.fn().mockReturnValue(Buffer.from('fake-png-data')),
+  });
+  const _mockResvg = vi.fn().mockImplementation(function() { return {
+    render: _mockResvgRender,
+  }; });
 
-const mockResvgRender = jest.fn().mockReturnValue({
-  asPng: jest.fn().mockReturnValue(Buffer.from('fake-png-data')),
+  const _mockTerminalImageBuffer = vi.fn().mockResolvedValue('terminal-image-output');
+
+  return {
+    mockCreateSVG: _mockCreateSVG,
+    mockSvgElement: _mockSvgElement,
+    mockD3: _mockD3,
+    mockD3Node: _mockD3Node,
+    mockResvgRender: _mockResvgRender,
+    mockResvg: _mockResvg,
+    mockTerminalImageBuffer: _mockTerminalImageBuffer,
+  };
 });
-const mockResvg = jest.fn().mockImplementation(() => ({
-  render: mockResvgRender,
-}));
 
-jest.mock('@resvg/resvg-js', () => ({
+vi.mock('d3-node', () => ({ default: mockD3Node }));
+
+vi.mock('@resvg/resvg-js', () => ({
   Resvg: mockResvg,
 }));
 
-const mockTerminalImageBuffer = jest.fn().mockResolvedValue('terminal-image-output');
-
-jest.mock('terminal-image', () => ({
+vi.mock('terminal-image', () => ({
   default: {
     buffer: mockTerminalImageBuffer,
   },
@@ -141,9 +161,9 @@ describe('SVG Charts Module', () => {
     mockSvgElement.text.mockClear();
     mockSvgElement.text.mockReturnThis();
     mockResvg.mockClear();
-    mockResvg.mockImplementation(() => ({
+    mockResvg.mockImplementation(function() { return {
       render: mockResvgRender,
-    }));
+    }; });
     mockResvgRender.mockClear();
     mockResvgRender.mockReturnValue({
       asPng: jest.fn().mockReturnValue(Buffer.from('fake-png-data')),

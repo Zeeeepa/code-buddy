@@ -11,22 +11,31 @@
  * - Self-healing functionality
  */
 
+
+// Mock child_process
+
 import { spawn, ChildProcess, SpawnOptions } from 'child_process';
 import { EventEmitter } from 'events';
 import path from 'path';
 import os from 'os';
+import { BashTool } from '../../src/tools/bash';
+import { validateWithSchema, validateCommand as validateCommandSafety, sanitizeForShell } from '../../src/utils/input-validator';
+import { isLikelyTestOutput, parseTestOutput } from '../../src/utils/test-output-parser';
+import { registerDisposable } from '../../src/utils/disposable';
 
-// Mock child_process
 jest.mock('child_process', () => ({
   spawn: jest.fn(),
   SpawnOptions: {},
 }));
 
 // Mock fs for any file system operations
-jest.mock('fs', () => ({
-  ...jest.requireActual('fs'),
+jest.mock('fs', async () => {
+  const impl = {
+  ...await vi.importActual('fs'),
   existsSync: jest.fn().mockReturnValue(true),
-}));
+};
+  return { ...impl, default: impl };
+});
 
 // Mock confirmation service
 interface MockConfirmationResult {
@@ -34,27 +43,27 @@ interface MockConfirmationResult {
   dontAskAgain?: boolean;
   feedback?: string;
 }
-const mockGetSessionFlags = jest.fn(() => ({ bashCommands: true, allOperations: false }));
+const mockGetSessionFlags = jest.fn(function() { return { bashCommands: true, allOperations: false }; });
 const mockRequestConfirmation = jest.fn((): Promise<MockConfirmationResult> =>
   Promise.resolve({ confirmed: true })
 );
 
 jest.mock('../../src/utils/confirmation-service', () => ({
   ConfirmationService: {
-    getInstance: jest.fn(() => ({
+    getInstance: jest.fn(function() { return {
       getSessionFlags: mockGetSessionFlags,
       requestConfirmation: mockRequestConfirmation,
-    })),
+    }; }),
   },
 }));
 
 // Mock sandbox manager
-const mockValidateCommand = jest.fn(() => ({ valid: true }));
+const mockValidateCommand = jest.fn(function() { return { valid: true }; });
 
 jest.mock('../../src/security/sandbox', () => ({
-  getSandboxManager: jest.fn(() => ({
+  getSandboxManager: jest.fn(function() { return {
     validateCommand: mockValidateCommand,
-  })),
+  }; }),
 }));
 
 // Mock self-healing engine
@@ -73,15 +82,15 @@ const mockAttemptHealing = jest.fn((): Promise<MockHealingResult> =>
 );
 
 jest.mock('../../src/utils/self-healing', () => ({
-  getSelfHealingEngine: jest.fn(() => ({
+  getSelfHealingEngine: jest.fn(function() { return {
     attemptHealing: mockAttemptHealing,
-  })),
+  }; }),
   SelfHealingEngine: class {},
 }));
 
 // Mock test output parser
 jest.mock('../../src/utils/test-output-parser', () => ({
-  parseTestOutput: jest.fn(() => ({ isTestOutput: false, data: null })),
+  parseTestOutput: jest.fn(function() { return { isTestOutput: false, data: null }; }),
   isLikelyTestOutput: jest.fn(() => false),
 }));
 
@@ -110,8 +119,8 @@ jest.mock('../../src/utils/input-validator', () => ({
       files: { type: 'string', required: false },
     },
   },
-  validateWithSchema: jest.fn(() => ({ valid: true, value: {} })),
-  validateCommand: jest.fn(() => ({ valid: true, value: '' })),
+  validateWithSchema: jest.fn(function() { return { valid: true, value: {} }; }),
+  validateCommand: jest.fn(function() { return { valid: true, value: '' }; }),
   sanitizeForShell: jest.fn((input: string) => `'${input.replace(/'/g, "'\\''")}'`),
 }));
 
@@ -123,34 +132,34 @@ jest.mock('@vscode/ripgrep', () => ({
 // Mock safe-binaries checker
 jest.mock('../../src/security/safe-binaries', () => ({
   SafeBinariesChecker: {
-    getInstance: jest.fn(() => ({
+    getInstance: jest.fn(function() { return {
       isSafe: jest.fn((cmd) => {
         const safe = ['ls', 'cat', 'grep', 'echo'];
         return safe.some(s => cmd.trim().startsWith(s));
       }),
-    })),
+    }; }),
   },
 }));
 
 // Mock auto-sandbox (dynamic import in execute())
 jest.mock('../../src/sandbox/auto-sandbox', () => ({
-  getAutoSandboxRouter: jest.fn(() => ({
+  getAutoSandboxRouter: jest.fn(function() { return {
     route: jest.fn().mockResolvedValue({ mode: 'direct' }),
-  })),
+  }; }),
 }));
 
 // Mock command-validator
 jest.mock('../../src/tools/bash/command-validator', () => ({
-  ...jest.requireActual('../../src/tools/bash/command-validator'),
-  getFilteredEnv: jest.fn(() => ({ ...process.env })),
+  ...await vi.importActual('../../src/tools/bash/command-validator'),
+  getFilteredEnv: jest.fn(function() { return { ...process.env }; }),
 }));
 
 // Mock shell-env-policy
 jest.mock('../../src/security/shell-env-policy', () => ({
-  getShellEnvPolicy: jest.fn(() => ({
+  getShellEnvPolicy: jest.fn(function() { return {
     filterEnv: jest.fn((env: Record<string, string>) => env),
     buildEnv: jest.fn((env: Record<string, string>) => env),
-  })),
+  }; }),
 }));
 
 // Mock streaming-executor
@@ -160,19 +169,19 @@ jest.mock('../../src/tools/bash/streaming-executor', () => ({
 
 // Mock bash-parser
 jest.mock('../../src/security/bash-parser', () => ({
-  parseBashCommand: jest.fn(() => ({
+  parseBashCommand: jest.fn(function() { return {
     commands: [],
     pipes: [],
     redirects: [],
     isValid: true,
-  })),
+  }; }),
 }));
 
 // Mock checkpoint-manager
 jest.mock('../../src/checkpoints/checkpoint-manager', () => ({
-  getCheckpointManager: jest.fn(() => ({
+  getCheckpointManager: jest.fn(function() { return {
     createCheckpoint: jest.fn(),
-  })),
+  }; }),
 }));
 
 // Mock audit-logger
@@ -196,8 +205,6 @@ jest.mock('../../src/utils/logger', () => ({
 }));
 
 // Import after mocking
-import { BashTool } from '../../src/tools/bash';
-import { validateWithSchema, validateCommand as validateCommandSafety } from '../../src/utils/input-validator';
 
 // Helper to create a mock child process
 function createMockChildProcess(): ChildProcess & EventEmitter {
@@ -246,7 +253,6 @@ describe('BashTool', () => {
 
   describe('Constructor and Disposal', () => {
     it('should register with disposable manager on construction', () => {
-      const { registerDisposable } = require('../../src/utils/disposable');
       expect(registerDisposable).toHaveBeenCalled();
     });
 
@@ -259,12 +265,15 @@ describe('BashTool', () => {
       // Start a command execution
       const executePromise = bashTool.execute('sleep 10');
 
+      // Wait for async pre-spawn logic (dynamic imports, etc.) to complete
+      await new Promise(r => setTimeout(r, 100));
+
       // Dispose - currently runningProcesses is empty as spawned processes aren't tracked
       bashTool.dispose();
 
       // The dispose method should not throw
       // Complete the process to resolve the promise
-      emitAfterSpawn(mockProcess, { exitCode: 0 });
+      mockProcess.emit('close', 0);
       await executePromise;
 
       // Verify dispose doesn't crash on subsequent calls
@@ -273,7 +282,7 @@ describe('BashTool', () => {
 
     it('should handle errors when killing processes during dispose', () => {
       const mockProcess = createMockChildProcess();
-      mockProcess.kill = jest.fn().mockImplementation(() => {
+      mockProcess.kill = jest.fn().mockImplementation(function() {
         throw new Error('Process already dead');
       });
       mockSpawn.mockReturnValue(mockProcess);
@@ -379,11 +388,8 @@ describe('BashTool', () => {
 
       const executePromise = bashTool.execute('sleep 60', 1000);
 
-      // Drain microtasks so async pre-spawn logic completes and setTimeout is registered
-      for (let i = 0; i < 10; i++) await Promise.resolve();
-
-      // Advance timer past timeout
-      jest.advanceTimersByTime(1500);
+      // Use advanceTimersByTimeAsync to properly flush microtasks + advance timers
+      await vi.advanceTimersByTimeAsync(1500);
 
       // Process should have been killed
       expect(mockProcess.kill).toHaveBeenCalled();
@@ -408,11 +414,8 @@ describe('BashTool', () => {
 
       const executePromise = bashTool.execute('slow-command', 500);
 
-      // Drain microtasks so async pre-spawn logic completes and setTimeout is registered
-      for (let i = 0; i < 10; i++) await Promise.resolve();
-
-      // Advance past timeout
-      jest.advanceTimersByTime(600);
+      // Use advanceTimersByTimeAsync to properly flush microtasks + advance timers
+      await vi.advanceTimersByTimeAsync(600);
 
       // On Unix (non-Windows), process.kill(-pgid, signal) is called
       // First call should be SIGTERM (graceful)
@@ -423,7 +426,7 @@ describe('BashTool', () => {
       }
 
       // Advance past grace period (3 seconds)
-      jest.advanceTimersByTime(3500);
+      await vi.advanceTimersByTimeAsync(3500);
 
       // Complete the process
       mockProcess.emit('close', null);
@@ -439,15 +442,15 @@ describe('BashTool', () => {
 
       const executePromise = bashTool.execute('fast-command', 5000);
 
-      // Drain microtasks so spawn and listeners are set up before emitting events
-      for (let i = 0; i < 10; i++) await Promise.resolve();
+      // Use advanceTimersByTimeAsync to flush microtasks so spawn and listeners are set up
+      await vi.advanceTimersByTimeAsync(10);
 
       // Complete quickly
       (mockProcess.stdout as EventEmitter).emit('data', Buffer.from('done'));
       mockProcess.emit('close', 0);
 
       // Advance a bit (but not past timeout)
-      jest.advanceTimersByTime(100);
+      await vi.advanceTimersByTimeAsync(100);
 
       const result = await executePromise;
       expect(result.success).toBe(true);
@@ -460,14 +463,11 @@ describe('BashTool', () => {
 
       const executePromise = bashTool.execute('some-command'); // No timeout specified
 
-      // Drain microtasks so async pre-spawn logic completes and setTimeout is registered
-      for (let i = 0; i < 10; i++) await Promise.resolve();
-
-      // Default is 30000ms
-      jest.advanceTimersByTime(29000);
+      // Use advanceTimersByTimeAsync to properly flush microtasks + advance timers
+      await vi.advanceTimersByTimeAsync(29000);
       expect(mockProcess.kill).not.toHaveBeenCalled();
 
-      jest.advanceTimersByTime(2000);
+      await vi.advanceTimersByTimeAsync(2000);
       expect(mockProcess.kill).toHaveBeenCalled();
 
       mockProcess.emit('close', null);
@@ -488,7 +488,7 @@ describe('BashTool', () => {
     });
 
     it('should handle cd command separately', async () => {
-      (process.chdir as jest.Mock).mockImplementation(() => {
+      (process.chdir as jest.Mock).mockImplementation(function() {
         // Simulate successful directory change
       });
 
@@ -505,7 +505,7 @@ describe('BashTool', () => {
     });
 
     it('should handle cd with quoted path', async () => {
-      (process.chdir as jest.Mock).mockImplementation(() => {});
+      (process.chdir as jest.Mock).mockImplementation(function() {});
       jest.spyOn(process, 'cwd').mockReturnValue('/path with spaces');
 
       const result = await bashTool.execute('cd "/path with spaces"');
@@ -515,7 +515,7 @@ describe('BashTool', () => {
     });
 
     it('should handle cd with single-quoted path', async () => {
-      (process.chdir as jest.Mock).mockImplementation(() => {});
+      (process.chdir as jest.Mock).mockImplementation(function() {});
       jest.spyOn(process, 'cwd').mockReturnValue('/another/path');
 
       const result = await bashTool.execute("cd '/another/path'");
@@ -525,7 +525,7 @@ describe('BashTool', () => {
     });
 
     it('should return error for non-existent directory', async () => {
-      (process.chdir as jest.Mock).mockImplementation(() => {
+      (process.chdir as jest.Mock).mockImplementation(function() {
         throw new Error('ENOENT: no such file or directory');
       });
 
@@ -537,7 +537,7 @@ describe('BashTool', () => {
 
     it('should track current directory', async () => {
       const cwdSpy = jest.spyOn(process, 'cwd').mockReturnValue('/new/directory');
-      (process.chdir as jest.Mock).mockImplementation(() => {});
+      (process.chdir as jest.Mock).mockImplementation(function() {});
 
       await bashTool.execute('cd /new/directory');
 
@@ -731,7 +731,7 @@ describe('BashTool', () => {
 
     it('should handle exception in execute', async () => {
       // Force an exception by making spawn throw
-      mockSpawn.mockImplementation(() => {
+      mockSpawn.mockImplementation(function() {
         throw new Error('Spawn failed completely');
       });
 
@@ -886,7 +886,6 @@ describe('BashTool', () => {
         await bashTool.listFiles('test dir');
 
         // sanitizeForShell should be called
-        const { sanitizeForShell } = require('../../src/utils/input-validator');
         expect(sanitizeForShell).toHaveBeenCalledWith('test dir');
       });
 
@@ -922,7 +921,6 @@ describe('BashTool', () => {
         emitAfterSpawn(mockProcess, { exitCode: 0 });
         await bashTool.findFiles('*.txt', 'src');
 
-        const { sanitizeForShell } = require('../../src/utils/input-validator');
         expect(sanitizeForShell).toHaveBeenCalledWith('*.txt');
         expect(sanitizeForShell).toHaveBeenCalledWith('src');
       });
@@ -1010,9 +1008,8 @@ describe('BashTool', () => {
 
   describe('Test Output Detection', () => {
     it('should parse test output when detected', async () => {
-      const { isLikelyTestOutput, parseTestOutput } = require('../../src/utils/test-output-parser');
-      isLikelyTestOutput.mockReturnValueOnce(true);
-      parseTestOutput.mockReturnValueOnce({
+      (isLikelyTestOutput as ReturnType<typeof vi.fn>).mockReturnValueOnce(true);
+      (parseTestOutput as ReturnType<typeof vi.fn>).mockReturnValueOnce({
         isTestOutput: true,
         data: { framework: 'jest', passed: 10, failed: 0 },
       });
@@ -1028,8 +1025,7 @@ describe('BashTool', () => {
     });
 
     it('should return regular output when not test output', async () => {
-      const { isLikelyTestOutput } = require('../../src/utils/test-output-parser');
-      isLikelyTestOutput.mockReturnValueOnce(false);
+      (isLikelyTestOutput as ReturnType<typeof vi.fn>).mockReturnValueOnce(false);
 
       const mockProcess = createMockChildProcess();
       mockSpawn.mockReturnValue(mockProcess);
@@ -1140,9 +1136,12 @@ describe('BashTool Integration Edge Cases', () => {
       bashTool.execute('cmd3'),
     ];
 
-    emitAfterSpawn(mockProcess1, { exitCode: 0 });
-    emitAfterSpawn(mockProcess2, { exitCode: 0 });
-    emitAfterSpawn(mockProcess3, { exitCode: 0 });
+    // Wait for async pre-spawn logic (dynamic imports, etc.) on all three to complete
+    await new Promise(r => setTimeout(r, 200));
+
+    mockProcess1.emit('close', 0);
+    mockProcess2.emit('close', 0);
+    mockProcess3.emit('close', 0);
 
     const results = await Promise.all(promises);
 

@@ -10,23 +10,52 @@
  * 6. Error handling
  */
 
+import { vi } from 'vitest';
 import { EventEmitter } from 'events';
 
-// Create mock functions with proper types
-const mockEnsureDir = jest.fn().mockResolvedValue(undefined);
-const mockPathExists = jest.fn().mockResolvedValue(false);
-const mockReadJSON = jest.fn().mockResolvedValue({ checkpoints: [], currentIndex: -1 });
-const mockWriteJSON = jest.fn().mockResolvedValue(undefined);
-const mockWriteFile = jest.fn().mockResolvedValue(undefined);
-const mockReadFile = jest.fn().mockResolvedValue(Buffer.from('file content'));
-const mockCopy = jest.fn().mockResolvedValue(undefined);
-const mockChmod = jest.fn().mockResolvedValue(undefined);
-const mockRemove = jest.fn().mockResolvedValue(undefined);
-const mockStat = jest.fn().mockResolvedValue({ size: 100, mode: 0o644 });
-const mockReaddir = jest.fn().mockResolvedValue([]);
+// Hoist mock variables so they are available inside vi.mock() factories
+const {
+  mockEnsureDir,
+  mockPathExists,
+  mockReadJSON,
+  mockWriteJSON,
+  mockWriteFile,
+  mockReadFile,
+  mockCopy,
+  mockChmod,
+  mockRemove,
+  mockStat,
+  mockReaddir,
+  mockSpawn,
+} = vi.hoisted(() => ({
+  mockEnsureDir: vi.fn().mockResolvedValue(undefined),
+  mockPathExists: vi.fn().mockResolvedValue(false),
+  mockReadJSON: vi.fn().mockResolvedValue({ checkpoints: [], currentIndex: -1 }),
+  mockWriteJSON: vi.fn().mockResolvedValue(undefined),
+  mockWriteFile: vi.fn().mockResolvedValue(undefined),
+  mockReadFile: vi.fn().mockResolvedValue(Buffer.from('file content')),
+  mockCopy: vi.fn().mockResolvedValue(undefined),
+  mockChmod: vi.fn().mockResolvedValue(undefined),
+  mockRemove: vi.fn().mockResolvedValue(undefined),
+  mockStat: vi.fn().mockResolvedValue({ size: 100, mode: 0o644 }),
+  mockReaddir: vi.fn().mockResolvedValue([]),
+  mockSpawn: vi.fn().mockImplementation(function() {
+    const emitter = new EventEmitter();
+    const proc = Object.assign(emitter, {
+      stdout: new EventEmitter(),
+      stderr: new EventEmitter(),
+    });
+    setTimeout(() => {
+      proc.stdout.emit('data', Buffer.from('main'));
+      proc.emit('close', 0);
+    }, 0);
+    return proc;
+  }),
+}));
 
 // Mock fs-extra before importing the module
-jest.mock('fs-extra', () => ({
+jest.mock('fs-extra', () => {
+  const impl = {
   ensureDir: mockEnsureDir,
   pathExists: mockPathExists,
   readJSON: mockReadJSON,
@@ -38,21 +67,8 @@ jest.mock('fs-extra', () => ({
   remove: mockRemove,
   stat: mockStat,
   readdir: mockReaddir,
-}));
-
-// Create mock spawn function
-const mockSpawn = jest.fn().mockImplementation(() => {
-  const emitter = new EventEmitter();
-  const proc = Object.assign(emitter, {
-    stdout: new EventEmitter(),
-    stderr: new EventEmitter(),
-  });
-  // Emit success asynchronously
-  setTimeout(() => {
-    proc.stdout.emit('data', Buffer.from('main'));
-    proc.emit('close', 0);
-  }, 0);
-  return proc;
+};
+  return { ...impl, default: impl };
 });
 
 // Mock child_process
@@ -62,12 +78,12 @@ jest.mock('child_process', () => ({
 
 // Mock diff-match-patch
 jest.mock('diff-match-patch', () => ({
-  diff_match_patch: jest.fn().mockImplementation(() => ({
+  diff_match_patch: jest.fn().mockImplementation(function() { return {
     diff_main: jest.fn().mockReturnValue([[0, 'content']]),
     diff_cleanupSemantic: jest.fn(),
     patch_make: jest.fn().mockReturnValue([]),
     patch_toText: jest.fn().mockReturnValue('@@ -1,4 +1,4 @@\n-old\n+new\n'),
-  })),
+  }; }),
 }));
 
 import {
@@ -1024,7 +1040,7 @@ describe('CheckpointManager', () => {
     });
 
     it('should handle spawn errors for git commands', async () => {
-      mockSpawn.mockImplementation(() => {
+      mockSpawn.mockImplementation(function() {
         const emitter = new EventEmitter();
         const proc = Object.assign(emitter, {
           stdout: new EventEmitter(),
@@ -1170,7 +1186,7 @@ describe('CheckpointManager', () => {
 
     it('should return false for canUndo with one checkpoint', async () => {
       // Reset mock to avoid timing issues
-      mockSpawn.mockImplementation(() => {
+      mockSpawn.mockImplementation(function() {
         const emitter = new EventEmitter();
         const proc = Object.assign(emitter, {
           stdout: new EventEmitter(),
@@ -1189,7 +1205,7 @@ describe('CheckpointManager', () => {
 
     it('should return true for canUndo with multiple checkpoints', async () => {
       // Reset mock to avoid timing issues
-      mockSpawn.mockImplementation(() => {
+      mockSpawn.mockImplementation(function() {
         const emitter = new EventEmitter();
         const proc = Object.assign(emitter, {
           stdout: new EventEmitter(),
@@ -1209,7 +1225,7 @@ describe('CheckpointManager', () => {
 
     it('should return false for canRedo at latest checkpoint', async () => {
       // Reset mock to avoid timing issues
-      mockSpawn.mockImplementation(() => {
+      mockSpawn.mockImplementation(function() {
         const emitter = new EventEmitter();
         const proc = Object.assign(emitter, {
           stdout: new EventEmitter(),
@@ -1229,7 +1245,7 @@ describe('CheckpointManager', () => {
 
     it('should return true for canRedo after undo', async () => {
       // Reset mock to avoid timing issues
-      mockSpawn.mockImplementation(() => {
+      mockSpawn.mockImplementation(function() {
         const emitter = new EventEmitter();
         const proc = Object.assign(emitter, {
           stdout: new EventEmitter(),
@@ -1252,7 +1268,7 @@ describe('CheckpointManager', () => {
   describe('Format Status', () => {
     beforeEach(() => {
       // Reset spawn mock for each test
-      mockSpawn.mockImplementation(() => {
+      mockSpawn.mockImplementation(function() {
         const emitter = new EventEmitter();
         const proc = Object.assign(emitter, {
           stdout: new EventEmitter(),
@@ -1314,7 +1330,7 @@ describe('CheckpointManager', () => {
   describe('Dispose', () => {
     beforeEach(() => {
       // Reset spawn mock for each test
-      mockSpawn.mockImplementation(() => {
+      mockSpawn.mockImplementation(function() {
         const emitter = new EventEmitter();
         const proc = Object.assign(emitter, {
           stdout: new EventEmitter(),

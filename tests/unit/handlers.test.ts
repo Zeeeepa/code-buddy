@@ -13,115 +13,165 @@
  */
 
 // Type imports for documentation - used in handler return types
-import type { ChatEntry as _ChatEntry } from '../../src/agent/codebuddy-agent';
-import type { CommandHandlerResult as _CommandHandlerResult } from '../../src/commands/handlers/branch-handlers';
 
 // ============================================================================
 // MOCKS
 // ============================================================================
 
 // Mock memory manager (legacy - may be used by old tests)
-const mockMemoryManager = {
-  initialize: jest.fn(),
-  recall: jest.fn(),
-  forget: jest.fn(),
-  remember: jest.fn(),
-  formatMemories: jest.fn(),
-};
+
+import type { ChatEntry as _ChatEntry } from '../../src/agent/codebuddy-agent';
+import type { CommandHandlerResult as _CommandHandlerResult } from '../../src/commands/handlers/branch-handlers';
+import { handleSessions } from '../../src/commands/handlers/session-handlers';
+import { handleGenerateTests } from '../../src/commands/handlers/test-handlers';
+
+const {
+  mockMemoryManager, mockEnhancedMemory, mockCommentWatcher, mockCostTracker,
+  mockToolCache, mockRequestOptimizer, mockPerformanceManager,
+  mockResponseCache, mockSelfHealingEngine, mockContextLoader,
+  mockWorkspaceDetector, mockInteractionLogger, mockSecurityManager,
+  mockConfirmationService, mockCodeGuardianAgent, mockExportManager,
+  mockSessionRepository, mockSettingsManager, mockSlashCommandManager,
+  mockToolFilter,
+} = vi.hoisted(() => ({
+  mockMemoryManager: {
+    initialize: vi.fn(),
+    recall: vi.fn(),
+    forget: vi.fn(),
+    remember: vi.fn(),
+    formatMemories: vi.fn(),
+  },
+  mockEnhancedMemory: {
+    store: vi.fn().mockResolvedValue({ id: 'test-id' }),
+    recall: vi.fn().mockResolvedValue([]),
+    forget: vi.fn().mockResolvedValue(undefined),
+    buildContext: vi.fn().mockResolvedValue('Mock context'),
+    formatStatus: vi.fn().mockReturnValue('Memory Status: OK'),
+    dispose: vi.fn(),
+  },
+  mockCommentWatcher: {
+    scanProject: vi.fn(),
+    formatComments: vi.fn(),
+    getDetectedComments: vi.fn(),
+    generatePromptForComment: vi.fn(),
+  },
+  mockCostTracker: {
+    setBudgetLimit: vi.fn(),
+    setDailyLimit: vi.fn(),
+    getReport: vi.fn(),
+    resetSession: vi.fn(),
+    formatDashboard: vi.fn(),
+  },
+  mockToolCache: {
+    getStats: vi.fn(),
+  },
+  mockRequestOptimizer: {
+    getStats: vi.fn(),
+  },
+  mockPerformanceManager: {
+    getToolCache: vi.fn(function() { return { getStats: vi.fn() }; }),
+    getRequestOptimizer: vi.fn(function() { return { getStats: vi.fn() }; }),
+    resetStats: vi.fn(),
+    getSummary: vi.fn(),
+  },
+  mockResponseCache: {
+    clear: vi.fn(),
+    getStats: vi.fn(),
+    formatStatus: vi.fn(),
+  },
+  mockSelfHealingEngine: {
+    updateOptions: vi.fn(),
+    getOptions: vi.fn(),
+    getStats: vi.fn(),
+  },
+  mockContextLoader: {
+    loadFiles: vi.fn(),
+    getSummary: vi.fn(),
+  },
+  mockWorkspaceDetector: {
+    detect: vi.fn(),
+    formatDetectionResults: vi.fn(),
+  },
+  mockInteractionLogger: {
+    listSessions: vi.fn(),
+    loadSession: vi.fn(),
+    deleteSession: vi.fn(),
+    getLatestSession: vi.fn(),
+    searchSessions: vi.fn(),
+    formatSession: vi.fn(),
+  },
+  mockSecurityManager: {
+    updateConfig: vi.fn(),
+    resetStats: vi.fn(),
+    getEvents: vi.fn(),
+    formatDashboard: vi.fn(),
+  },
+  mockConfirmationService: {
+    setDryRunMode: vi.fn(),
+    getDryRunLog: vi.fn(),
+    isDryRunMode: vi.fn(),
+    formatDryRunLog: vi.fn(),
+  },
+  mockCodeGuardianAgent: {
+    isReady: vi.fn(),
+    initialize: vi.fn(),
+    setMode: vi.fn(),
+    getMode: vi.fn(),
+    execute: vi.fn(),
+  },
+  mockExportManager: {
+    exportSession: vi.fn(),
+    listExports: vi.fn(),
+  },
+  mockSessionRepository: {
+    findSessions: vi.fn(),
+  },
+  mockSettingsManager: {
+    loadUserSettings: vi.fn(),
+  },
+  mockSlashCommandManager: {
+    reload: vi.fn(),
+  },
+  mockToolFilter: {
+    enabledPatterns: [] as string[],
+    disabledPatterns: [] as string[],
+  },
+}));
+// Fix mockPerformanceManager to use the actual mockToolCache/mockRequestOptimizer
+mockPerformanceManager.getToolCache = jest.fn(function() { return mockToolCache; });
+mockPerformanceManager.getRequestOptimizer = jest.fn(function() { return mockRequestOptimizer; });
 
 jest.mock('../../src/memory/persistent-memory', () => ({
-  getMemoryManager: jest.fn(() => mockMemoryManager),
+  getMemoryManager: jest.fn(function() { return mockMemoryManager; }),
 }));
-
-// Mock EnhancedMemory (new memory system used by handlers)
-const mockEnhancedMemory = {
-  store: jest.fn().mockResolvedValue({ id: 'test-id' }),
-  recall: jest.fn().mockResolvedValue([]),
-  forget: jest.fn().mockResolvedValue(undefined),
-  buildContext: jest.fn().mockResolvedValue('Mock context'),
-  formatStatus: jest.fn().mockReturnValue('Memory Status: OK'),
-  dispose: jest.fn(),
-};
 
 jest.mock('../../src/memory/index.js', () => ({
-  getEnhancedMemory: jest.fn(() => mockEnhancedMemory),
+  getEnhancedMemory: jest.fn(function() { return mockEnhancedMemory; }),
+  getMemoryManager: jest.fn(function() { return mockMemoryManager; }),
 }));
-
-// Mock comment watcher
-const mockCommentWatcher = {
-  scanProject: jest.fn(),
-  formatComments: jest.fn(),
-  getDetectedComments: jest.fn(),
-  generatePromptForComment: jest.fn(),
-};
 
 jest.mock('../../src/tools/comment-watcher', () => ({
-  getCommentWatcher: jest.fn(() => mockCommentWatcher),
+  getCommentWatcher: jest.fn(function() { return mockCommentWatcher; }),
 }));
-
-// Mock cost tracker
-const mockCostTracker = {
-  setBudgetLimit: jest.fn(),
-  setDailyLimit: jest.fn(),
-  getReport: jest.fn(),
-  resetSession: jest.fn(),
-  formatDashboard: jest.fn(),
-};
 
 jest.mock('../../src/utils/cost-tracker', () => ({
-  getCostTracker: jest.fn(() => mockCostTracker),
+  getCostTracker: jest.fn(function() { return mockCostTracker; }),
 }));
-
-// Mock performance manager
-const mockToolCache = {
-  getStats: jest.fn(),
-};
-
-const mockRequestOptimizer = {
-  getStats: jest.fn(),
-};
-
-const mockPerformanceManager = {
-  getToolCache: jest.fn(() => mockToolCache),
-  getRequestOptimizer: jest.fn(() => mockRequestOptimizer),
-  resetStats: jest.fn(),
-  getSummary: jest.fn(),
-};
 
 jest.mock('../../src/performance/index', () => ({
-  getPerformanceManager: jest.fn(() => mockPerformanceManager),
+  getPerformanceManager: jest.fn(function() { return mockPerformanceManager; }),
 }));
-
-// Mock response cache
-const mockResponseCache = {
-  clear: jest.fn(),
-  getStats: jest.fn(),
-  formatStatus: jest.fn(),
-};
 
 jest.mock('../../src/utils/response-cache', () => ({
-  getResponseCache: jest.fn(() => mockResponseCache),
+  getResponseCache: jest.fn(function() { return mockResponseCache; }),
 }));
-
-// Mock self-healing engine
-const mockSelfHealingEngine = {
-  updateOptions: jest.fn(),
-  getOptions: jest.fn(),
-  getStats: jest.fn(),
-};
 
 jest.mock('../../src/utils/self-healing', () => ({
-  getSelfHealingEngine: jest.fn(() => mockSelfHealingEngine),
+  getSelfHealingEngine: jest.fn(function() { return mockSelfHealingEngine; }),
 }));
 
-// Mock context loader
-const mockContextLoader = {
-  loadFiles: jest.fn(),
-  getSummary: jest.fn(),
-};
-
 jest.mock('../../src/context/context-loader', () => ({
-  getContextLoader: jest.fn(() => mockContextLoader),
+  getContextLoader: jest.fn(function() { return mockContextLoader; }),
   ContextLoader: {
     parsePatternString: jest.fn((pattern: string) => ({
       include: [pattern],
@@ -130,40 +180,16 @@ jest.mock('../../src/context/context-loader', () => ({
   },
 }));
 
-// Mock workspace detector
-const mockWorkspaceDetector = {
-  detect: jest.fn(),
-  formatDetectionResults: jest.fn(),
-};
-
 jest.mock('../../src/utils/workspace-detector', () => ({
-  getWorkspaceDetector: jest.fn(() => mockWorkspaceDetector),
+  getWorkspaceDetector: jest.fn(function() { return mockWorkspaceDetector; }),
 }));
-
-// Mock interaction logger
-const mockInteractionLogger = {
-  listSessions: jest.fn(),
-  loadSession: jest.fn(),
-  deleteSession: jest.fn(),
-  getLatestSession: jest.fn(),
-  searchSessions: jest.fn(),
-  formatSession: jest.fn(),
-};
 
 jest.mock('../../src/logging/interaction-logger', () => ({
   InteractionLogger: mockInteractionLogger,
 }));
 
-// Mock security manager
-const mockSecurityManager = {
-  updateConfig: jest.fn(),
-  resetStats: jest.fn(),
-  getEvents: jest.fn(),
-  formatDashboard: jest.fn(),
-};
-
 jest.mock('../../src/security/index', () => ({
-  getSecurityManager: jest.fn(() => mockSecurityManager),
+  getSecurityManager: jest.fn(function() { return mockSecurityManager; }),
   ApprovalMode: {
     READ_ONLY: 'read-only',
     AUTO: 'auto',
@@ -171,31 +197,14 @@ jest.mock('../../src/security/index', () => ({
   },
 }));
 
-// Mock confirmation service
-const mockConfirmationService = {
-  setDryRunMode: jest.fn(),
-  getDryRunLog: jest.fn(),
-  isDryRunMode: jest.fn(),
-  formatDryRunLog: jest.fn(),
-};
-
 jest.mock('../../src/utils/confirmation-service', () => ({
   ConfirmationService: {
-    getInstance: jest.fn(() => mockConfirmationService),
+    getInstance: jest.fn(function() { return mockConfirmationService; }),
   },
 }));
 
-// Mock code guardian agent
-const mockCodeGuardianAgent = {
-  isReady: jest.fn(),
-  initialize: jest.fn(),
-  setMode: jest.fn(),
-  getMode: jest.fn(),
-  execute: jest.fn(),
-};
-
 jest.mock('../../src/agent/specialized/code-guardian-agent', () => ({
-  getCodeGuardianAgent: jest.fn(() => mockCodeGuardianAgent),
+  getCodeGuardianAgent: jest.fn(function() { return mockCodeGuardianAgent; }),
   CodeGuardianMode: {
     ANALYZE_ONLY: 'ANALYZE_ONLY',
     SUGGEST_REFACTOR: 'SUGGEST_REFACTOR',
@@ -204,51 +213,24 @@ jest.mock('../../src/agent/specialized/code-guardian-agent', () => ({
   },
 }));
 
-// Mock export manager
-const mockExportManager = {
-  exportSession: jest.fn(),
-  listExports: jest.fn(),
-};
-
 jest.mock('../../src/utils/export-manager', () => ({
-  getExportManager: jest.fn(() => mockExportManager),
+  getExportManager: jest.fn(function() { return mockExportManager; }),
 }));
-
-// Mock session repository
-const mockSessionRepository = {
-  findSessions: jest.fn(),
-};
 
 jest.mock('../../src/database/repositories/session-repository', () => ({
-  getSessionRepository: jest.fn(() => mockSessionRepository),
+  getSessionRepository: jest.fn(function() { return mockSessionRepository; }),
 }));
-
-// Mock settings manager
-const mockSettingsManager = {
-  loadUserSettings: jest.fn(),
-};
 
 jest.mock('../../src/utils/settings-manager', () => ({
-  getSettingsManager: jest.fn(() => mockSettingsManager),
+  getSettingsManager: jest.fn(function() { return mockSettingsManager; }),
 }));
-
-// Mock slash command manager
-const mockSlashCommandManager = {
-  reload: jest.fn(),
-};
 
 jest.mock('../../src/commands/slash-commands', () => ({
-  getSlashCommandManager: jest.fn(() => mockSlashCommandManager),
+  getSlashCommandManager: jest.fn(function() { return mockSlashCommandManager; }),
 }));
 
-// Mock tool filter
-const mockToolFilter = {
-  enabledPatterns: [],
-  disabledPatterns: [],
-};
-
 jest.mock('../../src/utils/tool-filter', () => ({
-  getToolFilter: jest.fn(() => mockToolFilter),
+  getToolFilter: jest.fn(function() { return mockToolFilter; }),
   setToolFilter: jest.fn(),
   resetToolFilter: jest.fn(),
   filterTools: jest.fn((tools: unknown[]) => ({
@@ -310,7 +292,6 @@ import {
   handleWorkspace,
 } from '../../src/commands/handlers/context-handlers';
 
-import { handleSessions } from '../../src/commands/handlers/session-handlers';
 
 import {
   handleSecurity,
@@ -324,7 +305,6 @@ import {
   handleExportFormats,
 } from '../../src/commands/handlers/export-handlers';
 
-import { handleGenerateTests } from '../../src/commands/handlers/test-handlers';
 
 import {
   handleReload,
@@ -350,21 +330,21 @@ describe('Memory Handlers', () => {
 
   describe('handleMemory', () => {
     test('should list memories by default', async () => {
-      mockEnhancedMemory.formatStatus.mockReturnValue('Memory Status: 5 memories');
+      mockMemoryManager.formatMemories.mockReturnValue('Memory Status: 5 memories');
 
       const result = await handleMemory([]);
 
       expect(result.handled).toBe(true);
       expect(result.entry?.type).toBe('assistant');
       expect(result.entry?.content).toBe('Memory Status: 5 memories');
-      expect(mockEnhancedMemory.formatStatus).toHaveBeenCalled();
+      expect(mockMemoryManager.formatMemories).toHaveBeenCalled();
     });
 
     test('should list memories with "list" action', async () => {
       const result = await handleMemory(['list']);
 
       expect(result.handled).toBe(true);
-      expect(mockEnhancedMemory.formatStatus).toHaveBeenCalled();
+      expect(mockMemoryManager.formatMemories).toHaveBeenCalled();
     });
 
     test('should recall memories matching query', async () => {
@@ -375,7 +355,7 @@ describe('Memory Handlers', () => {
       const result = await handleMemory(['recall', 'mykey']);
 
       expect(result.handled).toBe(true);
-      expect(result.entry?.content).toContain('Recall Results');
+      expect(result.entry?.content).toContain('Enhanced Memory');
       expect(result.entry?.content).toContain('stored-value');
     });
 
@@ -394,22 +374,21 @@ describe('Memory Handlers', () => {
     });
 
     test('should forget a memory', async () => {
-      // Mock finding memories with the tag
-      mockEnhancedMemory.recall.mockResolvedValueOnce([{ id: 'mem-1', type: 'fact', content: 'test', importance: 0.8, createdAt: new Date() }]);
+      // Mock persistent memory returning true (found and forgot)
+      mockMemoryManager.forget.mockResolvedValueOnce(true);
 
       const result = await handleMemory(['forget', 'mykey']);
 
       expect(result.handled).toBe(true);
       expect(result.entry?.content).toContain('Forgot');
       expect(result.entry?.content).toContain('mykey');
-      expect(mockEnhancedMemory.recall).toHaveBeenCalledWith({ tags: ['mykey'] });
+      expect(mockMemoryManager.forget).toHaveBeenCalledWith('mykey', 'project');
     });
 
     test('should show usage when forget has no key', async () => {
       const result = await handleMemory(['forget']);
 
       expect(result.entry?.content).toContain('Usage: /memory forget');
-      expect(result.entry?.content).toContain('forget last');
     });
 
     test('should have timestamp in entry', async () => {
@@ -424,13 +403,13 @@ describe('Memory Handlers', () => {
       const result = await handleRemember(['apiKey', 'secret123']);
 
       expect(result.handled).toBe(true);
-      expect(result.entry?.content).toContain('Remembered:');
-      expect(result.entry?.content).toContain('secret123');
+      expect(result.entry?.content).toContain('Remembered');
       expect(result.entry?.content).toContain('apiKey');
+      expect(mockMemoryManager.remember).toHaveBeenCalled();
       expect(mockEnhancedMemory.store).toHaveBeenCalledWith({
         type: 'fact',
-        content: 'secret123',
-        tags: ['apiKey'],
+        content: 'apiKey: secret123',
+        tags: ['apiKey', 'project'],
         importance: 0.8,
       });
     });
@@ -440,23 +419,23 @@ describe('Memory Handlers', () => {
 
       expect(mockEnhancedMemory.store).toHaveBeenCalledWith({
         type: 'fact',
-        content: 'this is a note',
-        tags: ['note'],
+        content: 'note: this is a note',
+        tags: ['note', 'project'],
         importance: 0.8,
       });
-      expect(result.entry?.content).toContain('this is a note');
+      expect(result.entry?.content).toContain('Remembered');
     });
 
     test('should show usage when no key provided', async () => {
       const result = await handleRemember([]);
 
-      expect(result.entry?.content).toBe('Usage: /remember <key> <value>');
+      expect(result.entry?.content).toContain('Usage: /remember <key> <value>');
     });
 
     test('should show usage when no value provided', async () => {
       const result = await handleRemember(['key']);
 
-      expect(result.entry?.content).toBe('Usage: /remember <key> <value>');
+      expect(result.entry?.content).toContain('Usage: /remember <key> <value>');
     });
 
     test('should store via EnhancedMemory', async () => {
@@ -1673,9 +1652,9 @@ describe('Common Handler Patterns', () => {
 describe('Error Handling', () => {
   test('handleAddContext should catch and format errors', async () => {
     const { getContextLoader } = await import('../../src/context/context-loader');
-    (getContextLoader as jest.Mock).mockImplementation(() => ({
+    (getContextLoader as jest.Mock).mockImplementation(function() { return {
       loadFiles: jest.fn().mockRejectedValue(new Error('File system error')),
-    }));
+    }; });
 
     const result = await handleAddContext(['**/*.ts']);
 

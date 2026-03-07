@@ -24,13 +24,16 @@ jest.mock('../../src/codebuddy/tools.js', () => ({
   getMCPManager: jest.fn(),
 }));
 
-jest.mock('chalk', () => ({
+jest.mock('chalk', () => {
+  const impl = {
   green: jest.fn((s: string) => s),
   red: jest.fn((s: string) => s),
   blue: jest.fn((s: string) => s),
   yellow: jest.fn((s: string) => s),
   bold: jest.fn((s: string) => s),
-}));
+};
+  return { ...impl, default: impl };
+});
 
 jest.mock('../../src/utils/logger.js', () => ({
   logger: {
@@ -42,12 +45,15 @@ jest.mock('../../src/utils/logger.js', () => ({
 }));
 
 // Mock readline to auto-confirm security prompts
-jest.mock('readline', () => ({
-  createInterface: () => ({
-    question: (_prompt: string, cb: (answer: string) => void) => cb('y'),
-    close: jest.fn(),
-  }),
-}));
+jest.mock('readline', () => {
+  const mod = {
+    createInterface: () => ({
+      question: (_prompt: string, cb: (answer: string) => void) => cb('y'),
+      close: jest.fn(),
+    }),
+  };
+  return { ...mod, default: mod };
+});
 
 import { createMCPCommand } from '../../src/commands/mcp';
 import * as mcpConfig from '../../src/mcp/config';

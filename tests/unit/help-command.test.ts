@@ -26,28 +26,42 @@ import {
   handleSaveConversation,
 } from '../../src/commands/handlers/core-handlers';
 
-// Mock slash command manager
-const mockGetAllCommands = jest.fn();
-const mockGetSlashCommandManager = jest.fn(() => ({
+// Hoist all mock variables
+const {
+  mockGetAllCommands, mockGetSlashCommandManager,
+  mockEnableYOLO, mockDisableYOLO, mockUpdateYOLOConfig, mockFormatYOLOStatus,
+  mockGetLevel, mockSetLevel, mockAddToYOLOAllowList, mockAddToYOLODenyList,
+  mockGetAvailableSkills, mockGetActiveSkill, mockGetSkill, mockActivateSkill, mockDeactivateSkill,
+  mockExport,
+} = vi.hoisted(() => ({
+  mockGetAllCommands: vi.fn(),
+  mockGetSlashCommandManager: vi.fn(),
+  mockEnableYOLO: vi.fn(),
+  mockDisableYOLO: vi.fn(),
+  mockUpdateYOLOConfig: vi.fn(),
+  mockFormatYOLOStatus: vi.fn(),
+  mockGetLevel: vi.fn(),
+  mockSetLevel: vi.fn(),
+  mockAddToYOLOAllowList: vi.fn(),
+  mockAddToYOLODenyList: vi.fn(),
+  mockGetAvailableSkills: vi.fn(),
+  mockGetActiveSkill: vi.fn(),
+  mockGetSkill: vi.fn(),
+  mockActivateSkill: vi.fn(),
+  mockDeactivateSkill: vi.fn(),
+  mockExport: vi.fn(),
+}));
+
+mockGetSlashCommandManager.mockImplementation(() => ({
   getAllCommands: mockGetAllCommands,
 }));
 
-jest.mock('../../src/commands/slash-commands', () => ({
+vi.mock('../../src/commands/slash-commands', () => ({
   getSlashCommandManager: () => mockGetSlashCommandManager(),
 }));
 
-// Mock autonomy manager
-const mockEnableYOLO = jest.fn();
-const mockDisableYOLO = jest.fn();
-const mockUpdateYOLOConfig = jest.fn();
-const mockFormatYOLOStatus = jest.fn();
-const mockGetLevel = jest.fn();
-const mockSetLevel = jest.fn();
-const mockAddToYOLOAllowList = jest.fn();
-const mockAddToYOLODenyList = jest.fn();
-
-jest.mock('../../src/utils/autonomy-manager', () => ({
-  getAutonomyManager: jest.fn(() => ({
+vi.mock('../../src/utils/autonomy-manager', () => ({
+  getAutonomyManager: vi.fn(() => ({
     enableYOLO: mockEnableYOLO,
     disableYOLO: mockDisableYOLO,
     updateYOLOConfig: mockUpdateYOLOConfig,
@@ -66,15 +80,8 @@ jest.mock('../../src/utils/autonomy-manager', () => ({
   },
 }));
 
-// Mock skill manager
-const mockGetAvailableSkills = jest.fn();
-const mockGetActiveSkill = jest.fn();
-const mockGetSkill = jest.fn();
-const mockActivateSkill = jest.fn();
-const mockDeactivateSkill = jest.fn();
-
-jest.mock('../../src/skills/skill-manager', () => ({
-  getSkillManager: jest.fn(() => ({
+vi.mock('../../src/skills/skill-manager', () => ({
+  getSkillManager: vi.fn(() => ({
     getAvailableSkills: mockGetAvailableSkills,
     getActiveSkill: mockGetActiveSkill,
     getSkill: mockGetSkill,
@@ -83,14 +90,26 @@ jest.mock('../../src/skills/skill-manager', () => ({
   })),
 }));
 
-// Mock conversation exporter
-const mockExport = jest.fn();
-
-jest.mock('../../src/utils/conversation-export', () => ({
-  getConversationExporter: jest.fn(() => ({
+vi.mock('../../src/utils/conversation-export', () => ({
+  getConversationExporter: vi.fn(() => ({
     export: mockExport,
   })),
 }));
+
+// Mock fs to prevent handlePipeline from finding actual pipeline files on disk
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
+  return {
+    ...actual,
+    default: {
+      ...actual,
+      existsSync: vi.fn().mockReturnValue(false),
+      readdirSync: vi.fn().mockReturnValue([]),
+    },
+    existsSync: vi.fn().mockReturnValue(false),
+    readdirSync: vi.fn().mockReturnValue([]),
+  };
+});
 
 describe('Help Command Handler', () => {
   beforeEach(() => {
@@ -455,15 +474,15 @@ describe('Autonomy Handler', () => {
 
 describe('Pipeline Handler', () => {
   describe('handlePipeline', () => {
-    it('should show available pipelines when no name provided', () => {
-      const result = handlePipeline([]);
+    it('should show available pipelines when no name provided', async () => {
+      const result = await handlePipeline([]);
 
       expect(result.handled).toBe(true);
       expect(result.entry?.content).toContain('Available Pipelines');
     });
 
-    it('should list pipeline types', () => {
-      const result = handlePipeline([]);
+    it('should list pipeline types', async () => {
+      const result = await handlePipeline([]);
 
       expect(result.entry?.content).toContain('code-review');
       expect(result.entry?.content).toContain('bug-fix');
@@ -472,69 +491,69 @@ describe('Pipeline Handler', () => {
       expect(result.entry?.content).toContain('documentation');
     });
 
-    it('should show usage example', () => {
-      const result = handlePipeline([]);
+    it('should show usage example', async () => {
+      const result = await handlePipeline([]);
 
       expect(result.entry?.content).toContain('Usage:');
       expect(result.entry?.content).toContain('/pipeline');
     });
 
-    it('should pass to AI with pipeline name', () => {
-      const result = handlePipeline(['code-review']);
+    it('should pass to AI with pipeline name', async () => {
+      const result = await handlePipeline(['code-review']);
 
       expect(result.passToAI).toBe(true);
       expect(result.prompt).toContain('code-review');
     });
 
-    it('should include steps for code-review pipeline', () => {
-      const result = handlePipeline(['code-review']);
+    it('should include steps for code-review pipeline', async () => {
+      const result = await handlePipeline(['code-review']);
 
       expect(result.prompt).toContain('Analyze code structure');
       expect(result.prompt).toContain('code smells');
     });
 
-    it('should include steps for bug-fix pipeline', () => {
-      const result = handlePipeline(['bug-fix']);
+    it('should include steps for bug-fix pipeline', async () => {
+      const result = await handlePipeline(['bug-fix']);
 
       expect(result.prompt).toContain('Reproduce');
       expect(result.prompt).toContain('root cause');
     });
 
-    it('should include steps for feature-development pipeline', () => {
-      const result = handlePipeline(['feature-development']);
+    it('should include steps for feature-development pipeline', async () => {
+      const result = await handlePipeline(['feature-development']);
 
       expect(result.prompt).toContain('requirements');
       expect(result.prompt).toContain('Implement');
     });
 
-    it('should include steps for security-audit pipeline', () => {
-      const result = handlePipeline(['security-audit']);
+    it('should include steps for security-audit pipeline', async () => {
+      const result = await handlePipeline(['security-audit']);
 
       expect(result.prompt).toContain('vulnerabilities');
       expect(result.prompt).toContain('authentication');
     });
 
-    it('should include steps for documentation pipeline', () => {
-      const result = handlePipeline(['documentation']);
+    it('should include steps for documentation pipeline', async () => {
+      const result = await handlePipeline(['documentation']);
 
       expect(result.prompt).toContain('API documentation');
       expect(result.prompt).toContain('README');
     });
 
-    it('should use cwd as default target', () => {
-      const result = handlePipeline(['code-review']);
+    it('should use cwd as default target', async () => {
+      const result = await handlePipeline(['code-review']);
 
       expect(result.prompt).toContain('on:');
     });
 
-    it('should use provided target', () => {
-      const result = handlePipeline(['code-review', 'src/utils.ts']);
+    it('should use provided target', async () => {
+      const result = await handlePipeline(['code-review', 'src/utils.ts']);
 
       expect(result.prompt).toContain('src/utils.ts');
     });
 
-    it('should handle unknown pipeline gracefully', () => {
-      const result = handlePipeline(['unknown-pipeline']);
+    it('should handle unknown pipeline gracefully', async () => {
+      const result = await handlePipeline(['unknown-pipeline']);
 
       expect(result.passToAI).toBe(true);
       expect(result.prompt).toContain('unknown-pipeline');
@@ -544,29 +563,29 @@ describe('Pipeline Handler', () => {
 
 describe('Parallel Handler', () => {
   describe('handleParallel', () => {
-    it('should show usage when no task provided', () => {
-      const result = handleParallel([]);
+    it('should show usage when no task provided', async () => {
+      const result = await handleParallel([]);
 
       expect(result.handled).toBe(true);
       expect(result.entry?.content).toContain('Parallel Subagent Runner');
     });
 
-    it('should show example', () => {
-      const result = handleParallel([]);
+    it('should show example', async () => {
+      const result = await handleParallel([]);
 
       expect(result.entry?.content).toContain('Example:');
       expect(result.entry?.content).toContain('/parallel');
     });
 
-    it('should pass to AI with task', () => {
-      const result = handleParallel(['analyze', 'all', 'files']);
+    it('should pass to AI with task', async () => {
+      const result = await handleParallel(['analyze', 'all', 'files']);
 
       expect(result.passToAI).toBe(true);
       expect(result.prompt).toContain('analyze all files');
     });
 
-    it('should include parallel guidance in prompt', () => {
-      const result = handleParallel(['analyze', 'files']);
+    it('should include parallel guidance in prompt', async () => {
+      const result = await handleParallel(['analyze', 'files']);
 
       expect(result.prompt).toContain('parallel');
       expect(result.prompt).toContain('Independent file analysis');
@@ -814,11 +833,11 @@ describe('Save Conversation Handler', () => {
 });
 
 describe('Edge Cases', () => {
-  it('should handle empty args for all handlers', () => {
+  it('should handle empty args for all handlers', async () => {
     expect(() => handleYoloMode([])).not.toThrow();
     expect(() => handleAutonomy([])).not.toThrow();
-    expect(() => handlePipeline([])).not.toThrow();
-    expect(() => handleParallel([])).not.toThrow();
+    await expect(handlePipeline([])).resolves.toBeDefined();
+    await expect(handleParallel([])).resolves.toBeDefined();
     expect(() => handleSkill([])).not.toThrow();
   });
 
@@ -827,12 +846,12 @@ describe('Edge Cases', () => {
     expect(() => handleAutonomy([undefined as unknown as string])).not.toThrow();
   });
 
-  it('should have timestamp in all entries', () => {
+  it('should have timestamp in all entries', async () => {
     const results = [
       handleYoloMode([]),
       handleAutonomy([]),
-      handlePipeline([]),
-      handleParallel([]),
+      await handlePipeline([]),
+      await handleParallel([]),
       handleSkill([]),
     ];
 
@@ -843,12 +862,12 @@ describe('Edge Cases', () => {
     }
   });
 
-  it('should have correct entry type for all handlers', () => {
+  it('should have correct entry type for all handlers', async () => {
     const results = [
       handleYoloMode([]),
       handleAutonomy([]),
-      handlePipeline([]),
-      handleParallel([]),
+      await handlePipeline([]),
+      await handleParallel([]),
       handleSkill([]),
     ];
 
@@ -875,8 +894,8 @@ describe('CommandHandlerResult Structure', () => {
     expect(result.passToAI).toBeUndefined();
   });
 
-  it('should have prompt when passing to AI', () => {
-    const result = handlePipeline(['code-review']);
+  it('should have prompt when passing to AI', async () => {
+    const result = await handlePipeline(['code-review']);
 
     expect(result.passToAI).toBe(true);
     expect(result.prompt).toBeDefined();

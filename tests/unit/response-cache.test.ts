@@ -12,22 +12,30 @@
  * 8. Singleton and reset
  */
 
-// Create mock functions
-const mockReadFile = jest.fn().mockResolvedValue('{}');
-const mockWriteFile = jest.fn().mockResolvedValue(undefined);
-const mockExistsSync = jest.fn().mockReturnValue(false);
-const mockMkdirSync = jest.fn();
+// Create mock functions using vi.hoisted so they are available inside vi.mock factories
+const { mockReadFile, mockWriteFile, mockExistsSync, mockMkdirSync } = vi.hoisted(() => ({
+  mockReadFile: vi.fn().mockResolvedValue('{}'),
+  mockWriteFile: vi.fn().mockResolvedValue(undefined),
+  mockExistsSync: vi.fn().mockReturnValue(false),
+  mockMkdirSync: vi.fn(),
+}));
 
 // Mock fs modules before importing
-jest.mock('fs/promises', () => ({
-  readFile: mockReadFile,
-  writeFile: mockWriteFile,
-}));
+vi.mock('fs/promises', () => {
+  const impl = {
+    readFile: mockReadFile,
+    writeFile: mockWriteFile,
+  };
+  return { ...impl, default: impl };
+});
 
-jest.mock('fs', () => ({
-  existsSync: mockExistsSync,
-  mkdirSync: mockMkdirSync,
-}));
+vi.mock('fs', () => {
+  const impl = {
+    existsSync: mockExistsSync,
+    mkdirSync: mockMkdirSync,
+  };
+  return { ...impl, default: impl };
+});
 
 import {
   ResponseCache,

@@ -9,20 +9,25 @@
  * - Singleton pattern
  */
 
-// Mock fs-extra module
-const mockFs = {
-  existsSync: jest.fn(),
-  readFileSync: jest.fn(),
-  writeFileSync: jest.fn(),
-  ensureDirSync: jest.fn(),
-};
+// Mock fs-extra module using vi.hoisted so mockFs is available inside vi.mock factory
+const { mockFs } = vi.hoisted(() => ({
+  mockFs: {
+    existsSync: vi.fn(),
+    readFileSync: vi.fn(),
+    writeFileSync: vi.fn(),
+    ensureDirSync: vi.fn(),
+  },
+}));
 
-jest.mock('fs-extra', () => mockFs);
+vi.mock('fs-extra', () => ({ ...mockFs, default: mockFs }));
 
 // Mock os module
-jest.mock('os', () => ({
+jest.mock('os', () => {
+  const impl = {
   homedir: jest.fn(() => '/home/testuser'),
-}));
+};
+  return { ...impl, default: impl };
+});
 
 // Mock logger
 jest.mock('../../src/utils/logger', () => ({
@@ -778,7 +783,7 @@ describe('ToolPermissionManager', () => {
 
     it('should handle save errors gracefully', () => {
       mockFs.existsSync.mockReturnValue(true);
-      mockFs.writeFileSync.mockImplementation(() => {
+      mockFs.writeFileSync.mockImplementation(function() {
         throw new Error('Write error');
       });
 

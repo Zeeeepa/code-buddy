@@ -19,10 +19,10 @@ import {
 
 // Mock browser-automation module
 jest.mock('../../../src/browser-automation/index.js', () => ({
-  BrowserTool: jest.fn().mockImplementation(() => ({
+  BrowserTool: jest.fn().mockImplementation(function() { return {
     execute: jest.fn().mockResolvedValue({ success: true, output: 'Browser result' }),
     close: jest.fn(),
-  })),
+  }; }),
   getBrowserTool: jest.fn(),
   resetBrowserTool: jest.fn(),
 }));
@@ -37,20 +37,20 @@ jest.mock('../../../src/tools/computer-control-tool.js', () => ({
 
 // Mock screenshot-tool
 jest.mock('../../../src/tools/screenshot-tool.js', () => ({
-  ScreenshotTool: jest.fn().mockImplementation(() => ({
+  ScreenshotTool: jest.fn().mockImplementation(function() { return {
     capture: jest.fn().mockResolvedValue({
       success: true,
       output: 'Screenshot captured',
       data: { path: '/tmp/screenshot.png' },
     }),
-  })),
+  }; }),
 }));
 
 // Mock reasoning-tool (already used in tests)
 jest.mock('../../../src/tools/reasoning-tool.js', () => ({
-  ReasoningTool: jest.fn().mockImplementation(() => ({
+  ReasoningTool: jest.fn().mockImplementation(function() { return {
     execute: jest.fn().mockResolvedValue({ success: true, output: 'Reasoning result' }),
-  })),
+  }; }),
 }));
 
 describe('Computer Use Tool Adapters', () => {
@@ -337,13 +337,17 @@ describe('Computer Use Tool Adapters', () => {
   describe('createMiscTools', () => {
     it('should return all tool types', () => {
       const tools = createMiscTools();
-      expect(tools).toHaveLength(6);
+      expect(tools).toHaveLength(8);
 
       const names = tools.map(t => t.name);
       expect(names).toContain('browser');
       expect(names).toContain('computer_control');
       expect(names).toContain('screenshot');
       expect(names).toContain('reason');
+      expect(names).toContain('skill_discover');
+      expect(names).toContain('device_manage');
+      expect(names).toContain('deploy');
+      expect(names).toContain('knowledge_graph');
     });
 
     it('should return ITool-compliant instances', () => {

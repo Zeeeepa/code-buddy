@@ -13,18 +13,23 @@
  */
 
 // Create mock functions for fs-extra
-const mockExistsSync = jest.fn().mockReturnValue(false);
-const mockReadFileSync = jest.fn().mockReturnValue('[]');
-const mockWriteFileSync = jest.fn();
-const mockEnsureDirSync = jest.fn();
+const { mockExistsSync, mockReadFileSync, mockWriteFileSync, mockEnsureDirSync } = vi.hoisted(() => ({
+  mockExistsSync: vi.fn().mockReturnValue(false),
+  mockReadFileSync: vi.fn().mockReturnValue('[]'),
+  mockWriteFileSync: vi.fn(),
+  mockEnsureDirSync: vi.fn(),
+}));
 
 // Mock fs-extra before importing
-jest.mock('fs-extra', () => ({
+jest.mock('fs-extra', () => {
+  const impl = {
   existsSync: mockExistsSync,
   readFileSync: mockReadFileSync,
   writeFileSync: mockWriteFileSync,
   ensureDirSync: mockEnsureDirSync,
-}));
+};
+  return { ...impl, default: impl };
+});
 
 import {
   HistoryManager,
@@ -92,7 +97,7 @@ describe('HistoryManager', () => {
 
     it('should handle corrupted history file gracefully', () => {
       mockExistsSync.mockReturnValue(true);
-      mockReadFileSync.mockImplementation(() => {
+      mockReadFileSync.mockImplementation(function() {
         throw new Error('File corrupted');
       });
 

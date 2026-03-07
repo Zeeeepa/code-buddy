@@ -22,12 +22,12 @@ function createMockProcess(exitCode: number, stdout: string, stderr: string) {
   proc.stdout = new EventEmitter();
   proc.stderr = new EventEmitter();
 
-  // Schedule data emission and close
+  // Schedule data emission and close after listeners are attached
   setTimeout(() => {
     if (stdout) proc.stdout.emit('data', Buffer.from(stdout));
     if (stderr) proc.stderr.emit('data', Buffer.from(stderr));
     proc.emit('close', exitCode);
-  }, 5);
+  }, 10);
 
   return proc;
 }
@@ -134,7 +134,7 @@ describe('LocalTransport', () => {
 
 describe('SSHTransport', () => {
   it('should connect via SSH', async () => {
-    mockSpawn.mockReturnValue(createMockProcess(0, 'connected', ''));
+    mockSpawn.mockImplementation(() => createMockProcess(0, 'connected', ''));
 
     const { SSHTransport } = await import('../../src/nodes/transports/ssh-transport.js');
     const transport = new SSHTransport({
@@ -167,7 +167,7 @@ describe('SSHTransport', () => {
   it('should execute commands via SSH', async () => {
     // First call is connect, second is the actual command
     let callCount = 0;
-    mockSpawn.mockImplementation(() => {
+    mockSpawn.mockImplementation(function() {
       callCount++;
       if (callCount === 1) return createMockProcess(0, 'connected', '');
       return createMockProcess(0, 'Linux', '');
@@ -189,7 +189,7 @@ describe('SSHTransport', () => {
 
   it('should use SCP for file upload', async () => {
     let callCount = 0;
-    mockSpawn.mockImplementation(() => {
+    mockSpawn.mockImplementation(function() {
       callCount++;
       return createMockProcess(0, callCount === 1 ? 'connected' : '', '');
     });
@@ -240,7 +240,7 @@ describe('SSHTransport', () => {
 
 describe('ADBTransport', () => {
   it('should connect to device via ADB', async () => {
-    mockSpawn.mockReturnValue(createMockProcess(0, 'connected', ''));
+    mockSpawn.mockImplementation(() => createMockProcess(0, 'connected', ''));
 
     const { ADBTransport } = await import('../../src/nodes/transports/adb-transport.js');
     const transport = new ADBTransport({ deviceId: 'emulator-5554' });
@@ -260,7 +260,7 @@ describe('ADBTransport', () => {
 
   it('should execute ADB shell commands', async () => {
     let callCount = 0;
-    mockSpawn.mockImplementation(() => {
+    mockSpawn.mockImplementation(function() {
       callCount++;
       if (callCount === 1) return createMockProcess(0, 'connected', '');
       return createMockProcess(0, 'Android 13', '');

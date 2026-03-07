@@ -11,12 +11,15 @@
  * - Error handling for non-git directories
  */
 
+
+// Mock child_process spawn
+
 import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import { Readable } from 'stream';
 import { GitTool, GitStatus, getGitTool } from '../../src/tools/git-tool';
+import { ConfirmationService } from '../../src/utils/confirmation-service';
 
-// Mock child_process spawn
 jest.mock('child_process', () => ({
   spawn: jest.fn(),
 }));
@@ -24,10 +27,10 @@ jest.mock('child_process', () => ({
 // Mock ConfirmationService
 jest.mock('../../src/utils/confirmation-service', () => ({
   ConfirmationService: {
-    getInstance: jest.fn(() => ({
-      getSessionFlags: jest.fn(() => ({ bashCommands: true, allOperations: false })),
+    getInstance: jest.fn(function() { return {
+      getSessionFlags: jest.fn(function() { return { bashCommands: true, allOperations: false }; }),
       requestConfirmation: jest.fn(() => Promise.resolve({ confirmed: true })),
-    })),
+    }; }),
   },
 }));
 
@@ -997,12 +1000,11 @@ describe('GitTool Confirmation Integration', () => {
 
   it('should request confirmation when session flags require it', async () => {
     // Override the mock to require confirmation
-    const mockConfirmationService = require('../../src/utils/confirmation-service');
-    mockConfirmationService.ConfirmationService.getInstance.mockReturnValue({
-      getSessionFlags: jest.fn(() => ({
+    (ConfirmationService.getInstance as any).mockReturnValue({
+      getSessionFlags: jest.fn(function() { return {
         bashCommands: false,
         allOperations: false,
-      })),
+      }; }),
       requestConfirmation: jest.fn(() =>
         Promise.resolve({ confirmed: false, feedback: 'User rejected' })
       ),

@@ -6,9 +6,21 @@
 import * as path from 'path';
 import * as os from 'os';
 
-// Mock child_process before importing the module
-const mockExec = jest.fn();
-const mockExecSync = jest.fn();
+// Mock dependencies before importing the module
+const {
+  mockExec, mockExecSync,
+  mockExistsSync, mockReadJsonSync, mockWriteJsonSync, mockEnsureDirSync,
+  mockPlatform, mockHomedir,
+} = vi.hoisted(() => ({
+  mockExec: vi.fn(),
+  mockExecSync: vi.fn(),
+  mockExistsSync: vi.fn(),
+  mockReadJsonSync: vi.fn(),
+  mockWriteJsonSync: vi.fn(),
+  mockEnsureDirSync: vi.fn(),
+  mockPlatform: vi.fn(),
+  mockHomedir: vi.fn().mockReturnValue('/home/testuser'),
+}));
 
 jest.mock('child_process', () => ({
   exec: mockExec,
@@ -16,26 +28,24 @@ jest.mock('child_process', () => ({
 }));
 
 // Mock fs-extra
-const mockExistsSync = jest.fn();
-const mockReadJsonSync = jest.fn();
-const mockWriteJsonSync = jest.fn();
-const mockEnsureDirSync = jest.fn();
-
-jest.mock('fs-extra', () => ({
+jest.mock('fs-extra', () => {
+  const impl = {
   existsSync: mockExistsSync,
   readJsonSync: mockReadJsonSync,
   writeJsonSync: mockWriteJsonSync,
   ensureDirSync: mockEnsureDirSync,
-}));
+};
+  return { ...impl, default: impl };
+});
 
 // Mock os module
-const mockPlatform = jest.fn();
-const mockHomedir = jest.fn().mockReturnValue('/home/testuser');
-
-jest.mock('os', () => ({
+jest.mock('os', () => {
+  const impl = {
   platform: () => mockPlatform(),
   homedir: () => mockHomedir(),
-}));
+};
+  return { ...impl, default: impl };
+});
 
 import {
   ClipboardManager,
@@ -83,7 +93,7 @@ describe('ClipboardManager', () => {
 
     it('should handle corrupt history file gracefully', () => {
       mockExistsSync.mockReturnValue(true);
-      mockReadJsonSync.mockImplementation(() => {
+      mockReadJsonSync.mockImplementation(function() {
         throw new Error('JSON parse error');
       });
 
@@ -761,7 +771,7 @@ describe('ClipboardManager', () => {
         callback(null);
         return child;
       });
-      mockWriteJsonSync.mockImplementation(() => {
+      mockWriteJsonSync.mockImplementation(function() {
         throw new Error('Write error');
       });
       manager = new ClipboardManager({ historyEnabled: true });

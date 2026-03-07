@@ -13,13 +13,16 @@
 // ============================================================================
 
 // Mock fs-extra before importing anything
-jest.mock('fs-extra', () => ({
+jest.mock('fs-extra', () => {
+  const impl = {
   existsSync: jest.fn().mockReturnValue(false),
   readJsonSync: jest.fn().mockReturnValue({}),
   writeJsonSync: jest.fn(),
   ensureDirSync: jest.fn(),
   pathExists: jest.fn().mockResolvedValue(false),
-}));
+};
+  return { ...impl, default: impl };
+});
 
 // Mock child_process
 jest.mock('child_process', () => ({
@@ -32,11 +35,14 @@ jest.mock('child_process', () => ({
 }));
 
 // Mock os
-jest.mock('os', () => ({
-  ...jest.requireActual('os'),
+jest.mock('os', () => {
+  const impl = {
+  ...await vi.importActual('os'),
   platform: jest.fn().mockReturnValue('linux'),
   homedir: jest.fn(() => '/mock/home'),
-}));
+};
+  return { ...impl, default: impl };
+});
 
 import * as os from 'os';
 import * as fs from 'fs-extra';
@@ -874,8 +880,8 @@ describe('Sound Notifications', () => {
     // Reset all fs mocks to consistent state
     (fs.existsSync as jest.Mock).mockReturnValue(false);
     (fs.readJsonSync as jest.Mock).mockReturnValue({});
-    (fs.writeJsonSync as jest.Mock).mockImplementation(() => {});
-    (fs.ensureDirSync as jest.Mock).mockImplementation(() => {});
+    (fs.writeJsonSync as jest.Mock).mockImplementation(function() {});
+    (fs.ensureDirSync as jest.Mock).mockImplementation(function() {});
     (fs.pathExists as jest.Mock).mockResolvedValue(false);
     (os.platform as jest.Mock).mockReturnValue('linux');
 
@@ -903,20 +909,14 @@ describe('Sound Notifications', () => {
     });
 
     it('should load existing config from file', async () => {
-      // Must reset modules and set up mocks before importing
-      jest.resetModules();
-
       // Re-setup the fs mock with specific return values
-      const fsMock = require('fs-extra');
-      fsMock.existsSync.mockReturnValue(true);
-      fsMock.readJsonSync.mockReturnValue({
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.readJsonSync as jest.Mock).mockReturnValue({
         enabled: false,
         volume: 75,
       });
 
-      // Now import the module fresh
-      const module = await import('../../src/ui/sound-notifications');
-      const manager = new module.SoundNotificationManager();
+      const manager = new SoundNotificationManager();
 
       expect(manager.isEnabled()).toBe(false);
       expect(manager.getVolume()).toBe(75);
@@ -924,7 +924,7 @@ describe('Sound Notifications', () => {
 
     it('should use defaults on config read error', () => {
       (fs.existsSync as jest.Mock).mockReturnValue(true);
-      (fs.readJsonSync as jest.Mock).mockImplementation(() => {
+      (fs.readJsonSync as jest.Mock).mockImplementation(function() {
         throw new Error('Read error');
       });
 
@@ -1001,16 +1001,11 @@ describe('Sound Notifications', () => {
     });
 
     it('should accept existing sound file', async () => {
-      // Must reset modules and set up mocks before importing
-      jest.resetModules();
+      (fs.existsSync as jest.Mock).mockReturnValue(false);
+      (fs.readJsonSync as jest.Mock).mockReturnValue({});
+      (fs.pathExists as jest.Mock).mockResolvedValue(true);
 
-      const fsMock = require('fs-extra');
-      fsMock.existsSync.mockReturnValue(false);
-      fsMock.readJsonSync.mockReturnValue({});
-      fsMock.pathExists.mockResolvedValue(true);
-
-      const module = await import('../../src/ui/sound-notifications');
-      const manager = new module.SoundNotificationManager();
+      const manager = new SoundNotificationManager();
 
       const result = await manager.setCustomSound('success', '/path/to/sound.wav');
 
@@ -1114,7 +1109,7 @@ describe('Sound Notifications', () => {
     });
 
     it('should handle save errors gracefully', () => {
-      (fs.writeJsonSync as jest.Mock).mockImplementation(() => {
+      (fs.writeJsonSync as jest.Mock).mockImplementation(function() {
         throw new Error('Write error');
       });
 
@@ -1192,19 +1187,15 @@ describe('Notification Preferences', () => {
       jest.resetModules();
       (fs.existsSync as jest.Mock).mockReturnValue(false);
       (fs.readJsonSync as jest.Mock).mockReturnValue({});
-      (fs.writeJsonSync as jest.Mock).mockImplementation(() => {});
-      (fs.ensureDirSync as jest.Mock).mockImplementation(() => {});
+      (fs.writeJsonSync as jest.Mock).mockImplementation(function() {});
+      (fs.ensureDirSync as jest.Mock).mockImplementation(function() {});
       (fs.pathExists as jest.Mock).mockResolvedValue(false);
       (os.platform as jest.Mock).mockReturnValue('linux');
     });
 
     it('should load persisted preferences on init', async () => {
-      // Must reset modules and set up mocks before importing
-      jest.resetModules();
-
-      const fsMock = require('fs-extra');
-      fsMock.existsSync.mockReturnValue(true);
-      fsMock.readJsonSync.mockReturnValue({
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.readJsonSync as jest.Mock).mockReturnValue({
         enabled: false,
         volume: 25,
         mutedTimes: ['22:00-06:00'],
@@ -1213,8 +1204,8 @@ describe('Notification Preferences', () => {
         },
       });
 
-      const module = await import('../../src/ui/sound-notifications');
-      const manager = new module.SoundNotificationManager();
+      const { SoundNotificationManager } = await import('../../src/ui/sound-notifications');
+      const manager = new SoundNotificationManager();
 
       expect(manager.isEnabled()).toBe(false);
       expect(manager.getVolume()).toBe(25);

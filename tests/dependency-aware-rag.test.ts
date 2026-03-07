@@ -8,6 +8,8 @@ import {
   resetDependencyAwareRAG,
 } from '../src/context/dependency-aware-rag';
 
+import * as depAnalyzerModule from '../src/tools/intelligence/dependency-analyzer';
+
 // Mock the dependency analyzer
 jest.mock('../src/tools/intelligence/dependency-analyzer', () => ({
   getDependencyAnalyzer: jest.fn().mockReturnValue({
@@ -376,10 +378,10 @@ describe('DependencyAwareRAG', () => {
   describe('error handling', () => {
     it('should handle initialization errors gracefully', async () => {
       // Mock error in analyzer
-      const { getDependencyAnalyzer } = require('../src/tools/intelligence/dependency-analyzer');
-      getDependencyAnalyzer.mockReturnValueOnce({
+      const mockedDA = vi.mocked(depAnalyzerModule);
+      mockedDA.getDependencyAnalyzer.mockReturnValueOnce({
         analyze: jest.fn().mockRejectedValue(new Error('Analysis failed')),
-      });
+      } as any);
 
       const errorRAG = new DependencyAwareRAG();
 

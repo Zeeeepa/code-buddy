@@ -15,86 +15,96 @@
 import { EventEmitter } from 'events';
 
 // Mock fs-extra before importing the module
-const mockEnsureDir = jest.fn().mockResolvedValue(undefined);
-const mockPathExists = jest.fn().mockResolvedValue(false);
-const mockReadJson = jest.fn().mockResolvedValue({});
-const mockWriteJson = jest.fn().mockResolvedValue(undefined);
-
-jest.mock('fs-extra', () => ({
-  ensureDir: mockEnsureDir,
-  pathExists: mockPathExists,
-  readJson: mockReadJson,
-  writeJson: mockWriteJson,
+const { mockEnsureDir, mockPathExists, mockReadJson, mockWriteJson } = vi.hoisted(() => ({
+  mockEnsureDir: vi.fn().mockResolvedValue(undefined),
+  mockPathExists: vi.fn().mockResolvedValue(false),
+  mockReadJson: vi.fn().mockResolvedValue({}),
+  mockWriteJson: vi.fn().mockResolvedValue(undefined),
 }));
 
-// Helper function to parse version
-const parseVersion = (v: string): { major: number; minor: number; patch: number } => {
-  const [major, minor, patch] = v.split('.').map((p) => parseInt(p, 10) || 0);
-  return { major, minor, patch };
-};
-
-// Helper function to compare versions
-const compareVersions = (a: string, b: string): number => {
-  const va = parseVersion(a);
-  const vb = parseVersion(b);
-  if (va.major !== vb.major) return va.major - vb.major;
-  if (va.minor !== vb.minor) return va.minor - vb.minor;
-  return va.patch - vb.patch;
-};
-
-// Helper function to parse full version
-const parseFullVersion = (v: string): {
-  major: number;
-  minor: number;
-  patch: number;
-  prerelease: string[];
-  build: string[];
-} | null => {
-  const match = v.match(/^(\d+)\.(\d+)\.(\d+)(-([a-zA-Z0-9.]+))?(\+([a-zA-Z0-9.]+))?$/);
-  if (!match) return null;
-  return {
-    major: parseInt(match[1], 10),
-    minor: parseInt(match[2], 10),
-    patch: parseInt(match[3], 10),
-    prerelease: match[5] ? match[5].split('.') : [],
-    build: match[7] ? match[7].split('.') : [],
+vi.mock('fs-extra', () => {
+  const impl = {
+    ensureDir: mockEnsureDir,
+    pathExists: mockPathExists,
+    readJson: mockReadJson,
+    writeJson: mockWriteJson,
   };
-};
+  return { ...impl, default: impl };
+});
 
-// Mock semver
-jest.mock('semver', () => ({
-  valid: jest.fn((v: string): string | null => {
-    const regex = /^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)?$/;
-    return regex.test(v) ? v : null;
-  }),
-  coerce: jest.fn((v: string): { version: string } | null => {
-    const match = v.match(/(\d+)\.?(\d+)?\.?(\d+)?/);
+// Helper functions hoisted so they're available in vi.mock factories
+const { parseVersion, compareVersions, parseFullVersion } = vi.hoisted(() => {
+  const parseVersion = (v: string): { major: number; minor: number; patch: number } => {
+    const [major, minor, patch] = v.split('.').map((p: string) => parseInt(p, 10) || 0);
+    return { major, minor, patch };
+  };
+
+  const compareVersions = (a: string, b: string): number => {
+    const va = parseVersion(a);
+    const vb = parseVersion(b);
+    if (va.major !== vb.major) return va.major - vb.major;
+    if (va.minor !== vb.minor) return va.minor - vb.minor;
+    return va.patch - vb.patch;
+  };
+
+  const parseFullVersion = (v: string): {
+    major: number;
+    minor: number;
+    patch: number;
+    prerelease: string[];
+    build: string[];
+  } | null => {
+    const match = v.match(/^(\d+)\.(\d+)\.(\d+)(-([a-zA-Z0-9.]+))?(\+([a-zA-Z0-9.]+))?$/);
     if (!match) return null;
-    const version = `${match[1] || 0}.${match[2] || 0}.${match[3] || 0}`;
-    return { version };
-  }),
-  compare: jest.fn((a: string, b: string): number => compareVersions(a, b)),
-  parse: jest.fn((v: string) => parseFullVersion(v)),
-  eq: jest.fn((a: string, b: string): boolean => a === b),
-  lt: jest.fn((a: string, b: string): boolean => compareVersions(a, b) < 0),
-  gt: jest.fn((a: string, b: string): boolean => compareVersions(a, b) > 0),
-  lte: jest.fn((a: string, b: string): boolean => compareVersions(a, b) <= 0),
-  gte: jest.fn((a: string, b: string): boolean => compareVersions(a, b) >= 0),
-  satisfies: jest.fn((version: string, range: string): boolean => {
-    // Simple implementation for testing
-    if (range.startsWith('^')) {
-      const rangeVersion = range.slice(1);
-      const vParsed = parseFullVersion(version);
-      const rParsed = parseFullVersion(rangeVersion);
-      if (!vParsed || !rParsed) return false;
-      return vParsed.major === rParsed.major && compareVersions(version, rangeVersion) >= 0;
-    }
-    if (range.startsWith('>=')) {
-      return compareVersions(version, range.slice(2)) >= 0;
-    }
-    return version === range;
-  }),
-}));
+    return {
+      major: parseInt(match[1], 10),
+      minor: parseInt(match[2], 10),
+      patch: parseInt(match[3], 10),
+      prerelease: match[5] ? match[5].split('.') : [],
+      build: match[7] ? match[7].split('.') : [],
+    };
+  };
+
+  return { parseVersion, compareVersions, parseFullVersion };
+});
+
+// Mock semver — must include default export for ESM compatibility
+vi.mock('semver', () => {
+  const impl = {
+    valid: vi.fn((v: string): string | null => {
+      const regex = /^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)?$/;
+      return regex.test(v) ? v : null;
+    }),
+    coerce: vi.fn((v: string): { version: string } | null => {
+      const match = v.match(/(\d+)\.?(\d+)?\.?(\d+)?/);
+      if (!match) return null;
+      const version = `${match[1] || 0}.${match[2] || 0}.${match[3] || 0}`;
+      return { version };
+    }),
+    compare: vi.fn((a: string, b: string): number => compareVersions(a, b)),
+    parse: vi.fn((v: string) => parseFullVersion(v)),
+    eq: vi.fn((a: string, b: string): boolean => a === b),
+    lt: vi.fn((a: string, b: string): boolean => compareVersions(a, b) < 0),
+    gt: vi.fn((a: string, b: string): boolean => compareVersions(a, b) > 0),
+    lte: vi.fn((a: string, b: string): boolean => compareVersions(a, b) <= 0),
+    gte: vi.fn((a: string, b: string): boolean => compareVersions(a, b) >= 0),
+    satisfies: vi.fn((version: string, range: string): boolean => {
+      // Simple implementation for testing
+      if (range.startsWith('^')) {
+        const rangeVersion = range.slice(1);
+        const vParsed = parseFullVersion(version);
+        const rParsed = parseFullVersion(rangeVersion);
+        if (!vParsed || !rParsed) return false;
+        return vParsed.major === rParsed.major && compareVersions(version, rangeVersion) >= 0;
+      }
+      if (range.startsWith('>=')) {
+        return compareVersions(version, range.slice(2)) >= 0;
+      }
+      return version === range;
+    }),
+  };
+  return { ...impl, default: impl };
+});
 
 import {
   VersionDetector,
@@ -562,9 +572,9 @@ describe('VersionDetector', () => {
       expect(detector.coerceVersion('1.2.3')).toBe('1.2.3');
     });
 
-    it('should return null for non-coercible strings', () => {
-      const semver = require('semver');
-      semver.coerce.mockReturnValueOnce(null);
+    it('should return null for non-coercible strings', async () => {
+      const semver = await import('semver');
+      (semver as any).coerce.mockReturnValueOnce(null);
       expect(detector.coerceVersion('not-a-version')).toBeNull();
     });
   });
@@ -584,9 +594,9 @@ describe('VersionDetector', () => {
       expect(parsed!.prerelease).toContain('alpha');
     });
 
-    it('should return null for invalid version', () => {
-      const semver = require('semver');
-      semver.parse.mockReturnValueOnce(null);
+    it('should return null for invalid version', async () => {
+      const semver = await import('semver');
+      (semver as any).parse.mockReturnValueOnce(null);
       const parsed = detector.parseVersion('invalid');
       expect(parsed).toBeNull();
     });

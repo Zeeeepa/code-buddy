@@ -8,55 +8,62 @@
  * to ripgrep. The async behavior is tested in search-tool.test.ts.
  */
 
-import { EventEmitter } from 'events';
 
 // Mock @vscode/ripgrep
-jest.mock('@vscode/ripgrep', () => ({
+
+import { EventEmitter } from 'events';
+import { SearchTool } from '../../src/tools/search.js';
+
+const { mockSpawn, mockReaddir, mockFsExtra, mockEnhancedSearch } = vi.hoisted(() => ({
+  mockSpawn: vi.fn(),
+  mockReaddir: vi.fn(),
+  mockFsExtra: {
+    readdir: vi.fn(),
+    pathExists: vi.fn(() => Promise.resolve(true)),
+    stat: vi.fn(() => Promise.resolve({ isDirectory: () => false })),
+  },
+  mockEnhancedSearch: {
+    findSymbols: vi.fn(),
+    findReferences: vi.fn(),
+    findDefinition: vi.fn(),
+    searchMultiple: vi.fn(),
+    getCacheStats: vi.fn(function() { return { searchCache: 0, symbolCache: 0 }; }),
+    clearCache: vi.fn(),
+  },
+}));
+// Fix mockFsExtra.readdir to point to mockReaddir
+mockFsExtra.readdir = mockReaddir;
+
+vi.mock('@vscode/ripgrep', () => ({
   rgPath: '/mock/path/to/rg',
 }));
 
 // Mock child_process
-const mockSpawn = jest.fn();
-jest.mock('child_process', () => ({
+vi.mock('child_process', () => ({
   spawn: (...args: unknown[]) => mockSpawn(...args),
   ChildProcess: class {},
 }));
 
 // Mock fs-extra
-const mockReaddir = jest.fn();
-const mockFsExtra = {
-  readdir: mockReaddir,
-  pathExists: jest.fn(() => Promise.resolve(true)),
-  stat: jest.fn(() => Promise.resolve({ isDirectory: () => false })),
-};
-jest.mock('fs-extra', () => mockFsExtra);
+vi.mock('fs-extra', () => ({ ...mockFsExtra, default: mockFsExtra }));
 
 // Mock ConfirmationService
-jest.mock('../../src/utils/confirmation-service', () => ({
+vi.mock('../../src/utils/confirmation-service', () => ({
   ConfirmationService: {
-    getInstance: jest.fn(() => ({
-      getSessionFlags: jest.fn(() => ({ allOperations: false })),
-      requestConfirmation: jest.fn(() => Promise.resolve({ confirmed: true })),
-    })),
+    getInstance: vi.fn(function() { return {
+      getSessionFlags: vi.fn(function() { return { allOperations: false }; }),
+      requestConfirmation: vi.fn(() => Promise.resolve({ confirmed: true })),
+    }; }),
   },
 }));
 
 // Mock enhanced-search
-const mockEnhancedSearch = {
-  findSymbols: jest.fn(),
-  findReferences: jest.fn(),
-  findDefinition: jest.fn(),
-  searchMultiple: jest.fn(),
-  getCacheStats: jest.fn(() => ({ searchCache: 0, symbolCache: 0 })),
-  clearCache: jest.fn(),
-};
-jest.mock('../../src/tools/enhanced-search.js', () => ({
-  getEnhancedSearch: jest.fn(() => mockEnhancedSearch),
+vi.mock('../../src/tools/enhanced-search.js', () => ({
+  getEnhancedSearch: vi.fn(function() { return mockEnhancedSearch; }),
   SearchMatch: class {},
   SymbolMatch: class {},
 }));
 
-import { SearchTool } from '../../src/tools/search.js';
 
 function createMockProcess() {
   const stdout = new EventEmitter();

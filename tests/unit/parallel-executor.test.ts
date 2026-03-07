@@ -6,6 +6,7 @@
  */
 
 import { EventEmitter } from "events";
+
 import {
   ParallelExecutor,
   createParallelExecutor,
@@ -20,7 +21,7 @@ import {
 
 // Mock the CodeBuddyClient
 jest.mock("../../src/codebuddy/client.js", () => ({
-  CodeBuddyClient: jest.fn().mockImplementation(() => ({
+  CodeBuddyClient: jest.fn().mockImplementation(function() { return {
     chat: jest.fn().mockResolvedValue({
       choices: [
         {
@@ -35,12 +36,15 @@ jest.mock("../../src/codebuddy/client.js", () => ({
         completion_tokens: 50,
       },
     }),
-  })),
+  }; }),
 }));
 
 jest.mock("../../src/types/index.js", () => ({
   getErrorMessage: jest.fn().mockImplementation((err) => err?.message || String(err)),
 }));
+
+import { CodeBuddyClient as _CodeBuddyClient } from "../../src/codebuddy/client.js";
+const CodeBuddyClient = _CodeBuddyClient as any;
 
 // Helper to create mock model configs
 function createMockModels(count: number = 3): ModelConfig[] {
@@ -109,7 +113,7 @@ describe("ParallelExecutor", () => {
       const config = createMockConfig();
       new ParallelExecutor(config);
 
-      expect(require("../../src/codebuddy/client.js").CodeBuddyClient).toHaveBeenCalledTimes(3);
+      expect(CodeBuddyClient).toHaveBeenCalledTimes(3);
     });
 
     it("should skip disabled models", () => {
@@ -122,7 +126,7 @@ describe("ParallelExecutor", () => {
       });
       new ParallelExecutor(config);
 
-      expect(require("../../src/codebuddy/client.js").CodeBuddyClient).toHaveBeenCalledTimes(1);
+      expect(CodeBuddyClient).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -196,10 +200,10 @@ describe("ParallelExecutor", () => {
     });
 
     it("should handle errors gracefully", async () => {
-      const { CodeBuddyClient } = require("../../src/codebuddy/client.js");
-      CodeBuddyClient.mockImplementation(() => ({
+
+      CodeBuddyClient.mockImplementation(function() { return {
         chat: jest.fn().mockRejectedValue(new Error("API Error")),
-      }));
+      }; });
 
       const errorExecutor = new ParallelExecutor(createMockConfig());
       const result = await errorExecutor.execute("Test prompt");
@@ -411,7 +415,7 @@ describe("ParallelExecutor", () => {
 
         executor.addModel(newModel);
 
-        expect(require("../../src/codebuddy/client.js").CodeBuddyClient).toHaveBeenCalled();
+        expect(CodeBuddyClient).toHaveBeenCalled();
       });
     });
 
@@ -560,7 +564,7 @@ describe("ParallelExecutor", () => {
           ],
         });
 
-        expect(require("../../src/codebuddy/client.js").CodeBuddyClient).toHaveBeenCalled();
+        expect(CodeBuddyClient).toHaveBeenCalled();
       });
     });
   });
@@ -703,8 +707,8 @@ describe("Confidence Estimation", () => {
   });
 
   it("should increase confidence for longer responses", async () => {
-    const { CodeBuddyClient } = require("../../src/codebuddy/client.js");
-    CodeBuddyClient.mockImplementation(() => ({
+
+    CodeBuddyClient.mockImplementation(function() { return {
       chat: jest.fn().mockResolvedValue({
         choices: [
           {
@@ -715,7 +719,7 @@ describe("Confidence Estimation", () => {
         ],
         usage: { total_tokens: 600 },
       }),
-    }));
+    }; });
 
     const testExecutor = new ParallelExecutor(createMockConfig());
     const result = await testExecutor.execute("Test");
@@ -724,8 +728,8 @@ describe("Confidence Estimation", () => {
   });
 
   it("should decrease confidence for uncertain responses", async () => {
-    const { CodeBuddyClient } = require("../../src/codebuddy/client.js");
-    CodeBuddyClient.mockImplementation(() => ({
+
+    CodeBuddyClient.mockImplementation(function() { return {
       chat: jest.fn().mockResolvedValue({
         choices: [
           {
@@ -736,7 +740,7 @@ describe("Confidence Estimation", () => {
         ],
         usage: { total_tokens: 50 },
       }),
-    }));
+    }; });
 
     const testExecutor = new ParallelExecutor(createMockConfig());
     const result = await testExecutor.execute("Test");
@@ -849,10 +853,10 @@ describe("Event Emission", () => {
   });
 
   it("should emit parallel:model:error for failed models", async () => {
-    const { CodeBuddyClient } = require("../../src/codebuddy/client.js");
-    CodeBuddyClient.mockImplementation(() => ({
+
+    CodeBuddyClient.mockImplementation(function() { return {
       chat: jest.fn().mockRejectedValue(new Error("Model error")),
-    }));
+    }; });
 
     const errorExecutor = new ParallelExecutor(createMockConfig());
     const handler = jest.fn();

@@ -11,6 +11,7 @@
  */
 
 import { EventEmitter } from 'events';
+import { vi } from 'vitest';
 
 // Define MockAgent interface to avoid 'any' usage
 interface MockAgent {
@@ -27,146 +28,190 @@ interface MockAgent {
   cleanup: jest.Mock;
 }
 
-// Mock the specialized agent modules
-const mockPDFAgent = {
-  getId: jest.fn().mockReturnValue('pdf-agent'),
-  getName: jest.fn().mockReturnValue('PDF Agent'),
-  getConfig: jest.fn().mockReturnValue({
-    id: 'pdf-agent',
-    name: 'PDF Agent',
-    description: 'Extract text from PDF documents',
-    capabilities: ['pdf-extract', 'pdf-analyze'],
-    fileExtensions: ['pdf'],
-  }),
-  canHandleExtension: jest.fn().mockImplementation((ext: string) => ext === 'pdf'),
-  hasCapability: jest.fn().mockImplementation((cap: string) =>
-    ['pdf-extract', 'pdf-analyze'].includes(cap)
-  ),
-  getSupportedActions: jest.fn().mockReturnValue(['extract', 'metadata', 'analyze']),
-  getActionHelp: jest.fn().mockImplementation((action: string) => `Help for ${action}`),
-  isReady: jest.fn().mockReturnValue(false),
-  initialize: jest.fn().mockResolvedValue(undefined),
-  execute: jest.fn().mockResolvedValue({ success: true, output: 'PDF processed' }),
-  cleanup: jest.fn().mockResolvedValue(undefined),
-};
+// Use vi.hoisted so mock agents are available inside vi.mock factories (which are hoisted)
+const {
+  mockPDFAgent,
+  mockExcelAgent,
+  mockDataAnalysisAgent,
+  mockSQLAgent,
+  mockArchiveAgent,
+  mockCodeGuardianAgent,
+  mockSecurityReviewAgent,
+} = vi.hoisted(() => {
+  const _mockPDFAgent = {
+    getId: vi.fn().mockReturnValue('pdf-agent'),
+    getName: vi.fn().mockReturnValue('PDF Agent'),
+    getConfig: vi.fn().mockReturnValue({
+      id: 'pdf-agent',
+      name: 'PDF Agent',
+      description: 'Extract text from PDF documents',
+      capabilities: ['pdf-extract', 'pdf-analyze'],
+      fileExtensions: ['pdf'],
+    }),
+    canHandleExtension: vi.fn().mockImplementation((ext: string) => ext === 'pdf'),
+    hasCapability: vi.fn().mockImplementation((cap: string) =>
+      ['pdf-extract', 'pdf-analyze'].includes(cap)
+    ),
+    getSupportedActions: vi.fn().mockReturnValue(['extract', 'metadata', 'analyze']),
+    getActionHelp: vi.fn().mockImplementation((action: string) => `Help for ${action}`),
+    isReady: vi.fn().mockReturnValue(false),
+    initialize: vi.fn().mockResolvedValue(undefined),
+    execute: vi.fn().mockResolvedValue({ success: true, output: 'PDF processed' }),
+    cleanup: vi.fn().mockResolvedValue(undefined),
+  };
 
-const mockExcelAgent = {
-  getId: jest.fn().mockReturnValue('excel-agent'),
-  getName: jest.fn().mockReturnValue('Excel Agent'),
-  getConfig: jest.fn().mockReturnValue({
-    id: 'excel-agent',
-    name: 'Excel Agent',
-    description: 'Manipulate Excel files',
-    capabilities: ['excel-read', 'excel-write'],
-    fileExtensions: ['xlsx', 'xls', 'csv'],
-  }),
-  canHandleExtension: jest.fn().mockImplementation((ext: string) =>
-    ['xlsx', 'xls', 'csv'].includes(ext)
-  ),
-  hasCapability: jest.fn().mockImplementation((cap: string) =>
-    ['excel-read', 'excel-write'].includes(cap)
-  ),
-  getSupportedActions: jest.fn().mockReturnValue(['read', 'write', 'convert']),
-  getActionHelp: jest.fn().mockImplementation((action: string) => `Help for ${action}`),
-  isReady: jest.fn().mockReturnValue(true),
-  initialize: jest.fn().mockResolvedValue(undefined),
-  execute: jest.fn().mockResolvedValue({ success: true, output: 'Excel processed' }),
-  cleanup: jest.fn().mockResolvedValue(undefined),
-};
+  const _mockExcelAgent = {
+    getId: vi.fn().mockReturnValue('excel-agent'),
+    getName: vi.fn().mockReturnValue('Excel Agent'),
+    getConfig: vi.fn().mockReturnValue({
+      id: 'excel-agent',
+      name: 'Excel Agent',
+      description: 'Manipulate Excel files',
+      capabilities: ['excel-read', 'excel-write'],
+      fileExtensions: ['xlsx', 'xls', 'csv'],
+    }),
+    canHandleExtension: vi.fn().mockImplementation((ext: string) =>
+      ['xlsx', 'xls', 'csv'].includes(ext)
+    ),
+    hasCapability: vi.fn().mockImplementation((cap: string) =>
+      ['excel-read', 'excel-write'].includes(cap)
+    ),
+    getSupportedActions: vi.fn().mockReturnValue(['read', 'write', 'convert']),
+    getActionHelp: vi.fn().mockImplementation((action: string) => `Help for ${action}`),
+    isReady: vi.fn().mockReturnValue(true),
+    initialize: vi.fn().mockResolvedValue(undefined),
+    execute: vi.fn().mockResolvedValue({ success: true, output: 'Excel processed' }),
+    cleanup: vi.fn().mockResolvedValue(undefined),
+  };
 
-const mockDataAnalysisAgent = {
-  getId: jest.fn().mockReturnValue('data-analysis-agent'),
-  getName: jest.fn().mockReturnValue('Data Analysis Agent'),
-  getConfig: jest.fn().mockReturnValue({
-    id: 'data-analysis-agent',
-    name: 'Data Analysis Agent',
-    description: 'Analyze data files',
-    capabilities: ['data-transform', 'data-visualize'],
-    fileExtensions: ['json', 'csv'],
-  }),
-  canHandleExtension: jest.fn().mockImplementation((ext: string) =>
-    ['json', 'csv'].includes(ext)
-  ),
-  hasCapability: jest.fn().mockImplementation((cap: string) =>
-    ['data-transform', 'data-visualize'].includes(cap)
-  ),
-  getSupportedActions: jest.fn().mockReturnValue(['analyze', 'transform', 'describe']),
-  getActionHelp: jest.fn().mockImplementation((action: string) => `Help for ${action}`),
-  isReady: jest.fn().mockReturnValue(true),
-  initialize: jest.fn().mockResolvedValue(undefined),
-  execute: jest.fn().mockResolvedValue({ success: true, output: 'Data analyzed' }),
-  cleanup: jest.fn().mockResolvedValue(undefined),
-};
+  const _mockDataAnalysisAgent = {
+    getId: vi.fn().mockReturnValue('data-analysis-agent'),
+    getName: vi.fn().mockReturnValue('Data Analysis Agent'),
+    getConfig: vi.fn().mockReturnValue({
+      id: 'data-analysis-agent',
+      name: 'Data Analysis Agent',
+      description: 'Analyze data files',
+      capabilities: ['data-transform', 'data-visualize'],
+      fileExtensions: ['json', 'csv'],
+    }),
+    canHandleExtension: vi.fn().mockImplementation((ext: string) =>
+      ['json', 'csv'].includes(ext)
+    ),
+    hasCapability: vi.fn().mockImplementation((cap: string) =>
+      ['data-transform', 'data-visualize'].includes(cap)
+    ),
+    getSupportedActions: vi.fn().mockReturnValue(['analyze', 'transform', 'describe']),
+    getActionHelp: vi.fn().mockImplementation((action: string) => `Help for ${action}`),
+    isReady: vi.fn().mockReturnValue(true),
+    initialize: vi.fn().mockResolvedValue(undefined),
+    execute: vi.fn().mockResolvedValue({ success: true, output: 'Data analyzed' }),
+    cleanup: vi.fn().mockResolvedValue(undefined),
+  };
 
-const mockSQLAgent = {
-  getId: jest.fn().mockReturnValue('sql-agent'),
-  getName: jest.fn().mockReturnValue('SQL Agent'),
-  getConfig: jest.fn().mockReturnValue({
-    id: 'sql-agent',
-    name: 'SQL Agent',
-    description: 'Execute SQL queries',
-    capabilities: ['sql-query'],
-    fileExtensions: ['db', 'sqlite'],
-  }),
-  canHandleExtension: jest.fn().mockImplementation((ext: string) =>
-    ['db', 'sqlite'].includes(ext)
-  ),
-  hasCapability: jest.fn().mockImplementation((cap: string) => cap === 'sql-query'),
-  getSupportedActions: jest.fn().mockReturnValue(['query', 'tables', 'schema']),
-  getActionHelp: jest.fn().mockImplementation((action: string) => `Help for ${action}`),
-  isReady: jest.fn().mockReturnValue(true),
-  initialize: jest.fn().mockResolvedValue(undefined),
-  execute: jest.fn().mockResolvedValue({ success: true, output: 'Query executed' }),
-  cleanup: jest.fn().mockResolvedValue(undefined),
-};
+  const _mockSQLAgent = {
+    getId: vi.fn().mockReturnValue('sql-agent'),
+    getName: vi.fn().mockReturnValue('SQL Agent'),
+    getConfig: vi.fn().mockReturnValue({
+      id: 'sql-agent',
+      name: 'SQL Agent',
+      description: 'Execute SQL queries',
+      capabilities: ['sql-query'],
+      fileExtensions: ['db', 'sqlite'],
+    }),
+    canHandleExtension: vi.fn().mockImplementation((ext: string) =>
+      ['db', 'sqlite'].includes(ext)
+    ),
+    hasCapability: vi.fn().mockImplementation((cap: string) => cap === 'sql-query'),
+    getSupportedActions: vi.fn().mockReturnValue(['query', 'tables', 'schema']),
+    getActionHelp: vi.fn().mockImplementation((action: string) => `Help for ${action}`),
+    isReady: vi.fn().mockReturnValue(true),
+    initialize: vi.fn().mockResolvedValue(undefined),
+    execute: vi.fn().mockResolvedValue({ success: true, output: 'Query executed' }),
+    cleanup: vi.fn().mockResolvedValue(undefined),
+  };
 
-const mockArchiveAgent = {
-  getId: jest.fn().mockReturnValue('archive-agent'),
-  getName: jest.fn().mockReturnValue('Archive Agent'),
-  getConfig: jest.fn().mockReturnValue({
-    id: 'archive-agent',
-    name: 'Archive Agent',
-    description: 'Manage archives',
-    capabilities: ['archive-extract', 'archive-create'],
-    fileExtensions: ['zip', 'tar', 'gz'],
-  }),
-  canHandleExtension: jest.fn().mockImplementation((ext: string) =>
-    ['zip', 'tar', 'gz'].includes(ext)
-  ),
-  hasCapability: jest.fn().mockImplementation((cap: string) =>
-    ['archive-extract', 'archive-create'].includes(cap)
-  ),
-  getSupportedActions: jest.fn().mockReturnValue(['extract', 'create', 'list']),
-  getActionHelp: jest.fn().mockImplementation((action: string) => `Help for ${action}`),
-  isReady: jest.fn().mockReturnValue(true),
-  initialize: jest.fn().mockResolvedValue(undefined),
-  execute: jest.fn().mockResolvedValue({ success: true, output: 'Archive processed' }),
-  cleanup: jest.fn().mockResolvedValue(undefined),
-};
+  const _mockArchiveAgent = {
+    getId: vi.fn().mockReturnValue('archive-agent'),
+    getName: vi.fn().mockReturnValue('Archive Agent'),
+    getConfig: vi.fn().mockReturnValue({
+      id: 'archive-agent',
+      name: 'Archive Agent',
+      description: 'Manage archives',
+      capabilities: ['archive-extract', 'archive-create'],
+      fileExtensions: ['zip', 'tar', 'gz'],
+    }),
+    canHandleExtension: vi.fn().mockImplementation((ext: string) =>
+      ['zip', 'tar', 'gz'].includes(ext)
+    ),
+    hasCapability: vi.fn().mockImplementation((cap: string) =>
+      ['archive-extract', 'archive-create'].includes(cap)
+    ),
+    getSupportedActions: vi.fn().mockReturnValue(['extract', 'create', 'list']),
+    getActionHelp: vi.fn().mockImplementation((action: string) => `Help for ${action}`),
+    isReady: vi.fn().mockReturnValue(true),
+    initialize: vi.fn().mockResolvedValue(undefined),
+    execute: vi.fn().mockResolvedValue({ success: true, output: 'Archive processed' }),
+    cleanup: vi.fn().mockResolvedValue(undefined),
+  };
 
-const mockCodeGuardianAgent = {
-  getId: jest.fn().mockReturnValue('code-guardian-agent'),
-  getName: jest.fn().mockReturnValue('Code Guardian Agent'),
-  getConfig: jest.fn().mockReturnValue({
-    id: 'code-guardian-agent',
-    name: 'Code Guardian Agent',
-    description: 'Code analysis and review',
-    capabilities: ['code-analyze', 'code-review', 'code-refactor', 'code-security'],
-    fileExtensions: ['ts', 'js', 'py'],
-  }),
-  canHandleExtension: jest.fn().mockImplementation((ext: string) =>
-    ['ts', 'js', 'py'].includes(ext)
-  ),
-  hasCapability: jest.fn().mockImplementation((cap: string) =>
-    ['code-analyze', 'code-review', 'code-refactor', 'code-security'].includes(cap)
-  ),
-  getSupportedActions: jest.fn().mockReturnValue(['analyze', 'review', 'refactor', 'security-scan']),
-  getActionHelp: jest.fn().mockImplementation((action: string) => `Help for ${action}`),
-  isReady: jest.fn().mockReturnValue(true),
-  initialize: jest.fn().mockResolvedValue(undefined),
-  execute: jest.fn().mockResolvedValue({ success: true, output: 'Code reviewed' }),
-  cleanup: jest.fn().mockResolvedValue(undefined),
-};
+  const _mockCodeGuardianAgent = {
+    getId: vi.fn().mockReturnValue('code-guardian-agent'),
+    getName: vi.fn().mockReturnValue('Code Guardian Agent'),
+    getConfig: vi.fn().mockReturnValue({
+      id: 'code-guardian-agent',
+      name: 'Code Guardian Agent',
+      description: 'Code analysis and review',
+      capabilities: ['code-analyze', 'code-review', 'code-refactor', 'code-security'],
+      fileExtensions: ['ts', 'js', 'py'],
+    }),
+    canHandleExtension: vi.fn().mockImplementation((ext: string) =>
+      ['ts', 'js', 'py'].includes(ext)
+    ),
+    hasCapability: vi.fn().mockImplementation((cap: string) =>
+      ['code-analyze', 'code-review', 'code-refactor', 'code-security'].includes(cap)
+    ),
+    getSupportedActions: vi.fn().mockReturnValue(['analyze', 'review', 'refactor', 'security-scan']),
+    getActionHelp: vi.fn().mockImplementation((action: string) => `Help for ${action}`),
+    isReady: vi.fn().mockReturnValue(true),
+    initialize: vi.fn().mockResolvedValue(undefined),
+    execute: vi.fn().mockResolvedValue({ success: true, output: 'Code reviewed' }),
+    cleanup: vi.fn().mockResolvedValue(undefined),
+  };
+
+  const _mockSecurityReviewAgent = {
+    getId: vi.fn().mockReturnValue('security-review-agent'),
+    getName: vi.fn().mockReturnValue('Security Review Agent'),
+    getConfig: vi.fn().mockReturnValue({
+      id: 'security-review-agent',
+      name: 'Security Review Agent',
+      description: 'Security vulnerability detection',
+      capabilities: ['security-scan', 'vulnerability-detect'],
+      fileExtensions: ['ts', 'js', 'py'],
+    }),
+    canHandleExtension: vi.fn().mockImplementation((ext: string) =>
+      ['ts', 'js', 'py'].includes(ext)
+    ),
+    hasCapability: vi.fn().mockImplementation((cap: string) =>
+      ['security-scan', 'vulnerability-detect'].includes(cap)
+    ),
+    getSupportedActions: vi.fn().mockReturnValue(['scan', 'audit']),
+    getActionHelp: vi.fn().mockImplementation((action: string) => `Help for ${action}`),
+    isReady: vi.fn().mockReturnValue(true),
+    initialize: vi.fn().mockResolvedValue(undefined),
+    execute: vi.fn().mockResolvedValue({ success: true, output: 'Security reviewed' }),
+    cleanup: vi.fn().mockResolvedValue(undefined),
+  };
+
+  return {
+    mockPDFAgent: _mockPDFAgent,
+    mockExcelAgent: _mockExcelAgent,
+    mockDataAnalysisAgent: _mockDataAnalysisAgent,
+    mockSQLAgent: _mockSQLAgent,
+    mockArchiveAgent: _mockArchiveAgent,
+    mockCodeGuardianAgent: _mockCodeGuardianAgent,
+    mockSecurityReviewAgent: _mockSecurityReviewAgent,
+  };
+});
 
 // Mock the agent factory functions
 jest.mock('../../src/agent/specialized/pdf-agent.js', () => ({
@@ -191,6 +236,10 @@ jest.mock('../../src/agent/specialized/archive-agent.js', () => ({
 
 jest.mock('../../src/agent/specialized/code-guardian-agent.js', () => ({
   getCodeGuardianAgent: jest.fn().mockReturnValue(mockCodeGuardianAgent),
+}));
+
+jest.mock('../../src/agent/specialized/security-review-agent.js', () => ({
+  getSecurityReviewAgent: jest.fn().mockReturnValue(mockSecurityReviewAgent),
 }));
 
 // Mock getErrorMessage

@@ -9,87 +9,77 @@
 
 import { EventEmitter } from 'events';
 
-// Mock the cost tracker
-const mockCalculateCost = jest.fn().mockReturnValue(0.01);
-const mockRecordUsage = jest.fn();
-const mockCostTracker = {
-  calculateCost: mockCalculateCost,
-  recordUsage: mockRecordUsage,
-};
+// Hoist all mock variables so they are available inside vi.mock() factories
+const {
+  mockCalculateCost, mockRecordUsage, mockCostTracker,
+  mockGetMode, mockSetMode, mockIsToolAllowed, mockFormatModeStatus, mockModeManager,
+  mockValidateCommand, mockFormatSandboxStatus, mockSandboxManager,
+  mockGetStats, mockUpdateContextConfig, mockContextManagerDispose, mockContextManager,
+  mockUpdateCurrentSession, mockFormatSessionList, mockGetCurrentSessionId, mockExportSessionToFile, mockSessionStore,
+} = vi.hoisted(() => {
+  const mockCalculateCost = vi.fn().mockReturnValue(0.01);
+  const mockRecordUsage = vi.fn();
+  const mockCostTracker = { calculateCost: mockCalculateCost, recordUsage: mockRecordUsage };
 
-jest.mock('../../src/utils/cost-tracker.js', () => ({
-  getCostTracker: jest.fn().mockReturnValue(mockCostTracker),
-  CostTracker: jest.fn(),
-}));
+  const mockGetMode = vi.fn().mockReturnValue('code');
+  const mockSetMode = vi.fn();
+  const mockIsToolAllowed = vi.fn().mockReturnValue(true);
+  const mockFormatModeStatus = vi.fn().mockReturnValue('Mode: code - Code mode');
+  const mockModeManager = { getMode: mockGetMode, setMode: mockSetMode, isToolAllowed: mockIsToolAllowed, formatModeStatus: mockFormatModeStatus };
 
-// Mock the agent mode manager
-const mockGetMode = jest.fn().mockReturnValue('code');
-const mockSetMode = jest.fn();
-const mockIsToolAllowed = jest.fn().mockReturnValue(true);
-const mockFormatModeStatus = jest.fn().mockReturnValue('Mode: code - Code mode');
-const mockModeManager = {
-  getMode: mockGetMode,
-  setMode: mockSetMode,
-  isToolAllowed: mockIsToolAllowed,
-  formatModeStatus: mockFormatModeStatus,
-};
+  const mockValidateCommand = vi.fn().mockReturnValue({ valid: true });
+  const mockFormatSandboxStatus = vi.fn().mockReturnValue('Sandbox: native');
+  const mockSandboxManager = { validateCommand: mockValidateCommand, formatStatus: mockFormatSandboxStatus };
 
-jest.mock('../../src/agent/agent-mode.js', () => ({
-  getAgentModeManager: jest.fn().mockReturnValue(mockModeManager),
-  AgentModeManager: jest.fn(),
-}));
+  const mockGetStats = vi.fn().mockReturnValue({
+    totalTokens: 1000, maxTokens: 4000, usagePercent: 25, messageCount: 10,
+    summarizedSessions: 0, isNearLimit: false, isCritical: false,
+  });
+  const mockUpdateContextConfig = vi.fn();
+  const mockContextManagerDispose = vi.fn();
+  const mockContextManager = { getStats: mockGetStats, updateConfig: mockUpdateContextConfig, dispose: mockContextManagerDispose };
 
-// Mock the sandbox manager
-const mockValidateCommand = jest.fn().mockReturnValue({ valid: true });
-const mockFormatSandboxStatus = jest.fn().mockReturnValue('Sandbox: native');
-const mockSandboxManager = {
-  validateCommand: mockValidateCommand,
-  formatStatus: mockFormatSandboxStatus,
-};
+  const mockUpdateCurrentSession = vi.fn();
+  const mockFormatSessionList = vi.fn().mockReturnValue('No saved sessions.');
+  const mockGetCurrentSessionId = vi.fn().mockReturnValue('session_123');
+  const mockExportSessionToFile = vi.fn().mockReturnValue('/path/to/export.md');
+  const mockSessionStore = {
+    updateCurrentSession: mockUpdateCurrentSession, formatSessionList: mockFormatSessionList,
+    getCurrentSessionId: mockGetCurrentSessionId, exportSessionToFile: mockExportSessionToFile,
+  };
 
-jest.mock('../../src/security/sandbox.js', () => ({
-  getSandboxManager: jest.fn().mockReturnValue(mockSandboxManager),
-  SandboxManager: jest.fn(),
-}));
-
-// Mock the context manager
-const mockGetStats = jest.fn().mockReturnValue({
-  totalTokens: 1000,
-  maxTokens: 4000,
-  usagePercent: 25,
-  messageCount: 10,
-  summarizedSessions: 0,
-  isNearLimit: false,
-  isCritical: false,
+  return {
+    mockCalculateCost, mockRecordUsage, mockCostTracker,
+    mockGetMode, mockSetMode, mockIsToolAllowed, mockFormatModeStatus, mockModeManager,
+    mockValidateCommand, mockFormatSandboxStatus, mockSandboxManager,
+    mockGetStats, mockUpdateContextConfig, mockContextManagerDispose, mockContextManager,
+    mockUpdateCurrentSession, mockFormatSessionList, mockGetCurrentSessionId, mockExportSessionToFile, mockSessionStore,
+  };
 });
-const mockUpdateContextConfig = jest.fn();
-const mockContextManagerDispose = jest.fn();
-const mockContextManager = {
-  getStats: mockGetStats,
-  updateConfig: mockUpdateContextConfig,
-  dispose: mockContextManagerDispose,
-};
 
-jest.mock('../../src/context/context-manager-v2.js', () => ({
-  createContextManager: jest.fn().mockReturnValue(mockContextManager),
-  ContextManagerV2: jest.fn(),
+vi.mock('../../src/utils/cost-tracker.js', () => ({
+  getCostTracker: vi.fn().mockReturnValue(mockCostTracker),
+  CostTracker: vi.fn(),
 }));
 
-// Mock the session store
-const mockUpdateCurrentSession = jest.fn();
-const mockFormatSessionList = jest.fn().mockReturnValue('No saved sessions.');
-const mockGetCurrentSessionId = jest.fn().mockReturnValue('session_123');
-const mockExportSessionToFile = jest.fn().mockReturnValue('/path/to/export.md');
-const mockSessionStore = {
-  updateCurrentSession: mockUpdateCurrentSession,
-  formatSessionList: mockFormatSessionList,
-  getCurrentSessionId: mockGetCurrentSessionId,
-  exportSessionToFile: mockExportSessionToFile,
-};
+vi.mock('../../src/agent/agent-mode.js', () => ({
+  getAgentModeManager: vi.fn().mockReturnValue(mockModeManager),
+  AgentModeManager: vi.fn(),
+}));
 
-jest.mock('../../src/persistence/session-store.js', () => ({
-  getSessionStore: jest.fn().mockReturnValue(mockSessionStore),
-  SessionStore: jest.fn(),
+vi.mock('../../src/security/sandbox.js', () => ({
+  getSandboxManager: vi.fn().mockReturnValue(mockSandboxManager),
+  SandboxManager: vi.fn(),
+}));
+
+vi.mock('../../src/context/context-manager-v2.js', () => ({
+  createContextManager: vi.fn().mockReturnValue(mockContextManager),
+  ContextManagerV2: vi.fn(),
+}));
+
+vi.mock('../../src/persistence/session-store.js', () => ({
+  getSessionStore: vi.fn().mockReturnValue(mockSessionStore),
+  SessionStore: vi.fn(),
 }));
 
 import {

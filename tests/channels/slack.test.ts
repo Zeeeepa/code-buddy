@@ -2,25 +2,31 @@
  * Slack Channel Tests
  */
 
-import { SlackChannel } from '../../src/channels/slack/index.js';
-import type { SlackConfig, SlackEventCallback, SlackEvent } from '../../src/channels/slack/index.js';
-import crypto from 'crypto';
-
-// Mock WebSocket
-jest.mock('ws', () => {
-  const EventEmitter = require('events');
-  return class MockWebSocket extends EventEmitter {
+const { MockWebSocket, mockFetch } = vi.hoisted(() => {
+  const { EventEmitter } = require('events');
+  class _MockWebSocket extends EventEmitter {
     static OPEN = 1;
     readyState = 1;
-    send = jest.fn();
-    close = jest.fn();
-    ping = jest.fn();
+    send = vi.fn();
+    close = vi.fn();
+    ping = vi.fn();
+  }
+  return {
+    MockWebSocket: _MockWebSocket,
+    mockFetch: vi.fn(),
   };
 });
 
-// Mock fetch
-const mockFetch = jest.fn();
-global.fetch = mockFetch;
+vi.mock('ws', () => ({
+  default: MockWebSocket,
+  WebSocket: MockWebSocket,
+}));
+
+global.fetch = mockFetch as any;
+
+import crypto from 'crypto';
+import { SlackChannel } from '../../src/channels/slack/index.js';
+import type { SlackConfig, SlackEventCallback, SlackEvent } from '../../src/channels/slack/index.js';
 
 describe('SlackChannel', () => {
   let channel: SlackChannel;

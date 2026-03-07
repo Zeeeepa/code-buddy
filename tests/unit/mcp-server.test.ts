@@ -6,21 +6,27 @@
  * and error scenarios.
  */
 
-import { EventEmitter } from 'events';
 
 // Mock the MCP SDK
+
+import { EventEmitter } from 'events';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { MCPManager, MCPServerConfig } from '../../src/mcp/client';
+import { createTransport } from '../../src/mcp/transports';
+import { logger } from '../../src/utils/logger';
+
 const mockClientClose = jest.fn();
 const mockClientConnect = jest.fn();
 const mockClientListTools = jest.fn();
 const mockClientCallTool = jest.fn();
 
 jest.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
-  Client: jest.fn().mockImplementation(() => ({
+  Client: jest.fn().mockImplementation(function() { return {
     close: mockClientClose,
     connect: mockClientConnect,
     listTools: mockClientListTools,
     callTool: mockClientCallTool,
-  })),
+  }; }),
 }));
 
 // Mock transports
@@ -29,11 +35,11 @@ const mockTransportDisconnect = jest.fn();
 const mockTransportGetType = jest.fn();
 
 jest.mock('../../src/mcp/transports.js', () => ({
-  createTransport: jest.fn(() => ({
+  createTransport: jest.fn(function() { return {
     connect: mockTransportConnect,
     disconnect: mockTransportDisconnect,
     getType: mockTransportGetType,
-  })),
+  }; }),
 }));
 
 // Mock logger
@@ -48,13 +54,11 @@ jest.mock('../../src/utils/logger.js', () => ({
 
 // Mock config loader
 jest.mock('../../src/mcp/config', () => ({
-  loadMCPConfig: jest.fn(() => ({ servers: [] })),
+  loadMCPConfig: jest.fn(function() { return { servers: [] }; }),
 }));
 
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { MCPManager, MCPServerConfig } from '../../src/mcp/client';
-import { createTransport } from '../../src/mcp/transports';
-import { logger } from '../../src/utils/logger';
+import { loadMCPConfig } from '../../src/mcp/config';
+
 
 describe('MCPManager', () => {
   let manager: MCPManager;
@@ -495,8 +499,7 @@ describe('MCPManager', () => {
     });
 
     it('should load config and initialize servers when none exist', async () => {
-      const { loadMCPConfig } = require('../../src/mcp/config');
-      loadMCPConfig.mockReturnValue({
+      (loadMCPConfig as any).mockReturnValue({
         servers: [
           { name: 'config-server', transport: { type: 'stdio', command: 'node' } },
         ],
@@ -510,8 +513,7 @@ describe('MCPManager', () => {
     });
 
     it('should handle server initialization failures gracefully', async () => {
-      const { loadMCPConfig } = require('../../src/mcp/config');
-      loadMCPConfig.mockReturnValue({
+      (loadMCPConfig as any).mockReturnValue({
         servers: [
           { name: 'failing-server', transport: { type: 'stdio', command: 'bad-cmd' } },
         ],

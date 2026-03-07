@@ -18,18 +18,23 @@ import { EventEmitter } from 'events';
 import * as path from 'path';
 
 // Create mock functions
-const mockPathExists = jest.fn().mockResolvedValue(false);
-const mockReadJson = jest.fn().mockResolvedValue({});
-const mockReadFile = jest.fn().mockResolvedValue('');
-const mockReaddir = jest.fn().mockResolvedValue([]);
+const { mockPathExists, mockReadJson, mockReadFile, mockReaddir } = vi.hoisted(() => ({
+  mockPathExists: vi.fn().mockResolvedValue(false),
+  mockReadJson: vi.fn().mockResolvedValue({}),
+  mockReadFile: vi.fn().mockResolvedValue(''),
+  mockReaddir: vi.fn().mockResolvedValue([]),
+}));
 
 // Mock fs-extra before importing
-jest.mock('fs-extra', () => ({
+jest.mock('fs-extra', () => {
+  const impl = {
   pathExists: mockPathExists,
   readJson: mockReadJson,
   readFile: mockReadFile,
   readdir: mockReaddir,
-}));
+};
+  return { ...impl, default: impl };
+});
 
 import {
   WorkspaceDetector,

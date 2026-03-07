@@ -396,7 +396,7 @@ describe('Chat Components', () => {
       const module = await import('../../src/ui/components/ChatInterface.js');
 
       expect(module.default).toBeDefined();
-    });
+    }, 15000); // ChatInterface is a heavy module with many transitive imports
   });
 });
 

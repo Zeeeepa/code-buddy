@@ -8,35 +8,42 @@
  * - CacheRepository: caching logic
  */
 
-import { jest, describe, it, expect, beforeEach, afterEach, beforeAll } from '@jest/globals';
+import { vi } from 'vitest';
 
-// Mock better-sqlite3
-const mockPrepare = jest.fn();
-const mockExec = jest.fn();
-const mockPragma = jest.fn();
-const mockClose = jest.fn();
-const mockRun = jest.fn();
-const mockGet = jest.fn();
-const mockAll = jest.fn();
+// Hoist mock variables so they are available inside vi.mock() factories
+const {
+  mockPrepare,
+  mockExec,
+  mockPragma,
+  mockClose,
+  mockRun,
+  mockGet,
+  mockAll,
+  mockStatement,
+  mockDatabase,
+} = vi.hoisted(() => {
+  const mockRun = vi.fn();
+  const mockGet = vi.fn();
+  const mockAll = vi.fn();
+  const mockStatement = { run: mockRun, get: mockGet, all: mockAll };
+  const mockPrepare = vi.fn().mockReturnValue(mockStatement);
+  const mockExec = vi.fn();
+  const mockPragma = vi.fn();
+  const mockClose = vi.fn();
+  const mockDatabase = {
+    prepare: mockPrepare,
+    exec: mockExec,
+    pragma: mockPragma,
+    close: mockClose,
+  };
+  return { mockPrepare, mockExec, mockPragma, mockClose, mockRun, mockGet, mockAll, mockStatement, mockDatabase };
+});
 
-const mockStatement = {
-  run: mockRun,
-  get: mockGet,
-  all: mockAll,
-};
-
-const mockDatabase = {
-  prepare: mockPrepare.mockReturnValue(mockStatement),
-  exec: mockExec,
-  pragma: mockPragma,
-  close: mockClose,
-};
-
-jest.unstable_mockModule('better-sqlite3', () => ({
-  default: jest.fn(() => mockDatabase),
+jest.mock('better-sqlite3', () => ({
+  default: jest.fn(function() { return mockDatabase; }),
 }));
 
-jest.unstable_mockModule('fs', () => ({
+jest.mock('fs', () => ({
   existsSync: jest.fn().mockReturnValue(true),
   mkdirSync: jest.fn(),
   default: {

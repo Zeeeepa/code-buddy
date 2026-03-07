@@ -13,7 +13,9 @@
  */
 
 // Mock child_process before importing the module
-const mockExecSync = jest.fn();
+const { mockExecSync } = vi.hoisted(() => ({
+  mockExecSync: vi.fn(),
+}));
 jest.mock('child_process', () => ({
   execSync: mockExecSync,
 }));
@@ -36,7 +38,7 @@ describe('CodeEvolutionTracker', () => {
 
   describe('generateEvolutionReport', () => {
     it('should generate empty report when no git history', () => {
-      mockExecSync.mockImplementation(() => {
+      mockExecSync.mockImplementation(function() {
         throw new Error('Not a git repository');
       });
 

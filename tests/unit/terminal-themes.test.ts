@@ -5,25 +5,35 @@
 
 import * as path from 'path';
 
-// Mock fs-extra
-const mockExistsSync = jest.fn();
-const mockReadJsonSync = jest.fn();
-const mockWriteJsonSync = jest.fn();
-const mockEnsureDirSync = jest.fn();
+// Mock dependencies
+const {
+  mockExistsSync, mockReadJsonSync, mockWriteJsonSync, mockEnsureDirSync,
+  mockHomedir,
+} = vi.hoisted(() => ({
+  mockExistsSync: vi.fn(),
+  mockReadJsonSync: vi.fn(),
+  mockWriteJsonSync: vi.fn(),
+  mockEnsureDirSync: vi.fn(),
+  mockHomedir: vi.fn().mockReturnValue('/home/testuser'),
+}));
 
-jest.mock('fs-extra', () => ({
+jest.mock('fs-extra', () => {
+  const impl = {
   existsSync: mockExistsSync,
   readJsonSync: mockReadJsonSync,
   writeJsonSync: mockWriteJsonSync,
   ensureDirSync: mockEnsureDirSync,
-}));
+};
+  return { ...impl, default: impl };
+});
 
 // Mock os module
-const mockHomedir = jest.fn().mockReturnValue('/home/testuser');
-
-jest.mock('os', () => ({
+jest.mock('os', () => {
+  const impl = {
   homedir: () => mockHomedir(),
-}));
+};
+  return { ...impl, default: impl };
+});
 
 import {
   ThemeManager,
@@ -98,7 +108,7 @@ describe('ThemeManager', () => {
 
     it('should handle corrupt config file gracefully', () => {
       mockExistsSync.mockReturnValue(true);
-      mockReadJsonSync.mockImplementation(() => {
+      mockReadJsonSync.mockImplementation(function() {
         throw new Error('JSON parse error');
       });
 
@@ -464,7 +474,7 @@ describe('ThemeManager', () => {
 
   describe('Persistence', () => {
     it('should handle save errors gracefully', () => {
-      mockWriteJsonSync.mockImplementation(() => {
+      mockWriteJsonSync.mockImplementation(function() {
         throw new Error('Write error');
       });
 

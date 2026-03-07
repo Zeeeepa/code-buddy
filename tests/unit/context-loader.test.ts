@@ -3,26 +3,31 @@
  */
 
 import path from 'path';
-import fs from 'fs';
-import fsPromises from 'fs/promises';
-import {
-  ContextLoader,
-  getContextLoader,
-  resetContextLoader,
-  ContextFile,
-  ContextLoaderOptions,
-} from '../../src/context/context-loader';
 
-// Mock fs/promises module
-jest.mock('fs/promises', () => ({
-  access: jest.fn(),
-  readFile: jest.fn(),
-  stat: jest.fn(),
+// Hoist mock variables so they are available inside vi.mock factories
+const { mockFsAccess, mockFsReadFile, mockFsStat, mockGlob, mockIgnoreFn } = vi.hoisted(() => ({
+  mockFsAccess: vi.fn(),
+  mockFsReadFile: vi.fn(),
+  mockFsStat: vi.fn(),
+  mockGlob: vi.fn(),
+  mockIgnoreFn: vi.fn(function() { return {
+    add: vi.fn().mockReturnThis(),
+    ignores: vi.fn().mockReturnValue(false),
+  }; }),
 }));
 
+// Mock fs/promises module
+vi.mock('fs/promises', () => {
+  const impl = {
+    access: mockFsAccess,
+    readFile: mockFsReadFile,
+    stat: mockFsStat,
+  };
+  return { ...impl, default: impl };
+});
+
 // Mock fast-glob
-jest.mock('fast-glob', () => {
-  const mockGlob = jest.fn();
+vi.mock('fast-glob', () => {
   return {
     __esModule: true,
     default: { glob: mockGlob },
@@ -31,15 +36,20 @@ jest.mock('fast-glob', () => {
 });
 
 // Mock the ignore library
-jest.mock('ignore', () => {
-  return jest.fn(() => ({
-    add: jest.fn().mockReturnThis(),
-    ignores: jest.fn().mockReturnValue(false),
-  }));
+vi.mock('ignore', () => {
+  return { default: mockIgnoreFn };
 });
 
-const mockFsPromises = fsPromises as jest.Mocked<typeof fsPromises>;
-const mockFastGlob = require('fast-glob');
+import {
+  ContextLoader,
+  getContextLoader,
+  resetContextLoader,
+  ContextFile,
+  ContextLoaderOptions,
+} from '../../src/context/context-loader';
+
+const mockFsPromises = { access: mockFsAccess, readFile: mockFsReadFile, stat: mockFsStat };
+const mockFastGlob = { glob: mockGlob };
 
 describe('ContextLoader', () => {
   const testWorkingDir = '/test/project';
@@ -193,7 +203,7 @@ describe('ContextLoader', () => {
       mockFastGlob.glob.mockResolvedValue(['src/good.ts', 'src/bad.ts']);
 
       let callCount = 0;
-      mockFsPromises.stat.mockImplementation(() => {
+      mockFsPromises.stat.mockImplementation(function() {
         callCount++;
         if (callCount === 2) {
           return Promise.reject(new Error('File not found'));
@@ -419,12 +429,11 @@ describe('ContextLoader', () => {
 
   describe('File Filtering - Gitignore', () => {
     it('should respect gitignore patterns', async () => {
-      const mockIgnore = require('ignore');
       const mockIgnoresFunc = jest.fn().mockImplementation((path: string) => {
         return path.includes('ignored');
       });
 
-      mockIgnore.mockReturnValue({
+      mockIgnoreFn.mockReturnValue({
         add: jest.fn().mockReturnThis(),
         ignores: mockIgnoresFunc,
       });
@@ -499,7 +508,7 @@ describe('ContextLoader', () => {
       mockFastGlob.glob.mockResolvedValue(['src/small.ts', 'src/large.ts']);
 
       let callCount = 0;
-      mockFsPromises.stat.mockImplementation(() => {
+      mockFsPromises.stat.mockImplementation(function() {
         callCount++;
         return Promise.resolve({
           size: callCount === 1 ? 100 : 200 * 1024, // Second file is 200KB
@@ -1135,7 +1144,7 @@ describe('ContextLoader', () => {
       mockFsPromises.stat.mockResolvedValue({ size: 100, mtimeMs: Date.now() } as any);
 
       let callCount = 0;
-      mockFsPromises.readFile.mockImplementation(() => {
+      mockFsPromises.readFile.mockImplementation(function() {
         callCount++;
         if (callCount === 1) {
           return Promise.reject(new Error('EACCES: permission denied'));

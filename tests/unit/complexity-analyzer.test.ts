@@ -3,13 +3,18 @@
  */
 
 // Create mock functions
-const mockReadFile = jest.fn<Promise<string>, [string, string]>();
-const mockGlob = jest.fn<Promise<string[]>, [string[], { cwd: string; ignore: string[]; absolute: boolean }]>();
+const { mockReadFile, mockGlob } = vi.hoisted(() => ({
+  mockReadFile: vi.fn<Promise<string>, [string, string]>(),
+  mockGlob: vi.fn<Promise<string[]>, [string[], { cwd: string; ignore: string[]; absolute: boolean }]>(),
+}));
 
 // Mock dependencies before importing
-jest.mock('fs-extra', () => ({
+jest.mock('fs-extra', () => {
+  const impl = {
   readFile: mockReadFile,
-}));
+};
+  return { ...impl, default: impl };
+});
 
 jest.mock('fast-glob', () => ({
   glob: mockGlob,

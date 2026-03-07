@@ -14,25 +14,66 @@
 // MOCKS - Must be defined before imports (Jest hoists jest.mock() calls)
 // =============================================================================
 
-// Mock codebuddy client
-const mockChatResponse = jest.fn().mockResolvedValue({
-  choices: [{ message: { content: "Test response", tool_calls: null } }],
-  usage: { prompt_tokens: 100, completion_tokens: 50 },
-});
+import { vi } from 'vitest';
 
-const mockChatStreamResponse = jest.fn().mockImplementation(async function* () {
-  yield { choices: [{ delta: { content: "Hello " } }] };
-  yield { choices: [{ delta: { content: "World" } }] };
-});
+// Hoist mock variables so they are available inside vi.mock() factories
+const {
+  mockChatResponse,
+  mockChatStreamResponse,
+  mockViewFile,
+  mockCreateFile,
+  mockStrReplace,
+  mockBashExecute,
+  mockSearchTool,
+  mockWebSearch,
+  mockFetchPage,
+  mockCheckpointBeforeCreate,
+  mockCheckpointBeforeEdit,
+  mockCalculateCost,
+  mockRecordUsage,
+  mockIsYOLOEnabled,
+  mockPrepareMessages,
+  mockShouldWarn,
+  mockExecuteHooks,
+} = vi.hoisted(() => ({
+  mockChatResponse: vi.fn().mockResolvedValue({
+    choices: [{ message: { content: "Test response", tool_calls: null } }],
+    usage: { prompt_tokens: 100, completion_tokens: 50 },
+  }),
+  mockChatStreamResponse: vi.fn().mockImplementation(async function* () {
+    yield { choices: [{ delta: { content: "Hello " } }] };
+    yield { choices: [{ delta: { content: "World" } }] };
+  }),
+  mockViewFile: vi.fn().mockResolvedValue({ success: true, output: "file content" }),
+  mockCreateFile: vi.fn().mockResolvedValue({ success: true, output: "File created" }),
+  mockStrReplace: vi.fn().mockResolvedValue({ success: true, output: "Text replaced" }),
+  mockBashExecute: vi.fn().mockResolvedValue({ success: true, output: "command output" }),
+  mockSearchTool: vi.fn().mockResolvedValue({ success: true, output: "search results" }),
+  mockWebSearch: vi.fn().mockResolvedValue({ success: true, output: "web results" }),
+  mockFetchPage: vi.fn().mockResolvedValue({ success: true, output: "page content" }),
+  mockCheckpointBeforeCreate: vi.fn(),
+  mockCheckpointBeforeEdit: vi.fn(),
+  mockCalculateCost: vi.fn().mockReturnValue(0.001),
+  mockRecordUsage: vi.fn(),
+  mockIsYOLOEnabled: vi.fn().mockReturnValue(false),
+  mockPrepareMessages: vi.fn().mockImplementation((messages: any) => messages),
+  mockShouldWarn: vi.fn().mockReturnValue({ warn: false }),
+  mockExecuteHooks: vi.fn().mockResolvedValue(undefined),
+}));
+
+// Mock codebuddy client
+
+import { CodeBuddyAgent } from "../../src/agent/codebuddy-agent";
+import type { ChatEntry, StreamingChunk } from "../../src/agent/types";
 
 jest.mock("../../src/codebuddy/client.js", () => ({
-  CodeBuddyClient: jest.fn().mockImplementation(() => ({
+  CodeBuddyClient: jest.fn().mockImplementation(function() { return {
     chat: mockChatResponse,
     chatStream: mockChatStreamResponse,
     getCurrentModel: jest.fn().mockReturnValue("grok-code-fast-1"),
     setModel: jest.fn(),
     probeToolSupport: jest.fn().mockResolvedValue(true),
-  })),
+  }; }),
 }));
 
 // Mock codebuddy tools
@@ -93,48 +134,40 @@ jest.mock("../../src/mcp/config.js", () => ({
 }));
 
 // Mock tools - configurable for testing different scenarios
-const mockViewFile = jest.fn().mockResolvedValue({ success: true, output: "file content" });
-const mockCreateFile = jest.fn().mockResolvedValue({ success: true, output: "File created" });
-const mockStrReplace = jest.fn().mockResolvedValue({ success: true, output: "Text replaced" });
-const mockBashExecute = jest.fn().mockResolvedValue({ success: true, output: "command output" });
-const mockSearchTool = jest.fn().mockResolvedValue({ success: true, output: "search results" });
-const mockWebSearch = jest.fn().mockResolvedValue({ success: true, output: "web results" });
-const mockFetchPage = jest.fn().mockResolvedValue({ success: true, output: "page content" });
-
 jest.mock("../../src/tools/index.js", () => ({
-  TextEditorTool: jest.fn().mockImplementation(() => ({
+  TextEditorTool: jest.fn().mockImplementation(function() { return {
     view: mockViewFile,
     create: mockCreateFile,
     strReplace: mockStrReplace,
-  })),
-  MorphEditorTool: jest.fn().mockImplementation(() => ({
+  }; }),
+  MorphEditorTool: jest.fn().mockImplementation(function() { return {
     editFile: jest.fn().mockResolvedValue({ success: true, output: "Morph edit done" }),
-  })),
-  BashTool: jest.fn().mockImplementation(() => ({
+  }; }),
+  BashTool: jest.fn().mockImplementation(function() { return {
     execute: mockBashExecute,
     getCurrentDirectory: jest.fn().mockReturnValue("/home/test"),
     setSelfHealing: jest.fn(),
     isSelfHealingEnabled: jest.fn().mockReturnValue(true),
-  })),
-  TodoTool: jest.fn().mockImplementation(() => ({
+  }; }),
+  TodoTool: jest.fn().mockImplementation(function() { return {
     createTodoList: jest.fn().mockResolvedValue({ success: true, output: "Todo created" }),
     updateTodoList: jest.fn().mockResolvedValue({ success: true, output: "Todo updated" }),
-  })),
-  SearchTool: jest.fn().mockImplementation(() => ({
+  }; }),
+  SearchTool: jest.fn().mockImplementation(function() { return {
     search: mockSearchTool,
     findSymbols: jest.fn().mockResolvedValue({ success: true, output: "symbols" }),
     findReferences: jest.fn().mockResolvedValue({ success: true, output: "references" }),
     findDefinition: jest.fn().mockResolvedValue({ success: true, output: "definition" }),
     searchMultiple: jest.fn().mockResolvedValue({ success: true, output: "multi results" }),
-  })),
-  WebSearchTool: jest.fn().mockImplementation(() => ({
+  }; }),
+  WebSearchTool: jest.fn().mockImplementation(function() { return {
     search: mockWebSearch,
     fetchPage: mockFetchPage,
-  })),
-  ImageTool: jest.fn().mockImplementation(() => ({
+  }; }),
+  ImageTool: jest.fn().mockImplementation(function() { return {
     processImage: jest.fn().mockResolvedValue({ success: true, output: "Image processed" }),
     isImage: jest.fn().mockImplementation((path: string) => /\.(png|jpg|jpeg|gif|webp)$/i.test(path)),
-  })),
+  }; }),
 }));
 
 // Mock token counter
@@ -154,8 +187,6 @@ jest.mock("../../src/utils/custom-instructions.js", () => ({
 }));
 
 // Mock checkpoint manager
-const mockCheckpointBeforeCreate = jest.fn();
-const mockCheckpointBeforeEdit = jest.fn();
 jest.mock("../../src/checkpoints/checkpoint-manager.js", () => ({
   getCheckpointManager: jest.fn().mockReturnValue({
     checkpointBeforeCreate: mockCheckpointBeforeCreate,
@@ -238,8 +269,6 @@ jest.mock("../../src/prompts/index.js", () => ({
 }));
 
 // Mock cost tracker
-const mockCalculateCost = jest.fn().mockReturnValue(0.001);
-const mockRecordUsage = jest.fn();
 jest.mock("../../src/utils/cost-tracker.js", () => ({
   getCostTracker: jest.fn().mockReturnValue({
     calculateCost: mockCalculateCost,
@@ -252,18 +281,15 @@ jest.mock("../../src/utils/cost-tracker.js", () => ({
 }));
 
 // Mock autonomy manager
-const mockIsYOLOEnabled = jest.fn().mockReturnValue(false);
 jest.mock("../../src/utils/autonomy-manager.js", () => ({
-  getAutonomyManager: jest.fn(() => ({
+  getAutonomyManager: jest.fn(function() { return {
     isYOLOEnabled: mockIsYOLOEnabled,
     enableYOLO: jest.fn(),
     disableYOLO: jest.fn(),
-  })),
+  }; }),
 }));
 
 // Mock context manager
-const mockPrepareMessages = jest.fn().mockImplementation((messages) => messages);
-const mockShouldWarn = jest.fn().mockReturnValue({ warn: false });
 jest.mock("../../src/context/context-manager-v2.js", () => ({
   createContextManager: jest.fn().mockReturnValue({
     getStats: jest.fn().mockReturnValue({
@@ -326,7 +352,6 @@ jest.mock("../../src/optimization/prompt-cache.js", () => ({
 }));
 
 // Mock hooks manager
-const mockExecuteHooks = jest.fn().mockResolvedValue(undefined);
 jest.mock("../../src/hooks/lifecycle-hooks.js", () => ({
   getHooksManager: jest.fn().mockReturnValue({
     executeHooks: mockExecuteHooks,
@@ -354,8 +379,6 @@ jest.mock("../../src/optimization/model-routing.js", () => ({
 // =============================================================================
 // IMPORTS - After all mocks are set up
 // =============================================================================
-import { CodeBuddyAgent } from "../../src/agent/codebuddy-agent";
-import type { ChatEntry, StreamingChunk } from "../../src/agent/types";
 
 // =============================================================================
 // TEST SUITES

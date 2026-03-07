@@ -10,3 +10,5 @@ export { default as sessionsRoutes } from './sessions.js';
 export { default as memoryRoutes } from './memory.js';
 export { default as healthRoutes } from './health.js';
 export { default as metricsRoutes } from './metrics.js';
+export { createCanvasRoutes } from './canvas.js';
+export { createWorkflowBuilderRoutes } from './workflow-builder.js';

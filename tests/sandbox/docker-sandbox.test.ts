@@ -6,12 +6,14 @@
 
 import { EventEmitter } from 'events';
 
-// Mock child_process before importing the module
-const mockExecSync = jest.fn();
-const mockSpawn = jest.fn();
-const mockSpawnSync = jest.fn().mockReturnValue({ status: 0, stdout: Buffer.from(''), stderr: Buffer.from('') });
+// Hoist mock variables so they're available inside vi.mock factories
+const { mockExecSync, mockSpawn, mockSpawnSync } = vi.hoisted(() => ({
+  mockExecSync: vi.fn(),
+  mockSpawn: vi.fn(),
+  mockSpawnSync: vi.fn().mockReturnValue({ status: 0, stdout: Buffer.from(''), stderr: Buffer.from('') }),
+}));
 
-jest.mock('child_process', () => ({
+vi.mock('child_process', () => ({
   execSync: mockExecSync,
   spawn: mockSpawn,
   spawnSync: mockSpawnSync,
@@ -25,23 +27,23 @@ import { DockerSandbox, type SandboxConfig, type SandboxResult } from '../../src
 function createMockProcess() {
   const stdout = new EventEmitter();
   const stderr = new EventEmitter();
-  const stdin = { write: jest.fn(), end: jest.fn() };
+  const stdin = { write: vi.fn(), end: vi.fn() };
   const proc = new EventEmitter() as EventEmitter & {
     stdout: EventEmitter;
     stderr: EventEmitter;
-    stdin: { write: jest.Mock; end: jest.Mock };
-    kill: jest.Mock;
+    stdin: { write: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn> };
+    kill: ReturnType<typeof vi.fn>;
   };
   proc.stdout = stdout;
   proc.stderr = stderr;
   proc.stdin = stdin;
-  proc.kill = jest.fn();
+  proc.kill = vi.fn();
   return proc;
 }
 
 describe('DockerSandbox', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('constructor', () => {
@@ -65,7 +67,7 @@ describe('DockerSandbox', () => {
     });
 
     it('should return false when docker is not found', () => {
-      mockExecSync.mockImplementation(() => { throw new Error('command not found'); });
+      mockExecSync.mockImplementation(function() { throw new Error('command not found'); });
       expect(DockerSandbox.isAvailable()).toBe(false);
     });
   });
@@ -259,7 +261,7 @@ describe('DockerSandbox', () => {
     });
 
     it('should return false when kill fails', async () => {
-      mockSpawnSync.mockImplementation(() => { throw new Error('no such container'); });
+      mockSpawnSync.mockImplementation(function() { throw new Error('no such container'); });
 
       const sandbox = new DockerSandbox();
       const result = await sandbox.kill('nonexistent');
@@ -293,7 +295,7 @@ describe('DockerSandbox', () => {
     });
 
     it('should return 0 when prune fails', async () => {
-      mockExecSync.mockImplementation(() => { throw new Error('docker not available'); });
+      mockExecSync.mockImplementation(function() { throw new Error('docker not available'); });
 
       const sandbox = new DockerSandbox();
       const count = await sandbox.prune();

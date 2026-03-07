@@ -1,67 +1,83 @@
 
 import { handleMemory, handleRemember } from '../../src/commands/handlers/memory-handlers.js';
-import { getEnhancedMemory } from '../../src/memory/index.js';
+import { getEnhancedMemory, getMemoryManager } from '../../src/memory/index.js';
 
-// Mock getEnhancedMemory
-jest.mock('../../src/memory/index.js', () => {
-  const mockMemory = {
-    store: jest.fn().mockResolvedValue({ id: '1' }),
-    recall: jest.fn().mockResolvedValue([]),
-    forget: jest.fn().mockResolvedValue(true),
-    formatStatus: jest.fn().mockReturnValue('Memory Status OK'),
-    buildContext: jest.fn().mockResolvedValue('Memory Context'),
-    isEnabled: jest.fn().mockReturnValue(true),
+// Mock getEnhancedMemory and getMemoryManager
+vi.mock('../../src/memory/index.js', () => {
+  const mockEnhancedMemory = {
+    store: vi.fn().mockResolvedValue({ id: '1' }),
+    recall: vi.fn().mockResolvedValue([]),
+    forget: vi.fn().mockResolvedValue(true),
+    formatStatus: vi.fn().mockReturnValue('Memory Status OK'),
+    buildContext: vi.fn().mockResolvedValue('Memory Context'),
+    isEnabled: vi.fn().mockReturnValue(true),
+  };
+  const mockPersistentMemory = {
+    remember: vi.fn().mockResolvedValue(undefined),
+    recall: vi.fn().mockReturnValue(null),
+    forget: vi.fn().mockResolvedValue(false),
+    formatMemories: vi.fn().mockReturnValue('Persistent Memory Status OK'),
+    getContextForPrompt: vi.fn().mockReturnValue('Persistent Context'),
   };
   return {
-    getEnhancedMemory: jest.fn().mockReturnValue(mockMemory),
-    EnhancedMemory: jest.fn(),
+    getEnhancedMemory: vi.fn().mockReturnValue(mockEnhancedMemory),
+    getMemoryManager: vi.fn().mockReturnValue(mockPersistentMemory),
+    EnhancedMemory: vi.fn(),
   };
 });
 
-jest.mock('../../src/tools/comment-watcher.js', () => ({
-  getCommentWatcher: jest.fn(),
+vi.mock('../../src/tools/comment-watcher.js', () => ({
+  getCommentWatcher: vi.fn(),
+}));
+
+vi.mock('../../src/errors/index.js', () => ({
+  getErrorMessage: vi.fn((e: unknown) => e instanceof Error ? e.message : String(e)),
 }));
 
 describe('Memory Commands', () => {
-  let mockMemory: any;
+  let mockEnhancedMem: any;
+  let mockPersistentMem: any;
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    mockMemory = getEnhancedMemory();
+    vi.clearAllMocks();
+    mockEnhancedMem = getEnhancedMemory();
+    mockPersistentMem = getMemoryManager();
   });
 
   describe('handleMemory', () => {
     it('should show list/status by default', async () => {
       const result = await handleMemory([]);
       expect(result.handled).toBe(true);
-      expect(result.entry?.content).toContain('Memory Status OK');
-      expect(mockMemory.formatStatus).toHaveBeenCalled();
+      // The handler now uses persistentMemory.formatMemories() for list/status
+      expect(result.entry?.content).toContain('Persistent Memory Status OK');
+      expect(mockPersistentMem.formatMemories).toHaveBeenCalled();
     });
 
     it('should handle store/remember command', async () => {
       const result = await handleMemory(['store', 'key', 'value']);
       expect(result.handled).toBe(true);
-      expect(result.entry?.content).toContain('✅ Remembered');
-      expect(mockMemory.store).toHaveBeenCalledWith(expect.objectContaining({
-        content: 'value',
-        tags: ['key']
-      }));
+      expect(result.entry?.content).toContain('Remembered');
+      // Both persistent and enhanced memory are called
+      expect(mockPersistentMem.remember).toHaveBeenCalled();
+      expect(mockEnhancedMem.store).toHaveBeenCalled();
     });
 
     it('should handle recall command with results', async () => {
-      mockMemory.recall.mockResolvedValueOnce([
+      mockEnhancedMem.recall.mockResolvedValueOnce([
         { type: 'fact', content: 'test content', importance: 0.8, createdAt: new Date() }
       ]);
       const result = await handleMemory(['recall', 'query']);
       expect(result.handled).toBe(true);
-      expect(result.entry?.content).toContain('Recall Results');
-      expect(mockMemory.recall).toHaveBeenCalledWith(expect.objectContaining({
+      // The handler shows results from enhanced memory as "Enhanced Memory (Semantic)"
+      expect(result.entry?.content).toContain('Enhanced Memory');
+      expect(mockEnhancedMem.recall).toHaveBeenCalledWith(expect.objectContaining({
         query: 'query'
       }));
     });
 
     it('should handle recall command with no results', async () => {
-        mockMemory.recall.mockResolvedValueOnce([]);
+        mockEnhancedMem.recall.mockResolvedValueOnce([]);
+        mockPersistentMem.recall.mockReturnValue(null);
         const result = await handleMemory(['recall', 'query']);
         expect(result.handled).toBe(true);
         expect(result.entry?.content).toContain('No matching memories found');
@@ -71,129 +87,37 @@ describe('Memory Commands', () => {
       const result = await handleMemory(['context']);
       expect(result.handled).toBe(true);
       expect(result.entry?.content).toContain('Current Context Injection');
-      expect(mockMemory.buildContext).toHaveBeenCalled();
+      expect(mockEnhancedMem.buildContext).toHaveBeenCalled();
+      expect(mockPersistentMem.getContextForPrompt).toHaveBeenCalled();
     });
-    
-    it('should handle forget command with exact tag match', async () => {
-      mockMemory.recall.mockResolvedValue([{ id: '1', content: 'test', tags: ['tag'] }]);
+
+    it('should handle forget command', async () => {
+      // The new implementation uses persistentMemory.forget first, then falls back to enhanced
+      mockPersistentMem.forget.mockResolvedValue(true);
       const result = await handleMemory(['forget', 'tag']);
       expect(result.handled).toBe(true);
-      expect(result.entry?.content).toContain('Forgot 1');
-      expect(mockMemory.forget).toHaveBeenCalledWith('1');
+      expect(result.entry?.content).toContain('Forgot');
+      expect(mockPersistentMem.forget).toHaveBeenCalledWith('tag', 'project');
     });
 
-    it('should handle forget command with fuzzy content match', async () => {
-      // Reset mock for this specific test
-      mockMemory.recall.mockReset();
-      mockMemory.forget.mockReset();
-
-      // First call: tags search returns empty (no exact tag match)
-      // Second call: query search returns memories that match content
-      mockMemory.recall
-        .mockResolvedValueOnce([]) // No tag match for 'api key'
-        .mockResolvedValueOnce([
-          { id: '2', content: 'api key for service', tags: [] },
-          { id: '3', content: 'another api key', tags: [] }
-        ]);
-      mockMemory.forget.mockResolvedValue(true);
-
-      // Args are passed as separate strings, then joined with space
-      const result = await handleMemory(['forget', 'api', 'key']);
-      expect(result.handled).toBe(true);
-      expect(result.entry?.content).toContain('Forgot 2');
-      expect(mockMemory.forget).toHaveBeenCalledTimes(2);
-    });
-
-    it('should handle forget last command', async () => {
-      // Reset mock for this specific test
-      mockMemory.recall.mockReset();
-      mockMemory.forget.mockReset();
-
-      // Recall returns memories unsorted - the handler will sort them by createdAt (descending)
-      mockMemory.recall.mockResolvedValueOnce([
-        { id: '1', content: 'oldest', createdAt: '2024-01-01T00:00:00Z' },
-        { id: '2', content: 'middle', createdAt: '2024-01-02T00:00:00Z' },
-        { id: '3', content: 'newest', createdAt: '2024-01-03T00:00:00Z' },
+    it('should handle forget via enhanced memory fallback', async () => {
+      mockPersistentMem.forget.mockResolvedValue(false);
+      mockEnhancedMem.recall.mockResolvedValueOnce([
+        { id: '2', content: 'api key for service', tags: [] },
       ]);
-      mockMemory.forget.mockResolvedValue(true);
+      mockEnhancedMem.forget.mockResolvedValue(true);
 
-      const result = await handleMemory(['forget', 'last']);
+      const result = await handleMemory(['forget', 'api']);
       expect(result.handled).toBe(true);
-      expect(result.entry?.content).toContain('Forgot 1 most recent memory');
-      // Should forget the newest one (id: '3')
-      expect(mockMemory.forget).toHaveBeenCalledWith('3');
-    });
-
-    it('should handle forget last N command', async () => {
-      // Reset mock for this specific test
-      mockMemory.recall.mockReset();
-      mockMemory.forget.mockReset();
-
-      mockMemory.recall.mockResolvedValueOnce([
-        { id: '1', content: 'oldest', createdAt: '2024-01-01T00:00:00Z' },
-        { id: '2', content: 'middle', createdAt: '2024-01-02T00:00:00Z' },
-        { id: '3', content: 'newest', createdAt: '2024-01-03T00:00:00Z' },
-      ]);
-      mockMemory.forget.mockResolvedValue(true);
-
-      const result = await handleMemory(['forget', 'last', '2']);
-      expect(result.handled).toBe(true);
-      expect(result.entry?.content).toContain('Forgot 2 most recent memories');
-      expect(mockMemory.forget).toHaveBeenCalledTimes(2);
-      // Should forget newest first (id: '3'), then second newest (id: '2')
-      expect(mockMemory.forget).toHaveBeenCalledWith('3');
-      expect(mockMemory.forget).toHaveBeenCalledWith('2');
-    });
-
-    it('should show preview for many matches', async () => {
-      // Reset mock for this specific test
-      mockMemory.recall.mockReset();
-      mockMemory.forget.mockReset();
-
-      const manyMemories = Array.from({ length: 10 }, (_, i) => ({
-        id: String(i),
-        content: `memory ${i} about testing things`,
-        tags: ['testing']  // tag matches the search term
-      }));
-      mockMemory.recall
-        .mockResolvedValueOnce([]) // No exact tag match (exact tag would be 'testing' but we use tags:[searchTerm])
-        .mockResolvedValueOnce(manyMemories);
-      mockMemory.forget.mockResolvedValue(true);
-
-      const result = await handleMemory(['forget', 'testing']);
-      expect(result.handled).toBe(true);
-      expect(result.entry?.content).toContain('Found 10 memories');
-      expect(result.entry?.content).toContain('forget-confirm');
-      // Should not have forgotten anything yet
-      expect(mockMemory.forget).not.toHaveBeenCalled();
-    });
-
-    it('should handle forget-confirm command', async () => {
-      // Reset mock for this specific test
-      mockMemory.recall.mockReset();
-      mockMemory.forget.mockReset();
-
-      const manyMemories = Array.from({ length: 10 }, (_, i) => ({
-        id: String(i),
-        content: `memory ${i} about testing things`,
-        tags: ['testing']  // tag matches the search term
-      }));
-      mockMemory.recall
-        .mockResolvedValueOnce([]) // No exact tag match
-        .mockResolvedValueOnce(manyMemories);
-      mockMemory.forget.mockResolvedValue(true);
-
-      const result = await handleMemory(['forget-confirm', 'testing']);
-      expect(result.handled).toBe(true);
-      expect(result.entry?.content).toContain('Forgot 10');
-      expect(mockMemory.forget).toHaveBeenCalledTimes(10);
+      expect(result.entry?.content).toContain('Forgot');
+      expect(mockEnhancedMem.forget).toHaveBeenCalledWith('2');
     });
 
     it('should show usage for forget without args', async () => {
       const result = await handleMemory(['forget']);
       expect(result.handled).toBe(true);
       expect(result.entry?.content).toContain('Usage:');
-      expect(result.entry?.content).toContain('forget last');
+      expect(result.entry?.content).toContain('forget');
     });
   });
 
@@ -201,9 +125,11 @@ describe('Memory Commands', () => {
      it('should handle shortcut', async () => {
        const result = await handleRemember(['key', 'value']);
        expect(result.handled).toBe(true);
-       expect(mockMemory.store).toHaveBeenCalled();
+       // handleRemember calls both persistentMemory.remember and enhancedMemory.store
+       expect(mockPersistentMem.remember).toHaveBeenCalled();
+       expect(mockEnhancedMem.store).toHaveBeenCalled();
      });
-     
+
      it('should show usage if args missing', async () => {
        const result = await handleRemember(['key']);
        expect(result.handled).toBe(true);

@@ -6,8 +6,8 @@ import { TelegramChannel } from '../../src/channels/telegram/index.js';
 import type { TelegramConfig, TelegramUpdate } from '../../src/channels/telegram/index.js';
 
 // Mock fetch
-const mockFetch = jest.fn();
-global.fetch = mockFetch;
+const mockFetch = vi.fn();
+global.fetch = mockFetch as any;
 
 describe('TelegramChannel', () => {
   let channel: TelegramChannel;
@@ -17,6 +17,7 @@ describe('TelegramChannel', () => {
     token: 'test-bot-token',
     pollingTimeout: 1,
     defaultParseMode: 'Markdown',
+    enhancedCommands: false,
   };
 
   beforeEach(() => {

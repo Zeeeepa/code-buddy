@@ -1,4 +1,7 @@
 
+
+// Mock UnifiedVfsRouter
+
 import { CommentWatcher } from '../../src/tools/comment-watcher.js';
 import { semanticDiffFiles } from '../../src/tools/semantic-diff.js';
 import { MigrationManager } from '../../src/tools/db-migration.js';
@@ -6,7 +9,6 @@ import { ScreenshotTool } from '../../src/tools/screenshot-tool.js';
 import { loadImageFromFile } from '../../src/tools/image-input.js';
 import { UnifiedVfsRouter } from '../../src/services/vfs/unified-vfs-router.js';
 
-// Mock UnifiedVfsRouter
 const mockReadFile = jest.fn();
 const mockReadFileBuffer = jest.fn();
 const mockWriteFile = jest.fn();
@@ -33,16 +35,17 @@ jest.mock('../../src/services/vfs/unified-vfs-router.js', () => ({
 
 // Mock Database for MigrationManager
 jest.mock('better-sqlite3', () => {
-  return jest.fn().mockImplementation(() => ({
+  const ctor = jest.fn().mockImplementation(function() { return {
     exec: jest.fn(),
-    prepare: jest.fn(() => ({
+    prepare: jest.fn(function() { return {
       get: jest.fn(),
       all: jest.fn(),
       run: jest.fn(),
-    })),
+    }; }),
     transaction: (fn: any) => fn,
     close: jest.fn(),
-  }));
+  }; });
+  return { default: ctor };
 });
 
 describe('Miscellaneous Tools VFS Migration', () => {

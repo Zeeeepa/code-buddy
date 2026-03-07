@@ -20,7 +20,8 @@ import {
 } from '../../src/collaboration/team-session';
 
 // Mock fs-extra
-jest.mock('fs-extra', () => ({
+jest.mock('fs-extra', () => {
+  const impl = {
   ensureDir: jest.fn().mockResolvedValue(undefined),
   ensureDirSync: jest.fn(),
   existsSync: jest.fn().mockReturnValue(false),
@@ -32,7 +33,9 @@ jest.mock('fs-extra', () => ({
   readFile: jest.fn().mockResolvedValue(''),
   remove: jest.fn().mockResolvedValue(undefined),
   readdir: jest.fn().mockResolvedValue([]),
-}));
+};
+  return { ...impl, default: impl };
+});
 
 // Mock WebSocket
 const mockWsInstance = {
@@ -44,7 +47,8 @@ const mockWsInstance = {
 };
 
 jest.mock('ws', () => {
-  return jest.fn().mockImplementation(() => mockWsInstance);
+  const MockWS = jest.fn().mockImplementation(function() { return mockWsInstance; });
+  return { default: MockWS, WebSocket: MockWS };
 });
 
 describe('TeamSessionManager', () => {

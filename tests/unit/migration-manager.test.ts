@@ -15,19 +15,26 @@
 import { EventEmitter } from 'events';
 
 // Mock fs-extra before importing the module
-const mockEnsureDir = jest.fn().mockResolvedValue(undefined);
-const mockPathExists = jest.fn().mockResolvedValue(false);
-const mockReadJson = jest.fn().mockResolvedValue({ history: [] });
-const mockWriteJson = jest.fn().mockResolvedValue(undefined);
-const mockUnlink = jest.fn().mockResolvedValue(undefined);
-const mockReadFile = jest.fn().mockResolvedValue(Buffer.from(''));
-const mockWriteFile = jest.fn().mockResolvedValue(undefined);
-const mockOpenSync = jest.fn().mockReturnValue(42); // Mock file descriptor
-const mockWriteSync = jest.fn();
-const mockCloseSync = jest.fn();
-const mockUnlinkSync = jest.fn();
+const {
+  mockEnsureDir, mockPathExists, mockReadJson, mockWriteJson,
+  mockUnlink, mockReadFile, mockWriteFile,
+  mockOpenSync, mockWriteSync, mockCloseSync, mockUnlinkSync,
+} = vi.hoisted(() => ({
+  mockEnsureDir: vi.fn().mockResolvedValue(undefined),
+  mockPathExists: vi.fn().mockResolvedValue(false),
+  mockReadJson: vi.fn().mockResolvedValue({ history: [] }),
+  mockWriteJson: vi.fn().mockResolvedValue(undefined),
+  mockUnlink: vi.fn().mockResolvedValue(undefined),
+  mockReadFile: vi.fn().mockResolvedValue(Buffer.from('')),
+  mockWriteFile: vi.fn().mockResolvedValue(undefined),
+  mockOpenSync: vi.fn().mockReturnValue(42),
+  mockWriteSync: vi.fn(),
+  mockCloseSync: vi.fn(),
+  mockUnlinkSync: vi.fn(),
+}));
 
-jest.mock('fs-extra', () => ({
+jest.mock('fs-extra', () => {
+  const impl = {
   ensureDir: mockEnsureDir,
   pathExists: mockPathExists,
   readJson: mockReadJson,
@@ -44,7 +51,9 @@ jest.mock('fs-extra', () => ({
     O_EXCL: 128,
     O_WRONLY: 1,
   },
-}));
+};
+  return { ...impl, default: impl };
+});
 
 // Helper function to parse version
 const parseVersion = (v: string): { major: number; minor: number; patch: number } => {
@@ -62,18 +71,21 @@ const compareVersions = (a: string, b: string): number => {
 };
 
 // Mock semver
-jest.mock('semver', () => ({
-  valid: jest.fn((v: string): string | null => {
-    const regex = /^\d+\.\d+\.\d+$/;
-    return regex.test(v) ? v : null;
-  }),
-  compare: jest.fn((a: string, b: string): number => compareVersions(a, b)),
-  eq: jest.fn((a: string, b: string): boolean => a === b),
-  lt: jest.fn((a: string, b: string): boolean => compareVersions(a, b) < 0),
-  gt: jest.fn((a: string, b: string): boolean => compareVersions(a, b) > 0),
-  lte: jest.fn((a: string, b: string): boolean => compareVersions(a, b) <= 0),
-  gte: jest.fn((a: string, b: string): boolean => compareVersions(a, b) >= 0),
-}));
+jest.mock('semver', () => {
+  const impl = {
+    valid: jest.fn((v: string): string | null => {
+      const regex = /^\d+\.\d+\.\d+$/;
+      return regex.test(v) ? v : null;
+    }),
+    compare: jest.fn((a: string, b: string): number => compareVersions(a, b)),
+    eq: jest.fn((a: string, b: string): boolean => a === b),
+    lt: jest.fn((a: string, b: string): boolean => compareVersions(a, b) < 0),
+    gt: jest.fn((a: string, b: string): boolean => compareVersions(a, b) > 0),
+    lte: jest.fn((a: string, b: string): boolean => compareVersions(a, b) <= 0),
+    gte: jest.fn((a: string, b: string): boolean => compareVersions(a, b) >= 0),
+  };
+  return { ...impl, default: impl };
+});
 
 import {
   MigrationManager,

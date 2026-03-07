@@ -2,24 +2,30 @@
  * Discord Channel Tests
  */
 
-import { DiscordChannel } from '../../src/channels/discord/index.js';
-import type { DiscordConfig } from '../../src/channels/discord/index.js';
-
-// Mock WebSocket
-jest.mock('ws', () => {
-  const EventEmitter = require('events');
-  return class MockWebSocket extends EventEmitter {
+const { MockWebSocket, mockFetch } = vi.hoisted(() => {
+  const { EventEmitter } = require('events');
+  class _MockWebSocket extends EventEmitter {
     static OPEN = 1;
     readyState = 1;
-    send = jest.fn();
-    close = jest.fn();
-    ping = jest.fn();
+    send = vi.fn();
+    close = vi.fn();
+    ping = vi.fn();
+  }
+  return {
+    MockWebSocket: _MockWebSocket,
+    mockFetch: vi.fn(),
   };
 });
 
-// Mock fetch
-const mockFetch = jest.fn();
-global.fetch = mockFetch;
+vi.mock('ws', () => ({
+  default: MockWebSocket,
+  WebSocket: MockWebSocket,
+}));
+
+global.fetch = mockFetch as any;
+
+import { DiscordChannel } from '../../src/channels/discord/index.js';
+import type { DiscordConfig } from '../../src/channels/discord/index.js';
 
 describe('DiscordChannel', () => {
   let channel: DiscordChannel;

@@ -54,6 +54,8 @@ jest.mock('../../src/agent/subagents.js', () => ({
   SubagentManager: jest.fn(),
 }));
 
+import { getSubagentManager } from '../../src/agent/subagents.js';
+
 // Helper to create mock conversation context
 function createMockContext(overrides: Partial<ConversationContext> = {}): ConversationContext {
   return {
@@ -320,7 +322,7 @@ describe('Agent Pipelines (src/agent/pipelines.ts)', () => {
     });
 
     it('should pass context between stages when passContext is true', async () => {
-      const { getSubagentManager } = require('../../src/agent/subagents.js');
+
 
       runner.registerPipeline({
         name: 'context-pass-test',
@@ -343,7 +345,7 @@ describe('Agent Pipelines (src/agent/pipelines.ts)', () => {
     });
 
     it('should not pass context when passContext is false', async () => {
-      const { getSubagentManager } = require('../../src/agent/subagents.js');
+
 
       runner.registerPipeline({
         name: 'no-context-test',
@@ -377,7 +379,7 @@ describe('Agent Pipelines (src/agent/pipelines.ts)', () => {
     });
 
     it('should halt on failure when haltOnFailure is true', async () => {
-      const { getSubagentManager } = require('../../src/agent/subagents.js');
+
       getSubagentManager().spawn.mockResolvedValueOnce({
         success: true,
         output: 'First stage output',
@@ -413,7 +415,7 @@ describe('Agent Pipelines (src/agent/pipelines.ts)', () => {
     });
 
     it('should continue on failure when haltOnFailure is false', async () => {
-      const { getSubagentManager } = require('../../src/agent/subagents.js');
+
       getSubagentManager().spawn.mockResolvedValueOnce({
         success: true,
         output: 'First stage output',
@@ -453,7 +455,7 @@ describe('Agent Pipelines (src/agent/pipelines.ts)', () => {
     });
 
     it('should handle exception thrown by subagent', async () => {
-      const { getSubagentManager } = require('../../src/agent/subagents.js');
+
       getSubagentManager().spawn.mockRejectedValueOnce(new Error('Subagent crashed'));
 
       runner.registerPipeline({
@@ -471,7 +473,7 @@ describe('Agent Pipelines (src/agent/pipelines.ts)', () => {
     });
 
     it('should retry stage on failure when retryOnFailure is true', async () => {
-      const { getSubagentManager } = require('../../src/agent/subagents.js');
+
       getSubagentManager().spawn
         .mockResolvedValueOnce({
           success: false,
@@ -516,7 +518,7 @@ describe('Agent Pipelines (src/agent/pipelines.ts)', () => {
     });
 
     it('should fail after max retries exceeded', async () => {
-      const { getSubagentManager } = require('../../src/agent/subagents.js');
+
       getSubagentManager().spawn.mockResolvedValue({
         success: false,
         output: 'Always fails',
@@ -545,7 +547,7 @@ describe('Agent Pipelines (src/agent/pipelines.ts)', () => {
     });
 
     it('should skip stage when condition is not met', async () => {
-      const { getSubagentManager } = require('../../src/agent/subagents.js');
+
       getSubagentManager().spawn.mockResolvedValue({
         success: true,
         output: 'Short output',
@@ -576,7 +578,7 @@ describe('Agent Pipelines (src/agent/pipelines.ts)', () => {
     });
 
     it('should run stage when condition includes check is met', async () => {
-      const { getSubagentManager } = require('../../src/agent/subagents.js');
+
       getSubagentManager().spawn.mockResolvedValue({
         success: true,
         output: 'Output containing error message',
@@ -711,7 +713,7 @@ describe('Agent Pipelines (src/agent/pipelines.ts)', () => {
     });
 
     it('should emit pipeline:stage-skipped when condition not met', async () => {
-      const { getSubagentManager } = require('../../src/agent/subagents.js');
+
       getSubagentManager().spawn.mockResolvedValue({
         success: true,
         output: '',
@@ -745,7 +747,7 @@ describe('Agent Pipelines (src/agent/pipelines.ts)', () => {
     });
 
     it('should emit pipeline:error on exception', async () => {
-      const { getSubagentManager } = require('../../src/agent/subagents.js');
+
       getSubagentManager().spawn.mockRejectedValueOnce(new Error('Test error'));
 
       const errorHandler = jest.fn();
