@@ -200,7 +200,17 @@ Tool aliases (Codex-style): `shell_exec`, `file_read`, `browser_search`, etc. �
 | Knowledge | `src/knowledge/` | Knowledge.md loading, injected as `<knowledge>` block |
 | Lessons | `src/agent/lessons-tracker.ts` | PATTERN/RULE/CONTEXT/INSIGHT, project + global `.codebuddy/lessons.md` |
 | Todo tracking | `src/agent/todo-tracker.ts` | Manus-style attention bias, injected at END of each turn |
-| Security | `src/security/` | write-policy, SSRF guard, bash-parser, shell-env-policy, skill-scanner |
+| Security | `src/security/` | write-policy, SSRF guard, bash-parser, shell-env-policy, skill-scanner, guardian-agent, policy-amendments |
+| Guardian Agent | `src/security/guardian-agent.ts` | AI-powered automatic approval reviewer; risk scoring 0-100; auto-approves < 80, denies >= 90; 90s timeout, fail-closed |
+| Policy Amendments | `src/security/policy-amendments.ts` | Suggests allow rules when commands are blocked; persists to `.codebuddy/rules/`; command canonicalization (strips shell wrappers) |
+| Ghost Snapshots | `src/checkpoints/ghost-snapshot.ts` | Git-based undo: auto-commits workspace before each turn; shadow refs in `refs/codebuddy/ghost/`; max 50 snapshots |
+| Permission Requests | `src/tools/request-permissions-tool.ts` | Dynamic permission escalation mid-session; turn-scoped or session-scoped grants; least-privilege model |
+| BM25 Tool Search | `src/tools/tool-search.ts` | BM25/TF-IDF search over tool metadata; `tool_search` tool for discovering relevant tools from large MCP sets |
+| apply_patch | `src/tools/apply-patch.ts` | Codex-style `*** Begin Patch` format; 4-pass seek_sequence (exact→trim→full-trim→Unicode); Add/Delete/Update/Move file ops |
+| Multi-Agent Tools | `src/agent/multi-agent/agent-tools.ts` | 5-tool LLM-callable surface: spawn/send_input/wait/close/resume; depth limits (max 3), nickname pool, completion watchers |
+| Agent Roles | `src/agent/multi-agent/agent-roles.ts` | explorer (read-only, fast), worker (execution, ownership), default; TOML config layering; custom roles via `.codebuddy/roles/` |
+| Memory Consolidation | `src/memory/memory-consolidation.ts` | Two-phase: extract memories from messages → consolidate into progressive-disclosure folder (summary.md, MEMORY.md, rollout_summaries/) |
+| Code Exec | `src/tools/code-exec-tool.ts` | JS runtime with tool bridge; `tools.<name>(args)` for multi-tool orchestration; store/load persistence; vm.runInContext isolation |
 | Observability | `src/observability/` | JSONL RunStore per run, `.codebuddy/runs/`, 30-run auto-prune; `tracing.ts` — OpenTelemetry via `OTEL_EXPORTER_OTLP_ENDPOINT`; Sentry via `SENTRY_DSN` |
 | Browser automation | `src/tools/browser/`, `src/tools/registry/browser-tools.ts` | Real Playwright impl (`BrowserTool`); adapters: `browser_launch`, `browser_navigate`, `browser_action` |
 | Vision / OCR | `src/tools/vision/`, `src/tools/registry/vision-tools.ts` | Tesseract.js OCR (`ocr_extract`), Sharp image processor (`image_process`) |
@@ -217,6 +227,13 @@ Tool aliases (Codex-style): `shell_exec`, `file_read`, `browser_search`, etc. �
 | Send Policy | `src/channels/send-policy.ts` | Rule-based deny/allow per channel, chatType, keyPrefix, peerId; runtime overrides via `/send on\|off\|inherit` |
 | Msg Preprocessing | `src/channels/message-preprocessing.ts` | 4-stage pipeline: media detection → audio transcription → link extraction → content enrichment |
 | Nodes | `src/nodes/` | Companion app management, device pairing (short codes), platform capability maps (20+ capabilities), remote invocation |
+| Omission Detection | `src/tools/omission-placeholder-detector.ts` | Detects `// ... rest of code` patterns before file writes, prevents silent code deletion |
+| Multi-Strategy Match | `src/utils/multi-strategy-match.ts` | Edit matching cascade: exact → flexible (whitespace-normalized) → regex (tokenized) → fuzzy (Levenshtein) |
+| JIT Context | `src/context/jit-context.ts` | Dynamically loads `.codebuddy/` context files when tools access subdirectories; lazy growth vs upfront loading |
+| Tool Output Masking | `src/context/tool-output-masking.ts` | Backward-scanned FIFO: protects newest 50K tokens of tool outputs, replaces older with head/tail previews |
+| Loop Detection | `src/agent/loop-detection.ts` | 3-tier: tool call repetition (5×), content chanting (50-char chunks), LLM-based diagnosis (after 30 turns) |
+| Plan Mode | `src/agent/plan-mode.ts` | Read-only research mode: restricts tools to Read/Search/Think/Plan, blocks Execute/Edit on source files |
+| Code Graph Integration | `src/knowledge/code-graph-context-provider.ts` | Graph-aware context (PageRank, grouped relations, multi-entity), wired into workflow guard, reasoning, SWE agent, repair, plan tool |
 | Secrets Vault | `src/commands/cli/secrets-command.ts` | AES-256-GCM encrypted vault with scrypt KDF, key rotation, env import, audit trail |
 | Deploy | `src/deploy/` | Cloud config generators (Fly.io, Railway, Render, Hetzner, Northflank, GCP), Nix flake support |
 | Canvas | `src/server/routes/canvas.ts` | HTTP serving at `/__codebuddy__/canvas/` and `/__codebuddy__/a2ui/`, push/get/list content |
@@ -227,6 +244,107 @@ Tool aliases (Codex-style): `shell_exec`, `file_read`, `browser_search`, etc. �
 | Terminate Tool | `src/tools/terminate-tool.ts` | Explicit `__AGENT_TERMINATE__` signal for loop exit, detected in agent-executor sequential + streaming paths |
 | Planning Flow | `src/agent/flow/planning-flow.ts` | Multi-agent plan → execute → synthesize, dependency ordering, retry, parallel steps; CLI: `buddy flow` |
 | A2A Protocol | `src/protocols/a2a/index.ts` | Google Agent-to-Agent spec: AgentCard discovery, Task lifecycle, client/server; HTTP: `/api/a2a/` |
+
+### Edit Tool — Multi-Strategy Matching
+
+The `str_replace` operation tries 4 matching strategies in cascade (inspired by Gemini CLI):
+
+1. **Exact** — literal `String.includes()` (fastest, confidence 1.0)
+2. **Flexible** — line-by-line with `trim()` normalization; preserves original indentation (confidence 0.95)
+3. **Regex** — splits on delimiters `():[]{}<>=,;`, joins with `\s*` pattern (confidence 0.85)
+4. **Fuzzy** — Levenshtein distance with whitespace penalty factor 0.1, threshold 10% (confidence 0.9+)
+5. **LCS fallback** — original `findBestFuzzyMatch()` at 90% similarity threshold
+
+**Omission Placeholder Detection**: Before any write/edit, content is scanned for `// ... rest of code`, `// remaining methods ...`, etc. If detected in `new_string` but not in `old_string`, the edit is blocked with an explicit error.
+
+### JIT Context Discovery
+
+When a tool accesses a file path (read, write, grep, glob), the system walks upward from that path to the project root, loading any `CODEBUDDY.md`, `CONTEXT.md`, `INSTRUCTIONS.md`, `AGENTS.md`, or `README.md` files found in the path or `.codebuddy/`/`.claude/` subdirectories. Already-loaded files are tracked to avoid duplication. Max 4KB per discovery.
+
+### Tool Output Masking (Hybrid Backward-Scanned FIFO)
+
+Before each model call, tool result messages are scanned backward. The newest ~50K tokens of outputs are protected. Older outputs are replaced with head/tail previews (10 lines each). Masking only triggers when total prunable content exceeds ~30K tokens. Exempt tools: `ask_human`, `plan`, `reason`, `terminate`.
+
+### Loop Detection (3-Tier)
+
+| Tier | Mechanism | Threshold | Confidence |
+|------|-----------|-----------|------------|
+| 1 | Tool call repetition (hash of name+args) | 5 consecutive identical calls | 0.95 |
+| 2 | Content chanting (50-char chunk hashing) | 10 repeats within 250 chars | 0.85 |
+| 3 | LLM diagnostic (separate model) | After 30 turns, every 10 turns | 0.90 required |
+
+### Plan Mode
+
+`/plan` enters read-only research mode. Available tools: Read, Search, Think, Plan, Communicate. Write tools have descriptions modified to restrict to `.md` plan files only. System prompt injection: `<plan_mode>` block. Mode state managed in `src/agent/plan-mode.ts`.
+
+### Guardian Sub-Agent (Codex-inspired)
+
+AI-powered automatic approval reviewer in `src/security/guardian-agent.ts`. Risk scoring 0-100: auto-approves < 80, prompts 80-90, denies >= 90. Always-safe set (no LLM needed): `read_file`, `grep`, `glob`, `plan`, `reason`. Always-denied patterns: `rm -rf /`, fork bombs, `drop database`. Timeout 90s, fail-closed.
+
+### Policy Amendments + Command Canonicalization
+
+`src/security/policy-amendments.ts` — suggests allow rules when commands are blocked. Rules persisted to `.codebuddy/rules/allow-rules.json`. Banned prefixes never suggested (interpreters, shells, `sudo`). Command canonicalization: `/bin/bash -c "npm test"` → `npm test`.
+
+### Ghost Snapshots (Codex-inspired)
+
+`src/checkpoints/ghost-snapshot.ts` — auto Git commits before each turn via shadow refs (`refs/codebuddy/ghost/`). Max 50 snapshots. Undo restores latest ghost commit.
+
+### Dynamic Permission Requests
+
+`src/tools/request-permissions-tool.ts` — AI requests additional permissions mid-session. Grants scoped to `turn` or `session`. Types: `filesystem`, `network`, `execute`.
+
+### BM25 Tool Search
+
+`src/tools/tool-search.ts` — BM25 ranking (k1=1.2, b=0.75) over tool metadata. `tool_search` tool discovers relevant tools from large MCP sets.
+
+### apply_patch Format (Codex-inspired)
+
+`src/tools/apply-patch.ts` — Custom patch format simpler than unified diff:
+```
+*** Begin Patch
+*** Update File: src/main.ts
+@@
+ context line
+-old line
++new line
+*** End Patch
+```
+Operations: `Add File`, `Delete File`, `Update File` (with `Move to`). `seek_sequence` algorithm tries 4 passes: exact → trailing-trim → full-trim → Unicode normalization.
+
+### Multi-Agent 5-Tool Surface (Codex-inspired)
+
+`src/agent/multi-agent/agent-tools.ts` — Five LLM-callable tools for agent orchestration:
+
+| Tool | Purpose |
+|------|---------|
+| `spawn_agent` | Create sub-agent with role, depth limit (max 3), nickname |
+| `send_input` | Send message to agent (with optional interrupt) |
+| `wait_agent` | Wait for agents to complete (with timeout) |
+| `close_agent` | Shutdown agent, release slot |
+| `resume_agent` | Resurrect closed agent |
+
+Max 10 concurrent agents. Completion watchers auto-notify parents. Nickname pool (24 names) with generation suffixes.
+
+### Agent Roles
+
+`src/agent/multi-agent/agent-roles.ts` — Three built-in roles:
+- **explorer**: Read-only, fast codebase Q&A. Only search/read tools. No spawning.
+- **worker**: Execution focus, file ownership. All tools except spawn. Sequential.
+- **default**: Full capabilities.
+
+Custom roles via `.codebuddy/roles/<name>.json`. Roles checked via `isToolAllowedForRole()`.
+
+### Code Exec (Codex-inspired)
+
+`src/tools/code-exec-tool.ts` — JS sandbox with tool bridge. The LLM writes JavaScript that calls `await tools.<name>(args)`. Helpers: `text()`, `store(key,val)`, `load(key)`, `yield_control()`. Runs in `vm.createContext` with no process/require access. 30s timeout.
+
+### Memory Consolidation (Codex-inspired)
+
+`src/memory/memory-consolidation.ts` — Two-phase pipeline:
+- **Phase 1**: Extract memories from user messages (preference/pattern/context/decision signals)
+- **Phase 2**: Consolidate into `.codebuddy/memory/` folder (memory_summary.md, MEMORY.md, rollout_summaries/)
+
+Deduplication by normalized substring. Auto-prunes to 30 rollout summaries.
 
 ### Context Engineering Patterns
 

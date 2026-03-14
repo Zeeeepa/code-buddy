@@ -52,17 +52,30 @@ const CORE_VARS = new Set([
   'CI', 'GITHUB_ACTIONS', 'GITLAB_CI',
 ]);
 
-/** Default exclusion glob patterns (credential-like names) */
+/** Default exclusion glob patterns (credential-like names).
+ *  Codex-style generic substring patterns (*KEY*, *SECRET*) catch
+ *  any variable containing these words regardless of prefix/suffix.
+ */
 const DEFAULT_EXCLUDE_PATTERNS = [
-  '*_KEY', '*_SECRET', '*_TOKEN', '*_PASSWORD', '*_PASSWD',
-  '*_CREDENTIAL', '*_CREDENTIALS', '*_CERT', '*_PRIVATE*',
+  // Generic substring matches (Codex-style: catches ANY var with these words)
+  '*KEY*', '*SECRET*', '*TOKEN*', '*PASSWORD*', '*PASSWD*',
+  '*CREDENTIAL*', '*PRIVATE*', '*AUTH*',
+  // Specific suffix patterns
+  '*_CERT', '*_CERTIFICATE',
+  // Cloud providers
   'AWS_*', 'OPENAI_*', 'ANTHROPIC_*', 'GOOGLE_*API*',
+  'AZURE_*', 'DIGITALOCEAN_*', 'HETZNER_*',
   'GROK_API*', 'MORPH_API*', 'EXA_API*', 'BRAVE_API*',
   'PERPLEXITY_API*', 'OPENROUTER_API*', 'PICOVOICE_*',
+  // Databases
   'DATABASE_URL', 'MONGO_*', 'REDIS_*', 'POSTGRES_*', 'MYSQL_*',
-  'JWT_SECRET', 'SESSION_SECRET', 'COOKIE_SECRET',
-  'SLACK_*TOKEN*', 'TELEGRAM_*TOKEN*', 'DISCORD_*TOKEN*',
-  'STRIPE_*', 'TWILIO_*', 'SENDGRID_*',
+  'SUPABASE_*',
+  // Session/crypto
+  'JWT_*', 'SESSION_SECRET', 'COOKIE_SECRET', 'ENCRYPTION_*',
+  // Messaging platforms
+  'SLACK_*', 'TELEGRAM_*', 'DISCORD_*',
+  // Payment/services
+  'STRIPE_*', 'TWILIO_*', 'SENDGRID_*', 'SENTRY_*DSN*',
 ];
 
 // ============================================================================

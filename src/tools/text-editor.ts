@@ -8,8 +8,10 @@ import {
   generateFuzzyDiff,
   suggestWhitespaceFixes,
 } from "../utils/fuzzy-match.js";
+import { multiStrategyMatch } from "../utils/multi-strategy-match.js";
 import { UnifiedVfsRouter } from "../services/vfs/unified-vfs-router.js";
 import { generateDiff as sharedGenerateDiff } from "../utils/diff-generator.js";
+import { detectOmissionPlaceholders, formatOmissionError } from "./omission-placeholder-detector.js";
 
 /**
  * Text Editor Tool
@@ -186,28 +188,26 @@ export class TextEditorTool implements Disposable {
 
       const content = await this.vfs.readFile(resolvedPath, "utf-8");
 
-      if (!content.includes(oldStr)) {
-        // Try fuzzy matching with 90% similarity threshold (like mistral-vibe)
-        const fuzzyResult = findBestFuzzyMatch(content, oldStr, 0.9);
+      // Multi-strategy matching: exact → flexible → regex → fuzzy
+      const strategyResult = multiStrategyMatch(content, oldStr);
 
-        if (fuzzyResult) {
-          // Found a fuzzy match - show diff and use it
-          const fuzzyDiff = generateFuzzyDiff(oldStr, fuzzyResult.match, filePath, fuzzyResult);
-          logger.debug("Fuzzy match applied", { diff: fuzzyDiff });
-
-          // Use the actual match from the file
-          oldStr = fuzzyResult.match;
+      if (!strategyResult) {
+        // All strategies failed — fall back to LCS-based fuzzy as last resort
+        const lcsResult = findBestFuzzyMatch(content, oldStr, 0.9);
+        if (lcsResult) {
+          const fuzzyDiff = generateFuzzyDiff(oldStr, lcsResult.match, filePath, lcsResult);
+          logger.debug("LCS fuzzy match applied", { diff: fuzzyDiff });
+          oldStr = lcsResult.match;
         } else {
-          // No match found - provide helpful error with suggestions
           const suggestions = suggestWhitespaceFixes(oldStr, content);
           let errorMessage = `String not found in file: "${oldStr.substring(0, 100)}${oldStr.length > 100 ? '...' : ''}"`;
 
           if (suggestions.length > 0) {
-            errorMessage += '\n\n💡 Possible issues:\n' + suggestions.map(s => `  • ${s}`).join('\n');
+            errorMessage += '\n\nPossible issues:\n' + suggestions.map(s => `  - ${s}`).join('\n');
           }
 
           if (oldStr.includes('\n')) {
-            errorMessage += '\n\n💡 Tip: For multi-line replacements, ensure exact whitespace match or use line-based editing.';
+            errorMessage += '\n\nTip: For multi-line replacements, ensure exact whitespace match or use line-based editing.';
           }
 
           return {
@@ -215,10 +215,23 @@ export class TextEditorTool implements Disposable {
             error: errorMessage,
           };
         }
+      } else if (strategyResult.strategy !== 'exact') {
+        // Used a non-exact strategy — log and use the matched text
+        logger.debug(`Edit match via ${strategyResult.strategy} strategy (confidence: ${strategyResult.confidence.toFixed(2)})`);
+        oldStr = strategyResult.matched;
+      }
+
+      // Omission placeholder detection: block edits that would delete code
+      const omissionResult = detectOmissionPlaceholders(newStr, oldStr);
+      if (omissionResult.hasOmissions) {
+        return {
+          success: false,
+          error: formatOmissionError(omissionResult),
+        };
       }
 
       const occurrences = (content.match(new RegExp(oldStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
-      
+
       const sessionFlags = this.confirmationService.getSessionFlags();
       if (!sessionFlags.fileOperations && !sessionFlags.allOperations) {
         const previewContent = replaceAll 
@@ -302,6 +315,15 @@ export class TextEditorTool implements Disposable {
             error: `File already exists: ${filePath}. Use str_replace_editor to modify existing files instead of create_file.`,
           };
         }
+      }
+
+      // Omission placeholder detection: block file creation with placeholders
+      const omissionResult = detectOmissionPlaceholders(content);
+      if (omissionResult.hasOmissions) {
+        return {
+          success: false,
+          error: formatOmissionError(omissionResult),
+        };
       }
 
       // Check if user has already accepted file operations for this session

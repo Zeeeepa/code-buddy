@@ -22,6 +22,7 @@ import {
   TestCoverage,
   FileReader,
 } from "./types.js";
+import type { KnowledgeGraph } from '../../knowledge/knowledge-graph.js';
 
 /**
  * Default fault localization configuration
@@ -127,13 +128,23 @@ const ERROR_PATTERNS: Array<{
 export class FaultLocalizer {
   private config: FaultLocalizationConfig;
   private fileReader?: FileReader;
+  private graph?: KnowledgeGraph;
 
   constructor(
     config: Partial<FaultLocalizationConfig> = {},
-    fileReader?: FileReader
+    fileReader?: FileReader,
+    graph?: KnowledgeGraph,
   ) {
     this.config = { ...DEFAULT_FL_CONFIG, ...config };
     this.fileReader = fileReader;
+    this.graph = graph;
+  }
+
+  /**
+   * Set or update the code graph reference (lazy wiring).
+   */
+  setGraph(graph: KnowledgeGraph): void {
+    this.graph = graph;
   }
 
   /**
@@ -160,10 +171,15 @@ export class FaultLocalizer {
       suspiciousStatements = this.calculateSuspiciousness(coverage);
     }
 
-    // Step 4: Merge and rank all suspicious locations
+    // Step 4: Callers analysis — use call graph to find suspicious callers
+    if (this.graph && this.graph.getStats().tripleCount > 0) {
+      this.enrichFaultsWithCallers(faults);
+    }
+
+    // Step 5: Merge and rank all suspicious locations
     const rankedFaults = this.rankFaults(faults, suspiciousStatements);
 
-    // Step 5: Read code snippets for context
+    // Step 6: Read code snippets for context
     if (this.fileReader) {
       await this.addCodeSnippets(rankedFaults);
     }
@@ -479,6 +495,58 @@ export class FaultLocalizer {
   }
 
   /**
+   * Enrich faults with caller information from the code graph.
+   * When a function is identified as suspicious, also flag its callers
+   * as potential sources of invalid input.
+   */
+  private enrichFaultsWithCallers(faults: Fault[]): void {
+    if (!this.graph) return;
+    const graph = this.graph;
+
+    for (const fault of [...faults]) {
+      // Try to find the entity in the graph from the file path and function name
+      const filePath = fault.location.file.replace(/\\/g, '/').replace(/\.[^.]+$/, '');
+      const entity = graph.findEntity(filePath);
+      if (!entity) continue;
+
+      // Query callers for this entity
+      const callers = graph.query({ predicate: 'calls', object: entity });
+      if (callers.length === 0) continue;
+
+      // Store caller info as metadata on the fault
+      const callerNames = callers.slice(0, 5).map(t => t.subject);
+      fault.metadata = fault.metadata || {};
+      fault.metadata.callers = callerNames.join(', ');
+      fault.metadata.callerCount = String(callers.length);
+
+      // Add callers as lower-suspicion faults (they may pass invalid input)
+      for (const caller of callers.slice(0, 3)) {
+        const callerEntity = caller.subject;
+        const definedIn = graph.query({ subject: callerEntity, predicate: 'definedIn' });
+        if (definedIn.length === 0) continue;
+
+        const callerFile = definedIn[0].object.replace(/^mod:/, '');
+        const alreadyFaulted = faults.some(f => f.location.file.includes(callerFile));
+        if (alreadyFaulted) continue;
+
+        faults.push({
+          id: `fault-caller-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+          type: fault.type,
+          severity: 'medium',
+          message: `Caller of suspicious ${entity}: ${callerEntity} — may pass invalid input`,
+          location: {
+            file: callerFile,
+            startLine: 1,
+            endLine: 1,
+          },
+          suspiciousness: fault.suspiciousness * 0.5,
+          metadata: { fromCallGraph: true, callerOf: entity },
+        });
+      }
+    }
+  }
+
+  /**
    * Deduplicate faults by location
    */
   private deduplicateFaults(faults: Fault[]): Fault[] {
@@ -539,7 +607,8 @@ export class FaultLocalizer {
  */
 export function createFaultLocalizer(
   config?: Partial<FaultLocalizationConfig>,
-  fileReader?: FileReader
+  fileReader?: FileReader,
+  graph?: KnowledgeGraph,
 ): FaultLocalizer {
-  return new FaultLocalizer(config, fileReader);
+  return new FaultLocalizer(config, fileReader, graph);
 }

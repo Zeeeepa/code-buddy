@@ -17,6 +17,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { ConversationMiddleware, MiddlewareContext, MiddlewareResult } from './types.js';
+import type { KnowledgeGraph } from '../../knowledge/knowledge-graph.js';
 
 // Action verbs that indicate non-trivial scope
 const ACTION_VERBS = new Set([
@@ -55,6 +56,57 @@ function hasPlanFile(cwd: string): boolean {
   );
 }
 
+/** Cached entity extractor — loaded lazily from context provider */
+let _extractEntities: ((msg: string) => string[]) | null = null;
+import('../../knowledge/code-graph-context-provider.js')
+  .then(mod => { _extractEntities = mod.extractEntities; })
+  .catch(() => { /* optional */ });
+
+/**
+ * Compute structural complexity from the code graph.
+ * High fan-in entities and cross-module changes indicate risky tasks.
+ */
+function computeStructuralComplexity(text: string, graph: KnowledgeGraph): number {
+  if (!_extractEntities) return 0;
+
+  const candidates = _extractEntities(text);
+  if (candidates.length === 0) return 0;
+
+  let score = 0;
+  const resolvedModules = new Set<string>();
+
+  for (const candidate of candidates.slice(0, 6)) {
+    const entity = graph.findEntity(candidate);
+    if (!entity) continue;
+
+    // Fan-in: callers and importers count
+    const callers = graph.query({ predicate: 'calls', object: entity });
+    const importers = graph.query({ predicate: 'imports', object: entity });
+    score += Math.min(callers.length, 5);
+    score += Math.min(importers.length, 5);
+
+    // Track module for cross-module detection
+    const modPath = entity.replace(/^(mod|cls|fn|iface):/, '').split('/').slice(0, 3).join('/');
+    if (modPath) resolvedModules.add(modPath);
+  }
+
+  // Cross-module bonus: touching 3+ distinct module paths = risky
+  if (resolvedModules.size > 2) score += 3;
+
+  return score;
+}
+
+/** Lazy-loaded graph reference for structural complexity */
+let _graphProvider: (() => KnowledgeGraph | null) | null = null;
+
+/**
+ * Wire the graph provider into the workflow guard.
+ * Called from codebuddy-agent.ts during initialization.
+ */
+export function setWorkflowGuardGraphProvider(provider: () => KnowledgeGraph | null): void {
+  _graphProvider = provider;
+}
+
 export class WorkflowGuardMiddleware implements ConversationMiddleware {
   readonly name = 'workflow-guard';
   readonly priority = 45;
@@ -84,12 +136,28 @@ export class WorkflowGuardMiddleware implements ConversationMiddleware {
 
     const verbCount = countDistinctActionVerbs(text);
 
-    // Trigger if 3+ distinct action verbs and no plan file exists
-    if (verbCount >= 3 && !hasPlanFile(process.cwd())) {
+    // Compute structural complexity from graph (if available)
+    let structuralScore = 0;
+    if (_graphProvider) {
+      try {
+        const graph = _graphProvider();
+        if (graph && graph.getStats().tripleCount > 0) {
+          structuralScore = computeStructuralComplexity(text, graph);
+        }
+      } catch { /* graph not available — degrade gracefully */ }
+    }
+
+    const needsPlan = !hasPlanFile(process.cwd());
+
+    // Trigger if 3+ action verbs OR high structural complexity (>8)
+    if (needsPlan && (verbCount >= 3 || structuralScore > 8)) {
+      const reason = structuralScore > 8
+        ? `structural complexity ${structuralScore} (high fan-in / cross-module)`
+        : `${verbCount} distinct actions`;
       return {
         action: 'warn',
         message: [
-          `[workflow-guard] This task involves ${verbCount} distinct actions.`,
+          `[workflow-guard] This task has ${reason}.`,
           'Consider initialising a plan first: call the `plan` tool with action="init"',
           'or create PLAN.md to break the work into verifiable steps before acting.',
           'Proceeding without a plan — but be mindful of the Verification Contract.',

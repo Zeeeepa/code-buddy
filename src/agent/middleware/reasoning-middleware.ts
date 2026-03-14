@@ -16,6 +16,7 @@ import type {
   MiddlewareResult,
 } from './types.js';
 import { getActiveThinkingMode } from '../../commands/handlers/think-handlers.js';
+import type { KnowledgeGraph } from '../../knowledge/knowledge-graph.js';
 
 // ── Complexity scoring ──────────────────────────────────────────────────
 
@@ -116,17 +117,92 @@ function mapScoreToLevel(score: number): ComplexityLevel {
   return 'none';
 }
 
+// ── Graph-aware complexity signals ──────────────────────────────────────
+
+/** Lazy graph provider for structural complexity signals */
+let _reasoningGraphProvider: (() => KnowledgeGraph | null) | null = null;
+
+/**
+ * Wire the graph provider into the reasoning middleware.
+ * Called from codebuddy-agent.ts during initialization.
+ */
+export function setReasoningGraphProvider(provider: () => KnowledgeGraph | null): void {
+  _reasoningGraphProvider = provider;
+}
+
+/** Cached entity extractor — loaded lazily from context provider */
+let _extractEntities: ((msg: string) => string[]) | null = null;
+import('../../knowledge/code-graph-context-provider.js')
+  .then(mod => { _extractEntities = mod.extractEntities; })
+  .catch(() => { /* optional */ });
+
+/**
+ * Compute graph-based complexity signals for a message.
+ * Returns additional score points to add to the textual score.
+ */
+function computeGraphComplexitySignals(message: string, graph: KnowledgeGraph): number {
+  if (!_extractEntities) return 0;
+
+  const candidates = _extractEntities(message);
+  if (candidates.length === 0) return 0;
+
+  let graphScore = 0;
+  const communities = new Set<string>();
+  const resolvedFiles = new Set<string>();
+
+  for (const candidate of candidates.slice(0, 6)) {
+    const entity = graph.findEntity(candidate);
+    if (!entity) continue;
+
+    // Track files for multi-file detection
+    const definedIn = graph.query({ subject: entity, predicate: 'definedIn' });
+    for (const t of definedIn) resolvedFiles.add(t.object);
+    // Module entities are files themselves
+    if (entity.startsWith('mod:')) resolvedFiles.add(entity);
+
+    // High PageRank entity = architecturally important = risky to change
+    const rank = graph.getEntityRank(entity);
+    if (rank > 0.3) graphScore += 2;
+
+    // Track community membership
+    const modPath = entity.replace(/^(mod|cls|fn|iface):/, '').split('/').slice(0, 2).join('/');
+    if (modPath) communities.add(modPath);
+
+    // Check for circular dependencies
+    const callers = graph.query({ predicate: 'calls', object: entity });
+    for (const caller of callers.slice(0, 3)) {
+      const reverseCall = graph.query({ predicate: 'calls', object: caller.subject, subject: entity });
+      if (reverseCall.length > 0) {
+        graphScore += 2; // circular dependency detected
+        break;
+      }
+    }
+  }
+
+  // Entities touch >3 files
+  if (resolvedFiles.size > 3) graphScore += 2;
+
+  // Cross-community (>1 cluster)
+  if (communities.size > 1) graphScore += 3;
+
+  return graphScore;
+}
+
 // ── Public API ──────────────────────────────────────────────────────────
 
 /**
  * Analyse the complexity of a user message and recommend a reasoning level.
  *
- * Scoring rubric (0-15):
+ * Scoring rubric (0-15 text + graph signals):
  *   - Distinct action verbs (max 8):  1 pt each
  *   - Constraint language (max 6):    1 pt each (capped at 3)
  *   - Exploration language (max 7):   1 pt each (capped at 3)
  *   - Multi-step indicators (max 6):  0.5 pt each (capped at 2)
  *   - Length bonus (> 100 words):     1 pt
+ *   - Graph: entities touch >3 files: +2
+ *   - Graph: entity PageRank > 0.3:   +2
+ *   - Graph: cross-community:         +3
+ *   - Graph: circular dependency:     +2
  *
  * Mapping:
  *   0-2  → none
@@ -148,12 +224,24 @@ export function detectComplexity(message: string): ComplexityScore {
   const multiStepIndicators = Math.min(multiStepRaw * 0.5, 2);
   const lengthBonus = wordCount(message) > 100 ? 1 : 0;
 
+  // Graph-based structural complexity signals
+  let graphBonus = 0;
+  if (_reasoningGraphProvider) {
+    try {
+      const graph = _reasoningGraphProvider();
+      if (graph && graph.getStats().tripleCount > 0) {
+        graphBonus = computeGraphComplexitySignals(message, graph);
+      }
+    } catch { /* graph not available — degrade gracefully */ }
+  }
+
   const score =
     actionVerbs +
     constraintLanguage +
     explorationLanguage +
     multiStepIndicators +
-    lengthBonus;
+    lengthBonus +
+    graphBonus;
 
   return {
     score,

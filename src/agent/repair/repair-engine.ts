@@ -354,9 +354,17 @@ export class RepairEngine extends EventEmitter {
         .replace("{code_context}", codeContext)
         .replace("{stack_trace}", fault.stackTrace || "N/A");
 
+      // Build fault context from call graph metadata (if available)
+      let faultContext = '';
+      if (fault.metadata?.callers && typeof fault.metadata.callers === 'string') {
+        const callerList = fault.metadata.callers.split(', ').map((c: string) => `- ${c}`).join('\n');
+        const callerCount = fault.metadata.callerCount ?? '?';
+        faultContext = `\n\n<fault_context>\nSuspicious function: ${fault.location.file}:${fault.location.startLine}\nCalled by:\n${callerList}\n(${callerCount} callers total)\nCheck if any caller passes invalid input.\n</fault_context>`;
+      }
+
       const messages: CodeBuddyMessage[] = [
         { role: "system", content: REPAIR_SYSTEM_PROMPT },
-        { role: "user", content: userPrompt + (contextHint ? `\n\nAdditional context: ${contextHint}` : "") },
+        { role: "user", content: userPrompt + faultContext + (contextHint ? `\n\nAdditional context: ${contextHint}` : "") },
       ];
 
       // Generate multiple candidates with higher temperature
@@ -787,6 +795,13 @@ Please provide an improved fix that addresses the issues with the previous attem
    */
   getConfig(): RepairConfig {
     return { ...this.config };
+  }
+
+  /**
+   * Wire the code graph into the fault localizer for callers analysis.
+   */
+  setFaultLocalizerGraph(graph: import('../../knowledge/knowledge-graph.js').KnowledgeGraph): void {
+    this.faultLocalizer.setGraph(graph);
   }
 
   /**

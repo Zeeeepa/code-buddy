@@ -351,6 +351,13 @@ export class RepairCoordinator extends EventEmitter {
   }
 
   /**
+   * Wire the code graph into the fault localizer for callers analysis.
+   */
+  setFaultLocalizerGraph(graph: import('../../knowledge/knowledge-graph.js').KnowledgeGraph): void {
+    this.getRepairEngine().setFaultLocalizerGraph?.(graph);
+  }
+
+  /**
    * Get current configuration
    */
   getConfig(): RepairConfig {

@@ -8,6 +8,7 @@
 import { EventEmitter } from 'events';
 import { AgentStateMachine, AgentStatus } from '../state-machine.js';
 import { TERMINATE_SIGNAL } from '../../tools/terminate-tool.js';
+import type { KnowledgeGraph } from '../../knowledge/knowledge-graph.js';
 
 /** SWE Agent configuration */
 export interface SWEAgentConfig {
@@ -19,6 +20,8 @@ export interface SWEAgentConfig {
   llmCall: (messages: SWEMessage[], tools: SWETool[]) => Promise<SWELLMResponse>;
   /** Tool execution function */
   executeTool: (name: string, args: Record<string, unknown>) => Promise<SWEToolResult>;
+  /** Optional code graph for file context injection */
+  graph?: KnowledgeGraph;
 }
 
 export interface SWEMessage {
@@ -141,6 +144,105 @@ const SWE_TOOLS: SWETool[] = [
 /** Next-step prompt injected after step 0 */
 const NEXT_STEP_PROMPT = 'Continue with the next step. If the task is complete, call the terminate tool.';
 
+/** Cached entity extractor — loaded lazily from context provider */
+let _extractEntities: ((msg: string) => string[]) | null = null;
+
+/**
+ * Set the entity extraction function (called during module initialization).
+ */
+export function setSWEEntityExtractor(fn: (msg: string) => string[]): void {
+  _extractEntities = fn;
+}
+
+// Auto-load entity extractor from context provider
+import('../../knowledge/code-graph-context-provider.js')
+  .then(mod => { _extractEntities = mod.extractEntities; })
+  .catch(() => { /* optional — degraded mode without entity extraction */ });
+
+/**
+ * Suggest relevant files for a task using the code graph.
+ * Extracts entities from the description, resolves them in the graph,
+ * then follows dependency edges (BFS) to build an ordered file list.
+ */
+export function suggestFilesForTask(
+  description: string,
+  graph: KnowledgeGraph,
+  entityExtractor?: (msg: string) => string[],
+): string | null {
+  if (graph.getStats().tripleCount === 0) return null;
+
+  const extractFn = entityExtractor ?? _extractEntities;
+  if (!extractFn) return null;
+
+  const candidates = extractFn(description);
+  if (candidates.length === 0) return null;
+
+  // Resolve entities and collect file info
+  const fileEntries: Array<{
+    entity: string;
+    file: string;
+    rank: number;
+    callerCount: number;
+  }> = [];
+  const seenEntities = new Set<string>();
+
+  for (const candidate of candidates.slice(0, 8)) {
+    const entity = graph.findEntity(candidate);
+    if (!entity || seenEntities.has(entity)) continue;
+    seenEntities.add(entity);
+
+    // Resolve file path from entity
+    let filePath = '';
+    if (entity.startsWith('mod:')) {
+      filePath = entity.replace(/^mod:/, '');
+    } else {
+      const definedIn = graph.query({ subject: entity, predicate: 'definedIn' });
+      if (definedIn.length > 0) {
+        filePath = definedIn[0].object.replace(/^mod:/, '');
+      }
+    }
+    if (!filePath) continue;
+
+    const callers = graph.query({ predicate: 'calls', object: entity });
+    const rank = graph.getEntityRank(entity);
+
+    fileEntries.push({ entity, file: filePath, rank, callerCount: callers.length });
+
+    // BFS: also include direct dependencies (1 hop)
+    const deps = graph.query({ subject: entity, predicate: 'imports' });
+    for (const dep of deps.slice(0, 3)) {
+      const depFile = dep.object.replace(/^mod:/, '');
+      if (!fileEntries.some(f => f.file === depFile)) {
+        fileEntries.push({
+          entity: dep.object,
+          file: depFile,
+          rank: graph.getEntityRank(dep.object),
+          callerCount: 0,
+        });
+      }
+    }
+  }
+
+  if (fileEntries.length === 0) return null;
+
+  // Sort: dependencies first (low caller count), then by rank
+  fileEntries.sort((a, b) => a.callerCount - b.callerCount || b.rank - a.rank);
+
+  // Build context block
+  const lines = ['Task affects these files (from dependency graph):'];
+  for (let i = 0; i < Math.min(fileEntries.length, 8); i++) {
+    const f = fileEntries[i];
+    const details: string[] = [];
+    if (f.callerCount > 0) details.push(`${f.callerCount} callers`);
+    if (f.rank > 0.05) details.push(`PageRank ${f.rank.toFixed(2)}`);
+    const detailStr = details.length > 0 ? ` (${details.join(', ')})` : '';
+    lines.push(`${i + 1}. ${f.file}${detailStr}`);
+  }
+  lines.push('Suggested edit order: dependencies first, then dependents.');
+
+  return lines.join('\n');
+}
+
 export class SWEAgent extends EventEmitter {
   readonly name = 'swe-agent';
   readonly description = 'Software Engineering Agent — code editing, debugging, and repository tasks';
@@ -169,6 +271,15 @@ export class SWEAgent extends EventEmitter {
   async run(request: string): Promise<string> {
     // Initialize
     this.memory = [{ role: 'system', content: SWE_SYSTEM_PROMPT }];
+
+    // Inject code graph context if available
+    if (this.config.graph) {
+      const codeContext = suggestFilesForTask(request, this.config.graph);
+      if (codeContext) {
+        this.memory.push({ role: 'system', content: `<code_context>\n${codeContext}\n</code_context>` });
+      }
+    }
+
     this.memory.push({ role: 'user', content: request });
 
     this.stateMachine.start(`SWE task: ${request.substring(0, 80)}`);

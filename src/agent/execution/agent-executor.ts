@@ -29,6 +29,25 @@ import { getRestorableCompressor } from "../../context/restorable-compression.js
 import { getResponseConstraintStack, resolveToolChoice } from "../response-constraint.js";
 import type { ICMBridge } from "../../memory/icm-bridge.js";
 
+// Lazy-loaded workspace context to avoid blocking tests.
+// Includes a 3s hard timeout so git commands never stall the agent loop.
+let _getWorkspaceContext: ((cwd: string) => Promise<string>) | null = null;
+async function lazyGetWorkspaceContext(cwd: string): Promise<string> {
+  try {
+    if (!_getWorkspaceContext) {
+      const mod = await import("../../context/workspace-context.js");
+      _getWorkspaceContext = mod.getWorkspaceContext;
+    }
+    const result = await Promise.race([
+      _getWorkspaceContext(cwd),
+      new Promise<string>((resolve) => setTimeout(() => resolve(''), 3000)),
+    ]);
+    return result;
+  } catch {
+    return '';
+  }
+}
+
 /**
  * Register an ICM bridge provider for cross-session memory.
  * Called by CodeBuddyAgent to wire up ICM without tight coupling.
@@ -38,6 +57,17 @@ export function setICMBridgeProvider(
   provider: () => ICMBridge | null
 ): void {
   _icmBridgeProvider = provider;
+}
+
+/**
+ * Register a code graph context provider for per-turn injection.
+ * Called by CodeBuddyAgent to wire up code graph without tight coupling.
+ */
+let _codeGraphContextProvider: ((message: string) => string | null) | null = null;
+export function setCodeGraphContextProvider(
+  provider: (message: string) => string | null
+): void {
+  _codeGraphContextProvider = provider;
 }
 
 /**
@@ -181,8 +211,29 @@ export class AgentExecutor {
   }
 
   /**
+   * Determine if a tool call can run in parallel.
+   * Uses `wait_for_previous` from tool args (Gemini CLI pattern) with fallback to static set.
+   */
+  private isToolParallelizable(toolCall: { function: { name: string; arguments?: string } }): boolean {
+    // Check explicit wait_for_previous flag in args (LLM-controlled parallelism)
+    try {
+      const args = JSON.parse(toolCall.function.arguments || '{}');
+      if (typeof args.wait_for_previous === 'boolean') {
+        return !args.wait_for_previous;
+      }
+    } catch { /* parse failure — use fallback */ }
+
+    // Fallback: read-only tools are parallel-safe
+    const readOnlyTools = new Set([
+      'grep', 'glob', 'read_file', 'list_files', 'search_files',
+      'get_file_info', 'tree', 'find_references',
+    ]);
+    return readOnlyTools.has(toolCall.function.name);
+  }
+
+  /**
    * Execute a tool call, optionally through the LaneQueue for serialization.
-   * Read-only tools (grep, glob, read_file) run in parallel; mutating tools run serially.
+   * Supports LLM-controlled parallelism via `wait_for_previous` parameter.
    */
   private executeToolViaLane(toolCall: Parameters<ToolHandler['executeTool']>[0]): ReturnType<ToolHandler['executeTool']> {
     const laneQueue = this.deps.laneQueue;
@@ -191,11 +242,7 @@ export class AgentExecutor {
     }
 
     const laneId = this.deps.laneId ?? 'default';
-    const readOnlyTools = new Set([
-      'grep', 'glob', 'read_file', 'list_files', 'search_files',
-      'get_file_info', 'tree', 'find_references',
-    ]);
-    const isParallel = readOnlyTools.has(toolCall.function.name);
+    const isParallel = this.isToolParallelizable(toolCall);
     const timeoutMs = this.getLaneTaskTimeoutMs(isParallel);
 
     return laneQueue.enqueue(
@@ -336,6 +383,14 @@ export class AgentExecutor {
       // Apply context management
       const preparedMessages = this.deps.contextManager.prepareMessages(messages);
 
+      // --- Workspace context: git state + directory tree (Codex CLI pattern) ---
+      try {
+        const wsCtx = await lazyGetWorkspaceContext(process.cwd());
+        if (wsCtx) {
+          preparedMessages.push({ role: 'system', content: wsCtx });
+        }
+      } catch { /* workspace context optional */ }
+
       // --- Lessons context: inject BEFORE todo suffix (stable rules, higher priority) ---
       const lessonsBlock = getLessonsTracker(process.cwd()).buildContextBlock();
       if (lessonsBlock) {
@@ -364,6 +419,16 @@ export class AgentExecutor {
             }
           }
         } catch { /* ICM search optional */ }
+      }
+
+      // --- Code graph context: ego-graph of entities mentioned in message ---
+      if (_codeGraphContextProvider) {
+        try {
+          const graphCtx = _codeGraphContextProvider(message);
+          if (graphCtx) {
+            preparedMessages.push({ role: 'system', content: `<context type="code_graph">\n${graphCtx}\n</context>` });
+          }
+        } catch { /* code graph context optional */ }
       }
 
       // --- Manus AI attention bias: append todo.md context at END of messages ---
@@ -490,6 +555,46 @@ export class AgentExecutor {
 
             const result = await this.executeToolViaLane(toolCall);
 
+            // --- Track file access for code graph context (incremental update) ---
+            try {
+              const fileTools = new Set(['view_file', 'create_file', 'str_replace_editor', 'file_read', 'file_write']);
+              if (fileTools.has(toolCall.function.name)) {
+                const args = JSON.parse(toolCall.function.arguments || '{}');
+                const filePath = args.path || args.file_path || args.target_file || '';
+                if (filePath) {
+                  const { trackRecentFile } = await import('../../knowledge/code-graph-context-provider.js');
+                  trackRecentFile(filePath);
+                  // Incremental graph update for write operations
+                  if (['create_file', 'str_replace_editor', 'file_write'].includes(toolCall.function.name)) {
+                    const { getKnowledgeGraph } = await import('../../knowledge/knowledge-graph.js');
+                    const kg = getKnowledgeGraph();
+                    if (kg.getStats().tripleCount > 0) {
+                      const { updateGraphForFile } = await import('../../knowledge/graph-updater.js');
+                      const path = await import('path');
+                      const absPath = path.default.resolve(process.cwd(), filePath);
+                      updateGraphForFile(kg, absPath, process.cwd());
+                    }
+                  }
+                }
+              }
+            } catch { /* file tracking is optional */ }
+
+            // --- JIT context discovery: load subdirectory context files ---
+            try {
+              const fileToolsJit = new Set(['view_file', 'create_file', 'str_replace_editor', 'file_read', 'file_write', 'read_file', 'grep', 'glob']);
+              if (fileToolsJit.has(toolCall.function.name)) {
+                const args = JSON.parse(toolCall.function.arguments || '{}');
+                const filePath = args.path || args.file_path || args.target_file || args.pattern || '';
+                if (filePath) {
+                  const { discoverJitContext } = await import('../../context/jit-context.js');
+                  const jitContext = discoverJitContext(filePath);
+                  if (jitContext) {
+                    preparedMessages.push({ role: 'system', content: jitContext });
+                  }
+                }
+              }
+            } catch { /* JIT context is optional */ }
+
             // --- Disk-backed tool result (Manus AI #19) ---
             // Persist full result to .codebuddy/tool-results/<callId>.txt for durable restoration.
             const rawToolContent = sanitizeToolResult(result.success ? result.output || "Success" : result.error || "Error");
@@ -566,6 +671,12 @@ export class AgentExecutor {
             // Legacy inline cost check when no pipeline
             this.config.recordSessionCost(inputTokens, totalOutputTokens);
           }
+
+          // Apply tool output masking (backward-scanned FIFO) before compaction
+          try {
+            const { applyToolOutputMasking } = await import('../../context/tool-output-masking.js');
+            applyToolOutputMasking(messages);
+          } catch { /* masking is optional */ }
 
           // Get next response (with tool result compaction guard)
           const nextPreparedMessages = this.compactLargeToolResults(
@@ -744,6 +855,14 @@ export class AgentExecutor {
 
         const preparedMessages = this.deps.contextManager.prepareMessages(messages);
 
+        // --- Workspace context: git state + directory tree (streaming path) ---
+        try {
+          const wsCtxStream = await lazyGetWorkspaceContext(process.cwd());
+          if (wsCtxStream) {
+            preparedMessages.push({ role: 'system', content: wsCtxStream });
+          }
+        } catch { /* workspace context optional */ }
+
         // --- Lessons context: inject BEFORE todo suffix (stable rules, higher priority) ---
         const lessonsBlockStream = getLessonsTracker(process.cwd()).buildContextBlock();
         if (lessonsBlockStream) {
@@ -772,6 +891,16 @@ export class AgentExecutor {
               }
             }
           } catch { /* ICM search optional */ }
+        }
+
+        // --- Code graph context: ego-graph of entities mentioned in message (streaming path) ---
+        if (_codeGraphContextProvider) {
+          try {
+            const graphCtxStream = _codeGraphContextProvider(message);
+            if (graphCtxStream) {
+              preparedMessages.push({ role: 'system', content: `<context type="code_graph">\n${graphCtxStream}\n</context>` });
+            }
+          } catch { /* code graph context optional */ }
         }
 
         // --- Manus AI attention bias: append todo.md context at END of messages ---
@@ -940,6 +1069,29 @@ export class AgentExecutor {
             } else {
               result = await this.executeToolViaLane(toolCall);
             }
+
+            // --- Track file access for code graph context (streaming, incremental update) ---
+            try {
+              const fileToolsStream = new Set(['view_file', 'create_file', 'str_replace_editor', 'file_read', 'file_write']);
+              if (fileToolsStream.has(toolCall.function.name)) {
+                const args = JSON.parse(toolCall.function.arguments || '{}');
+                const filePath = args.path || args.file_path || args.target_file || '';
+                if (filePath) {
+                  const { trackRecentFile } = await import('../../knowledge/code-graph-context-provider.js');
+                  trackRecentFile(filePath);
+                  if (['create_file', 'str_replace_editor', 'file_write'].includes(toolCall.function.name)) {
+                    const { getKnowledgeGraph } = await import('../../knowledge/knowledge-graph.js');
+                    const kg = getKnowledgeGraph();
+                    if (kg.getStats().tripleCount > 0) {
+                      const { updateGraphForFile } = await import('../../knowledge/graph-updater.js');
+                      const pathMod = await import('path');
+                      const absPath = pathMod.default.resolve(process.cwd(), filePath);
+                      updateGraphForFile(kg, absPath, process.cwd());
+                    }
+                  }
+                }
+              }
+            } catch { /* file tracking is optional */ }
 
             // Check abort after tool execution completes
             if (abortController?.signal.aborted) {

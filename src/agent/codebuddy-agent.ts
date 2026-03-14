@@ -11,7 +11,7 @@ import { getRepoProfiler } from "./repo-profiler.js";
 import { getToolSelectionStrategy, ToolSelectionStrategy } from "./execution/tool-selection-strategy.js";
 import { PromptBuilder } from "../services/prompt-builder.js";
 import { StreamingHandler } from "./streaming/index.js";
-import { AgentExecutor, setDecisionContextProvider, setICMBridgeProvider } from "./execution/agent-executor.js";
+import { AgentExecutor, setDecisionContextProvider, setICMBridgeProvider, setCodeGraphContextProvider } from "./execution/agent-executor.js";
 import { ToolHandler } from "./tool-handler.js";
 import { BaseAgent } from "./base-agent.js";
 import { createAgentInfrastructureSync, AgentInfrastructure } from "./infrastructure/index.js";
@@ -427,6 +427,32 @@ export class CodeBuddyAgent extends BaseAgent {
       }
       setICMBridgeProvider(() => bridge);
     }).catch((e) => { logger.debug('ICM bridge module load failed (optional)', { error: String(e) }); });
+
+    // Wire code graph context provider into executor + middleware
+    import('../knowledge/code-graph-context-provider.js').then(({ buildCodeGraphContext, warmEmbeddingIndex }) => {
+      import('../knowledge/knowledge-graph.js').then(({ getKnowledgeGraph }) => {
+        const graph = getKnowledgeGraph();
+        setCodeGraphContextProvider((message) => buildCodeGraphContext(graph, message));
+        // Pre-warm embedding index in background for semantic fallback
+        warmEmbeddingIndex(graph);
+        // Wire graph into workflow guard and reasoning middleware
+        import('./middleware/workflow-guard.js').then(({ setWorkflowGuardGraphProvider }) => {
+          setWorkflowGuardGraphProvider(() => graph);
+        }).catch(() => {});
+        import('./middleware/reasoning-middleware.js').then(({ setReasoningGraphProvider }) => {
+          setReasoningGraphProvider(() => graph);
+        }).catch(() => {});
+        // Wire graph into plan tool and fault localizer
+        import('../tools/registry/plan-tools.js').then(({ wirePlanToolGraph }) => {
+          wirePlanToolGraph(graph);
+        }).catch(() => {});
+        if (this.repairCoordinator) {
+          try {
+            this.repairCoordinator.setFaultLocalizerGraph?.(graph);
+          } catch { /* non-critical */ }
+        }
+      });
+    }).catch((e) => { logger.debug('Code graph context provider load failed (optional)', { error: String(e) }); });
   }
 
   private applySkillMatching(message: string): void {

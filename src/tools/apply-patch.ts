@@ -1,403 +1,327 @@
 /**
- * Apply Patch Tool (Codex-inspired)
+ * apply_patch Tool — Codex-style patch format
  *
- * Parses and applies unified diffs to files. The model outputs diffs
- * instead of full files, which is more token-efficient and safer.
+ * Parses and applies patches in the *** Begin Patch / *** End Patch format.
+ * Simpler than unified diff for LLM-generated edits.
  *
- * Supports:
- *   - Standard unified diff format (--- a/file, +++ b/file, @@ hunks)
- *   - Multiple file patches in one input
- *   - New file creation (--- /dev/null)
- *   - File deletion (+++ /dev/null)
- *   - Dry-run mode for preview
+ * Format:
+ *   *** Begin Patch
+ *   *** Add File: path
+ *   +line1
+ *   +line2
+ *   *** Delete File: path
+ *   *** Update File: path
+ *   @@ optional context header
+ *    context line (space prefix)
+ *   -removed line
+ *   +added line
+ *   *** End Patch
+ *
+ * Uses 4-pass seek_sequence for fuzzy matching:
+ *   1. Exact byte match
+ *   2. Trailing whitespace tolerance
+ *   3. Full trim (leading + trailing)
+ *   4. Unicode normalization (typographic → ASCII)
+ *
+ * Inspired by OpenAI Codex CLI's apply-patch crate.
  */
 
-import fs from 'fs';
-import path from 'path';
+import * as fs from 'fs';
+import * as path from 'path';
+import { BaseTool, ParameterDefinition } from './base-tool.js';
 import { ToolResult } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 
-export interface PatchHunk {
-  oldStart: number;
-  oldCount: number;
-  newStart: number;
-  newCount: number;
-  lines: string[];
+// ============================================================================
+// Types
+// ============================================================================
+
+interface FileOp {
+  type: 'add' | 'delete' | 'update';
+  path: string;
+  moveTo?: string;
+  hunks?: Hunk[];
+  content?: string;
 }
 
-export interface FilePatch {
-  oldPath: string;
-  newPath: string;
-  hunks: PatchHunk[];
-  isNew: boolean;
-  isDelete: boolean;
+interface Hunk {
+  header?: string;
+  oldLines: string[];
+  newLines: string[];
 }
 
-export interface ApplyPatchOptions {
-  /** Working directory for relative paths */
-  cwd?: string;
-  /** Dry run — don't write files, just validate */
-  dryRun?: boolean;
-  /** Number of context lines to tolerate mismatch (fuzz factor) */
-  fuzz?: number;
+interface PatchResult {
+  filesAdded: string[];
+  filesDeleted: string[];
+  filesUpdated: string[];
+  errors: string[];
 }
 
-export interface PatchResult {
-  file: string;
-  applied: boolean;
-  error?: string;
-  hunksApplied: number;
-  hunksTotal: number;
+// ============================================================================
+// Unicode Normalization (Pass 4)
+// ============================================================================
+
+function normalizeUnicode(str: string): string {
+  return str
+    .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
+    .replace(/[\u201C\u201D\u201E\u201F]/g, '"')
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/\u2026/g, '...')
+    .replace(/[\u00A0\u2002\u2003\u2009]/g, ' ');
+}
+
+// ============================================================================
+// 4-Pass seek_sequence Algorithm
+// ============================================================================
+
+/**
+ * Find a sequence of lines in the source, starting from startIndex.
+ * Tries 4 matching strategies with decreasing strictness.
+ *
+ * @returns The index where the pattern starts, or -1 if not found.
+ */
+export function seekSequence(
+  lines: string[],
+  pattern: string[],
+  startIndex: number = 0,
+): number {
+  if (pattern.length === 0) return startIndex;
+  if (startIndex + pattern.length > lines.length) return -1;
+
+  // Pass 1: Exact match
+  for (let i = startIndex; i <= lines.length - pattern.length; i++) {
+    let match = true;
+    for (let j = 0; j < pattern.length; j++) {
+      if (lines[i + j] !== pattern[j]) { match = false; break; }
+    }
+    if (match) return i;
+  }
+
+  // Pass 2: Trailing whitespace tolerance
+  for (let i = startIndex; i <= lines.length - pattern.length; i++) {
+    let match = true;
+    for (let j = 0; j < pattern.length; j++) {
+      if (lines[i + j].trimEnd() !== pattern[j].trimEnd()) { match = false; break; }
+    }
+    if (match) return i;
+  }
+
+  // Pass 3: Full trim (leading + trailing)
+  for (let i = startIndex; i <= lines.length - pattern.length; i++) {
+    let match = true;
+    for (let j = 0; j < pattern.length; j++) {
+      if (lines[i + j].trim() !== pattern[j].trim()) { match = false; break; }
+    }
+    if (match) return i;
+  }
+
+  // Pass 4: Unicode normalization
+  const normalizedPattern = pattern.map(l => normalizeUnicode(l).trim());
+  for (let i = startIndex; i <= lines.length - pattern.length; i++) {
+    let match = true;
+    for (let j = 0; j < pattern.length; j++) {
+      if (normalizeUnicode(lines[i + j]).trim() !== normalizedPattern[j]) { match = false; break; }
+    }
+    if (match) return i;
+  }
+
+  return -1;
 }
 
 // ============================================================================
 // Parser
 // ============================================================================
 
-const DIFF_HEADER = /^diff --git a\/(.*) b\/(.*)$/;
-const OLD_FILE = /^--- (?:a\/)?(.+)$/;
-const NEW_FILE = /^\+\+\+ (?:b\/)?(.+)$/;
-const HUNK_HEADER = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/;
-
 /**
- * Parse a unified diff string into FilePatch objects.
+ * Parse a patch string into FileOp operations.
  */
-export function parsePatch(diffText: string): FilePatch[] {
-  const patches: FilePatch[] = [];
-  const lines = diffText.split('\n');
+export function parsePatch(patchText: string): FileOp[] {
+  const ops: FileOp[] = [];
+
+  let text = patchText.trim();
+  // Strip heredoc wrappers (GPT sometimes wraps in <<'EOF'...EOF)
+  text = text.replace(/^<<['"]?EOF['"]?\s*\n/i, '').replace(/\nEOF\s*$/i, '');
+
+  const beginIdx = text.indexOf('*** Begin Patch');
+  const endIdx = text.indexOf('*** End Patch');
+  if (beginIdx < 0) return ops;
+
+  const body = text.substring(
+    text.indexOf('\n', beginIdx) + 1,
+    endIdx >= 0 ? endIdx : undefined,
+  );
+
+  const lines = body.split('\n');
   let i = 0;
 
   while (i < lines.length) {
-    // Skip until we find a file header
-    if (!lines[i].startsWith('---') && !DIFF_HEADER.test(lines[i])) {
-      i++;
-      continue;
-    }
+    const line = lines[i];
 
-    // Skip "diff --git" line if present
-    if (DIFF_HEADER.test(lines[i])) {
+    if (line.startsWith('*** Add File: ')) {
+      const filePath = line.slice('*** Add File: '.length).trim();
+      const contentLines: string[] = [];
       i++;
-      // Skip index, mode lines
-      while (i < lines.length && !lines[i].startsWith('---')) {
+      while (i < lines.length && !lines[i].startsWith('***') && !lines[i].startsWith('@@')) {
+        if (lines[i].startsWith('+')) {
+          contentLines.push(lines[i].slice(1));
+        }
         i++;
       }
-    }
+      ops.push({ type: 'add', path: filePath, content: contentLines.join('\n') });
 
-    // Parse --- and +++ lines
-    const oldMatch = OLD_FILE.exec(lines[i]);
-    if (!oldMatch) { i++; continue; }
-    i++;
-
-    const newMatch = NEW_FILE.exec(lines[i]);
-    if (!newMatch) { i++; continue; }
-    i++;
-
-    const oldPath = oldMatch[1];
-    const newPath = newMatch[1];
-    const isNew = oldPath === '/dev/null';
-    const isDelete = newPath === '/dev/null';
-
-    const hunks: PatchHunk[] = [];
-
-    // Parse hunks
-    while (i < lines.length && HUNK_HEADER.test(lines[i])) {
-      const hunkMatch = HUNK_HEADER.exec(lines[i])!;
-      const hunk: PatchHunk = {
-        oldStart: parseInt(hunkMatch[1], 10),
-        oldCount: parseInt(hunkMatch[2] ?? '1', 10),
-        newStart: parseInt(hunkMatch[3], 10),
-        newCount: parseInt(hunkMatch[4] ?? '1', 10),
-        lines: [],
-      };
+    } else if (line.startsWith('*** Delete File: ')) {
+      const filePath = line.slice('*** Delete File: '.length).trim();
+      ops.push({ type: 'delete', path: filePath });
       i++;
 
-      // Collect hunk lines
-      while (i < lines.length) {
-        const line = lines[i];
-        if (line.startsWith('+') || line.startsWith('-') || line.startsWith(' ') || line === '') {
-          // An empty line in a diff is a context line
-          hunk.lines.push(line === '' ? ' ' : line);
-          i++;
-        } else if (line.startsWith('\\')) {
-          // "\ No newline at end of file"
-          i++;
-        } else {
-          break;
-        }
+    } else if (line.startsWith('*** Update File: ')) {
+      const filePath = line.slice('*** Update File: '.length).trim();
+      let moveTo: string | undefined;
+      i++;
+
+      if (i < lines.length && lines[i].startsWith('*** Move to: ')) {
+        moveTo = lines[i].slice('*** Move to: '.length).trim();
+        i++;
       }
 
-      hunks.push(hunk);
-    }
+      const hunks: Hunk[] = [];
+      while (i < lines.length && !lines[i].startsWith('*** ')) {
+        if (lines[i].startsWith('@@')) {
+          const header = lines[i].slice(2).trim() || undefined;
+          i++;
+          const oldLines: string[] = [];
+          const newLines: string[] = [];
 
-    patches.push({ oldPath, newPath, hunks, isNew, isDelete });
+          while (i < lines.length && !lines[i].startsWith('@@') && !lines[i].startsWith('*** ')) {
+            const l = lines[i];
+            if (l.startsWith(' ')) {
+              oldLines.push(l.slice(1));
+              newLines.push(l.slice(1));
+            } else if (l.startsWith('-')) {
+              oldLines.push(l.slice(1));
+            } else if (l.startsWith('+')) {
+              newLines.push(l.slice(1));
+            }
+            i++;
+          }
+          hunks.push({ header, oldLines, newLines });
+        } else {
+          i++;
+        }
+      }
+      ops.push({ type: 'update', path: filePath, moveTo, hunks });
+
+    } else {
+      i++;
+    }
   }
 
-  return patches;
+  return ops;
 }
 
 // ============================================================================
 // Applier
 // ============================================================================
 
-/**
- * Apply a single hunk to file content lines.
- */
-function applyHunk(
-  contentLines: string[],
-  hunk: PatchHunk,
-  fuzz: number = 0,
-): { lines: string[]; applied: boolean } {
-  const oldLines: string[] = [];
-  const newLines: string[] = [];
+export function applyPatchOps(ops: FileOp[], cwd: string = process.cwd()): PatchResult {
+  const result: PatchResult = { filesAdded: [], filesDeleted: [], filesUpdated: [], errors: [] };
 
-  for (const line of hunk.lines) {
-    if (line.startsWith('-')) {
-      oldLines.push(line.slice(1));
-    } else if (line.startsWith('+')) {
-      newLines.push(line.slice(1));
-    } else {
-      // Context line (starts with ' ')
-      const ctx = line.startsWith(' ') ? line.slice(1) : line;
-      oldLines.push(ctx);
-      newLines.push(ctx);
-    }
-  }
+  for (const op of ops) {
+    const fullPath = path.resolve(cwd, op.path);
+    try {
+      if (op.type === 'add') {
+        const dir = path.dirname(fullPath);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(fullPath, op.content ?? '');
+        result.filesAdded.push(op.path);
 
-  // Try to find the old lines in the content, starting from the expected position
-  const startLine = hunk.oldStart - 1; // 0-indexed
-
-  // Try exact position first, then fuzz offsets (fixed: dir=0 means offset=0)
-  for (let offset = 0; offset <= fuzz; offset++) {
-    const directions = offset === 0 ? [0] : [-1, 1];
-    for (const dir of directions) {
-      const tryStart = startLine + (offset * dir);
-      if (tryStart < 0 || tryStart + oldLines.length > contentLines.length) continue;
-
-      // Check if old lines match at this position
-      let matches = true;
-      for (let j = 0; j < oldLines.length; j++) {
-        if (contentLines[tryStart + j] !== oldLines[j]) {
-          matches = false;
-          break;
+      } else if (op.type === 'delete') {
+        if (fs.existsSync(fullPath)) {
+          fs.unlinkSync(fullPath);
+          result.filesDeleted.push(op.path);
         }
-      }
 
-      if (matches) {
-        // Apply: replace old lines with new lines
-        const result = [
-          ...contentLines.slice(0, tryStart),
-          ...newLines,
-          ...contentLines.slice(tryStart + oldLines.length),
-        ];
-        return { lines: result, applied: true };
-      }
-    }
-  }
-
-  return { lines: contentLines, applied: false };
-}
-
-/**
- * Apply a FilePatch to the filesystem.
- */
-function applyFilePatch(
-  patch: FilePatch,
-  options: ApplyPatchOptions = {},
-): PatchResult {
-  const cwd = options.cwd || process.cwd();
-  const fuzz = options.fuzz ?? 2;
-  const patchPath = patch.isNew ? patch.newPath : patch.oldPath;
-  const filePath = path.resolve(cwd, patchPath);
-  const result: PatchResult = {
-    file: patchPath,
-    applied: false,
-    hunksApplied: 0,
-    hunksTotal: patch.hunks.length,
-  };
-
-  // Prevent path traversal outside working directory
-  const relativeToCwd = path.relative(cwd, filePath);
-  if (relativeToCwd.startsWith('..') || path.isAbsolute(relativeToCwd)) {
-    result.error = `Path traversal blocked: ${patchPath}`;
-    return result;
-  }
-
-  try {
-    // Handle deletion
-    if (patch.isDelete) {
-      if (!options.dryRun) {
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
+      } else if (op.type === 'update') {
+        if (!fs.existsSync(fullPath)) {
+          result.errors.push(`File not found: ${op.path}`);
+          continue;
         }
-      }
-      result.applied = true;
-      result.hunksApplied = patch.hunks.length;
-      return result;
-    }
+        const fileLines = fs.readFileSync(fullPath, 'utf-8').split('\n');
+        let lineIndex = 0;
 
-    // Handle new file
-    if (patch.isNew) {
-      const newContent: string[] = [];
-      for (const hunk of patch.hunks) {
-        for (const line of hunk.lines) {
-          if (line.startsWith('+')) {
-            newContent.push(line.slice(1));
+        for (const hunk of op.hunks ?? []) {
+          if (hunk.oldLines.length > 0) {
+            const seekIdx = seekSequence(fileLines, hunk.oldLines, lineIndex);
+            if (seekIdx >= 0) {
+              fileLines.splice(seekIdx, hunk.oldLines.length, ...hunk.newLines);
+              lineIndex = seekIdx + hunk.newLines.length;
+            } else {
+              result.errors.push(`Hunk failed in ${op.path}: "${hunk.oldLines[0]?.substring(0, 60)}..."`);
+            }
+          } else if (hunk.newLines.length > 0) {
+            fileLines.splice(lineIndex, 0, ...hunk.newLines);
+            lineIndex += hunk.newLines.length;
           }
         }
-      }
 
-      if (!options.dryRun) {
-        const dir = path.dirname(filePath);
-        if (!fs.existsSync(dir)) {
-          fs.mkdirSync(dir, { recursive: true });
+        if (op.moveTo) {
+          const newPath = path.resolve(cwd, op.moveTo);
+          const newDir = path.dirname(newPath);
+          if (!fs.existsSync(newDir)) fs.mkdirSync(newDir, { recursive: true });
+          fs.writeFileSync(newPath, fileLines.join('\n'));
+          fs.unlinkSync(fullPath);
+          result.filesUpdated.push(`${op.path} → ${op.moveTo}`);
+        } else {
+          fs.writeFileSync(fullPath, fileLines.join('\n'));
+          result.filesUpdated.push(op.path);
         }
-        const content = newContent.join('\n') + (newContent.length > 0 ? '\n' : '');
-        fs.writeFileSync(filePath, content);
       }
-      result.applied = true;
-      result.hunksApplied = patch.hunks.length;
-      return result;
+    } catch (err) {
+      result.errors.push(`${op.type} ${op.path}: ${err instanceof Error ? err.message : String(err)}`);
     }
-
-    // Regular modification
-    if (!fs.existsSync(filePath)) {
-      result.error = `File not found: ${filePath}`;
-      return result;
-    }
-
-    const originalContent = fs.readFileSync(filePath, 'utf-8');
-    const hadTrailingNewline = originalContent.endsWith('\n');
-    let contentLines = originalContent.split('\n');
-
-    for (const hunk of patch.hunks) {
-      const { lines, applied } = applyHunk(contentLines, hunk, fuzz);
-      if (applied) {
-        contentLines = lines;
-        result.hunksApplied++;
-      } else {
-        logger.debug('Hunk failed to apply', {
-          file: filePath,
-          oldStart: hunk.oldStart,
-          oldCount: hunk.oldCount,
-        });
-      }
-    }
-
-    result.applied = result.hunksApplied === result.hunksTotal;
-
-    // Only write if ALL hunks applied (all-or-nothing)
-    if (result.hunksApplied > 0 && !options.dryRun) {
-      if (result.applied) {
-        const output = contentLines.join('\n');
-        fs.writeFileSync(filePath, hadTrailingNewline && !output.endsWith('\n') ? output + '\n' : output);
-      } else {
-        // Partial apply: don't write, report failure
-        result.error = `Partial apply: ${result.hunksApplied}/${result.hunksTotal} hunks — file NOT modified (all-or-nothing)`;
-      }
-    } else if (result.hunksApplied === 0) {
-      result.error = 'No hunks could be applied (content mismatch)';
-    }
-  } catch (error) {
-    result.error = error instanceof Error ? error.message : String(error);
   }
-
   return result;
 }
 
 // ============================================================================
-// Tool interface
+// Tool
 // ============================================================================
 
-/**
- * Apply a unified diff patch to one or more files.
- * Uses atomic rollback: if any file fails, all changes are reverted.
- */
-export async function applyPatch(
-  diffText: string,
-  options: ApplyPatchOptions = {},
-): Promise<ToolResult> {
-  try {
-    const patches = parsePatch(diffText);
+export class ApplyPatchTool extends BaseTool {
+  readonly name = 'apply_patch';
+  readonly description = 'Apply a patch to modify files. Use *** Begin Patch / *** End Patch format with -/+ lines. Supports adding, deleting, and updating files with fuzzy matching.';
 
-    if (patches.length === 0) {
-      return { success: false, error: 'No valid patches found in input' };
-    }
-
-    // Phase 1: Save original file states for rollback
-    const cwd = options.cwd || process.cwd();
-    const backups = new Map<string, { content: string; existed: boolean }>();
-
-    if (!options.dryRun) {
-      for (const patch of patches) {
-        const patchPath = patch.isNew ? patch.newPath : patch.oldPath;
-        const filePath = path.resolve(cwd, patchPath);
-        try {
-          if (fs.existsSync(filePath)) {
-            backups.set(filePath, {
-              content: fs.readFileSync(filePath, 'utf-8'),
-              existed: true,
-            });
-          } else {
-            backups.set(filePath, { content: '', existed: false });
-          }
-        } catch {
-          backups.set(filePath, { content: '', existed: false });
-        }
-      }
-    }
-
-    // Phase 2: Apply all patches
-    const results: PatchResult[] = [];
-    for (const patch of patches) {
-      results.push(applyFilePatch(patch, options));
-    }
-
-    const allApplied = results.every(r => r.applied);
-
-    // Phase 3: If any failed and not dry-run, rollback all changes
-    if (!allApplied && !options.dryRun) {
-      for (const [filePath, backup] of backups) {
-        try {
-          if (backup.existed) {
-            fs.writeFileSync(filePath, backup.content);
-          } else if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-          }
-        } catch (rollbackErr) {
-          logger.debug('Rollback failed for file', { filePath, error: rollbackErr });
-        }
-      }
-    }
-
-    const summary = results.map(r => {
-      const status = r.applied ? 'OK' : 'FAILED';
-      const hunks = `${r.hunksApplied}/${r.hunksTotal} hunks`;
-      const err = r.error ? ` — ${r.error}` : '';
-      return `  ${status}: ${r.file} (${hunks}${err})`;
-    }).join('\n');
-
-    const action = options.dryRun ? 'Dry run' : (allApplied ? 'Applied' : 'ROLLED BACK');
-
+  protected getParameters(): Record<string, ParameterDefinition> {
     return {
-      success: allApplied,
-      output: `${action} ${patches.length} file(s):\n${summary}`,
-      error: !allApplied ? 'Patch failed — all changes rolled back (atomic)' : undefined,
-      data: { results },
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: `Failed to apply patch: ${error instanceof Error ? error.message : String(error)}`,
+      patch: {
+        type: 'string',
+        description: 'The patch content in *** Begin Patch format.',
+        required: true,
+      },
     };
   }
-}
 
-/**
- * Preview what a patch would do without applying it.
- */
-export async function previewPatch(
-  diffText: string,
-  cwd?: string,
-): Promise<ToolResult> {
-  return applyPatch(diffText, { dryRun: true, cwd });
+  async execute(input: Record<string, unknown>): Promise<ToolResult> {
+    const patchText = input.patch as string;
+    if (!patchText) return this.error('patch is required');
+
+    try {
+      const ops = parsePatch(patchText);
+      if (ops.length === 0) {
+        return this.error('No valid operations found in patch.');
+      }
+      const patchResult = applyPatchOps(ops);
+      const lines: string[] = [];
+      if (patchResult.filesAdded.length > 0) lines.push(`Added: ${patchResult.filesAdded.join(', ')}`);
+      if (patchResult.filesDeleted.length > 0) lines.push(`Deleted: ${patchResult.filesDeleted.join(', ')}`);
+      if (patchResult.filesUpdated.length > 0) lines.push(`Updated: ${patchResult.filesUpdated.join(', ')}`);
+      if (patchResult.errors.length > 0) lines.push(`Errors: ${patchResult.errors.join('; ')}`);
+      logger.debug(`apply_patch: +${patchResult.filesAdded.length} -${patchResult.filesDeleted.length} ~${patchResult.filesUpdated.length} !${patchResult.errors.length}`);
+      return patchResult.errors.length > 0 && lines.length === 1
+        ? this.error(lines[0])
+        : this.success(lines.join('\n'));
+    } catch (err) {
+      return this.error(`Patch failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
 }
