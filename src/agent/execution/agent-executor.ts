@@ -348,8 +348,8 @@ export class AgentExecutor {
     const maxToolRounds = this.config.maxToolRounds;
     let toolRounds = 0;
 
-    // Track token usage for cost calculation
-    const inputTokens = this.deps.tokenCounter.countMessageTokens(messages as Parameters<typeof this.deps.tokenCounter.countMessageTokens>[0]);
+    // Track token usage for cost calculation (recalculated each round for accuracy)
+    let inputTokens = this.deps.tokenCounter.countMessageTokens(messages as Parameters<typeof this.deps.tokenCounter.countMessageTokens>[0]);
     let totalOutputTokens = 0;
 
     try {
@@ -556,10 +556,21 @@ export class AgentExecutor {
             break;
           }
 
-          // Single-tool mode: only execute first tool call, defer rest
+          // Single-tool mode: only execute first tool call, re-enqueue rest for next round
           const toolCallsToExecute = this.config.singleToolMode
             ? [assistantMessage.tool_calls[0]]
             : assistantMessage.tool_calls;
+
+          // Re-enqueue deferred calls as synthetic assistant message for next iteration
+          if (this.config.singleToolMode && assistantMessage.tool_calls.length > 1) {
+            const deferred = assistantMessage.tool_calls.slice(1);
+            messages.push({
+              role: 'assistant',
+              content: null,
+              tool_calls: deferred,
+            } as CodeBuddyMessage);
+            logger.debug(`Single-tool mode: deferred ${deferred.length} tool calls to next round`);
+          }
 
           // Execute tool calls
           for (const toolCall of toolCallsToExecute) {
@@ -646,7 +657,7 @@ export class AgentExecutor {
             messages.push({
               role: "tool",
               content: variedContent,
-              tool_call_id: toolCall.id,
+              tool_call_id: toolCall.id || `tool_${Date.now()}`,
               name: toolCall.function.name,
             } as CodeBuddyMessage);
 
@@ -775,6 +786,8 @@ export class AgentExecutor {
         newEntries.push(warningEntry);
       }
 
+      // Recalculate input tokens at end of loop (messages grew during tool rounds)
+      inputTokens = this.deps.tokenCounter.countMessageTokens(messages as Parameters<typeof this.deps.tokenCounter.countMessageTokens>[0]);
       // Record session cost
       this.config.recordSessionCost(inputTokens, totalOutputTokens);
       if (this.config.isSessionCostLimitReached()) {
@@ -1042,14 +1055,26 @@ export class AgentExecutor {
                 content: steering.content,
                 timestamp: new Date(),
               });
+              // Rollback toolRounds since we didn't actually execute any tools
+              toolRounds--;
               continue; // Re-enter loop to get new LLM response
             }
           }
 
-          // Single-tool mode: only execute first tool call, defer rest
+          // Single-tool mode: only execute first tool call, re-enqueue rest
           const streamToolCallsToExecute = this.config.singleToolMode
             ? [toolCalls[0]]
             : toolCalls;
+
+          if (this.config.singleToolMode && toolCalls.length > 1) {
+            const deferred = toolCalls.slice(1);
+            preparedMessages.push({
+              role: 'assistant',
+              content: null,
+              tool_calls: deferred,
+            } as CodeBuddyMessage);
+            logger.debug(`Single-tool mode (stream): deferred ${deferred.length} tool calls`);
+          }
 
           if (!this.deps.streamingHandler.hasYieldedToolCalls()) {
             yield { type: "tool_calls", toolCalls: streamToolCallsToExecute };
@@ -1158,7 +1183,7 @@ export class AgentExecutor {
             messages.push({
               role: "tool",
               content: variedStreamContent,
-              tool_call_id: toolCall.id,
+              tool_call_id: toolCall.id || `tool_${Date.now()}`,
               name: toolCall.function.name,
             } as CodeBuddyMessage);
 

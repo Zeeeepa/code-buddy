@@ -143,12 +143,13 @@ export function applyToolOutputMasking(messages: CodeBuddyMessage[]): number {
   // Only mask if enough prunable content
   if (totalPrunable < MIN_PRUNABLE_CHARS) return 0;
 
-  // Mask old outputs
+  // Mask old outputs (validate index bounds before access)
   let masked = 0;
   for (let i = 0; i <= protectionBoundary; i++) {
     const { index, toolName } = toolMessages[i];
+    if (index < 0 || index >= messages.length) continue;
     const msg = messages[index];
-    if (typeof msg.content !== 'string') continue;
+    if (!msg || typeof msg.content !== 'string') continue;
 
     const preview = generatePreview(msg.content);
     const originalChars = msg.content.length;

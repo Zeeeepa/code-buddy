@@ -285,16 +285,9 @@ export class KnowledgeGraph {
       if (this.objectIndex.get(t.object)?.size === 0) this.objectIndex.delete(t.object);
     }
 
-    // Compact: rebuild only if >20% of triples were removed (amortized cost)
-    if (toRemove.size > this.triples.length * 0.2) {
-      const newTriples = this.triples.filter((_, i) => !toRemove.has(i));
-      this.rebuildIndices(newTriples);
-    } else {
-      // Mark removed triples as null and skip in queries (lazy compaction)
-      // For simplicity, just filter and rebuild indices for small removals
-      const newTriples = this.triples.filter((_, i) => !toRemove.has(i));
-      this.rebuildIndices(newTriples);
-    }
+    // Compact: filter out removed triples and rebuild indices
+    const newTriples = this.triples.filter((_, i) => !toRemove.has(i));
+    this.rebuildIndices(newTriples);
 
     this._pageRankDirty = true;
     return matching.length;

@@ -536,10 +536,26 @@ export class ContextManagerV2 {
     let result = [...messages];
     let currentTokens = this.countTokens(result);
 
-    // Remove oldest messages one by one until within limits
+    // Remove oldest messages, preserving tool-call/tool-result pairs
     while (currentTokens > this.effectiveLimit && result.length > 2) {
-      // Keep at least 2 messages (1 user + 1 assistant minimum)
-      result = result.slice(1);
+      const first = result[0];
+      // If removing an assistant message with tool_calls, also remove its paired tool results
+      if (first.role === 'assistant' && 'tool_calls' in first && Array.isArray((first as { tool_calls?: unknown[] }).tool_calls)) {
+        const toolCallIds = new Set(
+          ((first as { tool_calls: Array<{ id: string }> }).tool_calls).map(tc => tc.id)
+        );
+        // Remove the assistant message + all paired tool results
+        result = result.filter((msg, idx) => {
+          if (idx === 0) return false; // remove the assistant message
+          if (msg.role === 'tool' && toolCallIds.has((msg as { tool_call_id?: string }).tool_call_id ?? '')) return false;
+          return true;
+        });
+      } else if (first.role === 'tool') {
+        // Orphaned tool result (its assistant was already removed) — safe to drop
+        result = result.slice(1);
+      } else {
+        result = result.slice(1);
+      }
       currentTokens = this.countTokens(result);
     }
 

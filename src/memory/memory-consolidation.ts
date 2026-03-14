@@ -162,10 +162,14 @@ export function consolidateMemories(
       continue;
     }
 
-    // Check for substring match (fuzzy dedup)
+    // Check for word-overlap dedup (more robust than substring prefix)
     let isDuplicate = false;
+    const words = new Set(normalized.split(/\s+/).filter(w => w.length > 3));
     for (const existing of existingLines) {
-      if (existing.includes(normalized.substring(0, 50)) || normalized.includes(existing.substring(0, 50))) {
+      const existingWords = existing.split(/\s+/).filter(w => w.length > 3);
+      const overlap = existingWords.filter(w => words.has(w)).length;
+      // If >60% of words overlap, consider it a duplicate
+      if (existingWords.length > 0 && overlap / existingWords.length > 0.6) {
         isDuplicate = true;
         break;
       }
@@ -180,10 +184,22 @@ export function consolidateMemories(
     memoriesAdded++;
   }
 
-  // Append new entries to MEMORY.md
+  // Append new entries to MEMORY.md with file lock
   if (newEntries.length > 0) {
     const section = `\n## Session ${new Date().toISOString().split('T')[0]}\n\n${newEntries.join('\n')}\n`;
-    fs.appendFileSync(memoryFilePath, section);
+    const lockPath = memoryFilePath + '.lock';
+    try {
+      // Atomic lock: O_EXCL fails if file exists
+      fs.writeFileSync(lockPath, String(process.pid), { flag: 'wx' });
+      try {
+        fs.appendFileSync(memoryFilePath, section);
+      } finally {
+        try { fs.unlinkSync(lockPath); } catch { /* best effort */ }
+      }
+    } catch {
+      // Lock failed (another process writing) — append anyway (appendFileSync is atomic on most OS for small writes)
+      fs.appendFileSync(memoryFilePath, section);
+    }
   }
 
   // Update summary (first 500 chars of key facts)
