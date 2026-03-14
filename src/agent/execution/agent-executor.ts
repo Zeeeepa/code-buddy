@@ -901,9 +901,9 @@ export class AgentExecutor {
         }
 
         // --- ICM cross-session memory: search for relevant past episodes (streaming path) ---
-        if (_icmBridgeProvider) {
+        if (this.getICMBridgeProvider()) {
           try {
-            const icm = _icmBridgeProvider();
+            const icm = this.getICMBridgeProvider()!();
             if (icm?.isAvailable()) {
               const memories = await icm.searchMemory(message, { limit: 3 });
               if (memories.length > 0) {

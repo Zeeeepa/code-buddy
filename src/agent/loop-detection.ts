@@ -141,7 +141,7 @@ export class LoopDetectionService {
     const startPos = Math.max(0, this.contentHistory.length - cleaned.length);
     for (let i = startPos; i <= this.contentHistory.length - CONTENT_CHUNK_SIZE; i += CONTENT_CHUNK_SIZE) {
       const chunk = this.contentHistory.substring(i, i + CONTENT_CHUNK_SIZE);
-      const hash = createHash('md5').update(chunk).digest('hex');
+      const hash = createHash('sha256').update(chunk).digest('hex').substring(0, 16);
 
       const positions = this.chunkHashes.get(hash) ?? [];
       positions.push(i);

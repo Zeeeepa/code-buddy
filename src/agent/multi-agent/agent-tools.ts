@@ -212,6 +212,9 @@ export function waitForAgents(
       agentEvents.removeListener('complete', onComplete);
     };
 
+    // Use addListener (not once) because cleanup removes it explicitly.
+    // Set maxListeners higher to prevent Node warning for many concurrent waits.
+    agentEvents.setMaxListeners(Math.max(agentEvents.getMaxListeners(), 50));
     agentEvents.on('complete', onComplete);
   });
 }

@@ -181,12 +181,13 @@ export async function evaluateToolCall(ctx: GuardianContext): Promise<GuardianEv
       ctx.recentFiles?.length ? `Recent files: ${ctx.recentFiles.slice(0, 5).join(', ')}` : '',
     ].filter(Boolean).join('\n');
 
-    // Race with timeout
+    // Race with timeout (clear timer on success to prevent leak)
+    let timeoutId: ReturnType<typeof setTimeout>;
     const response = await Promise.race([
-      _llmCall(GUARDIAN_SYSTEM_PROMPT, userPrompt),
-      new Promise<string>((_, reject) =>
-        setTimeout(() => reject(new Error('Guardian timeout')), GUARDIAN_TIMEOUT_MS)
-      ),
+      _llmCall(GUARDIAN_SYSTEM_PROMPT, userPrompt).finally(() => clearTimeout(timeoutId)),
+      new Promise<string>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('Guardian timeout')), GUARDIAN_TIMEOUT_MS);
+      }),
     ]);
 
     // Parse response

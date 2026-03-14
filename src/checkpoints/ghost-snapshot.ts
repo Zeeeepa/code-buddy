@@ -83,7 +83,10 @@ export class GhostSnapshotManager {
 
     this.turnCounter++;
     const id = new Date().toISOString().replace(/[:.]/g, '-');
-    const desc = description ?? `Turn ${this.turnCounter}`;
+    // Sanitize description: cap length, strip control chars
+    const rawDesc = description ?? `Turn ${this.turnCounter}`;
+    // eslint-disable-next-line no-control-regex
+    const desc = rawDesc.substring(0, 200).replace(/[\x00-\x1f\x7f]/g, '');
 
     try {
       // Stage all changes (including untracked, excluding .gitignored)

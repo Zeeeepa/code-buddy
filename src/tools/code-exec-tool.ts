@@ -27,7 +27,7 @@ import * as vm from 'vm';
 export type ToolExecutor = (toolName: string, args: Record<string, unknown>) => Promise<ToolResult>;
 
 interface CodeExecState {
-  /** Persistent key-value store across calls */
+  /** Persistent key-value store across calls (per-session, not global) */
   store: Map<string, unknown>;
   /** Output buffer */
   output: string[];
@@ -36,14 +36,31 @@ interface CodeExecState {
 }
 
 // ============================================================================
-// State
+// State (per-session via WeakMap keyed by session ID)
 // ============================================================================
 
-const state: CodeExecState = {
-  store: new Map(),
-  output: [],
-  yielded: false,
-};
+const sessionStates = new Map<string, CodeExecState>();
+let _activeSessionId = 'default';
+
+function getState(): CodeExecState {
+  let s = sessionStates.get(_activeSessionId);
+  if (!s) {
+    s = { store: new Map(), output: [], yielded: false };
+    sessionStates.set(_activeSessionId, s);
+  }
+  return s;
+}
+
+/**
+ * Set the active session for code execution isolation.
+ */
+export function setCodeExecSession(sessionId: string): void {
+  _activeSessionId = sessionId;
+}
+
+// Legacy alias (kept for backward compat in tests)
+const _legacyState: CodeExecState = { store: new Map(), output: [], yielded: false };
+void _legacyState;
 
 /** Tool executor function (injected from agent) */
 let _toolExecutor: ToolExecutor | null = null;
@@ -63,9 +80,10 @@ export function setCodeModeToolExecutor(executor: ToolExecutor, tools: string[])
  * Reset code mode state (for testing).
  */
 export function resetCodeModeState(): void {
-  state.store.clear();
-  state.output = [];
-  state.yielded = false;
+  const s = getState();
+  s.store.clear();
+  s.output = [];
+  s.yielded = false;
 }
 
 // ============================================================================
@@ -100,8 +118,9 @@ export class CodeExecTool extends BaseTool {
     const timeoutMs = typeof input.timeout_ms === 'number' ? input.timeout_ms : DEFAULT_TIMEOUT_MS;
     const startTime = Date.now();
 
-    state.output = [];
-    state.yielded = false;
+    const execState = getState();
+    execState.output = [];
+    execState.yielded = false;
 
     try {
       // Build the tools bridge object
@@ -122,14 +141,14 @@ export class CodeExecTool extends BaseTool {
         tools: toolsBridge,
         ALL_TOOLS: _availableTools,
         console: {
-          log: (...args: unknown[]) => state.output.push(args.map(String).join(' ')),
-          error: (...args: unknown[]) => state.output.push(`[ERROR] ${args.map(String).join(' ')}`),
-          warn: (...args: unknown[]) => state.output.push(`[WARN] ${args.map(String).join(' ')}`),
+          log: (...args: unknown[]) => execState.output.push(args.map(String).join(' ')),
+          error: (...args: unknown[]) => execState.output.push(`[ERROR] ${args.map(String).join(' ')}`),
+          warn: (...args: unknown[]) => execState.output.push(`[WARN] ${args.map(String).join(' ')}`),
         },
-        text: (content: string) => state.output.push(content),
-        store: (key: string, value: unknown) => { state.store.set(key, value); },
-        load: (key: string) => state.store.get(key),
-        yield_control: () => { state.yielded = true; },
+        text: (content: string) => execState.output.push(content),
+        store: (key: string, value: unknown) => { execState.store.set(key, value); },
+        load: (key: string) => execState.store.get(key),
+        yield_control: () => { execState.yielded = true; },
         setTimeout: undefined, // Block timers
         setInterval: undefined,
         process: undefined, // Block process access
@@ -144,11 +163,11 @@ export class CodeExecTool extends BaseTool {
       await script.runInContext(context, { timeout: timeoutMs });
 
       const elapsed = Date.now() - startTime;
-      const statusLine = state.yielded
+      const statusLine = execState.yielded
         ? `Script yielded control after ${elapsed}ms`
         : `Script completed in ${elapsed}ms`;
 
-      const output = [statusLine, '', ...state.output].join('\n');
+      const output = [statusLine, '', ...execState.output].join('\n');
       return this.success(output.substring(0, 50000)); // Cap output
 
     } catch (err) {
@@ -156,12 +175,12 @@ export class CodeExecTool extends BaseTool {
       const errMsg = err instanceof Error ? err.message : String(err);
 
       if (errMsg.includes('Script execution timed out')) {
-        const output = [`Script timed out after ${elapsed}ms`, '', ...state.output].join('\n');
+        const output = [`Script timed out after ${elapsed}ms`, '', ...execState.output].join('\n');
         return this.error(output.substring(0, 10000));
       }
 
       logger.debug(`code_exec error: ${errMsg}`);
-      const output = [`Script failed after ${elapsed}ms: ${errMsg}`, '', ...state.output].join('\n');
+      const output = [`Script failed after ${elapsed}ms: ${errMsg}`, '', ...execState.output].join('\n');
       return this.error(output.substring(0, 10000));
     }
   }

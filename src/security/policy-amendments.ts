@@ -233,13 +233,24 @@ export function canonicalizeCommand(command: string): string {
   return cmd;
 }
 
+/** Shell operators that chain commands — block if present after the pattern match */
+const SHELL_CHAIN_OPERATORS = /[;&|`$(){}]|&&|\|\|/;
+
 /**
- * Simple glob pattern matching.
+ * Safe glob pattern matching.
+ * Rejects commands containing shell chaining operators after the matched prefix.
  */
 function matchesPattern(command: string, pattern: string): boolean {
   if (pattern === '*') return true;
+
   if (pattern.endsWith('*')) {
-    return command.startsWith(pattern.slice(0, -1));
+    const prefix = pattern.slice(0, -1);
+    if (!command.startsWith(prefix)) return false;
+    // Check if the rest after prefix contains dangerous shell operators
+    const remainder = command.slice(prefix.length);
+    if (SHELL_CHAIN_OPERATORS.test(remainder)) return false;
+    return true;
   }
+
   return command === pattern;
 }

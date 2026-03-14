@@ -64,6 +64,11 @@ const PLAN_MODE_RESTRICTED_TOOLS = new Set([
 // State
 // ============================================================================
 
+/**
+ * Mode state. WARNING: These are module-level globals. In multi-session
+ * server deployments, mode should be tracked per-session via SessionFacade.
+ * These globals are safe for the single-user CLI but must be reset between sessions.
+ */
 let _currentMode: AgentMode = AgentMode.DEFAULT;
 let _planPath: string | null = null;
 
@@ -181,4 +186,13 @@ Rules:
 Available operations: read files, search code, analyze dependencies, reason about architecture.
 Blocked operations: edit code, run commands, create source files.
 </plan_mode>`;
+}
+
+/**
+ * Reset plan mode state. Must be called between sessions in multi-session
+ * server deployments to prevent state leakage.
+ */
+export function resetPlanMode(): void {
+  _currentMode = AgentMode.DEFAULT;
+  _planPath = null;
 }
