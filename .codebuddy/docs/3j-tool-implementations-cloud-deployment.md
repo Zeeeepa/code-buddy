@@ -1,10 +1,29 @@
 # Subsystems (continued)
 
-This section details the peripheral subsystems responsible for tool execution, environment automation, and cloud deployment configurations. Developers should review these modules when extending the agent's capabilities to new platforms or modifying the infrastructure deployment pipeline to ensure consistent behavior across environments.
+This documentation covers the peripheral subsystems that extend the agent's capabilities beyond code analysis, specifically focusing on environmental interaction tools and deployment configurations. Developers working on cross-platform automation or cloud-native integration should read this to understand how the agent bridges the gap between local execution and external infrastructure.
 
 ## Tool Implementations & Cloud Deployment (12 modules)
 
-The following modules define the operational boundaries for the agent, ranging from low-level system interaction to high-level infrastructure provisioning.
+When the agent requires visual feedback or environmental interaction, it invokes specialized tools rather than relying on raw code analysis. This separation of concerns allows the agent to maintain a clean core while offloading complex tasks like screen capture or OCR to dedicated modules.
+
+```mermaid
+graph TD
+    Agent[CodeBuddyAgent] --> Registry[Tool Registry]
+    Registry --> ST[ScreenshotTool]
+    Registry --> OCR[OCRTool]
+    Registry --> CC[CloudConfigs]
+    Registry --> NC[NixConfig]
+    ST --> OS{OS Detection}
+    OS --> Win[captureWindows]
+    OS --> Mac[captureMacOS]
+    OS --> Lin[captureLinux]
+```
+
+The `ScreenshotTool` exemplifies this architecture. It does not implement a monolithic capture function; instead, it delegates to platform-specific methods such as `ScreenshotTool.captureMacOS()`, `ScreenshotTool.captureLinux()`, or `ScreenshotTool.captureWindows()` based on the host environment. This ensures that `ScreenshotTool.capture()` remains a clean, unified interface for the agent, regardless of the underlying operating system.
+
+> **Key concept:** The tool abstraction layer decouples the agent's decision-making logic from the underlying OS-specific implementation, allowing the system to handle platform-specific logic transparently without polluting the core agent loop.
+
+Below are the primary modules responsible for these capabilities:
 
 - **src/tools/screenshot-tool** (rank: 0.006, 20 functions)
 - **src/deploy/cloud-configs** (rank: 0.005, 10 functions)
@@ -18,28 +37,18 @@ The following modules define the operational boundaries for the agent, ranging f
 - **src/tools/registry/misc-tools** (rank: 0.002, 51 functions)
 - ... and 2 more
 
-```mermaid
-graph TD
-    Agent[Agent Core] --> Registry[Tool Registry]
-    Registry --> Screenshot[Screenshot Tool]
-    Registry --> OCR[OCR Tool]
-    Registry --> Computer[Computer Control]
-    Agent --> Deploy[Cloud/Nix Configs]
-    Screenshot --> OS[OS Layer]
-    OS --> Win[Windows]
-    OS --> Mac[macOS]
-    OS --> Lin[Linux]
-```
+Having mapped the tool landscape, we turn our attention to the deployment configurations that ensure these tools function reliably across different infrastructure environments.
 
-### Screenshot Tooling
-The `src/tools/screenshot-tool` module provides a unified interface for visual data acquisition across heterogeneous operating systems. It abstracts platform-specific implementation details, allowing the agent to request a capture without needing to know the underlying host environment.
+## Deployment and Configuration
 
-> **Key concept:** The `ScreenshotTool` abstracts platform-specific capture logic, allowing the agent to maintain a unified interface across macOS, Linux, and Windows environments, significantly reducing conditional logic in the agent core.
+Deployment modules ensure the agent maintains consistency across environments, whether running on a local workstation or a cloud-based container. By isolating configuration logic into `src/deploy/cloud-configs` and `src/deploy/nix-config`, the system avoids hardcoding environment variables or paths, which is essential for maintaining a portable codebase.
 
-The primary entry point is `ScreenshotTool.capture`, which orchestrates the capture process. Depending on the host OS, the module delegates to `ScreenshotTool.captureMacOS`, `ScreenshotTool.captureLinux`, or `ScreenshotTool.captureWindows`. The module also includes utility methods such as `ScreenshotTool.execSync` for shell execution and `ScreenshotTool.isWSL` to detect Windows Subsystem for Linux environments. Promise resolution and rejection are handled via `ScreenshotTool.resolve` and `ScreenshotTool.reject`.
+> **Developer tip:** When adding a new tool, always register it in both `metadata.ts` and `tools.ts` — missing either causes silent failures during the tool discovery phase.
 
-While the tool registry manages the lifecycle of available capabilities, the deployment configurations listed above ensure these tools are provisioned correctly in production environments. These configurations bridge the gap between local development and cloud-based execution.
+These modules act as the bridge between the agent's requirements and the host's capabilities. By centralizing these configurations, we ensure that when the agent needs to scale or move to a new environment, the transition is handled by updating the configuration layer rather than refactoring the agent's core logic.
 
 ---
 
 **See also:** [Architecture](./2-architecture.md) · [Subsystems](./3a-core-agent-system-cli-and-slash-commands.md) · [Tool System](./5-tools.md) · [Configuration](./8-configuration.md)
+
+--- END ---

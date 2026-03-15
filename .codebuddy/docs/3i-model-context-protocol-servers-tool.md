@@ -1,19 +1,14 @@
 # Subsystems (continued)
 
-This section details the subsystem architecture responsible for Model Context Protocol (MCP) integration and tool execution. It is intended for developers extending the agent's capabilities or integrating external data sources, as these modules define how the agent interacts with the environment and persistent state.
-
-```mermaid
-graph TD
-    A[SessionStore] --> B[CodeBuddyTools]
-    B --> C[MCP Servers]
-    C --> D[Tools]
-    E[Persistent Memory] --> B
-    F[Context Files] --> B
-```
+This section explores the architectural backbone of Code Buddy’s extensibility: the Model Context Protocol (MCP) servers and the tool implementation layer. Developers and system architects should read this to understand how the agent bridges the gap between static codebases and dynamic, external capabilities.
 
 ## Model Context Protocol Servers & Tool Implementations (13 modules)
 
-The following modules constitute the core infrastructure for tool orchestration and session management. These components are responsible for normalizing external tool definitions and maintaining state across agent interactions.
+When Code Buddy needs to interact with the outside world, it doesn't rely on hard-coded logic for every possible action. Instead, it utilizes a modular registry system that dynamically loads capabilities. The process begins when the system calls `initializeToolRegistry`, which acts as the central nervous system for extensibility. This function orchestrates the loading of various providers, ensuring that the agent can communicate with external environments through `initializeMCPServers`.
+
+By abstracting tool definitions, the system allows for seamless integration of new features without modifying the core agent logic. When an external MCP tool is discovered, the system invokes `convertMCPToolToCodeBuddyTool` to normalize the interface, making it compatible with the agent's internal execution loop. This decoupling ensures that the agent remains lightweight while the tool ecosystem grows independently.
+
+Furthermore, the persistence of these interactions is managed by the session layer. Before any tool execution occurs, the system relies on `SessionStore.loadSession` to retrieve the current context, ensuring that the agent has the necessary state to make informed decisions. This tight integration between tool availability and session state is what allows the agent to maintain continuity across complex, multi-step tasks.
 
 - **src/persistence/session-store** (rank: 0.008, 44 functions)
 - **src/codebuddy/tools** (rank: 0.006, 12 functions)
@@ -27,18 +22,22 @@ The following modules constitute the core infrastructure for tool orchestration 
 - **src/mcp/mcp-memory-tools** (rank: 0.002, 1 functions)
 - ... and 3 more
 
-These modules facilitate the bridge between raw LLM inference and actionable environment manipulation. By standardizing tool registration and session persistence, the system ensures consistent state management across disparate tool implementations.
+```mermaid
+graph LR
+    A[Agent] --> B[SessionStore]
+    A --> C[Tool Registry]
+    C --> D[MCP Servers]
+    C --> E[Plugin Tools]
+    D --> F[Executable Tools]
+    E --> F
+```
 
-> **Key concept:** The `src/codebuddy/tools` module acts as the central registry for MCP servers, utilizing `initializeToolRegistry` and `initializeMCPServers` to dynamically map external capabilities into the agent's available toolset.
+> **Key concept:** The `initializeToolRegistry` function acts as the central nervous system for extensibility, dynamically converting external MCP definitions into executable agent tools via `convertMCPToolToCodeBuddyTool`, which significantly reduces the memory footprint of the agent's initial prompt.
 
-### Component Interaction and State Management
+> **Developer tip:** When debugging tool availability, verify that `initializeMCPServers` has completed successfully before checking the agent's capability list; otherwise, the agent will report missing tools despite correct configuration.
 
-Effective integration requires a clear understanding of how state is persisted and how tools are registered. The `src/persistence/session-store` module is critical for stateful operations; developers interacting with this module should leverage `SessionStore.createSession` and `SessionStore.addMessageToCurrentSession` to maintain conversation history and ensure that session data is correctly serialized.
-
-For tool orchestration, the system relies on the `src/codebuddy/tools` module to bridge the gap between plugin architectures and the agent's runtime. When extending functionality, developers should utilize `convertMCPToolToCodeBuddyTool` and `addPluginToolsToCodeBuddyTools` to ensure that third-party tools are correctly normalized and accessible to the agent's decision-making loop.
+Now that we have established how the agent orchestrates tool calls and manages its external capabilities, we must examine the persistence layer that governs how these sessions are stored and retrieved to ensure long-term memory continuity.
 
 ---
 
 **See also:** [Subsystems](./3a-core-agent-system-cli-and-slash-commands.md) · [Tool System](./5-tools.md) · [Context & Memory](./7-context-memory.md) · [API Reference](./9-api-reference.md)
-
---- END ---

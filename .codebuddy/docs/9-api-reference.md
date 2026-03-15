@@ -1,10 +1,21 @@
 # CLI & API Reference
 
-This reference provides a comprehensive overview of the Code Buddy command-line interface (CLI) and HTTP API endpoints. It is intended for developers, system administrators, and contributors who need to integrate, automate, or extend the Code Buddy agent environment.
+This reference guide serves as the definitive manual for interacting with the Code Buddy ecosystem. Whether you are a developer integrating the agent into a CI/CD pipeline or a power user optimizing local workflows, understanding these interfaces is essential for mastering the agent's capabilities and ensuring seamless communication between human intent and machine execution.
 
 ## CLI Subcommands
 
-The CLI serves as the primary entry point for interacting with the agent, managing infrastructure, and configuring runtime behavior. These commands map directly to internal management modules, such as `DMPairingManager.approve` for security pairing or `DeviceNodeManager.pairDevice` for hardware integration.
+The Code Buddy CLI acts as the primary nervous system for the agent, translating human intent into actionable tasks. When you invoke a command like `buddy git`, the system does not simply execute a shell script; it orchestrates a series of agentic steps—planning, execution, and verification—to ensure the outcome aligns with your repository's state.
+
+```mermaid
+graph TD
+    User[User Input] --> CLI[CLI Interface]
+    CLI --> Agent[CodeBuddyAgent]
+    Agent --> Memory[EnhancedMemory]
+    Agent --> Tools[Tool Registry]
+    Tools --> Execution[Execution Layer]
+```
+
+By utilizing these subcommands, you interface directly with the core logic modules. For instance, `buddy pairing` interacts with `DMPairingManager` to handle secure communication, while `buddy device` utilizes `DeviceNodeManager` to manage hardware connectivity.
 
 | Command | Description |
 |---------|-------------|
@@ -41,24 +52,13 @@ The CLI serves as the primary entry point for interacting with the agent, managi
 | `buddy approvals` | Manage tool/action approval requests |
 | `buddy deploy` | Generate cloud deployment configurations (Fly, Railway, Render, Nix) |
 
-The following diagram illustrates the high-level interaction flow between the CLI entry points, the core agent system, and the persistence layer.
-
-```mermaid
-graph TD
-    A[CLI / API Request] --> B{Command Router}
-    B -->|Manage| C[DMPairingManager]
-    B -->|Execute| D[CodeBuddyAgent]
-    B -->|Persistence| E[SessionStore]
-    D -->|Tooling| F[ScreenshotTool]
-    D -->|State| E
-    C -->|Security| G[Access Control]
-```
+> **Developer tip:** When adding a new CLI command, ensure it is registered in the main entry point; failure to do so will result in the command being ignored by the argument parser, leading to silent failures during execution.
 
 ## CLI Options
 
-Beyond subcommands, the CLI supports granular configuration flags that modify execution parameters, security posture, and output formatting. These flags allow for fine-tuning the agent's behavior without modifying the underlying configuration files.
+Beyond simple command execution, the CLI offers granular control over the agent's runtime environment. These flags allow you to toggle security modes, adjust token budgets, or force specific model behaviors, effectively allowing you to tune the agent's "personality" for different tasks.
 
-> **Key concept:** The `--probe-tools` flag triggers `CodeBuddyClient.probeToolSupport()` at startup, ensuring the model's function-calling capabilities are verified before the agent attempts to execute complex tool chains.
+> **Key concept:** The `--probe-tools` flag is critical for local inference. By invoking `CodeBuddyClient.probeToolSupport()`, the agent dynamically verifies if the connected model can handle function calling, preventing runtime errors during complex tasks.
 
 | Flag | Description |
 |------|-------------|
@@ -83,9 +83,13 @@ Beyond subcommands, the CLI supports granular configuration flags that modify ex
 | `--no-color` | disable colored output |
 | `--no-emoji` | disable emoji in output |
 
+Having configured the runtime environment, we can now shift our focus to the interactive session layer, where slash commands provide immediate control over the agent's active state.
+
 ## Slash Commands
 
-Slash commands provide in-chat control mechanisms, allowing users to trigger specific agent behaviors or documentation generation without leaving the conversation context. These commands are parsed by the agent's input handler to invoke internal routines.
+Slash commands provide a shorthand interface for manipulating the agent's internal state during active sessions. These commands bypass the standard conversational flow, allowing for immediate access to system-level functions like documentation generation or prompt injection.
+
+> **Developer tip:** Slash commands are processed by the agent's command parser. Always validate input arguments before passing them to the underlying service to prevent injection vulnerabilities or unexpected state transitions.
 
 | File | Purpose |
 |------|---------|
@@ -95,9 +99,11 @@ Slash commands provide in-chat control mechanisms, allowing users to trigger spe
 | `/prompts` | /prompt Slash Commands |
 | `/types` | Slash Command Types |
 
+With the slash commands established as the primary interaction method for active sessions, we must now examine the HTTP API, which provides the necessary hooks for headless deployments and external integrations.
+
 ## HTTP API Routes
 
-For programmatic access and external integrations, the Code Buddy server exposes a RESTful API, enabling session management and metric tracking. These routes interface directly with the persistence layer, specifically utilizing `SessionStore.createSession` and `SessionStore.saveSession` to manage stateful interactions.
+For headless deployments or integration with external IDEs like Cursor or VS Code, the HTTP API provides a robust interface for programmatic access. This layer exposes the same functionality as the CLI but via standard RESTful endpoints, enabling seamless interoperability with the `SessionStore` and other persistence layers.
 
 | Route File | Endpoints |
 |------------|----------|
@@ -115,5 +121,3 @@ For programmatic access and external integrations, the Code Buddy server exposes
 ---
 
 **See also:** [Architecture](./2-architecture.md) · [Subsystems](./3a-core-agent-system-cli-and-slash-commands.md) · [Tool System](./5-tools.md) · [Security](./6-security.md)
-
---- END ---

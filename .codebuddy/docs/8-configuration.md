@@ -1,33 +1,24 @@
 # Configuration System
 
-The configuration system manages the operational parameters of the CodeBuddy environment through a multi-layered hierarchy. This architecture ensures that system behavior remains predictable across diverse deployment environments, from local development to production, and is critical for developers configuring model providers or agent autonomy levels.
+The configuration system acts as the central nervous system for Code Buddy, dictating how the agent perceives its environment and interacts with external services. By implementing a multi-layered hierarchy, the system ensures that developers can maintain global defaults while retaining the flexibility to override behaviors on a per-project or per-session basis. This documentation is essential for engineers looking to tune agent performance, secure API credentials, or customize model behavior.
 
 ## Configuration Hierarchy
 
-The system resolves settings using a strict precedence order, where higher-level definitions override lower-level defaults. This allows for granular control, enabling developers to set global defaults while maintaining project-specific overrides.
+The architecture follows a strict cascading priority model. When the agent initializes, it resolves settings from the bottom up, allowing specific overrides to supersede general defaults. This ensures that a project-specific `.codebuddy/` directory always takes precedence over global user settings, preventing accidental leakage of project-specific configurations into global environments.
 
 ```mermaid
 graph TD
-    A[Default Config] --> B[User Config]
-    B --> C[Project Config]
-    C --> D[Env Variables]
-    D --> E[CLI Flags]
-    E --> F((Resolved Config))
+    A[CLI Flags] --> B[Environment Variables]
+    B --> C[Project .codebuddy/]
+    C --> D[User ~/.codebuddy/]
+    D --> E[Default In-Code]
 ```
 
-The hierarchy dictates how settings are resolved at runtime, with specific precedence rules ensuring that user-defined preferences override default behaviors.
-
-```
-1. Default (in-code)     — Base behavior
-2. User (~/.codebuddy/)  — Personal preferences
-3. Project (.codebuddy/) — Project-specific settings
-4. Environment variables — Runtime overrides
-5. CLI flags             — Highest priority
-```
+Now that we understand the precedence of these layers, we must examine the specific files that govern these configurations.
 
 ## Key Configuration Files
 
-The following files define the static configuration state. These files are parsed during the initialization phase to establish the baseline environment for the agent.
+These files serve as the persistent state and configuration manifest for the agent. They are primarily located within the `.codebuddy/` directory, which acts as the local source of truth for the agent's operational parameters.
 
 | File | Location |
 |------|----------|
@@ -47,11 +38,11 @@ The following files define the static configuration state. These files are parse
 | `mcp.json` | .codebuddy/ |
 | `settings.local.json` | .claude/ |
 
-Beyond static configuration files, the system relies on environment variables to inject sensitive credentials and runtime toggles that influence agent behavior.
+> **Developer tip:** `settings.local.json` is ignored by git, making it the ideal place for sensitive local overrides that shouldn't be committed to the repository.
 
 ## Environment Variables
 
-Environment variables provide the mechanism for runtime configuration, particularly for sensitive data like API keys and operational toggles.
+Environment variables provide the runtime bridge between the host operating system and the agent's internal logic. They are critical for injecting secrets and toggling high-level features like autonomy modes or performance profiling without modifying the codebase.
 
 | Variable | Description |
 |----------|-------------|
@@ -74,21 +65,19 @@ Environment variables provide the mechanism for runtime configuration, particula
 | `SENTRY_DSN` | Sentry error reporting DSN |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | OpenTelemetry OTLP endpoint for distributed tracing |
 
-Model-specific behavior is further refined through the model configuration layer, which maps provider-specific capabilities to the internal agent architecture.
+> **Key concept:** The configuration loader uses a lazy-loading strategy for environment variables, ensuring that sensitive keys like `GROK_API_KEY` are only accessed when the specific provider is initialized, reducing the risk of accidental exposure in logs.
 
 ## Model Configuration
 
-Models are configured via `src/config/model-tools.ts` using glob matching patterns to determine capabilities. During the initialization sequence, the system invokes `CodeBuddyClient.validateModel()` to ensure the selected model is compatible with the current environment.
+Model behavior is governed by `src/config/model-tools.ts`, which acts as the registry for supported LLMs. When the agent prepares to execute a task, it calls `CodeBuddyClient.validateModel()` to ensure the selected model is compatible with the required toolset.
 
-> **Key concept:** The configuration resolution engine implements a "last-write-wins" strategy. CLI flags and environment variables are evaluated last, allowing for ephemeral overrides without modifying persistent configuration files in `~/.codebuddy/` or the project root.
-
-For specific providers, such as Gemini, the system utilizes `CodeBuddyClient.isGeminiModelName()` to apply provider-specific optimizations. Furthermore, `CodeBuddyAgent.initializeAgentSystemPrompt()` is called to inject the appropriate system instructions based on the resolved model configuration.
+If the agent detects a specific provider, such as when `CodeBuddyAgent.isGrokModel()` returns true, it adjusts its internal prompt engineering and token budgeting accordingly. Furthermore, the system performs runtime checks using `CodeBuddyClient.isGeminiModelName()` to apply specific formatting rules required by different model architectures.
 
 - Per-model: `contextWindow`, `maxOutputTokens`, `patchFormat`
 - Provider auto-detection from model name or base URL
 - Supports: Grok, Claude, GPT, Gemini, Ollama, LM Studio
 
----
+With the configuration and model settings defined, the agent is ready to initialize its memory and tool registries.
 
 **See also:** [Overview](./1-overview.md) · [Tool System](./5-tools.md) · [Context & Memory](./7-context-memory.md) · [API Reference](./9-api-reference.md)
 

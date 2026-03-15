@@ -1,12 +1,35 @@
-# Subsystems
+# Subsystems Architecture
 
-This section provides an architectural overview of the 42 identified subsystems within the codebase, categorized by their functional domain. Developers should consult this documentation to understand module boundaries, dependency hierarchies, and the orchestration logic required when implementing new features or debugging cross-module interactions.
+The CodeBuddy architecture is built on a foundation of 42 distinct subsystems, each designed to encapsulate specific logic and minimize cross-module coupling. This document provides a high-level overview of these components, intended for engineers who need to navigate the codebase, debug integration points, or extend the agent's capabilities.
 
-## Core Agent System & CLI And Slash Commands (32 modules)
+## Core Agent System
 
-The core agent system serves as the primary orchestration layer for all user interactions, command parsing, and tool execution. It manages the lifecycle of the agent, including memory initialization and skill registration, ensuring that the environment is fully prepared before any user input is processed.
+At the center of this architecture lies the `CodeBuddyAgent`. When the system boots, it doesn't simply start; it orchestrates a complex sequence of initialization routines to ensure the agent is context-aware and ready for interaction. This process begins with `CodeBuddyAgent.initializeMemory()`, which sets up the storage layer, followed by `CodeBuddyAgent.initializeAgentRegistry()` to catalog available tools and skills.
 
-> **Key concept:** The `CodeBuddyAgent` acts as the central orchestrator. By invoking `CodeBuddyAgent.initializeAgentRegistry` and `CodeBuddyAgent.initializeSkills` during startup, the system ensures that all available capabilities are registered and ready for inference, while `CodeBuddyAgent.initializeMemory` establishes the necessary state persistence.
+By separating these concerns, the system ensures that if the memory provider fails, the agent registry remains intact, allowing for graceful degradation. The initialization flow is strictly ordered to prevent race conditions during the setup of the system prompt via `CodeBuddyAgent.initializeAgentSystemPrompt()`.
+
+```mermaid
+graph LR
+    A[CodeBuddyAgent] --> B[initializeMemory]
+    A --> C[initializeAgentRegistry]
+    A --> D[initializeSkills]
+    C --> E[initializeAgentSystemPrompt]
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+```
+
+> **Key concept:** The modularity score of 0.758 indicates a highly decoupled system. This allows developers to swap out the `EnhancedMemory` provider or modify `DMPairingManager` logic without triggering cascading failures across the core agent loop.
+
+> **Developer tip:** When modifying the initialization sequence, ensure that `CodeBuddyAgent.ensureDecisionMemoryProvider()` is called before any tool execution, as missing decision context will cause the agent to hallucinate tool parameters.
+
+Now that we have established the core initialization sequence, we can examine the broader subsystem inventory that supports these operations and provides the necessary infrastructure for the agent to function.
+
+## Subsystem Inventory
+
+The project is organized into 42 architectural subsystems. These modules are categorized by their responsibility, ranging from communication channels to specialized repair engines.
+
+Detected **42** architectural subsystems (modularity: 0.758)
+
+### Core Agent System & CLI And Slash Commands (32 modules)
 
 - **src/agent/codebuddy-agent** (rank: 0.013, 65 functions)
 - **src/channels/index** (rank: 0.007, 0 functions)
@@ -20,20 +43,13 @@ The core agent system serves as the primary orchestration layer for all user int
 - **src/agent/repair/repair-engine** (rank: 0.003, 25 functions)
 - ... and 22 more
 
-Beyond the core agent orchestration, the system relies on specialized modules to manage complex reasoning, persistent state across sessions, and external tool integration. The following diagram illustrates the high-level relationship between the agent, its memory providers, and the extended thinking capabilities.
+## Specialized Subsystems
 
-```mermaid
-graph LR
-    Agent[CodeBuddyAgent] --> Memory[EnhancedMemory]
-    Agent --> Thinking[ExtendedThinkingManager]
-    Agent --> Tools[ToolRegistry]
-    Memory --> Session[SessionStore]
-    Thinking --> Config[ThinkingConfig]
-    
-    style Agent fill:#f9f,stroke:#333,stroke-width:2px
-    style Memory fill:#bbf,stroke:#333
-    style Thinking fill:#bbf,stroke:#333
-```
+Beyond the core agent, the system relies on specialized modules to handle external interactions and state persistence. For instance, the `DMPairingManager` handles secure communication handshakes. When the agent receives a request, `DMPairingManager.checkSender()` is invoked to validate the origin before any processing occurs. This ensures that unauthorized entities cannot trigger agent actions.
+
+Similarly, state management is offloaded to the `SessionStore`. This module is responsible for the lifecycle of a conversation, utilizing `SessionStore.createSession()` to initialize new contexts and `SessionStore.saveSession()` to persist them to disk. By isolating these concerns, the system maintains a clean separation between the "brain" (the agent) and the "memory" (the session store).
+
+> **Developer tip:** When debugging session issues, always check `SessionStore.ensureWritableDirectory()` first. If the process lacks filesystem permissions, the agent will fail to save state, leading to "amnesia" between restarts.
 
 ---
 

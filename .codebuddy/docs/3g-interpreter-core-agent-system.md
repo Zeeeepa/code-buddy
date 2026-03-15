@@ -1,25 +1,32 @@
-# Subsystems (continued)
+# Subsystems: Interpreter & Core Agent System
 
-The Interpreter and Core Agent System serves as the primary execution engine for CodeBuddy, orchestrating model interactions, tool invocation, and state management. This section details the architectural components responsible for translating user intent into actionable code and system operations, which is critical for developers extending agent capabilities or debugging execution flows.
+This section details the architectural backbone of the Code Buddy agent, focusing on the interpreter and core agent systems. Developers and system architects should read this to understand how the agent translates high-level intent into low-level system operations, ranging from file manipulation to browser interaction.
+
+At the heart of Code Buddy lies the `src/codebuddy/client` module, which acts as the primary interface between the user's intent and the underlying LLM infrastructure. Before any task begins, `CodeBuddyClient.validateModel()` ensures the selected model is capable of the required reasoning depth, preventing runtime failures during complex operations. This validation step is critical because it determines whether the agent should attempt advanced function calling or fall back to standard inference.
+
+When the agent encounters a problem requiring multi-step logic, it leverages `src/agent/extended-thinking`. By calling `ExtendedThinkingManager.toggle()`, the system can dynamically adjust its token budget, ensuring that complex architectural decisions are not cut short by strict output limits. This capability allows the agent to "think" before it acts, a necessary precursor to executing tasks that require deep context awareness.
 
 ```mermaid
-graph TD
-    A[CodeBuddy Client] --> B[CodeBuddy Agent]
-    B --> C[Extended Thinking]
-    B --> D[Cache Breakpoints]
-    B --> E[Interpreter System]
-    E --> F[OS]
-    E --> G[Files]
-    E --> H[Browser]
-    style A fill:#f9f,stroke:#333,stroke-width:2px
-    style B fill:#bbf,stroke:#333,stroke-width:2px
+graph LR
+    User --> Client[CodeBuddyClient]
+    Client --> Thinking[ExtendedThinking]
+    Thinking --> Files[Interpreter: Files]
+    Thinking --> OS[Interpreter: OS]
+    Thinking --> Browser[Interpreter: Browser]
+    
+    style Client fill:#f9f,stroke:#333
+    style Thinking fill:#bbf,stroke:#333
 ```
 
-## Interpreter & Core Agent System (16 modules)
+Beyond the core reasoning loop, the system must optimize for performance. The `src/optimization/cache-breakpoints` module allows the agent to inject checkpoints into long-running LLM calls, significantly reducing latency for repeated tasks.
 
-The core of the system relies on the `src/codebuddy/client` module to manage model connectivity and validation. By utilizing `CodeBuddyClient.validateModel()` and `CodeBuddyClient.isGeminiModelName()`, the system ensures that only supported inference providers are utilized during the request lifecycle. Furthermore, the `src/agent/extended-thinking` module provides advanced reasoning capabilities, allowing developers to manage cognitive overhead via `ExtendedThinkingManager.setTokenBudget()` and `ExtendedThinkingManager.isEnabled()`.
+> **Key concept:** The `src/optimization/cache-breakpoints` module enables the agent to inject checkpoints into long-running LLM calls. By using `injectAnthropicCacheBreakpoints()`, the system can cache intermediate states, saving significant compute time on subsequent iterations.
 
-> **Key concept:** The `CodeBuddyClient` acts as the central gateway for model validation, while `ExtendedThinkingManager` allows for dynamic token budget adjustments, significantly impacting the reasoning depth of the agent during complex tasks.
+Once the agent has formulated a plan, it must execute that plan against the host environment. This is where the interpreter modules, such as `src/interpreter/computer/files`, `src/interpreter/computer/os`, and `src/interpreter/computer/browser`, take control. These modules translate abstract agent commands into concrete system calls, effectively acting as the agent's hands.
+
+> **Developer tip:** When interacting with the file system via `src/interpreter/computer/files`, always verify permissions before execution, as the agent operates with the user's current shell privileges.
+
+The following list outlines the primary modules responsible for the interpreter and core agent logic:
 
 - **src/codebuddy/client** (rank: 0.017, 22 functions)
 - **src/optimization/cache-breakpoints** (rank: 0.010, 3 functions)
@@ -33,7 +40,7 @@ The core of the system relies on the `src/codebuddy/client` module to manage mod
 - **src/agent/prompt-suggestions** (rank: 0.002, 10 functions)
 - ... and 6 more
 
-These modules collectively form the runtime environment for the agent. Developers should ensure that any modifications to these core paths maintain backward compatibility with existing session and memory management protocols.
+These modules are tightly coupled to ensure that when `CodeBuddyClient.performToolProbe()` identifies a capability, the corresponding interpreter module is ready to handle the request. Understanding this relationship is vital for debugging agent behavior or extending the system with new toolsets.
 
 ---
 

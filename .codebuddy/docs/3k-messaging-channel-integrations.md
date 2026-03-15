@@ -1,22 +1,8 @@
-# Subsystems (continued)
+# Messaging Channel Integrations
 
-This section details the messaging channel integration layer, which abstracts communication protocols across various platforms to provide a unified interface for the agent. Developers should reference these modules when implementing new channel support or modifying existing message routing logic to ensure compatibility with the core agent architecture and security policies.
+This documentation outlines the messaging channel architecture that allows Code Buddy to interface with diverse external communication platforms. Developers and system integrators should read this to understand how the agent bridges the gap between internal logic and external user interfaces, ensuring consistent behavior regardless of the transport layer.
 
-```mermaid
-graph LR
-    A[Messaging Channel] --> B[src/channels/index]
-    B --> C{DMPairingManager}
-    C --> D[Core Agent]
-    C --> E[Session Store]
-```
-
-## Messaging Channel Integrations (11 modules)
-
-The system utilizes a modular adapter pattern to handle diverse messaging APIs. Each channel module must interface with the `DMPairingManager` to handle authentication and message routing. Before a message is processed by the agent, the channel integration must verify the sender's status using `DMPairingManager.checkSender()` and ensure the connection is authorized via `DMPairingManager.isApproved()`.
-
-> **Key concept:** The `DMPairingManager` acts as a gatekeeper for all incoming channel traffic. By invoking `DMPairingManager.requiresPairing()`, the system prevents unauthorized message injection before the agent processes the payload, ensuring that only paired and approved channels can trigger agent execution.
-
-The following modules represent the current messaging channel implementations:
+The following list details the currently supported messaging modules, each serving as a gateway for the agent to receive inputs and dispatch responses.
 
 - **src/channels/discord/index** (rank: 0.002, 0 functions)
 - **src/channels/imessage/index** (rank: 0.002, 20 functions)
@@ -30,7 +16,27 @@ The following modules represent the current messaging channel implementations:
 - **src/channels/zalo/index** (rank: 0.002, 10 functions)
 - ... and 1 more
 
-These integrations rely on the centralized `src/channels/index` to register handlers and manage lifecycle events. For deeper integration with the agent's state, developers should also review the session persistence layer to ensure that channel-specific metadata is correctly mapped to the session store.
+Beyond the mere existence of these modules, the system relies on a robust security handshake to manage trust between the agent and the user. Because these channels operate in public or semi-public environments, the agent cannot blindly process every incoming request.
+
+When a message arrives from an external source, the agent must verify the sender's identity and authorization status before executing any logic. This verification process is governed by the `DMPairingManager`, which acts as the gatekeeper for all direct messaging interactions.
+
+```mermaid
+graph LR
+    User((User)) --> Channel[Messaging Channel]
+    Channel --> Agent[CodeBuddyAgent]
+    Agent --> Pairing{DMPairingManager}
+    Pairing -->|Check| Auth[Auth Status]
+    Auth -->|Approved| Logic[Execute Logic]
+    Auth -->|Blocked| Reject[Reject Request]
+```
+
+To maintain security, the agent invokes `DMPairingManager.requiresPairing()` to determine if the incoming channel or user requires an explicit handshake. If the sender is unknown, the agent utilizes `DMPairingManager.getPairingMessage()` to initiate the authorization flow. Only after `DMPairingManager.approve()` or `DMPairingManager.approveDirectly()` is called does the agent proceed with standard processing.
+
+> **Key concept:** The `DMPairingManager` acts as a mandatory security middleware. By decoupling the authentication logic from the channel implementation, the system ensures that security policies are applied uniformly, whether the user is on Slack, Discord, or Nostr.
+
+Furthermore, developers must be aware of the state of the sender. Before processing, the system calls `DMPairingManager.checkSender()` to validate the user's credentials and `DMPairingManager.isBlocked()` to ensure the user has not been blacklisted. This prevents malicious actors from flooding the agent with requests through unverified channels.
+
+> **Developer tip:** When implementing a new channel integration, always ensure that the entry point calls `DMPairingManager.requiresPairing()` before passing the message payload to the agent's core logic. Failing to do so may expose the agent to unauthorized command execution.
 
 ---
 

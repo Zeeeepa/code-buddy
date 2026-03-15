@@ -1,18 +1,44 @@
-# Documentation Index
+# Code Buddy — Documentation
 
-Generated: 2026-03-15T13:58:40.129Z
+> A terminal-based autonomous AI coding agent, multi-provider, open-source.
+
+*Generated: 2026-03-15*
+
+## Where to start?
+
+| I want to... | Go to... |
+|-------------|----------|
+| Understand the architecture | [Overview](./1-overview.md) then [Architecture](./2-architecture.md) |
+| Add a new tool | [Tool System](./5-tools.md) then [Development Guide](./10-development.md) |
+| Configure an AI provider | [Configuration](./8-configuration.md) |
+| Understand security | [Security](./6-security.md) |
+| Use the CLI or API | [API Reference](./9-api-reference.md) |
+| Explore code quality | [Metrics](./4-metrics.md) |
+
+## Project at a Glance
 
 | Metric | Value |
 |--------|-------|
-| Modules | 1077 |
+| Source Modules | 1 077 |
 | Classes | 907 |
-| Functions | 14313 |
-| Relationships | 49113 |
+| Functions | 14 317 |
+| Code Relationships | 49 126 |
 
-## Sections
+## All Sections
 
-- [Overview](./1-overview.md)
-- [Architecture](./2-architecture.md)
+1. [Overview](./1-overview.md)
+2. [Architecture](./2-architecture.md)
+4. [Metrics](./4-metrics.md)
+5. [Tools](./5-tools.md)
+6. [Security](./6-security.md)
+7. [Context memory](./7-context-memory.md)
+8. [Configuration](./8-configuration.md)
+9. [Api reference](./9-api-reference.md)
+10. [Development](./10-development.md)
+11. [Changelog](./11-changelog.md)
+
+### Subsystems
+
 - [Core Agent System & CLI And Slash Commands (32 modules)](./3a-core-agent-system-cli-and-slash-commands.md)
 - [CLI And Slash Commands & Shared Utilities (28 modules)](./3b-cli-and-slash-commands-shared-utilities.md)
 - [Shared Utilities & Context Window Management (23 modules)](./3c-shared-utilities-context-window.md)
@@ -32,11 +58,3 @@ Generated: 2026-03-15T13:58:40.129Z
 - [Shared Utilities & CLI And Slash Commands (5 modules)](./3q-shared-utilities-cli-and-slash-commands.md)
 - [Multi-Device Management (5 modules)](./3r-multi-device-management.md)
 - [Other Subsystems (69 modules in 24 clusters)](./3s-other-subsystems.md)
-- [Metrics](./4-metrics.md)
-- [Tools](./5-tools.md)
-- [Security](./6-security.md)
-- [Context memory](./7-context-memory.md)
-- [Configuration](./8-configuration.md)
-- [Api reference](./9-api-reference.md)
-- [Development](./10-development.md)
-- [Changelog](./11-changelog.md)

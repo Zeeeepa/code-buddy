@@ -1,19 +1,28 @@
-# Subsystems (continued)
+# Subsystems: Tool Implementations
 
-This section details the specialized tool implementations available within the agent ecosystem, ranging from multimodal processing to document management. These modules extend the core agent capabilities, allowing for complex interactions with local files, media, and external data formats.
+This section catalogs the specialized tool implementations that extend the core agent's capabilities beyond basic code manipulation. Developers and system integrators should review this documentation to understand how to leverage multimodal and utility tools within the CodeBuddy ecosystem, ensuring they can effectively extend the agent's reach into file management, media processing, and system interaction.
+
+When CodeBuddy needs to perform actions outside of its primary code-generation scope, it relies on a modular tool architecture. Rather than baking every possible capability into the core agent, the system uses a registry pattern managed by `src/codebuddy/tools`. This approach ensures that the agent remains lightweight, loading only the necessary logic for specific tasks—such as archiving files or processing video—when requested.
 
 ```mermaid
-graph TD
-    A[CodeBuddy Registry] --> B[MCP Manager]
-    A --> C[Plugin Tools]
-    B --> D[MCP Servers]
-    C --> E[ScreenshotTool]
-    E --> F[Execution Context]
+graph LR
+    Agent[CodeBuddyAgent] --> Registry[src/codebuddy/tools]
+    Registry --> Init[initializeToolRegistry]
+    Init --> Loader[addPluginToolsToCodeBuddyTools]
+    Loader --> Tools[Tool Modules]
+    Tools --> Archive[Archive Tool]
+    Tools --> Media[Multimodal Tools]
 ```
 
-The following modules represent the specialized toolset integrated into the agent's runtime environment. These tools are managed through a centralized registry system that handles lifecycle, discovery, and execution context.
+To ensure the agent can dynamically discover and execute these capabilities, the system relies on a standardized conversion process. When a new tool is introduced, the `convertPluginToolToCodeBuddyTool` function maps the external interface to the internal execution context, allowing the agent to treat disparate utilities as first-class citizens.
 
-## Tool Implementations — Archive tool (10 modules)
+> **Key concept:** The tool registry pattern allows the agent to dynamically load capabilities without bloating the main binary, keeping the memory footprint stable even as the feature set grows.
+
+Now that we understand how the agent orchestrates tool registration and discovery, we can examine the specific tool modules available in the current distribution.
+
+## Archive tool and utility modules
+
+The following modules represent the current suite of specialized tools available for integration. Each module is designed to be self-contained, providing specific functionality that the agent can invoke via the `src/codebuddy/tools` registry.
 
 - **src/tools/archive-tool** (rank: 0.002, 21 functions)
 - **src/tools/audio-tool** (rank: 0.002, 12 functions)
@@ -26,13 +35,11 @@ The following modules represent the specialized toolset integrated into the agen
 - **src/tools/video-tool** (rank: 0.002, 15 functions)
 - **src/tools/registry/multimodal-tools** (rank: 0.002, 59 functions)
 
-To maintain consistency across these diverse implementations, the system utilizes a unified registration process. This ensures that disparate tool types—whether they are local plugins or remote MCP servers—are normalized into a format the agent can execute reliably.
+Managing these tools effectively requires careful attention to the initialization sequence. The `initializeToolRegistry` function is responsible for aggregating these modules, while `addPluginToolsToCodeBuddyTools` ensures that any third-party or marketplace extensions are correctly merged into the active toolset.
 
-> **Key concept:** The tool registry abstracts the complexity of different tool sources (MCP, plugins, marketplace) into a unified interface, allowing the agent to invoke tools without needing to know their underlying implementation details.
+> **Developer tip:** When implementing a new tool, ensure it is compatible with the `convertPluginToolToCodeBuddyTool` interface; otherwise, the registry will fail to initialize the tool during the startup sequence.
 
-The registration process is orchestrated by `initializeToolRegistry()`, which coordinates with `getMCPManager()` to prepare the environment. For MCP-based tools, the system invokes `initializeMCPServers()` and subsequently uses `addMCPToolsToCodeBuddyTools()` to expose them to the agent. Similarly, for plugin-based architectures, the system relies on `convertPluginToolToCodeBuddyTool()` and `addPluginToolsToCodeBuddyTools()` to ensure compatibility.
-
-When executing specific tasks, such as visual capture, the system leverages specialized classes like `ScreenshotTool`. For example, `ScreenshotTool.capture()` is used to interface with the host OS, demonstrating how these registered tools bridge the gap between the agent's logic and the physical device environment.
+By maintaining this strict separation between the core agent logic and the tool implementations, the project ensures that adding new capabilities—such as a new `ScreenshotTool` or an expanded `ArchiveTool`—does not introduce regressions into the primary agent loop. This modularity is essential for scaling the project to support diverse developer workflows.
 
 ---
 

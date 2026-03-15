@@ -1,10 +1,12 @@
 # Context & Memory Management
 
-This section details the architecture of the system's context management and memory persistence layers. These modules are critical for maintaining state across long-running sessions, ensuring the agent retains architectural decisions, coding styles, and repository-specific knowledge. Developers working on agent state or retrieval-augmented generation (RAG) pipelines should familiarize themselves with these components to ensure efficient token utilization and state consistency.
+This documentation outlines the architectural foundation for how the agent perceives, retains, and retrieves information across sessions. Developers working on state persistence, context window optimization, or long-term recall should read this to understand how the system balances token efficiency with the need for deep, semantic understanding of the codebase.
 
 ## Context Management (28 modules)
 
-The context management layer is responsible for the dynamic assembly of LLM prompts. It handles everything from repository mapping and dependency-aware RAG to token-efficient compression techniques, ensuring the model receives only the most relevant information for the current task.
+When the agent interacts with a codebase, it cannot simply dump every file into the prompt; doing so would exhaust the context window and degrade performance. Instead, the system employs a multi-layered approach to context, where `context-manager-v2` acts as the primary orchestrator, determining which files, git diffs, or search results are relevant to the current task. By utilizing specialized modules like `dependency-aware-rag` and `repository-map`, the agent constructs a high-fidelity representation of the workspace that fits within the LLM's constraints.
+
+> **Key concept:** The `context-manager-v2` orchestrates the injection of context, utilizing `compression` and `smart-compaction` to reduce token usage by up to 60% without losing critical semantic markers.
 
 | Module | Purpose |
 |--------|---------|
@@ -37,23 +39,25 @@ The context management layer is responsible for the dynamic assembly of LLM prom
 | `web-search-grounding` | Web Search Grounding |
 | `workspace-context` | Workspace Context Builder |
 
-```mermaid
-graph TD
-    A[Context Loader] --> B[Context Manager V3]
-    B --> C[RAG System]
-    B --> D[Memory System]
-    D --> E[Enhanced Memory]
-    E --> F[LLM Inference]
-    C --> F
-```
+> **Developer tip:** When debugging context injection issues, verify the state of `SessionStore.convertChatEntryToMessage` to ensure that the context being passed to the LLM is correctly serialized and formatted.
 
-While context management handles the immediate, transient state of a conversation, the memory system provides the long-term persistence required for continuity across sessions.
+Now that we understand how the agent orchestrates immediate tool calls and file context, we need to examine the memory layer that governs how the agent retains information across long-running sessions.
 
 ## Memory System (15 modules)
 
-The memory system facilitates the storage and retrieval of historical interactions, architectural decisions, and user preferences. By utilizing `EnhancedMemory.store()` and `EnhancedMemory.loadMemories()`, the system ensures that subagents and primary agents can access a consistent state, effectively bridging the gap between stateless LLM calls and stateful application requirements.
+While context management handles the "now," the memory system provides the "then," allowing the agent to recall architectural decisions, user preferences, and past coding styles. The core of this system is `EnhancedMemory`, which manages the lifecycle of stored data, from initial capture to consolidation. By using `DecisionMemory`, the agent can extract and persist high-level design choices, ensuring that future interactions are informed by the history of the project rather than just the current file state.
 
-> **Key concept:** The `EnhancedMemory` module implements a two-phase consolidation pipeline. By invoking `EnhancedMemory.calculateImportance()`, the system filters transient noise from critical architectural decisions before persistence, optimizing token usage for future context windows.
+```mermaid
+graph TD
+    A[User Input] --> B[Context Manager V2]
+    B --> C{Compression/RAG}
+    C --> D[LLM Context Window]
+    D --> E[Enhanced Memory]
+    E --> F[Decision Memory]
+    F --> G[Persistent Storage]
+```
+
+> **Key concept:** The memory system uses a two-phase pipeline: `memory-consolidation` first captures raw interactions, and then `EnhancedMemory.calculateImportance` determines which memories are worth persisting to long-term storage.
 
 | Module | Purpose |
 |--------|---------|
@@ -73,10 +77,8 @@ The memory system facilitates the storage and retrieval of historical interactio
 | `semantic-memory-search` | OpenClaw-inspired 2-Step Memory Search System |
 | `subagent-memory` | Subagent Persistent Memory |
 
-To maintain session integrity, the system relies on the `SessionStore` module. When a new interaction begins, the system calls `SessionStore.createSession()` to initialize the workspace, and subsequently uses `SessionStore.addMessageToCurrentSession()` to append data to the active state. Before closing, `SessionStore.saveSession()` ensures all volatile memory is flushed to disk.
+> **Developer tip:** When implementing new memory hooks, ensure you call `EnhancedMemory.loadMemories` before attempting to access historical context, as failing to initialize the memory store will result in empty retrieval sets.
 
 ---
 
 **See also:** [Overview](./1-overview.md) · [Architecture](./2-architecture.md) · [Subsystems](./3a-core-agent-system-cli-and-slash-commands.md) · [Tool System](./5-tools.md)
-
---- END ---

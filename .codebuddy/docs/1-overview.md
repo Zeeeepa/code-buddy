@@ -1,36 +1,34 @@
 # @phuetz/code-buddy v0.5.0
 
-@phuetz/code-buddy is a terminal-based AI coding agent designed for high-extensibility and multi-provider support within TypeScript/Node.js environments. This documentation provides an architectural overview of the system, intended for developers looking to integrate new tools, modify agent behavior, or contribute to the core codebase.
-
-> Open-source multi-provider AI coding agent for the terminal. Supports Grok, Claude, ChatGPT, Gemini, Ollama and LM Studio with 52+ tools, multi-channel messaging, skills system, and OpenClaw-inspired architecture.
-
-The system's versatility stems from its modular design, enabling seamless integration across various communication channels and execution environments.
+`@phuetz/code-buddy` is a terminal-based AI coding agent designed to bridge the gap between local development environments and advanced LLM reasoning. It supports multiple LLM providers (Grok, Claude, ChatGPT, Gemini, Ollama, and LM Studio) with automatic failover and includes a library of 52+ tools. This documentation serves as the primary reference for developers looking to extend the agent's capabilities, integrate new messaging channels, or optimize the underlying reasoning engine.
 
 ## Key Capabilities
+
+The agent operates as a persistent daemon, constantly monitoring inputs from various sources to provide context-aware assistance. By leveraging a multi-channel architecture, it ensures that developers can interact with their codebase from Slack, Discord, or the terminal itself without context switching.
+
+```mermaid
+graph TD
+    User --> Agent[CodeBuddyAgent]
+    Agent --> Client[CodeBuddyClient]
+    Client --> LLM[LLM Provider]
+    Agent --> Tools[Tool Registry]
+    Tools --> Screenshot[ScreenshotTool]
+    Agent --> Memory[EnhancedMemory]
+    Agent --> Session[SessionStore]
+```
 
 - Multi-channel messaging (Telegram, Discord, Slack, WhatsApp, etc.)
 - Background daemon with health monitoring
 - Voice interaction with wake-word activation
 - Sandboxed execution (Docker, OS-level)
-- Advanced reasoning (Tree-of-Thought, MCTS)
-- Code graph analysis (49113 relationships)
+- Advanced reasoning (Tree-of-Thought, [MCTS Reasoning](./2-architecture.md))
+- Code graph analysis (49126 relationships)
 - Automated program repair (fault localization + LLM)
-- Agent-to-Agent protocol (Google A2A spec)
+- Agent-to-Agent protocol (Google [A2A Protocol](./9-api-reference.md)spec)
 - Workflow engine with DAG execution
 - Cloud deployment (Fly.io, Railway, Render, GCP)
 
-```mermaid
-graph TD
-    A[Entry Point: CLI/Server] --> B[CodeBuddyAgent]
-    B --> C[EnhancedMemory]
-    B --> D[CodeBuddyClient]
-    B --> E[ToolRegistry]
-    B --> F[DMPairingManager]
-    D --> G[LLM Providers]
-    C --> H[SessionStore]
-```
-
-The following metrics quantify the project's complexity and architectural footprint, reflecting the scale of the codebase and its dependency graph.
+Now that we have established the high-level capabilities of the agent, we must examine the structural complexity that makes this orchestration possible.
 
 ## Project Statistics
 
@@ -39,17 +37,15 @@ The following metrics quantify the project's complexity and architectural footpr
 | Version | 0.5.0 |
 | Source Modules | 1077 |
 | Classes | 907 |
-| Code Relationships | 49 113 |
+| Code Relationships | 49 126 |
 | Dependencies | 35 |
 | Dev Dependencies | 23 |
 
-The architecture relies on several high-rank modules that serve as the foundation for agent operations, memory management, and tool execution.
-
-> **Key concept:** The architectural rank (PageRank) of a module indicates its dependency density. Modules like `src/agent/codebuddy-agent` are central to system stability; modifications here require rigorous testing as they impact nearly every other subsystem.
+Understanding the sheer volume of modules is critical for maintaining the system's stability. With over 1,000 modules, the project relies on strict dependency management to prevent circular references and ensure that the agent remains performant under load.
 
 ## Core Modules (by architectural importance)
 
-Ranked by PageRank — higher rank means more modules depend on this one:
+Ranked by [PageRank](./4-metrics.md) — higher rank means more modules depend on this one:
 
 | Module | PageRank | Importers | Functions | Description |
 |--------|----------|-----------|-----------|-------------|
@@ -61,7 +57,7 @@ Ranked by PageRank — higher rank means more modules depend on this one:
 | `src/persistence/session-store` | 0.008 | 6 | 44 fns | Session persistence and restore |
 | `src/agent/repo-profiling/cartography` | 0.007 | 1 | 11 fns | Core agent system |
 | `src/nodes/device-node` | 0.006 | 2 | 21 fns | Multi-device management |
-| `src/codebuddy/tools` | 0.006 | 4 | 12 fns | Tool definitions and RAG selection |
+| `src/codebuddy/tools` | 0.006 | 4 | 12 fns | Tool definitions and [RAG Tool Selector](./5-tools.md) |
 | `src/tools/screenshot-tool` | 0.006 | 3 | 20 fns | Tool implementations |
 | `src/agent/repo-profiler` | 0.005 | 3 | 13 fns | Core agent system |
 | `src/deploy/cloud-configs` | 0.005 | 2 | 10 fns | Cloud deployment |
@@ -74,20 +70,24 @@ Ranked by PageRank — higher rank means more modules depend on this one:
 | `src/memory/decision-memory` | 0.004 | 1 | 10 fns | Memory and persistence |
 | `src/utils/memory-monitor` | 0.004 | 1 | 23 fns | Shared utilities |
 
-The core modules implement specific logic to maintain system integrity. For instance, `src/channels/dm-pairing` handles secure communication and channel pairing logic. The `src/codebuddy/client` module abstracts LLM interactions, validating models and probing capabilities across various providers.
+> **Key concept:** The PageRank metric identifies "keystone" modules. If a module like `src/agent/codebuddy-agent` is modified, it triggers a cascade of re-evaluations across the entire dependency tree, necessitating a full test suite run.
 
-Furthermore, the `src/agent/codebuddy-agent` module orchestrates the agent lifecycle, managing memory initialization and skill loading. Data persistence is handled by `src/persistence/session-store`, which manages session creation and state recovery to ensure continuity.
+When the agent initializes, it relies on `CodeBuddyAgent.initializeAgentRegistry` to map available skills and tools. Similarly, `DMPairingManager.checkSender` acts as a gatekeeper for incoming messages, ensuring that only authorized channels can trigger agent actions.
 
-Understanding the system's entry points is critical for debugging the initialization sequence and managing the lifecycle of the agent process.
+> **Developer tip:** When modifying core modules, always check the `Importers` count. If you are refactoring a module with high PageRank, ensure you update all downstream consumers to prevent runtime type mismatches.
 
 ## Entry Points
+
+Execution begins at specific entry points that bootstrap the environment. These entry points are responsible for dependency injection and setting up the global state required for the agent to function.
 
 - **`src/server/index`** — HTTP/WebSocket server (Express)
 - **`src/index`** — CLI entry point (Commander)
 
-The stack is built on modern TypeScript standards, prioritizing type safety and asynchronous performance for real-time AI interactions.
+Before the agent can process a request, it must establish a valid session. This is handled by `SessionStore.createSession`, which initializes the persistence layer, ensuring that conversation history is preserved across restarts.
 
 ## Technology Stack
+
+The stack is selected to balance developer ergonomics with high-performance execution. By utilizing TypeScript and Node.js, the project maintains type safety across the entire agent lifecycle.
 
 | Category | Technologies |
 |----------|-------------|
@@ -102,9 +102,9 @@ The stack is built on modern TypeScript standards, prioritizing type safety and 
 | MCP | @modelcontextprotocol/sdk |
 | Testing | vitest |
 
-Developers can initialize the development environment using standard Node.js workflows to begin contributing or testing local changes.
-
 ## Getting Started
+
+To begin working with the codebase, ensure you have the necessary dependencies installed. The build process compiles the TypeScript source into executable JavaScript, preparing the agent for deployment or local testing.
 
 ```bash
 # Install
@@ -122,8 +122,6 @@ npm start
 # Verify
 npm test
 ```
-
----
 
 **See also:** [Architecture](./2-architecture.md) · [Subsystems](./3a-core-agent-system-cli-and-slash-commands.md) · [Tool System](./5-tools.md) · [Security](./6-security.md)
 

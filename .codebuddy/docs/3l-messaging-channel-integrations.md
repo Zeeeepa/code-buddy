@@ -1,25 +1,31 @@
-# Subsystems (continued)
+# Messaging Channel Integrations
 
-This section details the messaging channel integration layer, which abstracts communication protocols across various platforms including Discord, Slack, and Matrix. Developers working on cross-platform connectivity or adding new messaging providers should consult this documentation to understand the standardized interface requirements and security gatekeeping mechanisms.
+This section documents the architectural framework governing how the agent interfaces with external messaging platforms. Understanding these integrations is essential for developers tasked with extending the agent's reach to new communication channels or maintaining the security protocols that govern direct interactions.
+
+## The DM Pairing Protocol
+
+Before the agent can engage in a private conversation, it must establish trust. This is handled by the `src/channels/dm-pairing` module, which acts as a gatekeeper for all incoming direct messages. When a user initiates contact, the system doesn't immediately process the request; instead, it invokes `DMPairingManager.requiresPairing` to determine if the sender has already been vetted.
+
+> **Key concept:** The DM Pairing system ensures that only authorized users can trigger agent actions, preventing unauthorized command execution in public or private channels. By decoupling the authentication handshake from the message processing logic, the system maintains a clean separation of concerns.
+
+When the agent encounters a new sender, it relies on `DMPairingManager.checkSender` to validate the user's identity against the current session state. If the user is unknown, the system halts execution until `DMPairingManager.approve` or `DMPairingManager.approveDirectly` is called, effectively creating a "human-in-the-loop" security barrier.
+
+> **Developer tip:** Always verify the sender's status using `DMPairingManager.isBlocked` before invoking `DMPairingManager.approve` to prevent race conditions during the handshake process.
 
 ```mermaid
 graph LR
-    A[Messaging Channel] --> B{DM Pairing Manager}
-    B --> C[Check Sender]
-    C --> D{Is Approved?}
-    D -- Yes --> E[Agent Core]
-    D -- No --> F[Request Pairing]
+    User((User)) --> Channel[Messaging Channel]
+    Channel --> Pairing{DMPairingManager}
+    Pairing -- Authorized --> Agent[CodeBuddyAgent]
+    Pairing -- Blocked --> Reject[Reject Request]
+    Pairing -- New --> Handshake[Approve/Revoke]
 ```
 
-The system relies on a unified interface for channel communication, with specific modules handling the complexities of individual platform APIs. The `src/channels/dm-pairing` module is the critical security component for all incoming channel traffic, ensuring that only authorized senders can trigger agent actions.
+Now that we understand how the agent validates incoming traffic through the pairing layer, we can examine the specific channel implementations that facilitate these connections.
 
-## Messaging Channel Integrations — Discord (10 modules)
+## Supported Messaging Channels
 
-The `src/channels/dm-pairing` module utilizes `DMPairingManager.checkSender()` to validate incoming requests and `DMPairingManager.requiresPairing()` to enforce authentication flows before message processing begins.
-
-> **Key concept:** The `dm-pairing` module acts as a security middleware, preventing unauthorized message injection by requiring explicit approval via `DMPairingManager.approve()` or `DMPairingManager.approveDirectly()` before the agent processes incoming requests.
-
-When a user attempts to interact with the agent, the system checks status via `DMPairingManager.isApproved()`. If the sender is not yet authorized, the system may trigger `DMPairingManager.getPairingMessage()` to initiate the handshake. Administrators can manage access control using `DMPairingManager.approve()` or `DMPairingManager.revoke()` to handle session permissions dynamically, while `DMPairingManager.isBlocked()` provides a fast-path check for rejected entities.
+The following modules represent the current landscape of supported messaging platforms, each encapsulating the specific API requirements for that provider. These modules are responsible for normalizing incoming webhooks into the standard format expected by the core agent.
 
 - **src/channels/dm-pairing** (rank: 0.019, 19 functions)
 - **src/channels/google-chat/index** (rank: 0.002, 16 functions)
@@ -32,10 +38,8 @@ When a user attempts to interact with the agent, the system checks status via `D
 - **src/channels/slack/client** (rank: 0.002, 31 functions)
 - **src/channels/telegram/client** (rank: 0.002, 37 functions)
 
-These channel integrations are tightly coupled with the core agent system, which handles the actual execution of tasks once the channel connection is validated.
+Having reviewed the channel infrastructure, we can now transition to the core agent system, which consumes these normalized messages to perform reasoning and tool execution.
 
 ---
 
 **See also:** [Subsystems](./3a-core-agent-system-cli-and-slash-commands.md)
-
---- END ---

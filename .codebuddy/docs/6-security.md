@@ -1,8 +1,8 @@
 # Security Architecture
 
-The security architecture implements a defense-in-depth strategy across 30 specialized modules within the `src/security/` directory. This system is designed to mitigate risks associated with AI-driven code generation, sandboxed execution, and external tool integration, ensuring that all operations adhere to strict safety policies before execution.
+The security architecture of this project is designed around the principle of "Zero Trust Execution." This document serves as the definitive guide for engineers and security auditors who need to understand how the system mitigates risks associated with AI-driven code generation and autonomous tool execution.
 
-The project maintains a modular security infrastructure, where each component is responsible for a specific aspect of system hardening, ranging from input validation to environment isolation.
+Security in an autonomous agent environment cannot rely on a single firewall. Instead, we employ a modular, defense-in-depth strategy comprising 30 distinct security modules located within `src/security/`. These modules handle everything from input sanitization to post-execution auditing, ensuring that every interaction is validated against strict policy definitions.
 
 | Module | Purpose |
 |--------|---------|
@@ -37,21 +37,21 @@ The project maintains a modular security infrastructure, where each component is
 | `trust-folders` | Trust Folder Manager |
 | `write-policy` | WritePolicy — enforces diff-first writes at the tool-handler level. |
 
-These modules function as a cohesive security layer, intercepting operations at the tool-handler level to enforce granular control. The following diagram illustrates the high-level flow of a request through the security validation pipeline.
+> **Developer tip:** When integrating new communication channels, always verify the sender's authorization status using `DMPairingManager.isBlocked()` before allowing the `SessionStore.saveSession()` method to persist any incoming data.
+
+Now that we have established the modular foundation of the security layer, we must visualize how these components orchestrate data flow during a standard agent request.
 
 ```mermaid
 graph TD
-    A[User Request] --> B[Security Modules]
-    B --> C{Guardian Agent}
-    C -->|Approved| D[Sandbox]
-    C -->|Blocked| E[Reject]
-    D --> F[Execution]
-    E --> G[Audit Log]
+    A[User Input] --> B[Guardian Agent]
+    B --> C{Risk Assessment}
+    C -->|High Risk| D[Block/Prompt]
+    C -->|Low Risk| E[Sandbox]
+    E --> F[Tool Execution]
+    F --> G[Audit Logger]
 ```
 
-## Security Features
-
-The system employs several automated mechanisms to ensure that code execution remains within defined safety parameters.
+Beyond the structural modules, the system implements high-level features that actively monitor and constrain agent behavior. These features act as the "immune system" of the agent, intercepting dangerous operations before they reach the host environment.
 
 - **AI Guardian Agent**: Automatic approval reviewer with risk scoring
 - **Sandbox Isolation**: Sandboxed execution environment
@@ -59,18 +59,12 @@ The system employs several automated mechanisms to ensure that code execution re
 - **Shell Command Validation**: Dangerous pattern detection
 - **Environment Filtering**: Sensitive variable stripping
 
-> **Key concept:** The `Guardian Agent` acts as the primary gatekeeper, utilizing risk scoring to automate approval decisions. This significantly reduces the cognitive load on users while maintaining strict adherence to the `WritePolicy` for all diff-first operations.
+> **Key concept:** The Guardian Agent acts as an automated risk-scoring layer. By intercepting tool calls before execution, it reduces the attack surface by filtering out potentially destructive commands that bypass standard syntax validation.
 
-## Integration with Agent Logic
-
-The security layer is tightly coupled with the agent's operational logic to ensure that authorization checks are performed before any tool execution. For instance, the `DMPairingManager.isBlocked` and `DMPairingManager.isApproved` methods are utilized to verify sender authorization, ensuring that only trusted sources can trigger sensitive operations within the `sender-policies` framework.
-
-Furthermore, when the `CodeBuddyAgent` initializes, it leverages these security modules to establish a baseline for safe execution, ensuring that the environment is filtered and policies are loaded before the agent begins processing tasks.
+> **Developer tip:** When working with the `ScreenshotTool` or other sensitive I/O operations, ensure the `GuardianAgent` has been initialized to prevent unauthorized data exfiltration from the host machine.
 
 ---
 
 **See also:** [Overview](./1-overview.md) · [Architecture](./2-architecture.md) · [Subsystems](./3a-core-agent-system-cli-and-slash-commands.md) · [Tool System](./5-tools.md)
 
 **Key source files:** `src/security/.ts`
-
---- END ---

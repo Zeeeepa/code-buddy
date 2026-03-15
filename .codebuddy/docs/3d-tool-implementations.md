@@ -1,24 +1,32 @@
 # Subsystems (continued)
 
-This section details the modular architecture of the tool registry system, which manages the lifecycle, discovery, and execution of specialized agent capabilities. Understanding these modules is essential for developers extending agent functionality or integrating new external services, as these registries define the interface between the core agent and the execution environment.
+This section provides a deep dive into the modular architecture of the Code Buddy tool ecosystem. It is intended for developers and system architects who need to understand how the agent extends its capabilities through isolated, specialized modules, ensuring that the core system remains lightweight while supporting a vast array of external functions.
 
-The system architecture relies on a centralized registry to manage tool discovery and execution, ensuring that disparate tool sources—such as MCP servers, local plugins, and marketplace tools—are normalized into a consistent interface. The initialization process is orchestrated by `initializeToolRegistry`, which coordinates with `getMCPManager` to prepare the environment.
+## The Tool Registry Architecture
+
+When Code Buddy needs to perform an action, it doesn't rely on a hardcoded list of capabilities. Instead, it utilizes a dynamic registry system that aggregates tools from various sources—including Model Context Protocol (MCP) servers, local plugins, and native implementations. The system orchestrates this via `src/codebuddy/tools`, which acts as the central nervous system for capability discovery.
+
+By decoupling the tool definitions from the agent's core logic, the system allows for hot-swapping capabilities without requiring a full restart. When the agent initializes, it calls `initializeToolRegistry()` to build the available toolset, which then invokes `getMCPManager()` and `initializeMCPServers()` to fetch external definitions. This architecture ensures that adding a new capability is as simple as registering a new module, rather than modifying the core agent loop.
 
 ```mermaid
 graph TD
-    A[CodeBuddyAgent] --> B[initializeToolRegistry]
-    B --> C[getMCPManager]
-    B --> D[Tool Registry Modules]
-    D --> E[convertPluginToolToCodeBuddyTool]
-    D --> F[convertMCPToolToCodeBuddyTool]
-    C --> G[initializeMCPServers]
+    Agent[CodeBuddyAgent] --> Registry[ToolRegistry]
+    Registry --> MCP[MCP Servers]
+    Registry --> Plugin[Plugin Tools]
+    Registry --> Native[Native Tools]
+    Native --> Screenshot[ScreenshotTool]
+    Native --> Bash[Bash Tools]
 ```
 
-> **Key concept:** The tool registry utilizes a dynamic loading pattern, allowing the system to convert disparate plugin and MCP tools into a unified `CodeBuddyTool` format via `convertMCPToolToCodeBuddyTool` and `convertPluginToolToCodeBuddyTool` at runtime, ensuring consistent execution context regardless of the tool's origin.
+> **Key concept:** The tool registry pattern allows the agent to scale its capabilities horizontally. By using `convertMCPToolToCodeBuddyTool()` and `convertPluginToolToCodeBuddyTool()`, the system normalizes disparate tool interfaces into a unified schema, reducing the complexity of the agent's decision-making loop.
 
-The following modules represent the specific domain-logic registries that populate the tool registry. These modules are responsible for defining the capabilities available to the agent, ranging from low-level system operations to high-level knowledge retrieval.
+> **Developer tip:** When implementing a new tool, always ensure it is registered in the central registry. If you are adding a custom plugin, use `addPluginToolsToCodeBuddyTools()` to ensure the agent can discover and execute your new logic during the next inference cycle.
+
+Now that we have established how the agent orchestrates and registers its capabilities, we can examine the specific implementation modules that populate the registry and provide the actual functional logic.
 
 ## Tool Implementations (22 modules)
+
+The following list represents the current inventory of specialized tool modules. Each module is designed to handle a specific domain, such as `ScreenshotTool` for visual capture or `docker-tools` for container orchestration. These modules are imported and managed by the central registry, allowing the agent to selectively load only the tools required for the current session context.
 
 - **src/tools/process-tool** (rank: 0.004, 11 functions)
 - **src/tools/registry/index** (rank: 0.004, 1 functions)
@@ -32,7 +40,7 @@ The following modules represent the specific domain-logic registries that popula
 - **src/tools/registry/kubernetes-tools** (rank: 0.002, 10 functions)
 - ... and 12 more
 
-Beyond these registry modules, specific tools often require dedicated implementation logic to handle platform-specific constraints or complex execution flows. For instance, the `ScreenshotTool.capture` method provides a unified interface for cross-platform screen capture, abstracting the underlying differences between `ScreenshotTool.captureMacOS`, `ScreenshotTool.captureLinux`, and `ScreenshotTool.captureWindows`.
+> **Developer tip:** When working with native tools like `ScreenshotTool`, always verify the environment before execution. For instance, `ScreenshotTool.captureMacOS()` and `ScreenshotTool.captureLinux()` handle platform-specific dependencies; failing to check `ScreenshotTool.isWSL()` before execution can lead to unhandled exceptions in non-GUI environments.
 
 ---
 

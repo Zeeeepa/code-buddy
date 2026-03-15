@@ -1,23 +1,24 @@
 # Subsystems (continued)
 
-This section details the performance optimization layer and core agent subsystems responsible for maintaining system responsiveness and operational integrity. Developers working on latency reduction, model routing, or agent lifecycle management should review these modules to understand how resource allocation and execution flow are governed.
+This section explores the high-performance subsystems that govern the Code Buddy agent's operational efficiency and core decision-making loops. Developers and system architects should read this to understand how the agent maintains low latency, manages memory constraints, and orchestrates complex tool interactions within the runtime environment.
+
+## Performance Optimization & Core Agent System
+
+The agent doesn't simply "think" in a vacuum; it orchestrates a complex dance of data retrieval, model inference, and state management. To keep this process performant, we utilize specialized modules like `src/optimization/model-routing` and `src/optimization/latency-optimizer`. When `CodeBuddyAgent.initializeAgentSystemPrompt()` is invoked, it sets the stage for these systems to begin monitoring the environment, ensuring that the agent remains responsive even when processing large codebases.
+
+Because performance is a critical bottleneck in LLM-based workflows, the system relies on a tight feedback loop between the profiler and the memory manager. `RepoProfiler.computeProfile()` generates the necessary context, which is then refined by `EnhancedMemory.calculateImportance()` to ensure only relevant data consumes the token budget.
 
 ```mermaid
 graph TD
-    A[Agent Mode] --> B[Context Manager]
-    B --> C[Model Routing]
-    C --> D[Latency Optimizer]
-    D --> E[Execution/Repair]
-    E --> F[Memory Monitor]
+  Agent[CodeBuddyAgent] --> Memory[EnhancedMemory]
+  Agent --> Profiler[RepoProfiler]
+  Profiler --> Cache[CacheBreakpoints]
+  Memory --> Session[SessionStore]
 ```
 
-## Performance Optimization & Core Agent System (16 modules)
+> **Key concept:** The `RepoProfiler` and `EnhancedMemory` modules work in tandem to reduce context bloat. By utilizing `RepoProfiler.isCacheStale()`, the system avoids redundant processing, saving significant compute cycles during repeated agent interactions.
 
-This subsystem cluster manages the high-level orchestration of the agent, including model selection, memory state, and execution flow. By leveraging `CodeBuddyAgent.initializeMemory` and `EnhancedMemory.calculateImportance`, the system ensures that context is prioritized based on relevance rather than raw volume, which is critical for maintaining performance under heavy load.
-
-> **Key concept:** The latency optimizer and cache-breakpoint modules work in tandem to reduce token overhead, specifically by using `injectAnthropicCacheBreakpoints` to identify stable dynamic splits in the prompt stream, thereby optimizing model response times.
-
-The following modules constitute the primary performance and agent control plane:
+The following modules represent the backbone of our performance and execution layer:
 
 - **src/utils/memory-monitor** (rank: 0.004, 23 functions)
 - **src/optimization/model-routing** (rank: 0.003, 13 functions)
@@ -31,10 +32,10 @@ The following modules constitute the primary performance and agent control plane
 - **src/hooks/moltbot-hooks** (rank: 0.002, 0 functions)
 - ... and 6 more
 
-With the core agent and optimization layers defined, the following resources provide additional context on architectural boundaries and security protocols.
+> **Developer tip:** When debugging performance regressions, always check `RepoProfiler.isCacheStale()` before assuming the LLM is hallucinating context; often, the agent is simply operating on an outdated code graph.
+
+Having reviewed the foundational modules that drive agent performance, we must now turn our attention to the specific mechanisms that ensure these systems remain stable under load. The interaction between `SessionStore` and the agent's memory lifecycle is the next logical step in understanding how state persists across complex tasks.
 
 ---
 
 **See also:** [Architecture](./2-architecture.md) · [Subsystems](./3a-core-agent-system-cli-and-slash-commands.md) · [Security](./6-security.md) · [Context & Memory](./7-context-memory.md)
-
---- END ---

@@ -1,20 +1,19 @@
-# Subsystems (continued)
+# Subsystems: Prompts and Context Management
 
-This section details the subsystems responsible for prompt engineering, context window optimization, and rule enforcement. These modules are critical for maintaining LLM coherence and ensuring that the agent adheres to user-defined constraints while maximizing token efficiency.
+This section details the orchestration layer responsible for transforming raw user intent into structured, actionable instructions for the LLM. Developers working on agent behavior, prompt engineering, or rule enforcement should read this to understand how the system maintains consistency across sessions and ensures the agent adheres to defined operational constraints.
+
+When the agent initializes, it does not simply start listening for input; it must first establish the "ground truth" of the current environment. This process relies on a modular pipeline that aggregates system rules, user-defined preferences, and task-specific skills. By centralizing this logic, the system ensures that `CodeBuddyAgent.initializeAgentSystemPrompt()` receives a coherent, deterministic instruction set regardless of the complexity of the underlying codebase.
 
 ```mermaid
 graph TD
-    Rules[Rules Loader] --> Builder[Prompt Builder]
-    Skills[Skills Index] --> Builder
-    Bootstrap[Bootstrap Loader] --> Context[Context Window]
-    Builder --> Context
-    Context --> LLM[LLM Execution]
-    style Context fill:#f9f,stroke:#333,stroke-width:2px
+    A[Rules Loader] --> B[Bootstrap Loader]
+    B --> C[Prompt Builder]
+    C --> D[Agent System Prompt]
+    E[Variation Injector] --> C
+    F[Skills Index] --> C
 ```
 
-## Prompts & Context Window Management (6 modules)
-
-The following modules manage the lifecycle of prompts, from initial bootstrapping to the injection of dynamic workflow rules. By centralizing these operations, the system ensures that `CodeBuddyAgent.initializeAgentSystemPrompt()` receives a consistent and optimized context, regardless of the specific task or tool being executed.
+With the foundational prompt structure defined, we must examine the specific modules that govern how these instructions are assembled and injected into the agent's memory. The following modules form the core of this pipeline:
 
 - **src/context/bootstrap-loader** (rank: 0.002, 7 functions)
 - **src/prompts/variation-injector** (rank: 0.002, 4 functions)
@@ -23,9 +22,13 @@ The following modules manage the lifecycle of prompts, from initial bootstrappin
 - **src/skills/index** (rank: 0.002, 8 functions)
 - **src/services/prompt-builder** (rank: 0.002, 2 functions)
 
-> **Key concept:** Context window management is a balancing act between providing sufficient historical data and minimizing token consumption. By utilizing `EnhancedMemory.loadMemories()` alongside the prompt builder, the system dynamically prunes irrelevant context, ensuring that the LLM remains focused on the current task without exceeding model constraints.
+> **Key concept:** The prompt pipeline uses a layered injection strategy. By separating `rules-loader` from `prompt-builder`, the system ensures that core behavioral constraints remain immutable while task-specific instructions remain flexible, significantly reducing the risk of prompt injection attacks.
 
-These components work in tandem with memory management systems to ensure that the context window remains relevant and within operational limits. For a deeper understanding of how these prompts interact with the broader agent architecture, refer to the core system documentation.
+Because the agent needs to adapt to different scenarios—such as switching between coding tasks and architectural analysis—the `variation-injector` allows the system to modify the system prompt dynamically. This ensures that the agent's persona remains consistent while its focus shifts according to the current `CodeBuddyAgent` state.
+
+> **Developer tip:** When modifying `rules-loader`, always verify that the resulting prompt length does not exceed the context window of the target model, as excessive rule injection can lead to truncated instructions and degraded agent performance.
+
+Now that we understand how the agent constructs its internal instructions, we must look at how it manages the persistence of these contexts across different sessions. The interaction between the `prompt-builder` and the session storage layer is critical for maintaining long-term continuity in complex development workflows.
 
 ---
 

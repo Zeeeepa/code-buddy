@@ -1,8 +1,43 @@
-# Subsystems (continued)
+# Subsystems: CLI, Slash Commands, and Shared Utilities
 
-## CLI And Slash Commands & Shared Utilities (28 modules)
+This section documents the peripheral subsystems that bridge the gap between the core agent logic and user interaction. Developers working on command-line interfaces, session management, or node-based device communication should read this to understand how user intent is translated into system actions and how state is persisted across execution boundaries.
 
-This section details the CLI interface, slash command infrastructure, and shared utility modules that facilitate inter-process communication and command execution. These components are critical for developers extending the system's interface, managing device states, or integrating new command-line workflows.
+## Command Architecture and Lazy Loading
+
+The command-line interface serves as the primary gateway for user interaction. When a user invokes a command, the system must resolve the input to a specific handler without loading the entire codebase into memory. This is why we employ a lazy-loading architecture for command groups; it minimizes the initial memory footprint while keeping the command registry extensible.
+
+> **Developer tip:** When implementing new CLI commands, ensure they are registered in the appropriate command group to avoid namespace collisions and ensure they are discoverable by the help system.
+
+By decoupling the command definition from the execution logic, we allow developers to add new capabilities—such as `src/commands/cli/secrets-command` or `src/commands/cli/approvals-command`—without modifying the core CLI entry point. This modularity is essential for maintaining a clean separation of concerns as the project scales.
+
+## Node Management and Device Communication
+
+Managing hardware devices requires a stable singleton instance to track state across the application lifecycle. By utilizing `DeviceNodeManager.getInstance()`, the system ensures that transport layers are initialized exactly once, preventing race conditions during pairing operations like `DeviceNodeManager.pairDevice()`.
+
+> **Key concept:** The `DeviceNodeManager` acts as a central registry for all connected hardware, abstracting the complexity of transport protocols (USB, Bluetooth, etc.) away from the business logic.
+
+```mermaid
+graph TD
+    N0[["DeviceNodeManager.getInstance"]]
+    N1["registerNodeCommands"]
+    N2["addLazyCommandGroup"]
+    N1 --> N0
+    N1 --> N1
+    N2 --> N1
+    style N0 fill:#f9f,stroke:#333,stroke-width:2px
+    style N1 fill:#dff,stroke:#0aa
+    style N2 fill:#dff,stroke:#0aa
+```
+
+Having covered device connectivity, we must now address how these interactions are persisted. The system relies on a robust session layer to maintain context between disparate CLI invocations.
+
+## Session Persistence and Utilities
+
+Persistence is critical for long-running agent sessions. When the agent needs to recall previous interactions, it relies on `SessionStore.loadSession()` to hydrate the memory state, ensuring continuity between CLI invocations. Before any data is written to disk, the system validates the environment using `SessionStore.ensureWritableDirectory()` to prevent I/O failures.
+
+> **Developer tip:** Always verify the session directory exists using `SessionStore.ensureWritableDirectory()` before attempting to save a new session to prevent silent failures in restricted environments.
+
+The following modules represent the current landscape of CLI, node, and utility subsystems:
 
 - **src/nodes/index** (rank: 0.004, 19 functions)
 - **src/utils/session-enhancements** (rank: 0.004, 22 functions)
@@ -16,29 +51,6 @@ This section details the CLI interface, slash command infrastructure, and shared
 - **src/commands/knowledge** (rank: 0.002, 1 functions)
 - ... and 18 more
 
-The command architecture relies heavily on centralized node management to handle device registration and state persistence. The following diagram illustrates the initialization flow for node-based command groups and the retrieval of the singleton manager.
-
-```mermaid
-graph TD
-    A[CLI Entry Point] --> B{Command Registry}
-    B --> C[DeviceNodeManager]
-    C --> D[DeviceNodeManager.getInstance]
-    D --> E[DeviceNodeManager.loadDevices]
-    E --> F[DeviceNodeManager.pairDevice]
-    
-    style D fill:#f9f,stroke:#333,stroke-width:2px
-```
-
-> **Key concept:** The `DeviceNodeManager` acts as a singleton registry for all connected hardware and virtual nodes. By utilizing `DeviceNodeManager.getInstance()`, command modules ensure that execution contexts remain consistent across disparate CLI sessions, preventing race conditions during device pairing.
-
-### Node and Session Management
-
-The integration between CLI commands and the underlying node infrastructure is managed through specific lifecycle hooks. When a user invokes a device-related command, the system utilizes `DeviceNodeManager.loadDevices()` to populate the current environment state. If a new connection is required, `DeviceNodeManager.pairDevice()` is triggered to establish the transport layer.
-
-Beyond device management, the system provides robust session handling through the `src/utils/session-enhancements` module. This module interacts directly with the persistence layer to ensure that command history and state are preserved. Developers should utilize `SessionStore.createSession()` when initializing new command contexts to ensure that all subsequent operations are correctly logged and recoverable.
-
 ---
 
 **See also:** [Architecture](./2-architecture.md) · [Subsystems](./3a-core-agent-system-cli-and-slash-commands.md) · [API Reference](./9-api-reference.md)
-
---- END ---

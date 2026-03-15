@@ -1,14 +1,20 @@
 # Tool System
 
-The Tool System provides the interface layer between the LLM and the host environment, enabling agentic capabilities through a modular registry. This section details the architecture of tool selection, categorization, and the RAG-based filtering mechanism used to maintain context window efficiency.
+The Tool System serves as the operational interface between the Code Buddy agent and the host environment, abstracting complex system interactions into a standardized, discoverable registry. By decoupling tool definitions from the core agent logic, the system allows for modular expansion, enabling the agent to perform actions ranging from file manipulation to web navigation without bloating the primary codebase. This documentation is intended for developers extending the agent's capabilities or debugging tool execution flows.
 
 ## Tool Registry
 
-The tool ecosystem contains **117** tool modules organized in `src/tools/` and `src/tools/registry/`. The registry is initialized via `initializeToolRegistry()`, which coordinates with `getMCPManager()` to load external capabilities and manage the lifecycle of available functions.
+Central to the agent's extensibility is the tool ecosystem, which currently contains **117** tool modules organized within `src/tools/` and `src/tools/registry/`. Rather than hardcoding every capability into the agent, the system utilizes a dynamic registration pattern.
 
-The registry acts as the central authority for tool discovery and initialization, ensuring that external capabilities are correctly mapped to agent-executable functions.
+When the application boots, the system invokes `initializeToolRegistry()` to scan these directories and build an in-memory map of available functions. This approach ensures that the agent only loads the necessary logic, keeping the memory footprint lean while maintaining a massive library of potential actions.
+
+> **Developer tip:** When adding a new tool, always ensure it is registered in the registry index; calling `initializeToolRegistry()` without proper export mapping in `src/tools/registry/` will result in the tool being invisible to the agent's RAG selector.
+
+Now that we understand how the registry provides a centralized catalog of capabilities, we must examine how these tools are grouped to facilitate efficient discovery and logical organization.
 
 ## Tool Categories
+
+Categorization serves as the primary mechanism for routing user intent to the correct toolset. By grouping tools into functional domains, the system can apply specific constraints or permissions to entire classes of operations, such as restricting `file_write` operations to specific directories while allowing `web` operations globally.
 
 | Category | Tools | Count |
 |----------|-------|-------|
@@ -21,35 +27,35 @@ The registry acts as the central authority for tool discovery and initialization
 | file_read | `view_file`, `list_directory` | 2 |
 | git | `git` | 1 |
 
-Categorization allows the system to group related operations, facilitating efficient retrieval and logical organization within the agent's available skill set.
+Having categorized our toolset, we must address the challenge of scale: how does the agent decide which tools to expose without overwhelming the context window?
 
 ## RAG-Based Tool Selection
 
-Each user query triggers a semantic similarity search over tool metadata:
+Providing the LLM with 117+ tool definitions in every prompt would exhaust the context window and degrade reasoning performance. To solve this, the system implements a Retrieval-Augmented Generation (RAG) selector that dynamically filters the registry based on the user's current query.
 
-1. **Query embedding** — User message converted to vector
-2. **Similarity scoring** — Each tool scored against query (0-1)
-3. **Top-K selection** — ~15-20 most relevant tools selected
-4. **Token savings** — Reduces prompt from 110+ tools to ~15-20
+```mermaid
+graph TD
+    A[User Query] --> B[Embedding Model]
+    B --> C{RAG Selector}
+    C --> D[Tool Registry]
+    D --> E[Selected Tools]
+    E --> F[LLM Execution]
+```
 
-Tools have priority (3-10), keywords, and category metadata used for matching.
+When the agent encounters a user request, it performs the following steps:
+
+1. **Query embedding** — The user message is converted into a vector representation.
+2. **Similarity scoring** — Each tool's metadata is scored against the query vector (0-1).
+3. **Top-K selection** — The system selects the ~15-20 most relevant tools.
+4. **Token savings** — The prompt is populated only with the selected subset, drastically reducing overhead.
 
 > **Key concept:** The RAG tool selector reduces prompt size from 110+ tools to ~15, saving approximately 8,000 tokens per LLM call.
 
-```mermaid
-graph LR
-    A[User Query] --> B[Embedding]
-    B --> C[Vector Search]
-    C --> D[Tool Registry]
-    D --> E[Top-K Selection]
-    E --> F[LLM Prompt]
-```
-
-By dynamically filtering the toolset, the system minimizes token overhead while maximizing the relevance of available tools for the current task.
+Tools are assigned priority (3-10), keywords, and category metadata, which the RAG engine uses to ensure that high-priority tools—like `edit_file` or `bash`—are favored when the context is ambiguous.
 
 ## Registered Tools
 
-27 tools registered in metadata:
+The following list represents the 27 primary tools currently registered in the metadata. These tools are managed via `src/codebuddy/tools`, which handles the conversion of various formats (MCP, plugins, marketplace) into the internal Code Buddy format using functions like `addMCPToolsToCodeBuddyTools()` and `convertPluginToolToCodeBuddyTool()`.
 
 - **bash**: bash
 - **browser**: browser
@@ -74,12 +80,8 @@ By dynamically filtering the toolset, the system minimizes token overhead while 
 - **view**: view_file
 - **web**: web_search, web_fetch
 
-The system integrates these tools using `addMCPToolsToCodeBuddyTools()` and `addPluginToolsToCodeBuddyTools()` to ensure compatibility across different execution environments. Additionally, `initializeMCPServers()` is invoked to prepare the server-side infrastructure required for remote tool execution.
-
 ---
 
 **See also:** [Overview](./1-overview.md) · [Architecture](./2-architecture.md) · [Subsystems](./3a-core-agent-system-cli-and-slash-commands.md) · [Context & Memory](./7-context-memory.md)
 
 **Key source files:** `src/tools/.ts`, `src/tools/registry/.ts`
-
---- END ---

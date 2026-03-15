@@ -1,10 +1,29 @@
-# Multi-Device Management
+# Subsystems (continued)
 
-The Multi-Device Management subsystem provides the abstraction layer necessary for the agent to interface with diverse hardware environments, including local machines, remote SSH hosts, and ADB-enabled devices. This architecture enables seamless command execution and file synchronization across heterogeneous infrastructure, ensuring consistent agent behavior regardless of the underlying transport mechanism.
+This section explores the Multi-Device Management subsystem, the architectural layer responsible for bridging the Code Buddy agent with disparate execution environments. Developers working on cross-platform integration, remote deployment workflows, or hardware-in-the-loop testing should read this to understand how the agent maintains state across physical and virtual devices.
 
-## Module Overview
+## Multi-Device Management (5 modules)
 
-The following modules constitute the core infrastructure for device connectivity and transport management:
+When the agent needs to interact with an external environment—whether it is a connected Android device via ADB, a remote server via SSH, or the local filesystem—it does not communicate directly with the hardware. Instead, it relies on the `DeviceNodeManager` to abstract the underlying transport layer. By centralizing these connections, the system ensures that the agent's core logic remains agnostic to the specific protocol being used.
+
+The lifecycle of a connection begins when `DeviceNodeManager.getInstance()` is invoked to retrieve the singleton controller. From there, the system uses `DeviceNodeManager.loadDevices()` to populate the registry of available endpoints. If a new connection is required, `DeviceNodeManager.createTransport()` is called to instantiate the appropriate protocol handler, which is then managed through `DeviceNodeManager.getTransport()`.
+
+```mermaid
+graph LR
+    Agent[CodeBuddy Agent] --> DNM[DeviceNodeManager]
+    DNM --> ADB[ADB Transport]
+    DNM --> SSH[SSH Transport]
+    DNM --> Local[Local Transport]
+    DNM --> DT[DeviceTool]
+```
+
+> **Key concept:** The `DeviceNodeManager` acts as an abstraction layer, decoupling the agent's logic from the specific transport protocol (ADB, SSH, or Local), allowing for seamless device switching without modifying core agent code.
+
+Once a transport is active, the agent can perform operations such as `DeviceNodeManager.pairDevice()` or `DeviceNodeManager.unpairDevice()` to manage the session state. This ensures that even if a connection drops, the `DeviceNodeManager` can gracefully handle the teardown and subsequent reconnection attempts without crashing the main agent loop.
+
+> **Developer tip:** When debugging connection issues, always use `DeviceNodeManager.resetInstance()` before attempting to re-initialize transports to ensure stale socket handles and corrupted state are cleared from the singleton.
+
+The following modules constitute the core of this subsystem:
 
 - **src/nodes/device-node** (rank: 0.006, 21 functions)
 - **src/nodes/transports/adb-transport** (rank: 0.004, 10 functions)
@@ -12,29 +31,7 @@ The following modules constitute the core infrastructure for device connectivity
 - **src/nodes/transports/ssh-transport** (rank: 0.004, 13 functions)
 - **src/tools/device-tool** (rank: 0.002, 1 functions)
 
-```mermaid
-graph TD
-    A[DeviceNodeManager] --> B[ADBTransport]
-    A --> C[LocalTransport]
-    A --> D[SSHTransport]
-    A --> E[DeviceTool]
-    
-    style A fill:#f9f,stroke:#333,stroke-width:2px
-```
-
-## Core Architecture
-
-The central component of this subsystem is the `DeviceNodeManager`, which acts as a singleton registry for all active device connections. Developers interacting with this module should utilize `DeviceNodeManager.getInstance()` to retrieve the active manager instance before performing operations. To manage device lifecycles, the system relies on `DeviceNodeManager.loadDevices()` and `DeviceNodeManager.saveDevices()` to persist connection states across agent restarts.
-
-> **Key concept:** The transport abstraction layer decouples the agent's logic from physical connectivity, allowing `DeviceNodeManager.createTransport()` to instantiate protocol-specific handlers without requiring changes to the core agent logic.
-
-Once the device registry is initialized, the system delegates specific communication tasks to specialized transport layers. These layers abstract the complexities of the underlying protocol, allowing the agent to treat a remote SSH connection similarly to a local process execution.
-
-## Connectivity and Lifecycle
-
-Security and connectivity are handled through explicit pairing flows managed by the node system. When a new device is introduced, the system invokes `DeviceNodeManager.pairDevice()` to establish the initial handshake and authentication. Conversely, `DeviceNodeManager.unpairDevice()` ensures that credentials and session data are purged from the registry, maintaining a clean state for future connections.
-
-If a specific transport is required for a task, the system calls `DeviceNodeManager.getTransport()` to retrieve the appropriate interface, ensuring that the agent always interacts with the correct protocol implementation.
+Now that we have established how the agent manages connections to external devices, we can examine how these transport layers are exposed to the agent's decision-making engine through the tool system.
 
 ---
 

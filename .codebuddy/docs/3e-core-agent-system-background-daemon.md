@@ -1,14 +1,27 @@
 # Subsystems (continued)
 
-This section details the auxiliary modules supporting the core agent system and background daemon services. These components manage identity, scheduling, and webhook event handling, ensuring the agent remains responsive and synchronized with external triggers.
+This document serves as a reference for the background infrastructure and support subsystems that sustain the Code Buddy agent. Developers and system architects should consult this guide to understand how the agent maintains state, manages identity, and executes scheduled tasks outside of the primary interaction loop.
 
-## Core Agent System & Background Daemon Service (19 modules)
+## Core Agent System & Background Daemon Service
 
-The core agent system relies on a distributed architecture where background daemons handle asynchronous tasks, such as webhook processing and cron-based scheduling. By decoupling these services from the primary execution loop, the system maintains high availability and responsiveness, allowing the agent to perform maintenance tasks without interrupting user interaction.
+When the Code Buddy agent initializes, it does not simply wait for user input; it spins up a suite of background services to ensure the environment remains responsive and synchronized. This architecture relies on a daemon-based approach, where critical tasks—such as heartbeat monitoring and cron scheduling—run independently of the main chat thread. By decoupling these processes, the system ensures that long-running operations do not block the user's interaction with the agent.
 
-> **Key concept:** The background daemon architecture utilizes `CodeBuddyAgent.initializeAgentRegistry` to maintain state across asynchronous tasks, ensuring that skills registered via `CodeBuddyAgent.initializeSkills` remain accessible even during idle periods.
+The initialization process is orchestrated through the `CodeBuddyAgent` class, which acts as the central nervous system. During startup, `CodeBuddyAgent.initializeAgentRegistry()` and `CodeBuddyAgent.initializeSkills()` are invoked to register available capabilities and establish the agent's operational boundaries. This setup ensures that when a user triggers a command, the agent already has a fully populated context, including identity verification and skill availability.
 
-The following modules constitute the backbone of the background service layer:
+```mermaid
+graph TD
+    A[CodeBuddyAgent] --> B[Daemon Service]
+    B --> C[Cron Scheduler]
+    B --> D[Heartbeat]
+    A --> E[Skills Registry]
+    E --> F[Identity Manager]
+```
+
+> **Key concept:** The daemon architecture separates the "thinking" layer from the "maintenance" layer. By offloading tasks like heartbeat monitoring and cron scheduling to background services, the agent maintains a consistent state even when the primary chat interface is idle.
+
+> **Developer tip:** When modifying the `src/daemon/heartbeat` module, ensure that your changes do not introduce blocking I/O operations. The heartbeat must remain lightweight to prevent the agent from appearing unresponsive to the system monitor.
+
+Now that we have established how the background services and core agent infrastructure operate, we can review the specific modules that comprise this support layer.
 
 - **src/skills/hub** (rank: 0.004, 27 functions)
 - **src/skills/registry** (rank: 0.004, 27 functions)
@@ -22,23 +35,8 @@ The following modules constitute the backbone of the background service layer:
 - **src/scheduler/cron-scheduler** (rank: 0.003, 27 functions)
 - ... and 9 more
 
-The orchestration of these modules is visualized in the component relationship diagram below, highlighting how the agent interacts with the daemon and skill registries.
-
-```mermaid
-graph TD
-    Agent[CodeBuddyAgent] --> Skills[Skills Hub/Registry]
-    Agent --> Daemon[Daemon Service]
-    Daemon --> Webhooks[Webhook Manager]
-    Daemon --> Scheduler[Cron Scheduler]
-    Agent --> Identity[Identity Manager]
-```
-
-These modules interact closely with the primary agent loop to ensure consistent behavior. For instance, `CodeBuddyAgent.initializeAgentSystemPrompt` is invoked to configure the daemon's operational context, while `CodeBuddyAgent.initializeMemory` ensures that background processes have access to the necessary decision-making history required for long-running tasks.
-
-Beyond the background daemon, these modules interface with the identity and security layers to validate incoming requests and maintain session integrity.
+With the background services and core agent infrastructure defined, we can now look at how these components integrate with the broader ecosystem, including memory management and tool execution.
 
 ---
 
 **See also:** [Architecture](./2-architecture.md) · [Subsystems](./3a-core-agent-system-cli-and-slash-commands.md) · [Tool System](./5-tools.md) · [Security](./6-security.md)
-
---- END ---
