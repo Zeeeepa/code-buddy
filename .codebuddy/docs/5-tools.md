@@ -1,22 +1,12 @@
 # Tool System
 
-The tool system provides an extensible framework for agent capabilities, utilizing a dual-registry architecture to manage over 100 distinct modules. This documentation covers the categorization, RAG-based selection logic, and registration processes required for developers to integrate new tools or modify existing execution flows.
+The Tool System provides the interface layer between the LLM and the host environment, enabling agentic capabilities through a modular registry. This section details the architecture of tool selection, categorization, and the RAG-based filtering mechanism used to maintain context window efficiency.
 
 ## Tool Registry
 
-The tool ecosystem contains **117** tool modules organized in `src/tools/` and `src/tools/registry/`. The registry acts as the central authority for tool availability and lifecycle management.
+The tool ecosystem contains **117** tool modules organized in `src/tools/` and `src/tools/registry/`. The registry is initialized via `initializeToolRegistry()`, which coordinates with `getMCPManager()` to load external capabilities and manage the lifecycle of available functions.
 
-Initialization is handled via `initializeToolRegistry()`, which orchestrates the loading of MCP servers and plugin-based tools. Developers should utilize `initializeMCPServers()` and `addMCPToolsToCodeBuddyTools()` to ensure new capabilities are correctly registered within the system's runtime environment.
-
-```mermaid
-graph LR
-    A[User Query] --> B[Embedding]
-    B --> C{RAG Selector}
-    C --> D[Tool Registry]
-    D --> E[Tool Execution]
-```
-
-The registry maintains a structured mapping of tools, which are further organized into functional categories to streamline discovery and access.
+The registry acts as the central authority for tool discovery and initialization, ensuring that external capabilities are correctly mapped to agent-executable functions.
 
 ## Tool Categories
 
@@ -31,7 +21,7 @@ The registry maintains a structured mapping of tools, which are further organize
 | file_read | `view_file`, `list_directory` | 2 |
 | git | `git` | 1 |
 
-While categorization provides a logical grouping, the system employs a dynamic selection process to ensure only the most relevant tools are exposed to the model.
+Categorization allows the system to group related operations, facilitating efficient retrieval and logical organization within the agent's available skill set.
 
 ## RAG-Based Tool Selection
 
@@ -46,11 +36,18 @@ Tools have priority (3-10), keywords, and category metadata used for matching.
 
 > **Key concept:** The RAG tool selector reduces prompt size from 110+ tools to ~15, saving approximately 8,000 tokens per LLM call.
 
-This selection mechanism ensures that the LLM context window remains focused on relevant capabilities. By converting user messages into vector embeddings, the system performs a similarity search against tool metadata, effectively filtering the available toolset before the prompt is constructed.
+```mermaid
+graph LR
+    A[User Query] --> B[Embedding]
+    B --> C[Vector Search]
+    C --> D[Tool Registry]
+    D --> E[Top-K Selection]
+    E --> F[LLM Prompt]
+```
+
+By dynamically filtering the toolset, the system minimizes token overhead while maximizing the relevance of available tools for the current task.
 
 ## Registered Tools
-
-The following inventory details the specific tools currently registered and available for use within the system.
 
 27 tools registered in metadata:
 
@@ -77,9 +74,11 @@ The following inventory details the specific tools currently registered and avai
 - **view**: view_file
 - **web**: web_search, web_fetch
 
+The system integrates these tools using `addMCPToolsToCodeBuddyTools()` and `addPluginToolsToCodeBuddyTools()` to ensure compatibility across different execution environments. Additionally, `initializeMCPServers()` is invoked to prepare the server-side infrastructure required for remote tool execution.
+
 ---
 
-**See also:** [Overview](./1-overview.md) · [Architecture](./2-architecture.md) · [Subsystems](./3-subsystems.md) · [Context & Memory](./7-context-memory.md)
+**See also:** [Overview](./1-overview.md) · [Architecture](./2-architecture.md) · [Subsystems](./3a-core-agent-system-cli-and-slash-commands.md) · [Context & Memory](./7-context-memory.md)
 
 **Key source files:** `src/tools/.ts`, `src/tools/registry/.ts`
 

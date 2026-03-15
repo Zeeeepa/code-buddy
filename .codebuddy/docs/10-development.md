@@ -3,7 +3,7 @@
 
 # Getting Started
 
-This section provides the foundational steps for setting up the `grok-cli` development environment. Developers should follow these instructions to initialize the local repository, install dependencies, and launch the runtime, which is a prerequisite for modifying core components such as the `CodeBuddyAgent` or the `DMPairingManager`.
+This section outlines the prerequisites and commands required to bootstrap the Grok CLI development environment. Developers must follow these steps to ensure the local runtime is correctly configured for either Bun or Node.js execution, which is critical for maintaining parity between development and production environments.
 
 ```bash
 git clone <repo-url>
@@ -13,36 +13,27 @@ npm run dev          # Development mode (Bun)
 npm run dev:node     # Development mode (tsx/Node.js)
 ```
 
-Once the environment is configured, the system initializes various subsystems to manage state, memory, and tool integration. Understanding the startup sequence is critical for debugging initialization failures in the agent registry or session persistence layers.
+> **Key concept:** The project supports dual-runtime execution. While `npm run dev` leverages Bun for high-performance execution, `npm run dev:node` provides a compatibility layer using `tsx` for standard Node.js environments.
 
-```mermaid
-graph TD
-    A[grok-cli] --> B[CodeBuddyAgent]
-    B --> C[SessionStore]
-    B --> D[EnhancedMemory]
-    B --> E[DMPairingManager]
-    B --> F[RepoProfiler]
-    C --> G[Filesystem]
-```
-
-> **Key concept:** The `CodeBuddyAgent.initializeAgentRegistry()` method acts as the central orchestrator during startup, dynamically loading skills and memory providers to ensure the agent is context-aware before the first user interaction.
-
-After the development server is active, the application lifecycle begins by verifying the environment state. The system relies on `CodeBuddyAgent.initializeAgentSystemPrompt()` to set the initial behavior and `SessionStore.ensureSessionsDirectory()` to verify that the local filesystem is ready for persistence. If you are working on connectivity features, ensure that `DMPairingManager.requiresPairing()` is evaluated correctly during the initial handshake to prevent unauthorized access to the agent's toolset.
-
-# Build & Development Commands
-
-This section outlines the standard build, test, and development lifecycle commands for the project. Developers should familiarize themselves with these scripts to ensure consistent environment configuration, code quality, and successful deployment across different runtime targets like Node.js and Bun.
+Once the environment is bootstrapped, the system proceeds to load the agentic framework and memory providers. The initialization sequence is critical, as it ensures that the agent registry and skill sets are correctly mapped before any tool execution occurs.
 
 ```mermaid
 graph LR
-    A[Source Code] --> B[TypeScript Compiler]
-    B --> C[Dist Folder]
-    A --> D[Vitest]
-    A --> E[ESLint/Prettier]
-    A --> F[Circular Dependency Check]
+    A[Git Clone] --> B[npm install]
+    B --> C{Runtime Selection}
+    C -->|Bun| D[npm run dev]
+    C -->|Node.js| E[npm run dev:node]
+    D --> F[Agent Initialization]
+    E --> F
+    F --> G[CodeBuddyAgent.initializeAgentRegistry]
+    F --> H[CodeBuddyAgent.initializeSkills]
 ```
 
-The following table details the available npm scripts used to manage the project lifecycle, from initial compilation to final validation.
+During the startup phase, the system invokes several core methods to prepare the agent's state. Specifically, the application calls `CodeBuddyAgent.initializeAgentRegistry` and `CodeBuddyAgent.initializeSkills` to populate the available toolset. Following this, the system configures the operational context by executing `CodeBuddyAgent.initializeMemory` and `CodeBuddyAgent.initializeAgentSystemPrompt` to ensure the agent is ready to process user requests.
+
+# Build & Development Commands
+
+This section outlines the standard build, test, and maintenance scripts required to manage the project lifecycle. Developers should familiarize themselves with these commands to ensure environment consistency, as CI/CD pipelines rely on these specific entry points for validation and deployment.
 
 | Command | Description |
 |---------|-------------|
@@ -67,15 +58,54 @@ The following table details the available npm scripts used to manage the project
 | `npm run validate` | `npm run lint && npm run typecheck && npm test` |
 | `npm run install:bun` | `bun install` |
 
-While these commands facilitate the build process, the underlying system relies on specific architectural modules to manage state, memory, and tool integration. Understanding how these components interact is critical when debugging build failures or extending core functionality.
+> **Key concept:** The `npm run validate` command acts as the primary gatekeeper for pull requests, executing linting, type checking, and unit tests sequentially to prevent regression in core modules like `src/agent/codebuddy-agent`.
 
-> **Key concept:** The `npm run check:circular` command is a critical gatekeeper in the CI/CD pipeline. It prevents complex dependency cycles that can cause runtime initialization failures in core modules like `CodeBuddyAgent` or `DMPairingManager`.
+The build system is tightly coupled with the project's architectural modules. When executing `npm run build`, the TypeScript compiler processes the entire dependency graph, including critical modules such as `src/channels/dm-pairing` and `src/agent/codebuddy-agent`. Ensuring that `CodeBuddyAgent.initializeAgentRegistry()` and `DMPairingManager.checkSender()` remain type-safe is critical, as these modules form the backbone of the agent's runtime behavior.
 
-The build process ensures that core modules are correctly compiled and linked. When developing features that interact with the agent's core, ensure that initialization methods such as `CodeBuddyAgent.initializeAgentRegistry()` and `SessionStore.createSession()` are properly handled within the build artifacts. Additionally, profiling tools like `RepoProfiler.getProfile()` rely on the integrity of the generated code graph, which is validated during the `npm run build` process.
+The following diagram illustrates the standard development lifecycle, from source modification to artifact validation:
+
+```mermaid
+graph LR
+    A[Source Code] --> B[Linting & Formatting]
+    B --> C[Type Checking]
+    C --> D[Build/Transpile]
+    D --> E[Unit Testing]
+    E --> F[Artifacts]
+```
+
+Before deploying, developers must ensure that the `src/codebuddy/client` is correctly configured. The `CodeBuddyClient.validateModel()` method is often invoked during initialization, and build-time type checking ensures that these model validation paths are strictly enforced. 
+
+Beyond compilation, maintaining code quality requires strict adherence to linting and formatting standards. The `npm run lint` and `npm run format` commands facilitate the automated enforcement of these standards across the repository, ensuring that modules like `src/persistence/session-store` maintain consistent structure, particularly when `SessionStore.convertChatEntryToMessage()` is modified.
 
 # Project Structure
 
-This section outlines the `src/` directory structure, which serves as the architectural blueprint for the codebase. Understanding this organization is critical for developers to locate specific logic, manage dependencies, and contribute effectively to the modular system.
+The `src/` directory serves as the central repository for the application's core logic, infrastructure, and integration layers. Understanding this hierarchy is critical for developers navigating the codebase, as it dictates the boundaries between agent orchestration, tool execution, and persistence layers.
+
+```mermaid
+graph TD
+    Agent[src/agent] --> Tools[src/tools]
+    Agent --> Memory[src/memory]
+    Agent --> Channels[src/channels]
+    Memory --> Persistence[src/persistence]
+    Tools --> Client[src/codebuddy/client]
+    
+    subgraph Core
+    Agent
+    end
+    
+    subgraph Persistence
+    Memory
+    Persistence
+    end
+```
+
+> **Key concept:** The modular architecture separates the `agent/` core from `tools/` and `channels/`, enabling independent scaling of LLM inference capabilities and external integration points.
+
+The codebase is organized by functional domain, separating core agent logic from peripheral services. The `src/agent/` directory contains the primary orchestration logic; developers interacting with the agent lifecycle should utilize `CodeBuddyAgent.initializeAgentRegistry` and `CodeBuddyAgent.initializeSkills` to configure the runtime environment.
+
+Beyond the agent core, the `src/codebuddy/` and `src/tools/` directories manage external interactions and tool definitions. When implementing new tool support, developers should reference `CodeBuddyClient.probeToolSupport` to verify model compatibility, while specific visual tasks rely on `ScreenshotTool.capture` to interface with the host environment.
+
+Data integrity and state management are centralized within `src/memory/` and `src/persistence/`. The `SessionStore.saveSession` and `EnhancedMemory.store` methods serve as the primary entry points for persisting state across agent restarts, ensuring that context is maintained. Finally, the `src/channels/` directory handles messaging protocols, where `DMPairingManager.approve` is essential for managing secure communication channels between the agent and external entities.
 
 ```
 src/
@@ -204,49 +234,6 @@ src/
 └── index.ts            # Entry point
 ```
 
-While the directory structure provides a high-level overview of the filesystem, the actual system behavior is driven by specific, highly-coupled modules. The following architectural components represent the core logic engines that facilitate agent operations, memory management, and tool execution.
-
-### Architectural Data Flow
-
-The following diagram illustrates the relationship between the core agent, memory, and tool subsystems.
-
-```mermaid
-graph TD
-    Agent[CodeBuddyAgent] --> Memory[EnhancedMemory]
-    Agent --> Tools[Tool Registry]
-    Agent --> Channels[DMPairingManager]
-    Agent --> Profiler[RepoProfiler]
-    Memory --> Persistence[SessionStore]
-    Tools --> Screenshot[ScreenshotTool]
-    Tools --> Devices[DeviceNodeManager]
-```
-
-> **Key concept:** The `CodeBuddyAgent` acts as the central orchestrator, utilizing `CodeBuddyAgent.initializeSkills` and `CodeBuddyAgent.initializeAgentRegistry` to dynamically load capabilities, effectively decoupling the core agent logic from specific tool implementations.
-
-### Core Agent and Client Logic
-The agent system is anchored by `CodeBuddyAgent`, which manages the lifecycle of the AI interaction. It relies on `CodeBuddyClient` to interface with various LLM providers, ensuring that model capabilities are validated before execution.
-
-*   **Agent Initialization:** Use `CodeBuddyAgent.initializeAgentSystemPrompt()` to set the behavioral context and `CodeBuddyAgent.setRunId()` to track execution state.
-*   **Client Validation:** Before invoking an LLM, ensure the model is supported via `CodeBuddyClient.validateModel()` and check for tool support using `CodeBuddyClient.probeToolSupport()`.
-
-### Memory and Persistence
-State management is handled through a combination of session persistence and long-term memory storage. This ensures that the agent maintains context across restarts and complex workflows.
-
-*   **Session Management:** `SessionStore.saveSession()` and `SessionStore.loadSession()` are the primary methods for handling chat history.
-*   **Memory Operations:** `EnhancedMemory.store()` is used to persist information, while `EnhancedMemory.calculateImportance()` determines the relevance of stored data to the current context.
-
-### Tooling and Channel Integration
-The system extends its capabilities through a robust tool registry and channel management system. This allows the agent to interact with external hardware, capture screen data, and manage direct messaging pairings.
-
-*   **Channel Security:** `DMPairingManager.approve()` and `DMPairingManager.revoke()` manage the authorization state of direct messaging channels.
-*   **Hardware Interaction:** `ScreenshotTool.capture()` provides visual context, while `DeviceNodeManager.pairDevice()` handles the lifecycle of connected hardware nodes.
-
-### Profiling and Optimization
-To maintain performance within the context window, the system employs profiling and optimization strategies. These components analyze the codebase and manage the "thinking" budget of the agent.
-
-*   **Code Profiling:** `RepoProfiler.getProfile()` generates the necessary context graph for the agent to understand the repository structure.
-*   **Extended Thinking:** Use `ExtendedThinkingManager.setTokenBudget()` to control the depth of reasoning, and `ExtendedThinkingManager.toggle()` to enable or disable extended thinking capabilities dynamically.
-
 ## Coding Conventions
 
 - TypeScript strict mode
@@ -256,17 +243,18 @@ To maintain performance within the context window, the system employs profiling 
 
 # Testing
 
-The testing infrastructure ensures system reliability through a comprehensive suite of unit and integration tests. Developers should utilize these tools to verify changes before submission, as the CI pipeline enforces strict coverage and validation requirements to prevent regressions in core functionality.
+The testing infrastructure ensures system reliability across the codebase, utilizing Vitest to validate core logic and integration points. This section outlines the standard testing workflow, coverage requirements, and validation procedures necessary for maintaining code quality during development.
 
 ```mermaid
 graph LR
     A[Source Code] --> B[Vitest]
-    B --> C[Unit Tests]
-    B --> D[Integration Tests]
-    C --> E[Coverage Report]
-    D --> E
-    E --> F[Validation]
+    B --> C{Validation}
+    C --> D[Coverage Report]
+    C --> E[Linting]
+    C --> F[Type Checking]
 ```
+
+The project employs a comprehensive testing strategy designed to catch regressions early in the development lifecycle. By leveraging `happy-dom`, the suite simulates browser-like environments, allowing for the testing of complex UI and interaction logic without requiring a full browser instance.
 
 - Framework: **Vitest** with happy-dom
 - Tests in `tests/` and co-located `src/**/*.test.ts`
@@ -274,47 +262,55 @@ graph LR
 - Coverage: `npm run test:coverage`
 - Validate: `npm run validate` (lint + typecheck + test)
 
-> **Key concept:** The `npm run validate` command acts as a gatekeeper, executing linting, type checking, and the full test suite in a single pass to ensure architectural integrity before merging.
+> **Key concept:** The `npm run validate` command acts as the final gatekeeper for CI/CD pipelines, combining linting, type checking, and unit testing to prevent regressions in critical modules like `RepoProfiler` or `SessionStore`.
 
-### Component-Specific Testing
+When writing tests for the persistence layer, developers must ensure that file system interactions are properly mocked or isolated. For instance, when testing session management, verify that `SessionStore.createSession` and `SessionStore.saveSession` handle directory initialization correctly using `SessionStore.ensureSessionsDirectory` before attempting to write data.
 
-When testing core modules, ensure that stateful components are properly initialized and that lifecycle methods are exercised. For instance, verify session persistence by invoking `SessionStore.createSession()` followed by `SessionStore.saveSession()` to confirm data integrity during state transitions.
+Furthermore, testing agent-based features requires careful setup of the agent registry. Ensure that `CodeBuddyAgent.initializeAgentRegistry` and `CodeBuddyAgent.initializeSkills` are correctly invoked during test setup to avoid side effects or missing dependencies when executing agent-related logic. For modules involving complex state, such as `EnhancedMemory`, ensure that `EnhancedMemory.initialize` is called to populate the necessary memory structures before running assertions on `EnhancedMemory.store` or `EnhancedMemory.calculateImportance`.
 
-Beyond standard unit tests, developers must validate agent behavior and memory initialization. When testing the agent's setup, use `CodeBuddyAgent.initializeAgentSystemPrompt()` to ensure the system prompt is correctly configured, and verify memory state with `EnhancedMemory.initialize()` to ensure the agent has access to the required context before running inference.
+# Extension Points
 
-### Integration and Mocking
+This section details the architectural extension points available for customizing and expanding the agent's capabilities. Developers should consult these guidelines when integrating new tools, communication channels, or plugins to ensure compatibility with the core system registry and maintain architectural integrity.
 
-The system relies on `happy-dom` to simulate browser environments, which is particularly useful for testing UI-adjacent logic or tool execution. When testing tool integration, ensure that the registry is correctly populated by calling `initializeToolRegistry()` and verifying that the resulting toolset matches expected capabilities.
+The system architecture relies on a modular registry pattern to manage extensions. When extending the toolset, developers must interact with the registry to ensure proper initialization and normalization of external capabilities.
 
-For modules involving external device communication or transport layers, utilize the `DeviceNodeManager` to simulate connection states. Always verify that `DeviceNodeManager.createTransport()` and `DeviceNodeManager.pairDevice()` are tested in isolation to prevent side effects from leaking into the broader test suite.
+```mermaid
+graph TD
+    A[Registry] --> B[Tool Loader]
+    A --> C[Channel Manager]
+    A --> D[Plugin System]
+    B --> E[MCP Manager]
+    C --> F[DM Pairing]
+    D --> G[Marketplace Tools]
+    E --> H[CodeBuddy Tools]
+    G --> H
+```
 
-## Extension Points
-
-The system is designed with a modular architecture that prioritizes extensibility through well-defined entry points. By adhering to these patterns, developers can introduce new functionality—ranging from specialized tools to communication channels—without introducing regressions into the core agent logic.
+### Tooling and Registry
+Tool integration is managed primarily via `src/codebuddy/tools`. Developers should utilize `initializeToolRegistry()` to register new capabilities and `getMCPManager()` to handle Model Context Protocol (MCP) server connections.
 
 - Add new tools in `src/tools/`
 - Register tools in `src/tools/registry/`
 - Add metadata in `src/tools/metadata.ts`
+
+> **Key concept:** The tool registry acts as the central orchestrator for all capabilities, ensuring that MCP servers and marketplace plugins are normalized into a unified interface before execution.
+
+Beyond standard tool registration, the system supports dynamic conversion of external plugins. Functions such as `convertPluginToolToCodeBuddyTool()` and `convertMarketplaceToolToPluginTool()` are critical for maintaining type safety and interface consistency across the plugin ecosystem.
+
+### Channels and Communication
+For communication channels, the `src/channels/dm-pairing` module handles security and authorization. When implementing new channels, ensure that `DMPairingManager.requiresPairing()` is correctly configured to maintain secure communication boundaries between the agent and the user.
+
 - Add channels in `src/channels/`
+
+The channel architecture ensures that all direct messaging interactions are validated before execution. By leveraging the existing `DMPairingManager` methods, developers can ensure that new channels adhere to the established security protocols.
+
+### Plugin Architecture
+Plugins are integrated into the core workflow through the `src/plugins/` directory. This layer allows for the extension of agent behavior without modifying core logic, provided the plugins adhere to the expected tool conversion signatures.
+
 - Add plugins in `src/plugins/`
-
-```mermaid
-graph TD
-    Core[Core System] --> Registry[Tool Registry]
-    Registry --> Tools[src/tools]
-    Registry --> Plugins[src/plugins]
-    Core --> Channels[src/channels]
-    Core --> Metadata[src/tools/metadata.ts]
-```
-
-When implementing new tools, the system relies on the registry pattern to maintain consistency across the runtime. Developers should utilize `initializeToolRegistry` to bootstrap the environment and `getMCPManager` to handle Model Context Protocol integrations. The conversion process is strictly handled by `convertMCPToolToCodeBuddyTool` and `convertPluginToolToCodeBuddyTool`, which normalize external definitions into the internal format used by the agent.
-
-> **Key concept:** The tool registry acts as the central orchestrator for all capabilities. By utilizing `initializeToolRegistry` and `addMCPToolsToCodeBuddyTools`, developers ensure that new tools are correctly serialized and available to the agent runtime without modifying core logic.
-
-Beyond tool integration, the channel architecture allows for flexible communication interfaces. These channels are managed independently, ensuring that adding a new transport layer does not impact the existing tool execution flow.
 
 ---
 
-**See also:** [Overview](./1-overview.md) · [Architecture](./2-architecture.md) · [Subsystems](./3-subsystems.md) · [Tool System](./5-tools.md)
+**See also:** [Overview](./1-overview.md) · [Architecture](./2-architecture.md) · [Subsystems](./3a-core-agent-system-cli-and-slash-commands.md) · [Tool System](./5-tools.md)
 
 **Key source files:** `src/tools/.ts`, `src/tools/registry/.ts`, `src/tools/metadata.ts`, `src/channels/.ts`, `src/plugins/.ts`

@@ -1,8 +1,8 @@
 # Security Architecture
 
-The security architecture implements a defense-in-depth strategy across 30 distinct modules within `src/security/`. This framework is critical for maintaining system integrity during code generation, tool execution, and session management, ensuring that all operations adhere to strict safety policies before reaching the host environment.
+The security architecture implements a defense-in-depth strategy across 30 specialized modules within the `src/security/` directory. This system is designed to mitigate risks associated with AI-driven code generation, sandboxed execution, and external tool integration, ensuring that all operations adhere to strict safety policies before execution.
 
-The project has **30** security modules in `src/security/`:
+The project maintains a modular security infrastructure, where each component is responsible for a specific aspect of system hardening, ranging from input validation to environment isolation.
 
 | Module | Purpose |
 |--------|---------|
@@ -37,9 +37,21 @@ The project has **30** security modules in `src/security/`:
 | `trust-folders` | Trust Folder Manager |
 | `write-policy` | WritePolicy — enforces diff-first writes at the tool-handler level. |
 
-These modules collectively enforce granular control over system resources and external interactions. The following features highlight the primary mechanisms used to mitigate common attack vectors and maintain a trusted execution environment.
+These modules function as a cohesive security layer, intercepting operations at the tool-handler level to enforce granular control. The following diagram illustrates the high-level flow of a request through the security validation pipeline.
+
+```mermaid
+graph TD
+    A[User Request] --> B[Security Modules]
+    B --> C{Guardian Agent}
+    C -->|Approved| D[Sandbox]
+    C -->|Blocked| E[Reject]
+    D --> F[Execution]
+    E --> G[Audit Log]
+```
 
 ## Security Features
+
+The system employs several automated mechanisms to ensure that code execution remains within defined safety parameters.
 
 - **AI Guardian Agent**: Automatic approval reviewer with risk scoring
 - **Sandbox Isolation**: Sandboxed execution environment
@@ -47,23 +59,17 @@ These modules collectively enforce granular control over system resources and ex
 - **Shell Command Validation**: Dangerous pattern detection
 - **Environment Filtering**: Sensitive variable stripping
 
-```mermaid
-graph TD
-    A[User Request] --> B[GuardianAgent]
-    B --> C{Security Policy}
-    C -->|Approved| D[Sandbox]
-    C -->|Blocked| E[AuditLogger]
-    D --> F[ToolExecution]
-    F --> G[SessionStore]
-```
+> **Key concept:** The `Guardian Agent` acts as the primary gatekeeper, utilizing risk scoring to automate approval decisions. This significantly reduces the cognitive load on users while maintaining strict adherence to the `WritePolicy` for all diff-first operations.
 
-> **Key concept:** The security architecture relies on `DMPairingManager.isBlocked` and `DMPairingManager.isApproved` to gate communication channels, ensuring that only verified entities can trigger sensitive operations within the `src/security/` domain.
+## Integration with Agent Logic
 
-The system integrates security checks directly into the tool execution lifecycle. For instance, before any sensitive operation is performed, the system verifies sender authorization using `DMPairingManager.isBlocked` and `DMPairingManager.isApproved`. If a tool requires interaction with the host environment, such as `ScreenshotTool.capture`, the security layer validates the request against `DMPairingManager.requiresPairing` to ensure the session is authorized.
+The security layer is tightly coupled with the agent's operational logic to ensure that authorization checks are performed before any tool execution. For instance, the `DMPairingManager.isBlocked` and `DMPairingManager.isApproved` methods are utilized to verify sender authorization, ensuring that only trusted sources can trigger sensitive operations within the `sender-policies` framework.
+
+Furthermore, when the `CodeBuddyAgent` initializes, it leverages these security modules to establish a baseline for safe execution, ensuring that the environment is filtered and policies are loaded before the agent begins processing tasks.
 
 ---
 
-**See also:** [Overview](./1-overview.md) · [Architecture](./2-architecture.md) · [Subsystems](./3-subsystems.md) · [Tool System](./5-tools.md)
+**See also:** [Overview](./1-overview.md) · [Architecture](./2-architecture.md) · [Subsystems](./3a-core-agent-system-cli-and-slash-commands.md) · [Tool System](./5-tools.md)
 
 **Key source files:** `src/security/.ts`
 

@@ -4,6 +4,7 @@
  */
 
 import * as dotenv from 'dotenv';
+import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -30,7 +31,14 @@ async function main() {
     console.log(`  → Graph already populated: ${graph.getStats().tripleCount} triples`);
   }
 
-  // Step 2: Generate raw docs
+  // Step 2: Clean old docs and generate raw docs
+  const docsDir = path.join(projectRoot, '.codebuddy', 'docs');
+  if (fs.existsSync(docsDir)) {
+    for (const f of fs.readdirSync(docsDir)) {
+      fs.unlinkSync(path.join(docsDir, f));
+    }
+    console.log('  Cleaned old docs');
+  }
   console.log('\n[2/4] Generating raw documentation...');
   const { generateDocs } = await import('../src/docs/docs-generator.js');
   const rawResult = await generateDocs(graph, {
@@ -95,7 +103,6 @@ async function main() {
   };
 
   const { enrichDocs } = await import('../src/docs/llm-enricher.js');
-  const docsDir = path.join(projectRoot, '.codebuddy', 'docs');
 
   const enrichResult = await enrichDocs({
     docsDir,

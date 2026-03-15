@@ -1,10 +1,10 @@
 # Architecture
 
-This section details the high-level architectural design of the system, focusing on the agent orchestrator and its interaction with infrastructure and tool ecosystems. It is intended for developers and system architects who need to understand the dependency graph and layer separation to implement new features or modify core agent behavior.
+The project follows a layered architecture with a central agent orchestrator coordinating all interactions between user interfaces, LLM providers, tools, and infrastructure services. This documentation provides a high-level overview of the system's structural design, intended for contributors and system architects who need to understand how components integrate and communicate within the codebase.
 
 ## System Layers
 
-The system architecture is organized into distinct functional layers, ensuring a clean separation of concerns between user-facing interfaces and backend infrastructure.
+The system utilizes a modular, layered architecture to decouple user interfaces from core agent logic. This separation ensures that infrastructure services, such as security and memory management, can evolve independently of the interface layer.
 
 ```mermaid
 graph TD
@@ -22,9 +22,11 @@ graph TD
   CTX --> INFRA
 ```
 
+To understand the internal connectivity of these layers, we must examine the dependency graph of the core agent.
+
 ## Core Module Dependencies
 
-Understanding the dependency graph is critical for maintaining system stability, as changes to core modules can propagate across the entire agent lifecycle.
+The dependency graph highlights the central role of `src/agent/codebuddy-agent`. It acts as the primary hub, importing various middleware and utility modules to facilitate complex agent operations.
 
 ```mermaid
 graph LR
@@ -110,9 +112,9 @@ graph LR
     style M0 fill:#f9f,stroke:#333,stroke-width:2px
 ```
 
-## Layer Breakdown
+The following table categorizes the codebase into functional domains, providing a high-level overview of the project's modular organization.
 
-The system is modularized into specific directories, each serving a distinct purpose in the agent's lifecycle.
+## Layer Breakdown
 
 | Layer | Modules | Description |
 |-------|---------|-------------|
@@ -142,28 +144,37 @@ The system is modularized into specific directories, each serving a distinct pur
 | `src/advanced/` | 8 | Advanced |
 | `src/daemon/` | 8 | Background daemon service |
 
-> **Key concept:** The RAG tool selector reduces prompt size from 110+ tools to ~15, saving approximately 8,000 tokens per LLM call.
+With the architectural structure established, we can examine the lifecycle of a user request as it traverses the agent system.
 
 ## Core Agent Flow
 
-Beyond the static layer breakdown, the runtime behavior is governed by a specific execution flow that manages state and tool invocation. The process begins when user input is received and passed to the orchestrator.
+The execution flow begins with input ingestion and proceeds through a series of middleware and execution steps. The system performs initialization tasks to prepare the agent for task execution and maintains state consistency across turns.
 
+> **Key concept:** The RAG tool selector reduces prompt size from 110+ tools to ~15, saving approximately 8,000 tokens per LLM call.
+
+```mermaid
+graph TD
+  Input["User Input → CLI/Chat/Voice/Channel"]
+  Process["CodeBuddyAgent.processUserMessage()"]
+  Executor["AgentExecutor (ReAct loop)"]
+  
+  Input --> Process
+  Process --> Executor
+  
+  subgraph Loop
+    1["1. RAG Tool Selection (~15 from 110+)"]
+    2["2. Context Injection (lessons, decisions, graph)"]
+    3["3. Middleware Before-Turn (cost, turn limit, reasoning)"]
+    4["4. LLM Call (multi-provider)"]
+    5["5. Tool Execution (parallel read / serial write)"]
+    6["6. Result Processing (masking, TTL, compaction)"]
+    7["7. Middleware After-Turn (auto-repair, metrics)"]
+    8["8. Loop or Return"]
+  end
+  
+  Executor --> 1 --> 2 --> 3 --> 4 --> 5 --> 6 --> 7 --> 8
 ```
-User Input → CLI/Chat/Voice/Channel
-  → CodeBuddyAgent.processUserMessage()
-    → AgentExecutor (ReAct loop)
-      1. RAG Tool Selection (~15 from 110+)
-      2. Context Injection (lessons, decisions, graph)
-      3. Middleware Before-Turn (cost, turn limit, reasoning)
-      4. LLM Call (multi-provider)
-      5. Tool Execution (parallel read / serial write)
-      6. Result Processing (masking, TTL, compaction)
-      7. Middleware After-Turn (auto-repair, metrics)
-      8. Loop or Return
-```
 
----
-
-**See also:** [Overview](./1-overview.md) · [Subsystems](./3-subsystems.md) · [Tool System](./5-tools.md) · [Security](./6-security.md)
+**See also:** [Overview](./1-overview.md) · [Subsystems](./3a-core-agent-system-cli-and-slash-commands.md) · [Tool System](./5-tools.md) · [Security](./6-security.md)
 
 **Key source files:** `src/agent/.ts`, `src/tools/.ts`, `src/utils/.ts`, `src/commands/.ts`, `src/ui/.ts`, `src/channels/.ts`, `src/context/.ts`, `src/security/.ts`

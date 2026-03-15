@@ -1,10 +1,10 @@
 # @phuetz/code-buddy v0.5.0
 
-This documentation provides an architectural overview of the `@phuetz/code-buddy` terminal-based AI coding agent. It is intended for developers and contributors who need to understand the system's modular structure, multi-provider LLM integration, and core operational workflows.
+@phuetz/code-buddy is a terminal-based AI coding agent designed for high-extensibility and multi-provider support within TypeScript/Node.js environments. This documentation provides an architectural overview of the system, intended for developers looking to integrate new tools, modify agent behavior, or contribute to the core codebase.
 
 > Open-source multi-provider AI coding agent for the terminal. Supports Grok, Claude, ChatGPT, Gemini, Ollama and LM Studio with 52+ tools, multi-channel messaging, skills system, and OpenClaw-inspired architecture.
 
-@phuetz/code-buddy is a terminal-based AI coding agent built in TypeScript/Node.js. It supports multiple LLM providers (Grok, Claude, ChatGPT, Gemini, Ollama, LM Studio) with automatic failover. The codebase contains 1077 source modules and 907 classes.
+The system's versatility stems from its modular design, enabling seamless integration across various communication channels and execution environments.
 
 ## Key Capabilities
 
@@ -13,13 +13,24 @@ This documentation provides an architectural overview of the `@phuetz/code-buddy
 - Voice interaction with wake-word activation
 - Sandboxed execution (Docker, OS-level)
 - Advanced reasoning (Tree-of-Thought, MCTS)
-- Code graph analysis (49110 relationships)
+- Code graph analysis (49113 relationships)
 - Automated program repair (fault localization + LLM)
 - Agent-to-Agent protocol (Google A2A spec)
 - Workflow engine with DAG execution
 - Cloud deployment (Fly.io, Railway, Render, GCP)
 
-These capabilities are supported by a robust backend architecture designed for extensibility and high-performance code analysis, allowing the agent to maintain state across complex coding sessions.
+```mermaid
+graph TD
+    A[Entry Point: CLI/Server] --> B[CodeBuddyAgent]
+    B --> C[EnhancedMemory]
+    B --> D[CodeBuddyClient]
+    B --> E[ToolRegistry]
+    B --> F[DMPairingManager]
+    D --> G[LLM Providers]
+    C --> H[SessionStore]
+```
+
+The following metrics quantify the project's complexity and architectural footprint, reflecting the scale of the codebase and its dependency graph.
 
 ## Project Statistics
 
@@ -28,11 +39,13 @@ These capabilities are supported by a robust backend architecture designed for e
 | Version | 0.5.0 |
 | Source Modules | 1077 |
 | Classes | 907 |
-| Code Relationships | 49 110 |
+| Code Relationships | 49 113 |
 | Dependencies | 35 |
 | Dev Dependencies | 23 |
 
-The following breakdown highlights the most critical modules within the repository, ranked by their architectural influence and dependency footprint.
+The architecture relies on several high-rank modules that serve as the foundation for agent operations, memory management, and tool execution.
+
+> **Key concept:** The architectural rank (PageRank) of a module indicates its dependency density. Modules like `src/agent/codebuddy-agent` are central to system stability; modifications here require rigorous testing as they impact nearly every other subsystem.
 
 ## Core Modules (by architectural importance)
 
@@ -61,36 +74,18 @@ Ranked by PageRank — higher rank means more modules depend on this one:
 | `src/memory/decision-memory` | 0.004 | 1 | 10 fns | Memory and persistence |
 | `src/utils/memory-monitor` | 0.004 | 1 | 23 fns | Shared utilities |
 
-### System Architecture Flow
+The core modules implement specific logic to maintain system integrity. For instance, `src/channels/dm-pairing` handles secure communication and channel pairing logic. The `src/codebuddy/client` module abstracts LLM interactions, validating models and probing capabilities across various providers.
 
-The following diagram illustrates the primary interaction flow between the core agent, memory subsystems, and external communication channels.
+Furthermore, the `src/agent/codebuddy-agent` module orchestrates the agent lifecycle, managing memory initialization and skill loading. Data persistence is handled by `src/persistence/session-store`, which manages session creation and state recovery to ensure continuity.
 
-```mermaid
-graph TD
-    Agent[CodeBuddyAgent] --> Client[CodeBuddyClient]
-    Agent --> Memory[EnhancedMemory]
-    Agent --> Session[SessionStore]
-    Agent --> Device[DeviceNode]
-    Agent --> Pairing[DMPairing]
-    Client --> Tools[CodeBuddyTools]
-    
-    style Agent fill:#f9f,stroke:#333,stroke-width:2px
-```
-
-> **Key concept:** The `CodeBuddyAgent` acts as the central orchestrator, utilizing `CodeBuddyClient` for LLM interactions and `EnhancedMemory` for state persistence. Modifying these core modules requires careful regression testing due to their high dependency count.
-
-### Component Interfaces
-
-To interact with these modules, developers should utilize the established public interfaces. For instance, the `CodeBuddyAgent` serves as the primary orchestrator for memory and registry initialization. When managing sessions, developers interact with the persistence layer via the `SessionStore` module.
-
-The system relies on a specific technology stack to manage these entry points and facilitate cross-platform compatibility.
+Understanding the system's entry points is critical for debugging the initialization sequence and managing the lifecycle of the agent process.
 
 ## Entry Points
 
 - **`src/server/index`** — HTTP/WebSocket server (Express)
 - **`src/index`** — CLI entry point (Commander)
 
-The entry points serve as the bootstrap layer, initializing the necessary managers before handing control to the agent loop.
+The stack is built on modern TypeScript standards, prioritizing type safety and asynchronous performance for real-time AI interactions.
 
 ## Technology Stack
 
@@ -107,7 +102,7 @@ The entry points serve as the bootstrap layer, initializing the necessary manage
 | MCP | @modelcontextprotocol/sdk |
 | Testing | vitest |
 
-To begin working with the codebase, follow the standard installation and build procedures outlined below.
+Developers can initialize the development environment using standard Node.js workflows to begin contributing or testing local changes.
 
 ## Getting Started
 
@@ -130,6 +125,6 @@ npm test
 
 ---
 
-**See also:** [Architecture](./2-architecture.md) · [Subsystems](./3-subsystems.md) · [Tool System](./5-tools.md) · [Security](./6-security.md)
+**See also:** [Architecture](./2-architecture.md) · [Subsystems](./3a-core-agent-system-cli-and-slash-commands.md) · [Tool System](./5-tools.md) · [Security](./6-security.md)
 
 **Key source files:** `src/channels/dm-pairing.ts`, `src/codebuddy/client.ts`, `src/agent/codebuddy-agent.ts`, `src/agent/extended-thinking.ts`, `src/memory/enhanced-memory.ts`, `src/persistence/session-store.ts`, `src/agent/repo-profiling/cartography.ts`, `src/nodes/device-node.ts`

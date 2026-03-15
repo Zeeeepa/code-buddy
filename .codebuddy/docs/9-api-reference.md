@@ -1,12 +1,10 @@
 # CLI & API Reference
 
-This reference documents the Code Buddy CLI interface and the underlying HTTP API surface. It is intended for developers integrating Code Buddy into existing workflows, managing agent deployments, or extending the platform's capabilities through custom tools and automation.
+This reference provides a comprehensive overview of the Code Buddy command-line interface (CLI) and HTTP API endpoints. It is intended for developers, system administrators, and contributors who need to integrate, automate, or extend the Code Buddy agent environment.
 
 ## CLI Subcommands
 
-The CLI provides a comprehensive interface for interacting with the agent runtime, managing security, and orchestrating multi-agent workflows. Each subcommand maps to specific internal managers, ensuring that operations performed via the terminal are consistent with those executed through the API.
-
-> **Key concept:** The CLI utilizes a modular command pattern where subcommands act as thin wrappers over core managers. This separation ensures that logic, such as `DMPairingManager.requiresPairing` checks, remains consistent whether triggered via CLI or API.
+The CLI serves as the primary entry point for interacting with the agent, managing infrastructure, and configuring runtime behavior. These commands map directly to internal management modules, such as `DMPairingManager.approve` for security pairing or `DeviceNodeManager.pairDevice` for hardware integration.
 
 | Command | Description |
 |---------|-------------|
@@ -43,25 +41,24 @@ The CLI provides a comprehensive interface for interacting with the agent runtim
 | `buddy approvals` | Manage tool/action approval requests |
 | `buddy deploy` | Generate cloud deployment configurations (Fly, Railway, Render, Nix) |
 
-For example, when managing secure communication channels, the `buddy pairing` command interfaces directly with `DMPairingManager.approve` to authorize senders, while `buddy device` leverages `DeviceNodeManager.pairDevice` to establish secure transport connections.
-
-## CLI Options
-
-The CLI options allow for granular control over the agent's runtime environment, security posture, and output formatting. These flags are processed during the initialization phase of the CLI application.
+The following diagram illustrates the high-level interaction flow between the CLI entry points, the core agent system, and the persistence layer.
 
 ```mermaid
 graph TD
-    A[CLI / API Entry] --> B[Agent Core]
-    B --> C[Memory Manager]
-    B --> D[Tool Registry]
-    B --> E[Device Manager]
-    B --> F[Session Store]
-    C --> F
-    D --> G[MCP Servers]
-    E --> H[Transport Layer]
+    A[CLI / API Request] --> B{Command Router}
+    B -->|Manage| C[DMPairingManager]
+    B -->|Execute| D[CodeBuddyAgent]
+    B -->|Persistence| E[SessionStore]
+    D -->|Tooling| F[ScreenshotTool]
+    D -->|State| E
+    C -->|Security| G[Access Control]
 ```
 
-When configuring the runtime, users can modify behavior using the following flags. Notably, when the `--probe-tools` flag is invoked, the system executes `CodeBuddyClient.probeToolSupport` to verify that the selected model can handle the required function calling capabilities before the agent starts.
+## CLI Options
+
+Beyond subcommands, the CLI supports granular configuration flags that modify execution parameters, security posture, and output formatting. These flags allow for fine-tuning the agent's behavior without modifying the underlying configuration files.
+
+> **Key concept:** The `--probe-tools` flag triggers `CodeBuddyClient.probeToolSupport()` at startup, ensuring the model's function-calling capabilities are verified before the agent attempts to execute complex tool chains.
 
 | Flag | Description |
 |------|-------------|
@@ -86,11 +83,9 @@ When configuring the runtime, users can modify behavior using the following flag
 | `--no-color` | disable colored output |
 | `--no-emoji` | disable emoji in output |
 
-Beyond standard CLI flags, the system supports an extensible slash command architecture for in-chat interactions.
-
 ## Slash Commands
 
-Slash commands provide a shortcut mechanism for common agent tasks, documentation generation, and system configuration. These commands are parsed by the input handler and routed to the appropriate internal module.
+Slash commands provide in-chat control mechanisms, allowing users to trigger specific agent behaviors or documentation generation without leaving the conversation context. These commands are parsed by the agent's input handler to invoke internal routines.
 
 | File | Purpose |
 |------|---------|
@@ -100,13 +95,9 @@ Slash commands provide a shortcut mechanism for common agent tasks, documentatio
 | `/prompts` | /prompt Slash Commands |
 | `/types` | Slash Command Types |
 
-The slash command system is tightly integrated with the HTTP API, allowing for consistent behavior across both terminal and web-based interfaces.
-
 ## HTTP API Routes
 
-The HTTP API exposes the core functionality of Code Buddy, enabling programmatic access to agent sessions, memory, and tool execution. This API is designed for high-concurrency environments and supports stateful session management.
-
-The `sessions.ts` route is particularly critical for maintaining conversation state, as it utilizes `SessionStore.loadSession` and `SessionStore.saveSession` to ensure that context is persisted correctly across API requests.
+For programmatic access and external integrations, the Code Buddy server exposes a RESTful API, enabling session management and metric tracking. These routes interface directly with the persistence layer, specifically utilizing `SessionStore.createSession` and `SessionStore.saveSession` to manage stateful interactions.
 
 | Route File | Endpoints |
 |------------|----------|
@@ -123,6 +114,6 @@ The `sessions.ts` route is particularly critical for maintaining conversation st
 
 ---
 
-**See also:** [Architecture](./2-architecture.md) · [Subsystems](./3-subsystems.md) · [Tool System](./5-tools.md) · [Security](./6-security.md)
+**See also:** [Architecture](./2-architecture.md) · [Subsystems](./3a-core-agent-system-cli-and-slash-commands.md) · [Tool System](./5-tools.md) · [Security](./6-security.md)
 
 --- END ---

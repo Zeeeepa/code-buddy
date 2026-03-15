@@ -1,21 +1,39 @@
 # Code Quality Metrics
 
-This section provides a quantitative overview of the codebase's structural integrity, identifying areas of high coupling and potential technical debt. Developers should review these metrics before initiating major refactoring or architectural changes to ensure system stability and maintainability.
+This section provides an overview of the current codebase health, identifying areas of technical debt, high coupling, and dead code. These metrics are used by the engineering team to prioritize refactoring efforts and ensure the long-term maintainability and performance of the core system.
 
-## Code Health: 100/100 (Excellent)
+## Code Health: 65/100 (Fair)
 
-A perfect score indicates that the codebase currently adheres to all defined linting, type safety, and architectural standards. This baseline is maintained through automated CI checks and strict adherence to dependency boundaries.
+The current health score of 65/100 indicates significant opportunities for optimization, particularly regarding the removal of unused code paths and the reduction of inter-module dependencies. Addressing these issues is critical for improving build times and reducing the cognitive load for new contributors.
+
+Score breakdown:
+- Dead code: -20 (3099 high-confidence)
+- High coupling: -15 (20 pairs)
+
+### System Architecture Overview
+
+The following diagram illustrates the core interaction flow between the primary system components. Understanding these relationships is vital when refactoring, as changes to central modules like `CodeBuddyAgent` or `SessionStore` will propagate across the dependency graph.
+
+```mermaid
+graph TD
+    Agent[CodeBuddyAgent] --> Memory[EnhancedMemory]
+    Agent --> Client[CodeBuddyClient]
+    Agent --> Session[SessionStore]
+    Client --> Device[DeviceNodeManager]
+    Client --> Profiler[RepoProfiler]
+    Session --> Persistence[SessionStore]
+```
 
 ## Dead Code Analysis
 
-The following analysis highlights functions that appear to be unreachable within the current execution graph. Identifying unreachable code is critical for reducing binary size and simplifying the cognitive load for new contributors. Note that dynamic dispatch targets and exported API methods are excluded from this list to prevent false positives.
+> **Key concept:** Dead code analysis uses static analysis to identify unreachable branches. While high-confidence candidates are safe to remove, dynamic dispatch targets—such as those managed by `DMPairingManager.approve` or `DeviceNodeManager.pairDevice`—must be verified against the runtime registry before deletion to prevent breaking core functionality.
 
 | Confidence | Count |
 |---|---|
-| High | 3098 |
+| High | 3099 |
 | Medium | 0 |
 | Low | 1910 |
-| **Total** | **5244** |
+| **Total** | **5245** |
 
 ### Top Dead Code Candidates
 
@@ -37,18 +55,9 @@ The following analysis highlights functions that appear to be unreachable within
 - `ACPRouter.reject` (high confidence)
 - `ACPRouter.request` (high confidence)
 
-```mermaid
-graph TD
-    A[Source Code] --> B[Static Analysis]
-    B --> C{Dead Code?}
-    C -->|Yes| D[Dead Code Report]
-    C -->|No| E[Active Code]
-    D --> F[Refactoring Queue]
-```
-
 ## Module Coupling
 
-Module coupling metrics quantify the interdependencies between system components. High values in the 'Calls' column indicate tight coupling, which can impede independent module testing and increase the risk of cascading failures.
+High coupling often indicates that modules are violating the single responsibility principle, making the system brittle to changes. The following table highlights the most tightly coupled modules that require architectural review to decouple dependencies.
 
 | Module A | Module B | Calls | Imports | Total |
 |---|---|---|---|---|
@@ -71,14 +80,12 @@ Module coupling metrics quantify the interdependencies between system components
 Most dependent module: `src/utils/validators`
 Most depended-upon: `src/utils/validators`
 
-> **Key concept:** The `src/utils/validators` module serves as the primary dependency for input validation across the system. Excessive coupling here suggests that validation logic should be abstracted into middleware or service-specific validators to improve modularity and reduce the impact of changes.
-
 ## Refactoring Suggestions
 
-The following functions exhibit high PageRank scores, indicating they are central nodes in the call graph. While these functions require attention, developers should look to established patterns in the codebase, such as `EnhancedMemory.calculateImportance` or `SessionStore.saveSession`, which demonstrate effective encapsulation and lower coupling. Addressing these high-coupling functions will improve testability and reduce the risk of regression during future feature development.
+The following functions exhibit high PageRank scores, indicating they are central to the system's operation. Refactoring these into interfaces or extracting them into dedicated services—such as moving logic into `CodeBuddyAgent.initializeMemory` or `SessionStore.saveSession`—will improve testability and modularity.
 
 - **getErrorMessage**: Called by 155 functions — high coupling, consider interface extraction (PageRank: 1.000, 155 callers)
-- **isExpired**: Called by 10 functions — high coupling, consider interface extraction (PageRank: 0.626, 10 callers)
+- **isExpired**: Called by 10 functions — high coupling, consider interface extraction (PageRank: 0.627, 10 callers)
 - **send**: Called by 41 functions — high coupling, consider interface extraction (PageRank: 0.547, 41 callers)
 - **SubagentManager.spawn**: Called by 96 functions — high coupling, consider interface extraction (PageRank: 0.444, 96 callers)
 - **generateId**: Called by 17 functions — high coupling, consider interface extraction (PageRank: 0.429, 17 callers)
@@ -90,8 +97,6 @@ The following functions exhibit high PageRank scores, indicating they are centra
 
 ---
 
-**See also:** [Overview](./1-overview.md) · [Architecture](./2-architecture.md) · [Subsystems](./3-subsystems.md) · [Tool System](./5-tools.md)
+**See also:** [Overview](./1-overview.md) · [Architecture](./2-architecture.md) · [Subsystems](./3a-core-agent-system-cli-and-slash-commands.md) · [Tool System](./5-tools.md)
 
 **Key source files:** `src/utils/validators.ts`
-
---- END ---
