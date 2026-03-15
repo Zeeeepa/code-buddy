@@ -130,15 +130,20 @@ export async function generateDocs(
           if (currentSection) sections.push(currentSection);
           const title = line.replace(/^## /, '');
           // Build a short, readable slug from the title
-          const label = title
-            .replace(/\s*\(\d+ modules?\)$/, '')  // strip (N modules)
-            .replace(/^src\//, '')                  // strip leading src/
+          let label = title
+            .replace(/\s*\(\d+ modules?.*\)$/, '')  // strip (N modules ...)
+            .replace(/\s*—\s*.+$/, '')               // strip disambiguation suffix
+            .replace(/^src\//, '')                    // strip leading src/
             .replace(/[^a-zA-Z0-9/-]/g, '-')
             .replace(/\//g, '-')
             .replace(/-+/g, '-')
             .replace(/^-|-$/g, '')
-            .toLowerCase()
-            .substring(0, 40);
+            .toLowerCase();
+          // Truncate at word boundary, max 40 chars
+          if (label.length > 40) {
+            const cut = label.lastIndexOf('-', 40);
+            label = cut > 10 ? label.substring(0, cut) : label.substring(0, 40);
+          }
           currentSection = { label, title, content: [line] };
         } else if (currentSection) {
           currentSection.content.push(line);
@@ -273,10 +278,12 @@ function addCrossLinksAndCitations(
   files: string[],
   graph: KnowledgeGraph,
 ): void {
+  // Find the actual subsystems file (may be split into 3a-, 3b-, etc.)
+  const subsystemFile = files.find(f => f.startsWith('3')) ?? '3-subsystems.md';
   const sectionMap: Record<string, { file: string; title: string; keywords: string[] }> = {
     'overview': { file: '1-overview.md', title: 'Overview', keywords: ['project', 'stats', 'capabilities'] },
     'architecture': { file: '2-architecture.md', title: 'Architecture', keywords: ['agent', 'executor', 'layer', 'flow'] },
-    'subsystems': { file: '3-subsystems.md', title: 'Subsystems', keywords: ['community', 'cluster', 'module'] },
+    'subsystems': { file: subsystemFile, title: 'Subsystems', keywords: ['community', 'cluster', 'module'] },
     'metrics': { file: '4-metrics.md', title: 'Code Quality', keywords: ['dead code', 'coupling', 'refactoring'] },
     'tools': { file: '5-tools.md', title: 'Tool System', keywords: ['tool', 'registry', 'RAG'] },
     'security': { file: '6-security.md', title: 'Security', keywords: ['security', 'validation', 'permission', 'sandbox'] },
@@ -708,10 +715,21 @@ async function generateSubsystems(
 
     // Document each main community — Bug 5 fix: inline diagrams only for top 3
     let inlineDiagramCount = 0;
+    const usedLabels = new Map<string, number>();
     for (const [communityId, members] of mainCommunities) {
 
       const shortNames = members.map(m => m.replace(/^mod:/, ''));
-      const label = deriveSubsystemLabel(shortNames, communityId);
+      let label = deriveSubsystemLabel(shortNames, communityId);
+      // Disambiguate duplicate labels (e.g. two "Messaging Channel Integrations")
+      const count = usedLabels.get(label) ?? 0;
+      usedLabels.set(label, count + 1);
+      if (count > 0) {
+        // Find the top-ranked module's specific subdir to differentiate
+        const ranked = members.map(m => m.replace(/^mod:src\//, '')).sort();
+        const topSub = ranked[0]?.split('/')[1] ?? `Part ${count + 1}`;
+        const humanSub = topSub.charAt(0).toUpperCase() + topSub.slice(1).replace(/-/g, ' ');
+        label = `${label} — ${humanSub}`;
+      }
 
       lines.push(`## ${label} (${members.length} modules)`, '');
 
@@ -777,13 +795,13 @@ async function generateSubsystems(
 }
 
 /** Bug 9 fix: Compute a code health score 0-100 */
-function computeHealthScore(graph: KnowledgeGraph): { score: number; label: string; penalties: string[] } {
+async function computeHealthScore(graph: KnowledgeGraph): Promise<{ score: number; label: string; penalties: string[] }> {
   let score = 100;
   const penalties: string[] = [];
 
   // Dead code penalty: -1 per high-confidence dead function, max -20
   try {
-    const { detectDeadCode } = require('../knowledge/graph-analytics.js');
+    const { detectDeadCode } = await import('../knowledge/graph-analytics.js');
     const deadCode = detectDeadCode(graph);
     const deadPenalty = Math.min(deadCode.byConfidence.high.length, 20);
     if (deadPenalty > 0) {
@@ -794,7 +812,7 @@ function computeHealthScore(graph: KnowledgeGraph): { score: number; label: stri
 
   // Coupling penalty: -1 per highly-coupled pair (>5 connections), max -15
   try {
-    const { computeCoupling } = require('../knowledge/graph-analytics.js');
+    const { computeCoupling } = await import('../knowledge/graph-analytics.js');
     const coupling = computeCoupling(graph, 20);
     const highCoupled = coupling.hotspots.filter((p: { total: number }) => p.total > 5).length;
     const couplingPenalty = Math.min(highCoupled * 2, 15);
@@ -825,8 +843,8 @@ function computeHealthScore(graph: KnowledgeGraph): { score: number; label: stri
 }
 
 async function generateMetrics(graph: KnowledgeGraph): Promise<string> {
-  // Bug 9 fix: Health score at top
-  const health = computeHealthScore(graph);
+  // Bug 9 fix: Health score at top (async — ESM dynamic import)
+  const health = await computeHealthScore(graph);
   const lines = [
     '# Code Quality Metrics',
     '',
