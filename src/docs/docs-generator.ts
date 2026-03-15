@@ -115,20 +115,31 @@ export async function generateDocs(
   // 3. Subsystems (per-community)
   // Bug 6 fix: split into multiple files when a single file exceeds 300 lines
   // ========================================================================
+  const titleMap = new Map<string, string>();
   try {
     const subsystems = await generateSubsystems(graph, modules, includeDiagrams);
     const subsystemLines = subsystems.split('\n');
     if (subsystemLines.length > 300) {
       // Split by ## headers into separate files
-      const sections: Array<{ label: string; content: string[] }> = [];
-      let currentSection: { label: string; content: string[] } | null = null;
+      const sections: Array<{ label: string; title: string; content: string[] }> = [];
+      let currentSection: { label: string; title: string; content: string[] } | null = null;
       const headerLines: string[] = [];
 
       for (const line of subsystemLines) {
         if (line.startsWith('## ') && !line.startsWith('## Community Interactions')) {
           if (currentSection) sections.push(currentSection);
-          const label = line.replace(/^## /, '').replace(/\s*\(.*\)$/, '').replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase();
-          currentSection = { label, content: [line] };
+          const title = line.replace(/^## /, '');
+          // Build a short, readable slug from the title
+          const label = title
+            .replace(/\s*\(\d+ modules?\)$/, '')  // strip (N modules)
+            .replace(/^src\//, '')                  // strip leading src/
+            .replace(/[^a-zA-Z0-9/-]/g, '-')
+            .replace(/\//g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-|-$/g, '')
+            .toLowerCase()
+            .substring(0, 40);
+          currentSection = { label, title, content: [line] };
         } else if (currentSection) {
           currentSection.content.push(line);
         } else {
@@ -137,14 +148,17 @@ export async function generateDocs(
       }
       if (currentSection) sections.push(currentSection);
 
-      // Write split files
+      // Write split files with readable names
       const suffixes = 'abcdefghijklmnopqrstuvwxyz';
       for (let i = 0; i < sections.length; i++) {
-        const suffix = suffixes[i] ?? String(i);
-        const fileName = `3${suffix}-subsystem-${sections[i].label.substring(0, 30)}.md`;
+        const suffix = i < 26 ? suffixes[i] : `${i + 1}`;
+        const sep = suffix.length === 1 ? '' : '-';
+        const slug = sections[i].label || 'misc';
+        const fileName = `3${suffix}${sep}-${slug}.md`;
         const content = [...(i === 0 ? headerLines : ['# Subsystems (continued)', '']), ...sections[i].content].join('\n');
         fs.writeFileSync(path.join(outputDir, fileName), content);
         files.push(fileName);
+        titleMap.set(fileName, sections[i].title);
       }
     } else {
       fs.writeFileSync(path.join(outputDir, '3-subsystems.md'), subsystems);
@@ -231,7 +245,7 @@ export async function generateDocs(
   // Index (table of contents)
   // ========================================================================
   try {
-    const index = generateIndex(files, stats, modules.size, classes.size, functions.size);
+    const index = generateIndex(files, stats, modules.size, classes.size, functions.size, titleMap);
     const indexPath = path.join(outputDir, 'index.md');
     fs.writeFileSync(indexPath, index);
     files.push('index.md');
@@ -683,14 +697,21 @@ async function generateSubsystems(
 
     lines.push(`Detected **${communities.communitySizes.size}** architectural subsystems (modularity: ${communities.modularity.toFixed(3)})`, '');
 
-    // Document each community — Bug 5 fix: inline diagrams only for top 3
+    // Sort communities by size (largest first), merge tiny ones (<4 modules)
+    const sortedComms = [...communities.communityMembers.entries()]
+      .filter(([, m]) => m.length >= 2)
+      .sort((a, b) => b[1].length - a[1].length);
+
+    const MIN_COMMUNITY_SIZE = 5;
+    const mainCommunities = sortedComms.filter(([, m]) => m.length >= MIN_COMMUNITY_SIZE);
+    const tinyCommunities = sortedComms.filter(([, m]) => m.length < MIN_COMMUNITY_SIZE);
+
+    // Document each main community — Bug 5 fix: inline diagrams only for top 3
     let inlineDiagramCount = 0;
-    for (const [communityId, members] of communities.communityMembers) {
-      if (members.length < 2) continue;
+    for (const [communityId, members] of mainCommunities) {
 
       const shortNames = members.map(m => m.replace(/^mod:/, ''));
-      const commonPrefix = findCommonPrefix(shortNames);
-      const label = commonPrefix || `Cluster ${communityId}`;
+      const label = deriveSubsystemLabel(shortNames, communityId);
 
       lines.push(`## ${label} (${members.length} modules)`, '');
 
@@ -721,6 +742,19 @@ async function generateSubsystems(
         } catch { /* diagram optional */ }
       }
 
+      lines.push('');
+    }
+
+    // Merge tiny communities into "Other Subsystems"
+    if (tinyCommunities.length > 0) {
+      const totalTinyModules = tinyCommunities.reduce((sum, [, m]) => sum + m.length, 0);
+      lines.push(`## Other Subsystems (${totalTinyModules} modules in ${tinyCommunities.length} clusters)`, '');
+      for (const [, members] of tinyCommunities) {
+        const shortNames = members.map(m => m.replace(/^mod:/, ''));
+        const label = deriveSubsystemLabel(shortNames, 0);
+        const topModule = shortNames.sort()[0];
+        lines.push(`- **${label}**: ${shortNames.slice(0, 3).map(n => `\`${n}\``).join(', ')}${shortNames.length > 3 ? ` +${shortNames.length - 3}` : ''}`);
+      }
       lines.push('');
     }
 
@@ -1425,6 +1459,7 @@ function generateIndex(
   moduleCount: number,
   classCount: number,
   functionCount: number,
+  titleMap: Map<string, string> = new Map(),
 ): string {
   const lines = [
     '# Documentation Index',
@@ -1443,8 +1478,15 @@ function generateIndex(
   ];
 
   for (const file of files.filter(f => f !== 'index.md')) {
-    const name = file.replace(/^\d+-/, '').replace(/\.md$/, '');
-    const title = name.charAt(0).toUpperCase() + name.slice(1);
+    // Use titleMap for subsystem files, fallback to filename-derived title
+    const mapTitle = titleMap.get(file);
+    let title: string;
+    if (mapTitle) {
+      title = mapTitle;
+    } else {
+      const name = file.replace(/^\d+[a-z]?-/, '').replace(/\.md$/, '');
+      title = name.charAt(0).toUpperCase() + name.slice(1).replace(/-/g, ' ');
+    }
     lines.push(`- [${title}](./${file})`);
   }
 
@@ -1454,6 +1496,57 @@ function generateIndex(
 // ============================================================================
 // Helpers
 // ============================================================================
+
+/**
+ * Derive a human-readable, DeepWiki-style subsystem label from community member paths.
+ * Produces semantic names like "Agent Orchestration", "Security & Permissions"
+ * instead of file paths like "src/agent" or "src (20 modules)".
+ */
+function deriveSubsystemLabel(paths: string[], communityId: number): string {
+  // Count subdirectory frequency (2nd path segment under src/)
+  const subdirCounts = new Map<string, number>();
+  for (const p of paths) {
+    const parts = p.replace(/^src\//, '').split('/');
+    const subdir = parts[0] ?? 'misc';
+    subdirCounts.set(subdir, (subdirCounts.get(subdir) ?? 0) + 1);
+  }
+
+  const sorted = [...subdirCounts.entries()].sort((a, b) => b[1] - a[1]);
+  if (sorted.length === 0) return `Subsystem ${communityId}`;
+
+  const [topDir, topCount] = sorted[0];
+  const total = paths.length;
+
+  // Convert directory names to semantic labels using inferModuleDescription
+  const toLabel = (dir: string): string => {
+    const desc = inferModuleDescription(dir);
+    return desc.replace(/\b\w/g, c => c.toUpperCase());
+  };
+
+  // If one subdirectory dominates (>60%), use its semantic name
+  // For large generic groups, try to find a more specific sub-path
+  if (topCount / total > 0.6) {
+    // Try deeper: count 2nd-level segments within the dominant dir
+    const deepCounts = new Map<string, number>();
+    for (const p of paths) {
+      const stripped = p.replace(/^src\//, '');
+      const parts = stripped.split('/');
+      if (parts[0] === topDir && parts.length >= 2) {
+        deepCounts.set(parts[1], (deepCounts.get(parts[1]) ?? 0) + 1);
+      }
+    }
+    const deepSorted = [...deepCounts.entries()].sort((a, b) => b[1] - a[1]);
+    if (deepSorted.length > 0 && deepSorted[0][1] / topCount > 0.4) {
+      // Specific sub-area dominates (e.g. agent/specialized, agent/reasoning)
+      return toLabel(`${topDir}/${deepSorted[0][0]}`);
+    }
+    return toLabel(topDir);
+  }
+
+  // Mixed community: combine top 2 subdirectories semantically
+  const top2 = sorted.slice(0, 2).map(([dir]) => toLabel(dir));
+  return top2.join(' & ');
+}
 
 function findCommonPrefix(strings: string[]): string {
   if (strings.length === 0) return '';
