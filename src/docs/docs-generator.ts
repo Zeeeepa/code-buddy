@@ -113,12 +113,43 @@ export async function generateDocs(
 
   // ========================================================================
   // 3. Subsystems (per-community)
+  // Bug 6 fix: split into multiple files when a single file exceeds 300 lines
   // ========================================================================
   try {
     const subsystems = await generateSubsystems(graph, modules, includeDiagrams);
-    const subPath = path.join(outputDir, '3-subsystems.md');
-    fs.writeFileSync(subPath, subsystems);
-    files.push('3-subsystems.md');
+    const subsystemLines = subsystems.split('\n');
+    if (subsystemLines.length > 300) {
+      // Split by ## headers into separate files
+      const sections: Array<{ label: string; content: string[] }> = [];
+      let currentSection: { label: string; content: string[] } | null = null;
+      const headerLines: string[] = [];
+
+      for (const line of subsystemLines) {
+        if (line.startsWith('## ') && !line.startsWith('## Community Interactions')) {
+          if (currentSection) sections.push(currentSection);
+          const label = line.replace(/^## /, '').replace(/\s*\(.*\)$/, '').replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase();
+          currentSection = { label, content: [line] };
+        } else if (currentSection) {
+          currentSection.content.push(line);
+        } else {
+          headerLines.push(line);
+        }
+      }
+      if (currentSection) sections.push(currentSection);
+
+      // Write split files
+      const suffixes = 'abcdefghijklmnopqrstuvwxyz';
+      for (let i = 0; i < sections.length; i++) {
+        const suffix = suffixes[i] ?? String(i);
+        const fileName = `3${suffix}-subsystem-${sections[i].label.substring(0, 30)}.md`;
+        const content = [...(i === 0 ? headerLines : ['# Subsystems (continued)', '']), ...sections[i].content].join('\n');
+        fs.writeFileSync(path.join(outputDir, fileName), content);
+        files.push(fileName);
+      }
+    } else {
+      fs.writeFileSync(path.join(outputDir, '3-subsystems.md'), subsystems);
+      files.push('3-subsystems.md');
+    }
   } catch (e) { errors.push(`subsystems: ${e}`); }
 
   // ========================================================================
@@ -322,20 +353,28 @@ function generateOverview(
   const devDeps = Object.keys((pkg.devDependencies ?? {}) as Record<string, string>);
 
   // Find top-ranked entities — filter to core src/ modules, skip index re-exports
-  const topEntities: Array<{ entity: string; rank: number; importers: number; callers: number }> = [];
+  // Bug 1 fix: Blended score = 60% PageRank + 40% function density
+  // Modules with 0 functions (like dm-pairing) get demoted
+  const topEntities: Array<{ entity: string; rank: number; blendedScore: number; importers: number; callers: number }> = [];
   for (const mod of modules) {
     const name = mod.replace(/^mod:/, '');
     // Skip non-core: test files, index re-exports with 0 functions, node_modules
     if (!name.startsWith('src/')) continue;
     if (name.endsWith('/index') && graph.query({ subject: mod, predicate: 'containsFunction' }).length === 0) continue;
+    const pageRank = graph.getEntityRank(mod);
+    const fnCount = graph.query({ subject: mod, predicate: 'containsFunction' }).length;
+    const classCount = graph.query({ subject: mod, predicate: 'containsClass' }).length;
+    const density = Math.min((fnCount + classCount) / 5, 1); // normalize to [0, 1], cap at 5
+    const blendedScore = fnCount === 0 ? pageRank * 0.3 : pageRank * 0.6 + density * 0.4;
     topEntities.push({
       entity: mod,
-      rank: graph.getEntityRank(mod),
+      rank: pageRank,
+      blendedScore,
       importers: graph.query({ predicate: 'imports', object: mod }).length,
       callers: graph.query({ predicate: 'calls', object: mod }).length,
     });
   }
-  topEntities.sort((a, b) => b.rank - a.rank);
+  topEntities.sort((a, b) => b.blendedScore - a.blendedScore);
 
   // Classify entry points (real ones, not all index files)
   const mainEntries = ['src/index', 'src/server/index', 'src/daemon/index'];
@@ -387,14 +426,15 @@ function generateOverview(
     '',
     'Ranked by PageRank — higher rank means more modules depend on this one:',
     '',
-    `| Module | PageRank | Importers | Description |`,
-    `|--------|----------|-----------|-------------|`,
+    `| Module | PageRank | Importers | Functions | Description |`,
+    `|--------|----------|-----------|-----------|-------------|`,
   ];
 
   for (const { entity, rank, importers } of topEntities.slice(0, 20)) {
     const name = entity.replace(/^mod:/, '');
     const desc = inferModuleDescription(name);
-    lines.push(`| \`${name}\` | ${rank.toFixed(3)} | ${importers} | ${desc} |`);
+    const fnCount = graph.query({ subject: entity, predicate: 'containsFunction' }).length;
+    lines.push(`| \`${name}\` | ${rank.toFixed(3)} | ${importers} | ${fnCount} fns | ${desc} |`);
   }
 
   // Entry points with explicit labels for known mains
@@ -437,6 +477,18 @@ function generateOverview(
   if (allDeps.some(d => d.includes('playwright'))) lines.push('| Browser Automation | playwright |');
   if (allDeps.some(d => d.includes('modelcontextprotocol'))) lines.push('| MCP | @modelcontextprotocol/sdk |');
   if (deps.includes('vitest') || devDeps.includes('vitest')) lines.push('| Testing | vitest |');
+
+  // Bug 8 fix: Getting Started section from package.json scripts
+  const scripts = (pkg.scripts ?? {}) as Record<string, string>;
+  lines.push('', '## Getting Started', '');
+  lines.push('```bash');
+  lines.push(`# Install`);
+  lines.push('npm install');
+  if (scripts.build) lines.push(`\n# Build\nnpm run build`);
+  if (scripts.dev) lines.push(`\n# Development mode\nnpm run dev`);
+  if (scripts.start) lines.push(`\n# Run\nnpm start`);
+  if (scripts.test) lines.push(`\n# Verify\nnpm test`);
+  lines.push('```');
 
   return lines.join('\n');
 }
@@ -564,7 +616,8 @@ async function generateArchitecture(
       }
       if (bestMod) {
         lines.push('## Core Module Dependencies', '');
-        const diagram = generateModuleDependencies(graph, bestMod, 2, 30);
+        // Bug 5 fix: cap dependency diagram to 20 nodes for readability
+        const diagram = generateModuleDependencies(graph, bestMod, 2, 20);
         lines.push('```mermaid', diagram, '```', '');
       }
     } catch { /* mermaid optional */ }
@@ -630,7 +683,8 @@ async function generateSubsystems(
 
     lines.push(`Detected **${communities.communitySizes.size}** architectural subsystems (modularity: ${communities.modularity.toFixed(3)})`, '');
 
-    // Document each community
+    // Document each community — Bug 5 fix: inline diagrams only for top 3
+    let inlineDiagramCount = 0;
     for (const [communityId, members] of communities.communityMembers) {
       if (members.length < 2) continue;
 
@@ -651,8 +705,8 @@ async function generateSubsystems(
       }
       if (ranked.length > 10) lines.push(`- ... and ${ranked.length - 10} more`);
 
-      // Class hierarchy for this community
-      if (includeDiagrams && ranked.length > 0) {
+      // Bug 5 fix: only render inline call flowcharts for top 3 communities
+      if (includeDiagrams && ranked.length > 0 && inlineDiagramCount < 3) {
         try {
           const { generateCallFlowchart } = await import('../knowledge/mermaid-generator.js');
           const topEntity = `mod:${ranked[0].name}`;
@@ -661,6 +715,7 @@ async function generateSubsystems(
             const chart = generateCallFlowchart(graph, fns[0].object, 1, 15);
             if (chart.includes('-->')) {
               lines.push('', '```mermaid', chart, '```');
+              inlineDiagramCount++;
             }
           }
         } catch { /* diagram optional */ }
@@ -673,7 +728,8 @@ async function generateSubsystems(
     if (includeDiagrams) {
       try {
         const { generateCommunityDiagram } = await import('../knowledge/mermaid-generator.js');
-        const communityChart = generateCommunityDiagram(graph, communities, 8);
+        // Bug 5 fix: limit community diagram to 6 communities, 30 nodes max
+        const communityChart = generateCommunityDiagram(graph, communities, 30, 6);
         if (communityChart.includes('-->')) {
           lines.push('## Community Interactions', '', '```mermaid', communityChart, '```', '');
         }
@@ -686,11 +742,70 @@ async function generateSubsystems(
   return lines.join('\n');
 }
 
+/** Bug 9 fix: Compute a code health score 0-100 */
+function computeHealthScore(graph: KnowledgeGraph): { score: number; label: string; penalties: string[] } {
+  let score = 100;
+  const penalties: string[] = [];
+
+  // Dead code penalty: -1 per high-confidence dead function, max -20
+  try {
+    const { detectDeadCode } = require('../knowledge/graph-analytics.js');
+    const deadCode = detectDeadCode(graph);
+    const deadPenalty = Math.min(deadCode.byConfidence.high.length, 20);
+    if (deadPenalty > 0) {
+      score -= deadPenalty;
+      penalties.push(`Dead code: -${deadPenalty} (${deadCode.byConfidence.high.length} high-confidence)`);
+    }
+  } catch { /* optional */ }
+
+  // Coupling penalty: -1 per highly-coupled pair (>5 connections), max -15
+  try {
+    const { computeCoupling } = require('../knowledge/graph-analytics.js');
+    const coupling = computeCoupling(graph, 20);
+    const highCoupled = coupling.hotspots.filter((p: { total: number }) => p.total > 5).length;
+    const couplingPenalty = Math.min(highCoupled * 2, 15);
+    if (couplingPenalty > 0) {
+      score -= couplingPenalty;
+      penalties.push(`High coupling: -${couplingPenalty} (${highCoupled} pairs)`);
+    }
+  } catch { /* optional */ }
+
+  // Hub penalty: modules with >20 importers, max -10
+  const allTriples = graph.toJSON();
+  const importCounts = new Map<string, number>();
+  for (const t of allTriples) {
+    if (t.predicate === 'imports') {
+      importCounts.set(t.object, (importCounts.get(t.object) ?? 0) + 1);
+    }
+  }
+  const hubs = [...importCounts.values()].filter(c => c > 20).length;
+  const hubPenalty = Math.min(hubs * 3, 10);
+  if (hubPenalty > 0) {
+    score -= hubPenalty;
+    penalties.push(`Hub modules: -${hubPenalty} (${hubs} modules with >20 importers)`);
+  }
+
+  score = Math.max(0, score);
+  const label = score >= 90 ? 'Excellent' : score >= 75 ? 'Good' : score >= 60 ? 'Fair' : score >= 40 ? 'Needs Work' : 'Critical';
+  return { score, label, penalties };
+}
+
 async function generateMetrics(graph: KnowledgeGraph): Promise<string> {
+  // Bug 9 fix: Health score at top
+  const health = computeHealthScore(graph);
   const lines = [
     '# Code Quality Metrics',
     '',
+    `## Code Health: ${health.score}/100 (${health.label})`,
+    '',
   ];
+  if (health.penalties.length > 0) {
+    lines.push('Score breakdown:');
+    for (const p of health.penalties) {
+      lines.push(`- ${p}`);
+    }
+    lines.push('');
+  }
 
   // Dead code detection
   try {
@@ -785,20 +900,21 @@ function generateToolSystem(graph: KnowledgeGraph, cwd: string, modules: Set<str
   // Dynamic tool categories from metadata file
   lines.push('## Tool Categories', '');
   if (metadataContent) {
-    // Extract categories from metadata
+    // Bug 2 fix: metadata has name: before category: in each entry block.
+    // Match each { ... } block containing both name and category fields.
     const catTools = new Map<string, string[]>();
-    const catMatch = metadataContent.matchAll(/category:\s*['"]([^'"]+)['"][\s\S]*?name:\s*['"]([^'"]+)['"]/g);
-    for (const m of catMatch) {
-      const list = catTools.get(m[1]) ?? [];
-      list.push(m[2]);
-      catTools.set(m[1], list);
-    }
-    // Also try name-first pattern
-    const nameFirst = metadataContent.matchAll(/name:\s*['"]([^'"]+)['"][\s\S]*?category:\s*['"]([^'"]+)['"]/g);
-    for (const m of nameFirst) {
+    const blockPattern = /\{\s*\n?[^}]*?name:\s*['"]([^'"]+)['"][^}]*?category:\s*['"]([^'"]+)['"][^}]*?\}/gs;
+    for (const m of metadataContent.matchAll(blockPattern)) {
       const list = catTools.get(m[2]) ?? [];
       if (!list.includes(m[1])) list.push(m[1]);
       catTools.set(m[2], list);
+    }
+    // Also try category-before-name pattern (for any reversed entries)
+    const reversedPattern = /\{\s*\n?[^}]*?category:\s*['"]([^'"]+)['"][^}]*?name:\s*['"]([^'"]+)['"][^}]*?\}/gs;
+    for (const m of metadataContent.matchAll(reversedPattern)) {
+      const list = catTools.get(m[1]) ?? [];
+      if (!list.includes(m[2])) list.push(m[2]);
+      catTools.set(m[1], list);
     }
     if (catTools.size > 0) {
       lines.push('| Category | Tools | Count |', '|----------|-------|-------|');
@@ -968,13 +1084,14 @@ function generateContextMemory(cwd: string): string {
 // ============================================================================
 
 function generateConfiguration(cwd: string): string {
-  // Extract env vars from CLAUDE.md — match `VARNAME` | description | default
-  const claudeMd = readFileSafe(path.join(cwd, 'CLAUDE.md'), 10000);
+  // Bug 10 fix: Extract env vars from CLAUDE.md — read enough to reach env var table
+  const claudeMd = readFileSafe(path.join(cwd, 'CLAUDE.md'), 35000);
   const envVars: Array<{ name: string; desc: string }> = [];
   if (claudeMd) {
-    const envMatch = claudeMd.matchAll(/\|\s*`([A-Z_]+)`\s*\|\s*([^|]+)\s*\|/g);
+    // Match `VAR_NAME` | description | in markdown tables (with digits)
+    const envMatch = claudeMd.matchAll(/\|\s*`([A-Z][A-Z0-9_]+)`\s*\|\s*([^|]+)\s*\|/g);
     for (const m of envMatch) {
-      if (m[1] && m[2] && !m[1].startsWith('Variable')) { // Skip header row
+      if (m[1] && m[2] && !m[1].startsWith('Variable') && !m[1].startsWith('Metric')) { // Skip header rows
         envVars.push({ name: m[1], desc: m[2].trim() });
       }
     }
@@ -985,11 +1102,12 @@ function generateConfiguration(cwd: string): string {
     if (envExample) {
       const envLines = envExample.split('\n');
       for (const line of envLines) {
-        const match = line.match(/^([A-Z][A-Z0-9_]+)\s*=/);
-        if (match) {
-          const comment = envLines[envLines.indexOf(line) - 1];
+        const envLineMatch = line.match(/^([A-Z][A-Z0-9_]+)\s*=/);
+        if (envLineMatch) {
+          const lineIdx = envLines.indexOf(line);
+          const comment = lineIdx > 0 ? envLines[lineIdx - 1] : '';
           const desc = comment?.startsWith('#') ? comment.slice(1).trim() : '';
-          envVars.push({ name: match[1], desc: desc || match[1].toLowerCase().replace(/_/g, ' ') });
+          envVars.push({ name: envLineMatch[1], desc: desc || envLineMatch[1].toLowerCase().replace(/_/g, ' ') });
         }
       }
     }
@@ -1024,12 +1142,22 @@ function generateConfiguration(cwd: string): string {
     if (fs.existsSync(path.join(cwd, f))) configFiles.push({ file: f, location: 'project root' });
   }
 
-  // .codebuddy/ config files
+  // .codebuddy/ config files — Bug 4 fix: exclude artifacts
+  const configExclusions = new Set([
+    'code-graph.json', 'code-graph-snapshot.json', 'tool-cache.json',
+    'graph-viz.html', 'repoProfile.json', 'PROJECT_KNOWLEDGE.md',
+  ]);
+  const configExcludeDirs = new Set(['screenshots', 'tool-results', 'docs', 'knowledge', 'runs', 'memory']);
   for (const dir of configDirs) {
     const dirPath = path.join(cwd, dir);
     if (fs.existsSync(dirPath) && fs.statSync(dirPath).isDirectory()) {
       try {
-        const files = fs.readdirSync(dirPath).filter(f => !f.startsWith('.') && (f.endsWith('.json') || f.endsWith('.toml') || f.endsWith('.md')));
+        const files = fs.readdirSync(dirPath).filter(f =>
+          !f.startsWith('.') &&
+          !configExclusions.has(f) &&
+          !configExcludeDirs.has(f) &&
+          (f.endsWith('.json') || f.endsWith('.toml') || f.endsWith('.md'))
+        );
         for (const f of files.slice(0, 10)) {
           configFiles.push({ file: f, location: `${dir}/` });
         }
@@ -1077,13 +1205,30 @@ function generateApiReference(cwd: string): string {
     '',
   ];
 
-  // CLI commands: extract from src/index.ts by scanning .command() calls
-  const indexTs = readFileSafe(path.join(cwd, 'src', 'index.ts'), 15000);
+  // CLI commands: extract from src/index.ts by scanning .command() and addLazyCommand/addLazyCommandGroup calls
+  // Bug 3 fix: read the full file — commands are often at the end (line 1700+)
+  const indexTs = readFileSafe(path.join(cwd, 'src', 'index.ts'), 80000);
   if (indexTs) {
     const commands: Array<{ name: string; desc: string }> = [];
-    const cmdMatches = indexTs.matchAll(/\.command\(\s*['"]([^'"]+)['"]\s*\)\s*\n?\s*\.description\(\s*['"]([^'"]+)['"]\s*\)/g);
-    for (const m of cmdMatches) {
+    // Bug 3 fix: Separate command and description extraction, pair by proximity
+    // Pattern 1: .command('name') ... .description('desc') with possible .option() between
+    const cmdDescMatches = indexTs.matchAll(/\.command\(\s*['"]([^'"]+)['"]\s*\)[\s\S]*?\.description\(\s*['"]([^'"]+)['"]\s*\)/g);
+    for (const m of cmdDescMatches) {
       commands.push({ name: m[1], desc: m[2] });
+    }
+    // Pattern 2: addLazyCommand(program, 'name', 'desc', ...)
+    const lazyMatches = indexTs.matchAll(/addLazyCommand\(\s*\w+\s*,\s*['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]/g);
+    for (const m of lazyMatches) {
+      if (!commands.some(c => c.name === m[1])) {
+        commands.push({ name: m[1], desc: m[2] });
+      }
+    }
+    // Pattern 3: addLazyCommandGroup(program, 'name', 'desc', ...)
+    const groupMatches = indexTs.matchAll(/addLazyCommandGroup\(\s*\w+\s*,\s*['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]/g);
+    for (const m of groupMatches) {
+      if (!commands.some(c => c.name === m[1])) {
+        commands.push({ name: m[1], desc: m[2] });
+      }
     }
     // Also extract options
     const optMatches = indexTs.matchAll(/\.option\(\s*['"](-[^'"]+)['"]\s*,\s*['"]([^'"]+)['"]/g);

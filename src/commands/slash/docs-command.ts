@@ -170,13 +170,30 @@ async function handleGenerateWithLLM(thinkingLevelOverride?: 'minimal' | 'low' |
       };
     }
 
-    // Step 3: Enrich raw docs with LLM prose
+    // Step 3: Build blueprint for verified entity context (improvement A + E)
+    let blueprintContext: string | undefined;
+    let verifiedEntities: Set<string> | undefined;
+    try {
+      const { getKnowledgeGraph } = await import('../../knowledge/knowledge-graph.js');
+      const graph = getKnowledgeGraph();
+      const { buildProjectBlueprint, serializeBlueprintForLLM } = await import('../../docs/blueprint-builder.js');
+      const blueprint = buildProjectBlueprint(graph);
+      blueprintContext = serializeBlueprintForLLM(blueprint);
+      verifiedEntities = blueprint.allEntities;
+      logger.info(`Blueprint: ${blueprint.moduleCount} modules, ${blueprint.functionCount} functions, ${blueprint.classCount} classes`);
+    } catch (e) {
+      logger.debug(`Blueprint build skipped: ${e}`);
+    }
+
+    // Step 4: Enrich raw docs with LLM prose
     const docsDir = require('path').join(process.cwd(), '.codebuddy', 'docs');
     const { enrichDocs } = await import('../../docs/llm-enricher.js');
     const result = await enrichDocs({
       docsDir,
       llmCall,
       thinkingLevel: thinkingLevelOverride,
+      blueprintContext,
+      verifiedEntities,
       onProgress: (file, current, total) => {
         logger.info(`Enriching [${current}/${total}] ${file}`);
       },
@@ -186,6 +203,7 @@ async function handleGenerateWithLLM(thinkingLevelOverride?: 'minimal' | 'low' |
       `Documentation generated and enriched with LLM:`,
       `  LLM enrichment: ${result.filesEnriched} files enriched in ${(result.durationMs / 1000).toFixed(1)}s`,
       `  Tokens used: ~${result.tokensUsed}`,
+      `  Hallucinations fixed: ${result.hallucinationsFixed}`,
       `  Knowledge file: ${result.knowledgePath}`,
       `  Output: .codebuddy/docs/`,
       result.errors.length > 0 ? `  Errors: ${result.errors.join('; ')}` : '',
