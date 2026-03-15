@@ -134,7 +134,70 @@ export async function generateDocs(
   }
 
   // ========================================================================
-  // 5. Index (table of contents)
+  // 5. Tool System
+  // ========================================================================
+  try {
+    const tools = generateToolSystem(graph, cwd, modules);
+    fs.writeFileSync(path.join(outputDir, '5-tools.md'), tools);
+    files.push('5-tools.md');
+  } catch (e) { errors.push(`tools: ${e}`); }
+
+  // ========================================================================
+  // 6. Security Architecture
+  // ========================================================================
+  try {
+    const security = generateSecurity(cwd);
+    fs.writeFileSync(path.join(outputDir, '6-security.md'), security);
+    files.push('6-security.md');
+  } catch (e) { errors.push(`security: ${e}`); }
+
+  // ========================================================================
+  // 7. Context & Memory
+  // ========================================================================
+  try {
+    const context = generateContextMemory(cwd);
+    fs.writeFileSync(path.join(outputDir, '7-context-memory.md'), context);
+    files.push('7-context-memory.md');
+  } catch (e) { errors.push(`context: ${e}`); }
+
+  // ========================================================================
+  // 8. Configuration
+  // ========================================================================
+  try {
+    const config = generateConfiguration(cwd);
+    fs.writeFileSync(path.join(outputDir, '8-configuration.md'), config);
+    files.push('8-configuration.md');
+  } catch (e) { errors.push(`config: ${e}`); }
+
+  // ========================================================================
+  // 9. CLI & API Reference
+  // ========================================================================
+  try {
+    const api = generateApiReference(cwd);
+    fs.writeFileSync(path.join(outputDir, '9-api-reference.md'), api);
+    files.push('9-api-reference.md');
+  } catch (e) { errors.push(`api: ${e}`); }
+
+  // ========================================================================
+  // 10. Development Guide
+  // ========================================================================
+  try {
+    const dev = generateDevGuide(cwd);
+    fs.writeFileSync(path.join(outputDir, '10-development.md'), dev);
+    files.push('10-development.md');
+  } catch (e) { errors.push(`dev: ${e}`); }
+
+  // ========================================================================
+  // 11. Changelog (from git)
+  // ========================================================================
+  try {
+    const changelog = generateChangelog(cwd);
+    fs.writeFileSync(path.join(outputDir, '11-changelog.md'), changelog);
+    files.push('11-changelog.md');
+  } catch (e) { errors.push(`changelog: ${e}`); }
+
+  // ========================================================================
+  // Index (table of contents)
   // ========================================================================
   try {
     const index = generateIndex(files, stats, modules.size, classes.size, functions.size);
@@ -566,6 +629,440 @@ async function generateMetrics(graph: KnowledgeGraph): Promise<string> {
 
   return lines.join('\n');
 }
+
+// ============================================================================
+// Section 5: Tool System
+// ============================================================================
+
+function generateToolSystem(graph: KnowledgeGraph, cwd: string, modules: Set<string>): string {
+  const lines = [
+    '# Tool System',
+    '',
+    'The project uses a dual-registry tool architecture with RAG-based selection. Tools are organized by category and selected per-query based on semantic relevance.',
+    '',
+  ];
+
+  // Detect tool-related modules
+  const toolModules = [...modules]
+    .filter(m => m.includes('/tools/'))
+    .map(m => m.replace(/^mod:/, ''));
+
+  lines.push('## Tool Registry', '');
+  lines.push(`The tool ecosystem contains **${toolModules.length}** tool modules organized in \`src/tools/\` and \`src/tools/registry/\`.`, '');
+
+  // Categorize tools by subdirectory
+  const categories = new Map<string, string[]>();
+  for (const mod of toolModules) {
+    const parts = mod.split('/');
+    const cat = parts.length >= 3 ? parts[2] : 'core';
+    const list = categories.get(cat) ?? [];
+    list.push(mod);
+    categories.set(cat, list);
+  }
+
+  lines.push('## Tool Categories', '');
+  lines.push('| Category | Tools | Key Modules |', '|----------|-------|-------------|');
+  const categoryDescriptions: Record<string, string> = {
+    'registry': 'Tool registration and factory',
+    'browser': 'Browser automation (Playwright)',
+    'vision': 'Image processing and OCR',
+    'hooks': 'Pre/post execution hooks',
+  };
+
+  for (const [cat, mods] of [...categories.entries()].sort((a, b) => b[1].length - a[1].length).slice(0, 15)) {
+    const desc = categoryDescriptions[cat] ?? cat.replace(/-/g, ' ');
+    const keyMods = mods.slice(0, 3).map(m => `\`${m.split('/').pop()}\``).join(', ');
+    lines.push(`| ${desc} | ${mods.length} | ${keyMods} |`);
+  }
+
+  // Tool selection process
+  lines.push('', '## RAG-Based Tool Selection', '');
+  lines.push('Each user query triggers a semantic similarity search over tool metadata:');
+  lines.push('');
+  lines.push('1. **Query embedding** — User message converted to vector');
+  lines.push('2. **Similarity scoring** — Each tool scored against query (0-1)');
+  lines.push('3. **Top-K selection** — ~15-20 most relevant tools selected');
+  lines.push('4. **Token savings** — Reduces prompt from 110+ tools to ~15-20');
+  lines.push('');
+  lines.push('Tools have priority (3-10), keywords, and category metadata used for matching.');
+
+  // Read metadata file for tool names
+  const metadataContent = readFileSafe(path.join(cwd, 'src', 'tools', 'metadata.ts'), 8000);
+  if (metadataContent) {
+    const toolNames = [...metadataContent.matchAll(/name:\s*['"]([^'"]+)['"]/g)].map(m => m[1]);
+    if (toolNames.length > 0) {
+      lines.push('', '## Registered Tools', '');
+      lines.push(`${toolNames.length} tools registered in metadata:`, '');
+      // Group by prefix
+      const grouped = new Map<string, string[]>();
+      for (const name of toolNames) {
+        const prefix = name.split('_')[0] ?? 'other';
+        const list = grouped.get(prefix) ?? [];
+        list.push(name);
+        grouped.set(prefix, list);
+      }
+      for (const [prefix, names] of [...grouped.entries()].sort()) {
+        lines.push(`- **${prefix}**: ${names.join(', ')}`);
+      }
+    }
+  }
+
+  return lines.join('\n');
+}
+
+// ============================================================================
+// Section 6: Security Architecture
+// ============================================================================
+
+function generateSecurity(_cwd: string): string {
+  const lines = [
+    '# Security Architecture',
+    '',
+    'The project implements a seven-layer defense-in-depth security model. Each layer catches different attack vectors, ensuring that a bypass in one layer is caught by another.',
+    '',
+    '## Security Layers',
+    '',
+    '| Layer | Component | Purpose |',
+    '|-------|-----------|---------|',
+    '| 1. Input Validation | Schema checking, sanitization | Prevents malformed data |',
+    '| 2. Authentication | JWT, API keys, DM pairing | Prevents unauthorized access |',
+    '| 3. Path Validation | Traversal detection, symlink escape | Prevents filesystem attacks |',
+    '| 4. Command Validation | Tree-sitter bash parsing | Prevents command injection |',
+    '| 5. Network Protection | SSRF guard, IP filtering | Prevents server-side request forgery |',
+    '| 6. Execution Control | Confirmation, sandbox, policies | User approval gate |',
+    '| 7. Post-Execution | Result sanitization, audit logging | Prevents data leakage |',
+    '',
+  ];
+
+  // Guardian agent
+  lines.push('## Guardian Sub-Agent', '');
+  lines.push('An AI-powered automatic approval reviewer (`src/security/guardian-agent.ts`) evaluates tool calls with structured risk scoring:');
+  lines.push('');
+  lines.push('| Risk Score | Decision | Examples |');
+  lines.push('|-----------|----------|----------|');
+  lines.push('| 0-20 | Auto-approve | Read operations, standard builds |');
+  lines.push('| 20-60 | Auto-approve | File edits, package installs |');
+  lines.push('| 60-80 | Approve with warning | System modifications, network ops |');
+  lines.push('| 80-90 | Prompt user | Credential access, unknown scripts |');
+  lines.push('| 90-100 | Deny | `rm -rf /`, fork bombs, `drop database` |');
+  lines.push('');
+
+  // Environment variable filtering
+  lines.push('## Environment Variable Filtering', '');
+  lines.push('Shell commands run in a filtered environment (`src/security/shell-env-policy.ts`):');
+  lines.push('');
+  lines.push('- Variables matching `*KEY*`, `*SECRET*`, `*TOKEN*`, `*PASSWORD*` are stripped');
+  lines.push('- Three inheritance modes: `core` (minimal), `all` (filtered), `none` (empty)');
+  lines.push('- Provider-specific patterns: `AWS_*`, `OPENAI_*`, `STRIPE_*`, etc.');
+  lines.push('');
+
+  // Policy amendments
+  lines.push('## Policy Amendments', '');
+  lines.push('When a command is blocked, the system suggests an allow rule (`src/security/policy-amendments.ts`):');
+  lines.push('');
+  lines.push('- Rules stored in `.codebuddy/rules/allow-rules.json`');
+  lines.push('- Shell operators (`&&`, `||`, `;`, `|`) after the matched prefix are blocked');
+  lines.push('- Banned prefixes: interpreters (python, node), shells (bash, sh), `sudo`, `curl`');
+
+  return lines.join('\n');
+}
+
+// ============================================================================
+// Section 7: Context & Memory
+// ============================================================================
+
+function generateContextMemory(_cwd: string): string {
+  const lines = [
+    '# Context & Memory Management',
+    '',
+    'The context management system ensures conversations stay within the LLM\'s token limit while preserving the most important information.',
+    '',
+    '## Context Manager V2', '',
+    'Four-stage compression pipeline (`src/context/context-manager-v2.ts`):', '',
+    '| Stage | Strategy | Token Reduction |',
+    '|-------|----------|----------------|',
+    '| 1 | Sliding window with importance scoring | 30-50% |',
+    '| 2 | Tool result truncation | 10-30% |',
+    '| 3 | LLM-based summarization | 40-70% |',
+    '| 4 | Hard truncation (last resort) | 70-90% |',
+    '',
+    'Importance scores by content type:', '',
+    '| Content Type | Score | Preservation |',
+    '|-------------|-------|-------------|',
+    '| Error messages | 0.95 | Nearly always preserved |',
+    '| Architectural decisions | 0.90 | High priority |',
+    '| Code blocks | 0.70 | Medium-high |',
+    '| General conversation | 0.25 | First to compress |',
+    '',
+    '## Attention Bias Patterns', '',
+    '- **Todo.md**: Appended at END of context (transformer recency bias)',
+    '- **Lessons.md**: Injected BEFORE messages (high priority)',
+    '- **Decision memory**: Injected with architectural rationale',
+    '- **Code graph**: Per-turn ego-graph of mentioned entities',
+    '',
+    '## Tool Output Management', '',
+    '**Adaptive compaction**: Threshold scales to 30% of model context window (not hardcoded).', '',
+    '**TTL-based expiry** (`src/context/tool-output-masking.ts`):', '',
+    '| Age (% of max) | Treatment |',
+    '|----------------|-----------|',
+    '| 0-50% | Full content preserved |',
+    '| 50-75% | Head/tail preview (10+10 lines) |',
+    '| 75-100% | One-line stub |',
+    '| >100% | Removed entirely |',
+    '',
+    '**Backward-scanned FIFO masking**: Newest ~50K tokens protected, older outputs replaced with previews.', '',
+    '## JIT Context Discovery', '',
+    'When tools access files, the system dynamically loads context files (`CODEBUDDY.md`, `CONTEXT.md`) from the accessed subdirectory. Context grows organically as the agent explores.', '',
+    '## Memory Consolidation', '',
+    'Two-phase pipeline (`src/memory/memory-consolidation.ts`):', '',
+    '1. **Extraction**: Detect preferences, patterns, corrections from user messages',
+    '2. **Consolidation**: Merge into `.codebuddy/memory/` folder with dedup',
+    '',
+    'Output structure:', '',
+    '- `memory_summary.md` — Always loaded into system prompt',
+    '- `MEMORY.md` — Full handbook entries',
+    '- `rollout_summaries/` — Per-session distilled summaries',
+  ];
+
+  return lines.join('\n');
+}
+
+// ============================================================================
+// Section 8: Configuration
+// ============================================================================
+
+function generateConfiguration(cwd: string): string {
+  const claudeMd = readFileSafe(path.join(cwd, 'CLAUDE.md'), 2000);
+  // Extract env vars from CLAUDE.md
+  const envVars: Array<{ name: string; desc: string }> = [];
+  if (claudeMd) {
+    const envMatch = claudeMd.matchAll(/\|\s*`(\w+)`\s*\|\s*([^|]+)\|/g);
+    for (const m of envMatch) {
+      envVars.push({ name: m[1], desc: m[2].trim() });
+    }
+  }
+
+  const lines = [
+    '# Configuration System',
+    '',
+    'Three-tier configuration hierarchy with environment variable overrides:',
+    '',
+    '## Configuration Hierarchy',
+    '',
+    '```',
+    '1. Default (in-code)     — Base behavior',
+    '2. User (~/.codebuddy/)  — Personal preferences',
+    '3. Project (.codebuddy/) — Project-specific settings',
+    '4. Environment variables — Runtime overrides',
+    '5. CLI flags             — Highest priority',
+    '```',
+    '',
+    '## Key Configuration Files',
+    '',
+    '| File | Location | Purpose |',
+    '|------|----------|---------|',
+    '| `config.toml` | `~/.codebuddy/` or `.codebuddy/` | Main configuration |',
+    '| `settings.json` | `.codebuddy/` | Model, theme, max rounds |',
+    '| `mcp.json` | `.codebuddy/` | MCP server configuration |',
+    '| `hooks.json` | `.codebuddy/` | Tool execution hooks |',
+    '| `CODEBUDDY.md` | `.codebuddy/` | Project instructions |',
+    '| `CONTEXT.md` | `.codebuddy/` | Additional context |',
+    '| `PROJECT_KNOWLEDGE.md` | `.codebuddy/` | Auto-generated project knowledge |',
+    '',
+  ];
+
+  if (envVars.length > 0) {
+    lines.push('## Environment Variables', '');
+    lines.push('| Variable | Description |', '|----------|-------------|');
+    for (const { name, desc } of envVars.slice(0, 20)) {
+      lines.push(`| \`${name}\` | ${desc} |`);
+    }
+    lines.push('');
+  }
+
+  lines.push('## Model Configuration', '');
+  lines.push('Models configured via `src/config/model-tools.ts` with glob matching:');
+  lines.push('');
+  lines.push('- Per-model: `contextWindow`, `maxOutputTokens`, `patchFormat`');
+  lines.push('- Provider auto-detection from model name or base URL');
+  lines.push('- Supports: Grok, Claude, GPT, Gemini, Ollama, LM Studio');
+
+  return lines.join('\n');
+}
+
+// ============================================================================
+// Section 9: API Reference
+// ============================================================================
+
+function generateApiReference(_cwd: string): string {
+  const lines = [
+    '# CLI & API Reference',
+    '',
+    '## CLI Commands',
+    '',
+    '| Command | Description |',
+    '|---------|-------------|',
+    '| `buddy` | Start interactive chat |',
+    '| `buddy [message]` | Process message and enter chat |',
+    '| `buddy --prompt <text>` | Headless mode — process and exit |',
+    '| `buddy --model <name>` | Override model |',
+    '| `buddy --continue` | Resume last session |',
+    '| `buddy onboard` | Interactive setup wizard |',
+    '| `buddy doctor` | Environment diagnostics |',
+    '| `buddy dev plan\\|run\\|pr\\|fix-ci` | Dev workflows |',
+    '| `buddy research "<topic>"` | Wide research mode |',
+    '| `buddy flow "<goal>"` | Planning flow |',
+    '| `buddy daemon start\\|stop\\|status` | Background daemon |',
+    '| `buddy server --port N` | HTTP/WS server |',
+    '| `buddy hub search\\|install` | Skills marketplace |',
+    '| `buddy nodes list\\|pair` | Device management |',
+    '| `buddy secrets list\\|set\\|get` | Encrypted vault |',
+    '| `buddy deploy platforms\\|init` | Cloud deployment |',
+    '',
+    '## Slash Commands (Interactive)', '',
+    '| Command | Purpose |',
+    '|---------|---------|',
+    '| `/help` | Show available commands |',
+    '| `/clear` | Clear conversation history |',
+    '| `/models` | Switch AI model |',
+    '| `/yolo on\\|off\\|safe` | Toggle autonomy mode |',
+    '| `/think off\\|shallow\\|medium\\|deep` | Set reasoning depth |',
+    '| `/persona list\\|use\\|info` | Manage AI personas |',
+    '| `/compact [level]` | Compress conversation context |',
+    '| `/docs generate [--with-llm]` | Generate documentation |',
+    '| `/plan` | Enter read-only research mode |',
+    '',
+    '## HTTP API Endpoints', '',
+    '| Method | Endpoint | Purpose |',
+    '|--------|----------|---------|',
+    '| GET | `/api/health` | Health check |',
+    '| GET | `/api/metrics` | Usage metrics |',
+    '| POST | `/api/chat` | Send message |',
+    '| POST | `/api/chat/completions` | OpenAI-compatible |',
+    '| GET/POST | `/api/sessions` | Session management |',
+    '| GET/POST | `/api/memory` | Memory CRUD |',
+    '| GET | `/api/daemon/status` | Daemon health |',
+    '| GET | `/api/hub/search` | Skills search |',
+    '',
+    '## WebSocket Protocol', '',
+    '| Event | Direction | Purpose |',
+    '|-------|-----------|---------|',
+    '| `authenticate` | Client → Server | JWT authentication |',
+    '| `chat_stream` | Bidirectional | Streaming conversation |',
+    '| `tool_execute` | Server → Client | Tool execution notifications |',
+    '| `ping/pong` | Bidirectional | Keep-alive |',
+    '',
+    'Default ports: HTTP 3000, Gateway WS 3001.',
+  ];
+
+  return lines.join('\n');
+}
+
+// ============================================================================
+// Section 10: Development Guide
+// ============================================================================
+
+function generateDevGuide(cwd: string): string {
+  const pkg = readPkg(cwd);
+  const scripts = (pkg.scripts ?? {}) as Record<string, string>;
+
+  const lines = [
+    '# Development Guide',
+    '',
+    '## Getting Started', '',
+    '```bash',
+    'git clone <repo-url>',
+    'cd ' + path.basename(cwd),
+    'npm install',
+    'npm run dev          # Development mode (Bun)',
+    'npm run dev:node     # Development mode (tsx/Node.js)',
+    '```', '',
+    '## Build & Development Commands', '',
+    '| Command | Description |',
+    '|---------|-------------|',
+  ];
+
+  for (const [name, cmd] of Object.entries(scripts).slice(0, 20)) {
+    lines.push(`| \`npm run ${name}\` | \`${cmd}\` |`);
+  }
+
+  lines.push('', '## Project Structure', '');
+  lines.push('```');
+  lines.push('src/');
+  lines.push('├── agent/           # Core agent system (orchestrator, executor, middleware)');
+  lines.push('├── codebuddy/       # LLM client, tool definitions');
+  lines.push('├── tools/           # 110+ tool implementations');
+  lines.push('├── context/         # Context window management');
+  lines.push('├── security/        # Security layers, validation');
+  lines.push('├── knowledge/       # Code graph, analysis');
+  lines.push('├── channels/        # Messaging platforms');
+  lines.push('├── server/          # HTTP/WebSocket server');
+  lines.push('├── commands/        # CLI and slash commands');
+  lines.push('├── config/          # Configuration management');
+  lines.push('├── memory/          # Persistence and memory');
+  lines.push('├── ui/              # Terminal UI (Ink/React)');
+  lines.push('├── daemon/          # Background daemon');
+  lines.push('├── docs/            # Documentation generator');
+  lines.push('└── index.ts         # CLI entry point');
+  lines.push('```', '');
+
+  lines.push('## Coding Conventions', '');
+  lines.push('- TypeScript strict mode, avoid `any`');
+  lines.push('- Single quotes, semicolons, 2-space indent');
+  lines.push('- Files: kebab-case (`text-editor.ts`), components: PascalCase');
+  lines.push('- ESM imports with `.js` extension');
+  lines.push('- Conventional Commits (`feat(scope): description`)');
+  lines.push('');
+
+  lines.push('## Testing', '');
+  lines.push('- Framework: **Vitest** with happy-dom');
+  lines.push('- Tests in `tests/` and co-located `src/**/*.test.ts`');
+  lines.push('- Run: `npm test` (all), `npm run test:watch` (dev)');
+  lines.push('- Coverage: `npm run test:coverage`');
+  lines.push('- Validate: `npm run validate` (lint + typecheck + test)');
+  lines.push('');
+
+  lines.push('## Adding a New Tool', '');
+  lines.push('1. Create class in `src/tools/`');
+  lines.push('2. Add definition in `src/codebuddy/tools.ts`');
+  lines.push('3. Add execution case in `CodeBuddyAgent.executeTool()`');
+  lines.push('4. Register in `src/tools/registry/`');
+  lines.push('5. Add metadata in `src/tools/metadata.ts`');
+
+  return lines.join('\n');
+}
+
+// ============================================================================
+// Section 11: Changelog (from git)
+// ============================================================================
+
+function generateChangelog(cwd: string): string {
+  const lines = [
+    '# Recent Changes',
+    '',
+  ];
+
+  try {
+    const { execFileSync } = require('child_process');
+    const log = execFileSync('git', ['log', '--oneline', '-30', '--no-decorate'], {
+      cwd,
+      timeout: 5000,
+      encoding: 'utf-8',
+    });
+    lines.push('Last 30 commits:', '');
+    lines.push('```');
+    lines.push(log.trim());
+    lines.push('```');
+  } catch {
+    lines.push('*Git log not available.*');
+  }
+
+  return lines.join('\n');
+}
+
+// ============================================================================
+// Index Generator
+// ============================================================================
 
 function generateIndex(
   files: string[],
