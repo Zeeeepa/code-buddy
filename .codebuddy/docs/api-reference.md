@@ -1,139 +1,54 @@
 # API Reference
 
-The @phuetz/code-buddy API provides a robust interface for interacting with our codebase analysis engine. With over 14,000 functions indexed across 1,000+ modules, this API is designed to handle high-concurrency requests while maintaining strict type safety and low latency.
+<details>
+<summary>Relevant source files</summary>
 
-## Authentication & Session Management
+- `src/server/index.ts.ts`
+- `src/channels/dm-pairing.ts.ts`
 
-[Security](./security.md) serves as the foundation of our [architecture](./architecture.md), ensuring that only authorized clients can access sensitive codebase metadata. We utilize JWT-based authentication to maintain stateless sessions, which allows our distributed Express instances to scale horizontally without sticky sessions.
+</details>
 
-When a developer initiates a session, the system validates the provided credentials against the identity provider and issues a short-lived access token because we need to minimize the window of opportunity for token interception.
+For [Architecture](./tool-development.md#architecture), see [System Overview].
+For Deployment, see [Deployment Guide].
 
-### Endpoints
+The `@phuetz/code-buddy` project is structured to separate server [entry points](./plugin-system.md#entry-points) from channel-specific logic. This separation ensures that communication channels, such as direct message pairing, remain decoupled from the core server infrastructure.
 
-*   **`POST /auth/login`**
-    *   **Params:** `username`, `password`
-    *   **Description:** Authenticates the user and returns an access token.
-*   **`POST /auth/refresh`**
-    *   **Params:** `refreshToken`
-    *   **Description:** Rotates the current session token.
+Currently, the codebase defines the structural foundation for these components, though no public API endpoints or command interfaces are exposed in the provided source modules.
 
-### Example Usage
+## Server Endpoints
 
-```bash
-curl -X POST https://api.code-buddy.dev/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "dev_user", "password": "secure_password"}'
-```
+The server entry point serves as the primary interface for the application. In a standard Express-based architecture, this module is responsible for initializing middleware, configuring routes, and starting the listener.
 
-> **Developer Tip:** Always store your refresh tokens in an `httpOnly` cookie to prevent XSS-based token theft.
+While the file `src/server/index.ts` exists to facilitate this setup, it currently contains no exported functions, classes, or route definitions. Consequently, there are no public API endpoints available for integration at this time.
+
+**Sources:** [src/server/index.ts:L1-L100](src/server/index.ts)
+
+> **Developer Tip:** Before implementing new routes, ensure that the Express application instance is correctly initialized within `src/server/index.ts` to avoid circular dependencies during module loading.
+
+## Channel Integration
+
+The channel integration layer is designed to handle specific communication protocols, such as the DM pairing logic. By isolating this logic, the system allows for the addition of new communication channels without modifying the core server code.
+
+The module `src/channels/dm-pairing.ts` is designated for this purpose. As of the current implementation, this module does not expose any public functions or classes, meaning there are no active command interfaces or pairing logic endpoints available for external consumption.
+
+**Sources:** [src/channels/dm-pairing.ts:L1-L100](src/channels/dm-pairing.ts)
+
+> **Developer Tip:** When implementing channel logic, keep the interface consistent with other channel modules to ensure the server can dynamically register new communication methods.
+
+## System Architecture
+
+The following diagram illustrates the intended relationship between the server entry point and the channel integration layer.
 
 ```mermaid
-graph LR
-    A[Client] --> B[Express Server]
-    B --> C{Auth Middleware}
-    C -->|Valid| D[JWT Generator]
-    C -->|Invalid| E[401 Unauthorized]
-    D --> F[Response]
+graph TD
+    A["src/server/index.ts"] --> B["src/channels/dm-pairing.ts"]
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style B fill:#bbf,stroke:#333,stroke-width:2px
 ```
 
-## Code Analysis Engine
+## Summary
 
-To facilitate deep insights into complex codebases, the analysis engine must perform heavy lifting without blocking the main event loop. We offload intensive parsing tasks to background workers, allowing the API to remain responsive even when scanning massive dependency trees.
-
-When a user requests a scan, the system triggers a background worker and returns a `jobId` immediately because parsing 14,000 functions is too computationally expensive for a standard synchronous request-response cycle.
-
-### Endpoints
-
-*   **`POST /analyze/scan`**
-    *   **Params:** `repoPath`, `depth`
-    *   **Description:** Initiates a full codebase scan.
-*   **`GET /analyze/status/:jobId`**
-    *   **Params:** `jobId`
-    *   **Description:** Polls the current progress of an analysis job.
-
-### Example Usage
-
-```javascript
-// Requesting a scan
-const response = await fetch('/analyze/scan', {
-  method: 'POST',
-  body: JSON.stringify({ repoPath: '/src', depth: 2 })
-});
-const { jobId } = await response.json();
-```
-
-> **Developer Tip:** Use WebSockets for real-time progress updates instead of polling the `/status` endpoint to reduce server load.
-
-## Chat & Contextual Interaction
-
-Interaction is the primary interface for developers to query the codebase, requiring a seamless bridge between natural language and structured code data. We utilize a vector database to store embeddings of your code, ensuring that the AI has the necessary context to provide accurate, module-specific advice.
-
-When a message is sent, the system retrieves relevant context chunks from the vector store because the LLM needs specific module definitions and function signatures to provide accurate, non-hallucinated advice.
-
-### Endpoints
-
-*   **`POST /chat/message`**
-    *   **Params:** `threadId`, `content`, `context`
-    *   **Description:** Sends a query to the code buddy and receives a response.
-*   **`GET /chat/history/:threadId`**
-    *   **Params:** `threadId`
-    *   **Description:** Retrieves previous conversation turns.
-
-### Example Usage
-
-```json
-// POST /chat/message
-{
-  "threadId": "abc-123",
-  "content": "How do I implement the auth middleware?",
-  "context": { "module": "src/server/index.ts" }
-}
-```
-
-> **Developer Tip:** Keep your context window small by only sending the relevant function signatures rather than the entire file content.
-
-## [Configuration](./configuration.md) & Preferences
-
-Every developer has a different style and set of requirements, so we provide a flexible configuration endpoint to tailor the analysis output. We store these preferences in a centralized cache, ensuring that linting rules and analysis depth are applied consistently across all sessions.
-
-When a preference changes, the system invalidates the cache for that user because stale configurations lead to inconsistent linting results and confusing developer feedback.
-
-### Endpoints
-
-*   **`PATCH /config/update`**
-    *   **Params:** `rules`, `theme`, `analysisDepth`
-    *   **Description:** Updates the user's analysis preferences.
-
-### Example Usage
-
-```bash
-curl -X PATCH https://api.code-buddy.dev/config/update \
-  -H "Authorization: Bearer <token>" \
-  -d '{"analysisDepth": 3, "theme": "dark"}'
-```
-
-> **Developer Tip:** Use JSON Schema validation on the server side to ensure configuration updates don't break the analysis engine.
-
-## [Error Handling](./interfaces.md#error-handling)
-
-Robust error handling is critical when dealing with complex TypeScript codebases where runtime exceptions can be difficult to trace. We implement a standardized error response format across all endpoints to ensure the client can gracefully handle failures without crashing.
-
-When an error occurs, the system returns a structured JSON object with a unique `correlationId` because the client needs to distinguish between a transient network issue and a permanent syntax error that requires developer intervention.
-
-### Error Schema
-
-```json
-{
-  "error": {
-    "code": "ERR_CODE",
-    "message": "Human readable message",
-    "correlationId": "uuid-1234"
-  }
-}
-```
-
-> **Developer Tip:** Always log the `correlationId` in your client-side error reporting tool (like Sentry) to make debugging across the stack easier.
-
----
-
-**See also:** [CLI Reference](./cli-reference.md)
+1. **No Public API:** The current codebase does not expose any public API endpoints or commands.
+2. **Structural Separation:** The project enforces a strict separation between server initialization (`src/server/index.ts`) and channel-specific logic (`src/channels/dm-pairing.ts`).
+3. **Extensibility:** The existing module structure is prepared for future implementation of route handlers and channel-specific pairing logic.
+4. **Integration Readiness:** Developers should focus on populating these modules with exported functions to establish the API surface.

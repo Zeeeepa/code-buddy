@@ -8,12 +8,12 @@
 
 | I want to... | Go to... |
 |-------------|----------|
-| Understand the project | [Overview](./overview.md) |
+| Understand the project | [Project Overview](./overview.md) |
 | Get started quickly | [Getting Started](./getting-started.md) |
-| Understand the architecture | [Architecture](./architecture.md) |
+| Understand the architecture | [Architecture Overview](./architecture.md) |
 | Configure the project | [Configuration](./configuration.md) |
-| Understand security | [Security & Configuration](./security-config.md) |
-| Use the CLI or API | [CLI & API Reference](./interfaces.md) |
+| Understand security | [Security & Persistence](./security-persistence.md) |
+| Use the CLI or API | [Interface Reference](./reference.md) |
 | Fix an issue | [Troubleshooting](./troubleshooting.md) |
 
 ## Project at a Glance
@@ -21,25 +21,23 @@
 | Metric | Value |
 |--------|-------|
 | Modules | 1 083 |
-| Functions | 14 351 |
-| Relationships | 49 278 |
+| Functions | 14 352 |
+| Relationships | 49 283 |
 
 ## All Sections
 
-- [1. Overview](./overview.md)
+- [1. Project Overview](./overview.md)
   - [1.1. Getting Started](./getting-started.md)
   - [1.2. Key Concepts](./key-concepts.md)
-- [2. Architecture](./architecture.md)
+- [2. Architecture Overview](./architecture.md)
   - [2.1. Plugin System](./plugin-system.md)
   - [2.2. Agent Orchestration](./agent-orchestration.md)
-- [3. Subsystems](./subsystems.md)
-  - [3.1. Channels](./channels.md)
+- [3. Core Subsystems](./subsystems.md)
+  - [3.1. Channels & UI](./channels-ui.md)
   - [3.2. Memory & Context](./memory-context.md)
-  - [3.3. Tools & Integrations](./tools-integrations.md)
-- [4. CLI & API Reference](./interfaces.md)
+  - [3.3. Security & Persistence](./security-persistence.md)
+- [4. Interface Reference](./reference.md)
   - [4.1. CLI Reference](./cli-reference.md)
   - [4.2. API Reference](./api-reference.md)
-- [5. Security & Configuration](./security-config.md)
-  - [5.1. Security](./security.md)
-  - [5.2. Configuration](./configuration.md)
+- [5. Configuration](./configuration.md)
 - [6. Troubleshooting](./troubleshooting.md)

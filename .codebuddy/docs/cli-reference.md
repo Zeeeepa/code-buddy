@@ -1,64 +1,50 @@
 # CLI Reference
 
-Efficiency is the cornerstone of the `@phuetz/code-buddy` ecosystem. By providing a robust command-line interface, we allow developers to interact with the codebase without leaving their terminal, effectively bypassing the overhead of GUI-based tools.
+<details>
+<summary>Relevant source files</summary>
 
-When you invoke a command, the CLI parses your input and routes it to the appropriate handler because the system needs to maintain strict separation between user intent and execution logic. This [architecture](./architecture.md) ensures that even with over 14,000 functions, the CLI remains responsive and predictable.
+- `src/commands/cli/approvals-command.ts.ts`
+- `src/commands/handlers/keybindings-handler.ts.ts`
 
-## Approvals
+</details>
 
-Code reviews often become the primary bottleneck in the development lifecycle. Automating the approval process allows teams to maintain velocity without sacrificing quality, which is why the `approvals` module exists.
+For [configuration](./getting-started.md#configuration), see [Configuration Guide]. For [architecture](./tool-development.md#architecture), see [System Overview].
 
-To manage these workflows, use the following commands:
+The `@phuetz/code-buddy` CLI is structured around modular command definitions and event handlers. By separating the CLI [entry points](./plugin-system.md#entry-points) from the underlying logic, the system maintains a clean separation of concerns, allowing for independent testing and maintenance of approval workflows and keybinding configurations.
 
-| Command | Params | Description |
-| :--- | :--- | :--- |
-| `buddy approve <id>` | `id` (string) | Approves a pending code review request. |
-| `buddy reject <id>` | `id` (string) | Rejects a pending code review request. |
+## Approvals Command
 
-*Example usage:*
-```bash
-buddy approve PR-1083
-```
+The approvals command module serves as the primary interface for managing approval workflows within the CLI. It acts as the entry point for users to interact with the approval system, ensuring that all approval-related operations are routed through a centralized command structure.
 
-> **Developer Tip:** Always run `buddy status` before approving to ensure the latest CI checks have passed, preventing accidental merges of broken builds.
+**Developer Tip:** When extending the CLI, ensure that new approval logic is encapsulated within this module to maintain a consistent command-line interface.
 
-## Keybindings
+**Sources:** [src/commands/cli/approvals-command.ts:L1-L100](src/commands/cli/approvals-command.ts)
 
-Context switching is the silent killer of productivity. By mapping complex, multi-step operations to simple key combinations, developers can reclaim their flow state, which is why we implemented the `keybindings-handler`.
+## Keybindings Handler
 
-The system processes these bindings by intercepting terminal input streams and mapping them to internal function calls.
+The keybindings handler module is responsible for processing keybinding events. Rather than executing logic directly within the CLI command, the system delegates the interpretation and execution of keybinding-related tasks to this handler. This ensures that keybinding logic remains decoupled from the command-line parsing layer.
+
+**Developer Tip:** Always validate the input context before passing data to the keybindings handler to prevent unexpected behavior during event processing.
+
+**Sources:** [src/commands/handlers/keybindings-handler.ts:L1-L100](src/commands/handlers/keybindings-handler.ts)
+
+## [Architecture Overview](./architecture.md)
+
+The following diagram illustrates the relationship between the CLI command modules and the event handlers within the system.
 
 ```mermaid
-graph LR
-    A[Terminal Input] --> B[CLI Parser]
-    B --> C[Keybindings Handler]
-    C --> D[Action Execution]
+graph TD
+    CLI[CLI Entry Point] --> Approvals[Approvals Command]
+    CLI --> Keybindings[Keybindings Handler]
+    
+    style CLI fill:#f9f,stroke:#333,stroke-width:2px
+    style Approvals fill:#bbf,stroke:#333
+    style Keybindings fill:#bbf,stroke:#333
 ```
 
-| Command | Params | Description |
-| :--- | :--- | :--- |
-| `buddy bind <key> <action>` | `key`, `action` | Maps a key to a specific system action. |
-| `buddy unbind <key>` | `key` | Removes an existing key mapping. |
+## Summary
 
-*Example usage:*
-```bash
-buddy bind ctrl+shift+a "approve --force"
-```
-
-> **Developer Tip:** Use the `buddy list-bindings` command frequently to avoid overlapping key combinations that might conflict with your shell's native shortcuts.
-
-## [Error Handling](./interfaces.md#error-handling)
-
-Robust systems must fail gracefully to prevent data corruption. We utilize standard exit codes to communicate status, ensuring that CI/CD pipelines can react appropriately to failures.
-
-Whenever an operation fails, the system logs the error to `stderr` and exits with a non-zero code because this allows automated scripts to halt execution immediately.
-
-*   `1`: General error (invalid arguments).
-*   `2`: Permission denied.
-*   `3`: Resource not found.
-
-> **Developer Tip:** Pipe the output of failed commands to `buddy logs --last` to retrieve the full stack trace for debugging purposes.
-
----
-
-**See also:** [API Reference](./api-reference.md)
+1. The CLI is modularized to separate command definitions from execution logic.
+2. `approvals-command.ts` provides the structural foundation for all approval-related CLI interactions.
+3. `keybindings-handler.ts` encapsulates the logic required to process and manage keybinding events.
+4. Decoupling command entry points from handlers allows for cleaner testing and future extensibility.

@@ -1,56 +1,61 @@
 # Key Concepts
 
-When a developer integrates `@phuetz/code-buddy`, they are essentially building a bridge between their codebase and an intelligent assistant. Understanding these primitives is crucial because they form the backbone of how the system orchestrates complex coding tasks across diverse environments.
+<details>
+<summary>Relevant source files</summary>
 
-## Core [Architecture](./architecture.md): Agents & Orchestration
+- `src/agent/codebuddy-agent.ts.ts`
+- `src/memory/enhanced-memory.ts.ts`
 
-To maintain consistency, the system requires a central authority that interprets intent and manages the lifecycle of automated tasks. The **CodeBuddy** instance acts as the root orchestrator, delegating specific responsibilities to an **Agent** that is tracked and managed within the **Registry**.
+</details>
 
-*   **CodeBuddy**: The primary entry point and orchestrator for the entire application lifecycle.
-*   **Agent**: A specialized unit of logic designed to interpret user intent and execute tasks.
-*   **Registry**: A centralized store that tracks available agents and their current operational status.
-*   **Middleware**: Intercepting logic that processes requests before they reach the agent, useful for logging or authentication.
+For [Agent Orchestration](./agent-orchestration.md), see [Agent Architecture]. For Data Persistence, see [Memory Management].
 
-> **Developer Tip:** Keep agents focused on single domains (e.g., "RefactoringAgent" vs "TestingAgent") to prevent prompt drift and reduce token usage.
+This glossary defines the core architectural concepts underpinning the `@phuetz/code-buddy` system. By understanding these abstractions, developers can better navigate the codebase and contribute to the system's evolution.
 
-## Communication & Interfaces: [Channels](./channels.md)
+## Glossary of Terms
 
-Systems need a way to talk to the outside world without coupling the core logic to specific transport protocols like HTTP, WebSockets, or CLI inputs. By utilizing **Channels**, the system normalizes incoming **Requests** and outgoing **Responses**, ensuring the agent remains agnostic about whether it is interacting with a developer via a terminal or a [REST API](./interfaces.md#rest-api).
+*   **CodeBuddyAgent** — The primary module responsible for executing agentic logic and decision-making processes.
+*   **EnhancedMemory** — The specialized module dedicated to managing state, context, and historical data for the system.
+*   **Agentic Orchestration** — The high-level coordination pattern where the agent manages task execution flows.
+*   **State Persistence** — The mechanism by which the system ensures memory remains available across different execution cycles.
+*   **Contextual Awareness** — The ability of the agent to utilize stored memory to inform current decision-making.
+*   **Memory Retrieval** — The process of querying the memory module to fetch relevant historical data.
+*   **Execution Flow** — The sequence of operations triggered by the agent to complete a specific task.
+*   **[System Architecture](./api-reference.md#system-architecture)** — The structural design that separates agent logic from memory management.
+*   **Module Encapsulation** — The practice of isolating agent and memory concerns into distinct, maintainable files.
+*   **Dependency Management** — The strategy of ensuring the agent has access to the memory module without tight coupling.
 
-*   **Channel**: An abstraction layer that defines how the system communicates with external interfaces.
-*   **Request**: A standardized data structure representing the user's intent or command.
-*   **Response**: The structured output returned by the agent back to the channel.
-*   **Session**: A persistent state container that tracks the history of a specific user interaction.
+**Sources:** [src/agent/codebuddy-agent.ts:L1-L100](src/agent/codebuddy-agent.ts)
+**Sources:** [src/memory/enhanced-memory.ts:L1-L100](src/memory/enhanced-memory.ts)
 
-> **Developer Tip:** Use channels to decouple transport logic from business logic; if you need to switch from Express to a CLI, you should only need to implement a new Channel.
+## Agent Architecture
 
-## Capabilities: Tools & Execution
+Agents are the "brains" of the operation. In `code-buddy`, the agent is not just a script; it is an orchestrator. By centralizing logic within the agent module, we ensure that decision-making remains consistent regardless of the task complexity. The agent acts as the primary interface for incoming requests, determining which actions to take and when to consult the memory layer.
 
-An agent is effectively blind and paralyzed without the ability to interact with the filesystem, external APIs, or project metadata. **Tools** provide the "hands" for the agent, utilizing a **Provider** to execute specific actions, while maintaining **Context** to ensure the agent knows exactly where it is in the project structure.
+> **Developer Tip:** Always keep the agent logic decoupled from the underlying storage implementation to ensure the system remains modular and testable.
 
-*   **Tool**: A discrete function or capability that an agent can invoke to perform work.
-*   **Provider**: The underlying service or driver that executes the logic defined by a tool.
-*   **Context**: The metadata and state information provided to a tool to ensure it operates within the correct scope.
-*   **Memory**: A storage mechanism that allows the agent to recall previous interactions or project states.
+**Sources:** [src/agent/codebuddy-agent.ts:L1-L100](src/agent/codebuddy-agent.ts)
 
-> **Developer Tip:** Always validate tool inputs using a schema validator; never trust the agent's output to directly modify the file system without sanitization.
+## Memory Management
 
-## Architectural [Overview](./overview.md)
+Memory is the "context" of the operation. Without a robust memory system, an agent is stateless and limited to the immediate input. The memory module provides the necessary infrastructure to store, retrieve, and manage the state of the conversation or task. By separating this into a dedicated module, we allow for future enhancements—such as vector database integration or long-term storage—without modifying the agent's core logic.
 
-The following diagram illustrates how a user request flows through the system, moving from the interface layer into the execution logic.
+> **Developer Tip:** Initialize the memory module before the agent to ensure that the agent has immediate access to the required context upon startup.
+
+**Sources:** [src/memory/enhanced-memory.ts:L1-L100](src/memory/enhanced-memory.ts)
+
+## Architectural Relationship
+
+The following diagram illustrates the fundamental relationship between the agent and the memory system.
 
 ```mermaid
-graph TD
-    User --> Channel
-    Channel --> Middleware
-    Middleware --> Agent
-    Agent --> Registry
-    Agent --> Tool
-    Tool --> Provider
-    Tool --> Context
-    Agent --> Memory
+graph LR
+    A["CodeBuddyAgent"] -- "queries/updates" --> B["EnhancedMemory"]
+    B -- "provides context" --> A
 ```
 
----
+## Summary
 
-**See also:** [Architecture](./architecture.md) · [Subsystems](./subsystems.md)
+1.  **Separation of Concerns:** The architecture strictly separates execution logic (`CodeBuddyAgent`) from state management (`EnhancedMemory`).
+2.  **Contextual Integrity:** The memory module is the single source of truth for the agent's historical context and state.
+3.  **Modular Design:** By isolating these components, the system allows for independent scaling and maintenance of agentic capabilities versus memory storage strategies.

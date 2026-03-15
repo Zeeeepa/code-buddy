@@ -561,7 +561,8 @@ function addDeepWikiStructure(content: string, page: DocPage, config: DocsConfig
   // 1. Add source files block after title
   if (page.sourceFiles.length > 0) {
     const sourceLinks = page.sourceFiles.slice(0, 8).map(f => {
-      const link = repoBase ? `[${f}.ts](${repoBase}${f}.ts)` : `\`${f}.ts\``;
+      const ext = f.endsWith('.ts') || f.endsWith('.js') || f.endsWith('.json') || f.endsWith('.md') ? '' : '.ts';
+      const link = repoBase ? `[${f}${ext}](${repoBase}${f}${ext})` : `\`${f}${ext}\``;
       return `- ${link}`;
     }).join('\n');
 

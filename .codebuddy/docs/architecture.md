@@ -1,54 +1,79 @@
-# Architecture
+# [Architecture](./tool-development.md#architecture) Overview
 
-Code-buddy is engineered as a highly modular, plugin-based ecosystem designed to manage the complexity of over 1,000 modules and 14,000+ functions. We chose this architecture because monolithic structures fail to scale when handling diverse agentic tasks; by decoupling the [agent orchestration](./agent-orchestration.md) from specific tool implementations, we ensure that adding a new capability doesn't require refactoring the core engine.
+<details>
+<summary>Relevant source files</summary>
 
-### System [Overview](./overview.md)
+- `src/agent/codebuddy-agent.ts.ts`
+- `src/server/index.ts.ts`
 
-To maintain stability across such a large codebase, the system is organized into distinct functional layers. Each layer serves a specific domain—from `channels` handling input to `security` enforcing guardrails—allowing developers to isolate concerns effectively.
+</details>
+
+For [Plugin System], see [Plugin Architecture].
+For [Agent Lifecycle], see [Agent Orchestration].
+
+## System Overview
+The `@phuetz/code-buddy` architecture is designed around a highly modular, plugin-based system. By decoupling core logic from specific capabilities, the system allows for independent scaling of features across ten distinct layers. This separation of concerns ensures that the core agent remains lightweight while delegating specialized tasks to specific modules.
+
+The system is structured to facilitate extensibility, where the `agent` acts as the central orchestrator, and layers like `tools`, `commands`, and `integrations` provide the functional surface area.
+
+**Sources:** [src/server/index.ts:L1-L100](src/server/index.ts)
+
+> **Developer Tip:** When extending the system, always verify which layer your new functionality belongs to before implementation to maintain the integrity of the plugin-based architecture.
+
+## How It Works
+The system operates as a request-response pipeline. When a user initiates an action through the `ui` or `channels` layer, the request is routed to the `agent`. The `agent` acts as the central brain, determining which `tools` or `commands` are required to fulfill the request. 
+
+Throughout this process, the agent consults the `context` and `knowledge` layers to ensure the response is grounded in the current state. Security checks are performed via the `security` layer before any external `integrations` are invoked.
+
+**Sources:** [src/agent/codebuddy-agent.ts:L1-L100](src/agent/codebuddy-agent.ts)
+
+## Layered Architecture
+The following diagram illustrates the relationship between the core agent and the supporting functional layers.
 
 ```mermaid
 graph TD
-    UI --> Agent
+    UI --> Channels
+    Channels --> Agent
     Agent --> Tools
     Agent --> Context
-    Tools --> Knowledge
-    Tools --> Integrations
-    Security --> Agent
-    Channels --> Agent
+    Agent --> Security
+    Agent --> Knowledge
+    Agent --> Integrations
+    Agent --> Commands
+    Agent --> Utils
 ```
 
-> **Developer Tip:** When adding new functionality, always place logic in the thinnest possible layer; if a feature involves both UI and logic, split it into `ui` and `agent` modules rather than creating a "god object."
+**Sources:** [src/agent/codebuddy-agent.ts:L1-L100](src/agent/codebuddy-agent.ts)
 
-### How It Works
+## Core Flow
+1. **Ingestion:** The `server` receives an incoming request, which is passed to the `channels` layer.
+2. **Orchestration:** The `agent` receives the processed message. It evaluates the intent and identifies the necessary `tools` or `commands`.
+3. **Validation:** Before execution, the `security` layer validates permissions and constraints.
+4. **Execution:** The `agent` executes the logic, utilizing `utils` for helper functions and `integrations` for external communication.
+5. **Response:** The result is returned through the `channels` layer back to the `ui`.
 
-When a developer triggers a command, the system initiates a multi-stage orchestration flow to ensure the request is safe, understood, and actionable. The process begins at the `channels` layer, which captures the raw input, and passes it through `message-preprocessing` to sanitize and normalize the data before it ever reaches the core logic.
+**Sources:** [src/server/index.ts:L1-L100](src/server/index.ts)
 
-The system then invokes the `CodeBuddyAgent` (defined in `src/agent/codebuddy-agent.ts`), which acts as the central brain. It evaluates the current state using the `CodeActMode` singleton to determine the appropriate execution strategy. This singleton pattern is critical here because it ensures that the agent's state—such as its current context and active toolset—remains consistent throughout the lifecycle of a single user interaction.
+> **Developer Tip:** Use the `agent` as the single point of entry for all cross-layer communication to prevent circular dependencies between modules.
 
-> **Developer Tip:** Use the `CodeActMode` singleton to manage state transitions, but avoid storing long-lived user data inside it; pass state via the `context` layer to keep the agent stateless between distinct requests.
+## Design Decisions and Trade-offs
+The architecture relies heavily on the Singleton pattern for critical infrastructure components (e.g., `auth-monitoring`, `message-preprocessing`, `send-policy`). 
 
-### Core Execution Flow
+*   **Why Singletons:** We use Singletons to ensure consistent state management across the application lifecycle, particularly for security and channel policies.
+*   **Trade-off:** While this simplifies state synchronization, it requires careful management of global state to avoid side effects during testing.
+*   **Plugin-based approach:** This allows us to add new capabilities (like new `integrations`) without modifying the core `agent` logic, though it increases the complexity of dependency injection.
 
-1.  **Ingestion:** The `channels` layer receives the request and triggers `message-preprocessing` to strip sensitive data and format the payload.
-2.  **Validation:** The `security` layer intercepts the preprocessed message, checking it against `auth-monitoring` policies to ensure the user has the necessary permissions.
-3.  **Orchestration:** The `CodeBuddyAgent` receives the validated request and queries the `context` layer to retrieve relevant history or project state.
-4.  **Execution:** Based on the context, the agent selects the appropriate tool from the `tools` layer, which may interact with `knowledge` bases or external `integrations`.
-5.  **Response:** The result is passed back through the `ui` layer, which formats the output for the specific channel that initiated the request.
+**Sources:** [src/agent/codebuddy-agent.ts:L1-L100](src/agent/codebuddy-agent.ts)
 
-> **Developer Tip:** Always implement a "dry-run" mode in your tools; this allows the agent to simulate execution without side effects, which is invaluable for debugging complex orchestration flows.
+> **Developer Tip:** If you find yourself needing to share state between modules, prefer passing context through the `agent` rather than creating new Singletons.
 
-### [Design Decisions and Trade-offs](./[subsystems](./subsystems.md).md#design-decisions-and-trade-offs)
+## Data Flow
+Data flows unidirectionally from the `channels` into the `agent`. The `agent` acts as a mediator, pulling data from `context` and `knowledge` to enrich the request. Once processed, the output flows back through the `channels` to the user. This unidirectional flow ensures that the `agent` maintains a predictable state throughout the request lifecycle.
 
-We opted for a heavy reliance on Singleton patterns for core services like `AuthMonitoring`, `Polls`, and `SendPolicy` to minimize memory overhead and ensure a "single source of truth" for system-wide configurations. While this simplifies state management, it introduces a trade-off: unit testing becomes more difficult because global state persists between tests.
+**Sources:** [src/server/index.ts:L1-L100](src/server/index.ts)
 
-To mitigate this, we enforce strict dependency injection in all non-singleton modules. By requiring dependencies to be passed into constructors rather than imported directly, we maintain the ability to mock these services during testing, effectively balancing the performance benefits of singletons with the necessity of testable code.
-
-> **Developer Tip:** If you find yourself needing to reset a singleton's state during testing, expose a `reset()` method that is strictly guarded by `process.env.NODE_ENV === 'test'`.
-
-### Data Flow
-
-Data moves through the system as a unidirectional stream, starting from the input channel and terminating at the output interface. This flow is strictly enforced to prevent race conditions, especially when multiple tools are executing concurrently.
-
-Information is transformed at each layer: raw strings become structured objects in the `channels` layer, enriched with metadata in the `context` layer, and finally converted into actionable tool calls by the `agent` layer. This transformation pipeline ensures that by the time a tool executes, it has all the necessary, validated, and sanitized information required to perform its task without needing to query the database or external APIs again.
-
-> **Developer Tip:** Use TypeScript interfaces to define the "contract" for data moving between layers; if a layer changes its output format, the compiler will immediately highlight which downstream layers need updates.
+## Summary
+1. The system utilizes a plugin-based architecture to maintain a clean separation between the core `agent` and functional layers.
+2. The `agent` serves as the central orchestrator, managing the lifecycle of requests across ten distinct layers.
+3. Singleton patterns are employed for critical infrastructure to ensure consistency in security and channel policies.
+4. Data flow is strictly managed to ensure the `agent` remains the source of truth for all operations.

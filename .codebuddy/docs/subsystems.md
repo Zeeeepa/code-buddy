@@ -1,60 +1,76 @@
-# Subsystems
+# Core Subsystems
 
-To manage the complexity of over 1,000 modules and 14,000 functions, @phuetz/code-buddy utilizes a strictly decoupled, plugin-based [architecture](./architecture.md). This structure ensures that no single subsystem becomes a bottleneck, allowing developers to extend functionality—such as adding new integrations or tools—without modifying the core agent logic.
+<details>
+<summary>Relevant source files</summary>
 
-This modularity is achieved by isolating concerns into distinct layers. Each layer acts as a specialized service, communicating through defined interfaces rather than direct object manipulation.
+- `src/memory/enhanced-memory.ts.ts`
+- `src/channels/index.ts.ts`
 
-> **Developer Tip:** When adding new functionality, always check if it belongs in an existing layer (e.g., `tools` or `channels`) before creating a new one to prevent architectural drift.
+</details>
 
-## [Architecture [Overview](./overview.md)](./agent-orchestration.md#architecture-overview)
+For Agent logic, see [Agent Layer].
+For communication protocols, see [Channels].
+For state persistence, see [Memory Management].
 
-The system is organized into a hierarchy where the `Agent` acts as the central orchestrator, delegating tasks to specialized sub-layers.
+The `@phuetz/code-buddy` architecture is built on a plugin-based foundation. This design choice allows the system to scale across 10 distinct functional layers, ensuring that concerns like security, knowledge, and agent logic remain decoupled. By isolating these responsibilities, the system maintains high modularity, allowing developers to extend functionality without modifying the core execution loop.
+
+## Architectural Layers
+
+The system organizes its 10,000+ functions into a hierarchical layer structure. This separation of concerns ensures that the `Agent` layer acts as the orchestrator, while specialized layers handle specific domains like `Security` or `Integrations`.
+
+**Sources:** [src/agent/modes/codeact-mode:L1-L100](src/agent/modes/codeact-mode)
+
+> **Developer Tip:** When extending the system, always verify which layer your new module belongs to. Avoid cross-layer dependencies that violate the hierarchy (e.g., `Utils` should never import from `Agent`).
+
+## Memory and Channel Subsystems
+
+The core of the system relies on two primary subsystems: `Memory` and `Channels`. 
+
+`src/channels/index.ts` serves as the gateway for all incoming and outgoing communication. It utilizes a message-preprocessing singleton to ensure that data is sanitized and formatted before reaching the agent. 
+
+`src/memory/enhanced-memory.ts` provides the persistence layer. While the system is plugin-based, the memory subsystem ensures that context is maintained across sessions, allowing the agent to retain state even when specific plugins are swapped or reloaded.
+
+**Sources:** [src/memory/enhanced-memory.ts:L1-L100](src/memory/enhanced-memory.ts), [src/channels/index.ts:L1-L100](src/channels/index.ts)
+
+## System Flow
+
+When a user initiates an action, the request enters through the `Channels` layer. The system flow follows this path:
+
+1.  **Ingress:** The request is intercepted by `src/channels/index.ts`.
+2.  **Preprocessing:** The `message-preprocessing` singleton cleans and validates the input.
+3.  **Orchestration:** The `Agent` (specifically `codeact-mode`) determines the necessary tools.
+4.  **Persistence:** The `enhanced-memory` module updates the current context.
+5.  **Execution:** The system triggers the appropriate `Tools` or `Commands`.
 
 ```mermaid
 graph TD
-    User((User)) --> UI[UI Layer]
-    UI --> Agent[Agent Layer]
-    Agent --> Tools[Tools]
-    Agent --> Channels[Channels]
-    Agent --> Context[Context]
-    Agent --> [Security](./security.md)[Security]
-    Agent --> Knowledge[Knowledge]
-    Agent --> Integrations[Integrations]
-    Agent --> Utils[Utils]
+    A["Channels"] --> B["Message Preprocessing"]
+    B --> C["Agent (CodeAct)"]
+    C --> D["Memory"]
+    C --> E["Tools"]
+    C --> F["Security"]
+    E --> G["Utils"]
+    F --> H["Integrations"]
+    D --> I["Context"]
+    I --> J["Commands"]
 ```
 
-## How It Works: The Execution Lifecycle
+> **Developer Tip:** Use the `Singleton` pattern for stateful services like `auth-monitoring` or `polls` to prevent race conditions during concurrent channel operations.
 
-When a user triggers an action, the system must ensure the request is valid, context-aware, and executable before any side effects occur. We prioritize validation to prevent unauthorized or malformed commands from reaching the core execution engine.
+## [Data Flow](./architecture.md#data-flow) and Design Decisions
 
-Imagine a user sends a request via a chat interface. First, the `Channels` layer intercepts the raw input and passes it through the `message-preprocessing` singleton. This singleton sanitizes the input and normalizes the data structure. Next, the `Agent` layer receives this normalized object and consults the `Context` layer to understand the current state. Finally, the `Agent` invokes the appropriate `Tool` to perform the action, and the result is routed back through the `Channels` layer to the user.
+The architecture prioritizes a "Plugin-First" approach. By treating every major component as a plugin, the system achieves high availability and testability. 
 
-> **Developer Tip:** Always utilize the `message-preprocessing` singleton for input sanitization; never pass raw user input directly to the Agent layer.
+*   **Trade-off:** The plugin-based architecture introduces a slight overhead in module resolution but significantly improves maintainability for a codebase of this size (1083 modules).
+*   **Singleton Usage:** Critical services, such as `send-policy` and `auth-monitoring`, are implemented as Singletons. This ensures that global policies are enforced consistently across all channels without redundant initialization.
 
-## Core Flow Explained
+**Sources:** [src/channels/send-policy:L1-L100](src/channels/send-policy), [src/automation/auth-monitoring:L1-L100](src/automation/auth-monitoring)
 
-The system processes requests through a linear, predictable pipeline to ensure traceability across the 14,000+ functions.
+> **Developer Tip:** If you need to share state between plugins, do not use global variables. Instead, leverage the `Context` layer to pass data through the defined pipeline.
 
-1.  **Ingestion:** The `Channels` layer receives the event and applies the `send-policy` singleton to determine if the message is permissible.
-2.  **Authentication:** The `Security` layer verifies the user's identity using the `auth-monitoring` singleton.
-3.  **Reasoning:** The `Agent` (specifically `codeact-mode`) evaluates the intent.
-4.  **Execution:** The `Tools` layer executes the requested function.
-5.  **Response:** The result is formatted and dispatched back to the origin channel.
+## Summary
 
-> **Developer Tip:** Use the `send-policy` singleton to enforce rate limiting and message filtering at the earliest possible stage of the flow.
-
-## Design Decisions and Trade-offs
-
-We rely heavily on the Singleton pattern for critical state management, such as `codeact-mode` and `polls`. We chose this approach because global state consistency is required for the agent to maintain a coherent "train of thought" across asynchronous operations. While Singletons can introduce testing challenges, they significantly reduce the overhead of passing state objects through deep dependency chains.
-
-This trade-off favors system stability and predictability over pure functional purity. By centralizing control in these specific modules, we ensure that conflicting agent modes or overlapping poll states cannot exist simultaneously.
-
-> **Developer Tip:** If you must use a Singleton, ensure it is immutable where possible to prevent side effects during concurrent execution.
-
-## Data Flow
-
-Data moves through the system as a strictly typed payload, evolving as it passes through each layer. The `Context` layer acts as the primary repository for this data, enriching the payload with historical information before it reaches the `Agent`.
-
-Once the `Agent` processes the data, it generates an output object. This object is then passed to the `Integrations` layer, which translates the internal representation into a format suitable for external services. This separation ensures that the core logic remains agnostic of the specific external API or UI implementation.
-
-> **Developer Tip:** Always define interfaces for your data payloads to ensure type safety across the boundaries of the `Agent` and `Tools` layers.
+1.  **Plugin-Based Architecture:** The system is organized into 10 distinct layers, ranging from `Agent` (127 modules) to `Integrations` (22 modules), promoting modularity.
+2.  **Core Subsystems:** `Memory` and `Channels` are the foundational pillars, responsible for state persistence and communication ingress/egress respectively.
+3.  **Singleton Pattern:** Critical services like `auth-monitoring`, `polls`, and `send-policy` are implemented as Singletons to ensure consistent policy enforcement.
+4.  **Orchestration:** The `Agent` layer, specifically `codeact-mode`, acts as the central hub for processing user requests and coordinating between tools and memory.

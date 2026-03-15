@@ -1,65 +1,49 @@
 # Agent Orchestration
 
-LLMs are inherently stateless and prone to "hallucination" when faced with complex, multi-file codebases. They require a structured environment to maintain context, verify logic, and execute changes safely. This orchestration layer exists to bridge the gap between raw LLM inference and reliable software engineering.
+<details>
+<summary>Relevant source files</summary>
 
-When a user submits a prompt, the system does not simply pipe text to an API. Instead, it initiates a multi-stage cognitive loop. The orchestrator first maps the repository, then performs an extended reasoning pass, and finally executes the code changes, ensuring that every action is grounded in the actual state of the filesystem.
+- `src/agent/codebuddy-agent.ts.ts`
+- `src/agent/modes/codeact-mode.ts.ts`
 
-## [Architecture](./architecture.md) [Overview](./overview.md)
+</details>
 
-Visualizing the flow of data helps explain how the agent maintains coherence across large projects. The orchestrator acts as the central brain, delegating specific tasks to specialized modules.
+For [configuration](./getting-started.md#configuration), see Configuration.
+For CLI integration, see CLI.
+
+The Agent Orchestration layer serves as the central nervous system of `@phuetz/code-buddy`. It exists to decouple the high-level agent lifecycle management from the specific operational strategies (modes) used to interact with the codebase. By separating the core agent logic from its execution modes, the system allows for modular expansion, enabling the agent to switch between different behaviors—such as autonomous coding or interactive assistance—without modifying the core orchestration engine.
+
+## [Architecture](./tool-development.md#architecture)
+
+The architecture follows a strategy-like pattern where the `CodeBuddyAgent` acts as the orchestrator, delegating specific execution tasks to registered modes like `CodeActMode`.
 
 ```mermaid
 graph TD
-    User((User)) --> Orchestrator[CodeBuddyAgent]
-    Orchestrator --> Cartographer[Cartography]
-    Orchestrator --> Thinker[ExtendedThinking]
-    Thinker --> LLM((LLM API))
-    Cartographer --> FS[(File System)]
-    Orchestrator --> FS
+    Agent["CodeBuddyAgent"]
+    Mode["CodeActMode"]
+    
+    Agent -->|delegates to| Mode
 ```
 
-> **Developer Tip:** Always treat the LLM as a non-deterministic service. Ensure your orchestrator has robust retry logic and state persistence so that if an API call fails, the agent can resume its reasoning chain without restarting the entire task.
+**Sources:** [src/agent/codebuddy-agent.ts:L1-L1](local)
+**Sources:** [src/agent/modes/codeact-mode.ts:L1-L1](local)
 
-## The Core Loop (`codebuddy-agent.ts`)
+## Core Agent Logic
 
-The `CodeBuddyAgent` exists to provide a stable interface for the agent's lifecycle. Without a central controller, the agent would struggle to manage the transition between "thinking" and "doing," often leading to race conditions or incomplete file writes.
+The `CodeBuddyAgent` module is the primary entry point for agent operations. Its purpose is to maintain the state of the agent's session and manage the transition between different operational states. By centralizing this logic, the system ensures that regardless of the active mode, the agent maintains a consistent context and lifecycle management.
 
-The agent operates by maintaining a persistent state object throughout the request. When the agent receives a task, it enters a loop: it observes the current file state, proposes a change, validates that change against the cartography map, and then commits the write. This loop continues until the agent determines the task is complete or an error threshold is reached.
+> **Developer Tip:** When extending the agent, ensure that new modes are registered within the orchestration layer rather than hardcoding logic into the agent core to maintain separation of concerns.
 
-> **Developer Tip:** Avoid long-running loops in the main thread. Use `setImmediate` or worker threads for heavy processing to ensure the agent remains responsive to cancellation signals from the user.
+**Sources:** [src/agent/codebuddy-agent.ts:L1-L1](local)
 
-## Extended Thinking (`extended-thinking.ts`)
+## Execution Modes
 
-Reasoning is often the bottleneck in complex refactoring tasks. If an agent attempts to write code immediately, it frequently misses edge cases or dependency conflicts. We implement `extended-thinking.ts` to force a "Chain of Thought" pre-computation step.
+The `CodeActMode` module defines a specific operational strategy for the agent. This modular approach allows the agent to adapt its decision-making process based on the current task requirements. By encapsulating mode-specific logic within dedicated files, the codebase remains maintainable even as the number of supported agent behaviors grows.
 
-Before a single line of code is generated, the system prompts the LLM to outline its plan, identify potential risks, and verify its assumptions against the project requirements. This internal monologue is stored in the agent's context, allowing it to self-correct before it ever touches the filesystem.
+**Sources:** [src/agent/modes/codeact-mode.ts:L1-L1](local)
 
-> **Developer Tip:** Keep the reasoning context window lean. If the "extended thinking" output becomes too verbose, it will consume tokens that are better spent on the actual code generation. Use a separate, smaller model for the reasoning pass if possible.
+## Summary
 
-## Repository Profiling (`cartography.ts`)
-
-Navigating a large codebase is difficult for an LLM that only sees the files it has explicitly opened. `cartography.ts` solves this by building a dependency graph of the project, allowing the agent to understand the "terrain" before it starts moving.
-
-If the agent needs to modify a function, it queries the cartography module to see which other files import that function. This prevents the agent from making breaking changes in isolation. By providing this map, we transform the agent from a blind text-generator into a context-aware developer.
-
-> **Developer Tip:** Watch out for graph staleness. If the agent modifies a file, ensure the cartography module invalidates and re-indexes that specific node in the dependency graph immediately, or the agent will be working with an outdated mental model.
-
-## Architectural Patterns
-
-To keep the codebase maintainable, we utilize specific design patterns:
-
-| Pattern | Usage | Why it matters |
-| :--- | :--- | :--- |
-| **Facade** | `CodeBuddyAgent` | Provides a simplified interface to the complex [subsystems](./subsystems.md) (Cartography, Thinking). |
-| **Strategy** | `ThinkingMode` | Allows swapping between "Fast/Direct" and "Deep/Reasoning" thinking styles. |
-| **Singleton** | `AgentState` | Ensures that the agent's current context is consistent across all modules. |
-
-## Sources & Citations
-
-*   *Chain-of-Thought Prompting Elicits Reasoning in Large Language Models* (Wei et al., 2022).
-*   *Dependency Graph Analysis in Large Codebases* (Internal Engineering Docs, 2023).
-*   *The Facade Pattern in TypeScript Orchestration* (Design Patterns for AI Agents, 2024).
-
----
-
-**See also:** [Plugin System](./plugin-system.md) · [Channels](./channels.md)
+1. **Separation of Concerns:** The orchestration layer separates the agent's lifecycle management (`CodeBuddyAgent`) from its operational strategies (`CodeActMode`).
+2. **Extensibility:** The architecture is designed to support new execution modes without requiring modifications to the core agent logic.
+3. **Modular Design:** By isolating mode-specific logic, the system reduces complexity and improves maintainability as the agent's capabilities evolve.

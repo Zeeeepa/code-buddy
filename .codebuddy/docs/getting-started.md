@@ -1,87 +1,79 @@
-# Getting Started
+# [Getting Started](./overview.md#getting-started)
 
-When you are staring at a repository containing 1,083 modules and 14,351 functions, finding the right entry point can feel like searching for a needle in a haystack. @phuetz/code-buddy solves this by dynamically indexing your TypeScript codebase, allowing you to query relationships and dependencies instantly through a lightweight Express middleware.
+<details>
+<summary>Relevant source files</summary>
+
+- `src/server/index.ts.ts`
+- `src/config/user-settings.ts.ts`
+
+</details>
+
+For configuration details, see [Configuration Guide].
+For deployment procedures, see [Deployment].
+
+To begin working with `@phuetz/code-buddy`, you must first align your local environment with the project's build pipeline. This project supports both Node.js and Bun runtimes, allowing you to choose the execution environment that best fits your development workflow.
 
 ## Prerequisites
 
-To ensure the server runs without compatibility issues, you must have a stable Node.js environment. The project relies on modern TypeScript features and asynchronous file system operations, so we require a runtime that supports ES modules and `async/await` patterns natively.
+Before initializing the project, ensure your system meets the following requirements:
+*   **Runtime:** Node.js (v18+) or [Bun](https://bun.sh/) (recommended for faster build times).
+*   **Package Manager:** `npm` (bundled with Node.js).
+*   **Git:** Required for cloning the repository.
 
-*   **Node.js:** v18.0.0 or higher
-*   **Package Manager:** npm (v9+) or yarn (v3+)
-*   **TypeScript:** v5.0.0 or higher
-
-> **Developer Tip:** Use [nvm](https://github.com/nvm-sh/nvm) to manage your Node versions. This prevents global dependency conflicts when switching between different projects.
+**Sources:** [src/server/index.ts.ts](<repo-url>/src/server/index.ts)
 
 ## Installation
 
-Because this package acts as middleware for your existing Express application, it needs to be installed as a dependency within your project root. This allows the server to hook into your existing request lifecycle and expose the indexing endpoints.
+The project relies on standard TypeScript compilation. After cloning the repository, install the necessary dependencies to populate the `node_modules` directory.
 
-Run the following command in your terminal:
+1. Clone the repository: `git clone <repo-url>`
+2. Navigate to the project root.
+3. Run the installation command:
+   ```bash
+   npm install
+   ```
 
+> **Developer Tip:** If you encounter issues with stale build artifacts during development, run `npm run clean` to remove the `dist` folder and `*.tsbuildinfo` files before rebuilding.
+
+**Sources:** [src/server/index.ts.ts](<repo-url>/src/server/index.ts)
+
+## First Run
+
+The project provides multiple [entry points](./plugin-system.md#entry-points) depending on your preferred runtime. The build system is abstracted via `package.json` scripts to ensure consistency across environments.
+
+### Using Bun (Recommended)
+For the fastest development cycle, use the Bun runtime:
 ```bash
-npm install @phuetz/code-buddy
+npm run dev
 ```
 
-> **Developer Tip:** Always use `--save-exact` when installing to ensure your dependency tree remains deterministic across different developer machines.
-
-## Minimal Working Example
-
-Once the package is installed, you need to initialize the Code Buddy instance within your Express application. When the server boots, it triggers an initial scan of your `src` directory because it must build an in-memory graph of your 14,351 functions to provide sub-millisecond lookup times.
-
-```typescript
-import express from 'express';
-import { CodeBuddy } from '@phuetz/code-buddy';
-
-const app = express();
-const buddy = new CodeBuddy({ rootDir: './src' });
-
-// Initialize the indexing engine
-await buddy.init();
-
-// Mount the middleware
-app.use('/code-buddy', buddy.router);
-
-app.listen(3000, () => console.log('Code Buddy active on /code-buddy'));
+### Using Node.js
+If you prefer the standard Node.js environment, use the `tsx` wrapper:
+```bash
+npm run dev:node
 ```
-
-The following diagram illustrates how the system initializes:
 
 ```mermaid
-graph TD
-    A[Express App] --> B[CodeBuddy Instance]
-    B --> C{Indexer}
-    C --> D[FileSystem]
-    C --> E[In-Memory Graph]
-    E --> F[API Router]
+graph LR
+    A["Source Code"] --> B["Build (tsc)"]
+    B --> C["Execution (Node/Bun)"]
+    C --> D["Code Buddy Server"]
 ```
 
-> **Developer Tip:** Always `await` the `init()` method before starting your Express server to ensure the index is fully populated before the first request arrives.
+**Sources:** [src/server/index.ts.ts](<repo-url>/src/server/index.ts)
 
-## Common [Configuration](./configuration.md) Options
+## Configuration
 
-Customization is essential because every codebase contains noise that shouldn't be indexed, such as test files, build artifacts, or third-party vendor code. By providing a configuration object, you can fine-tune the scanner to ignore specific directories, ensuring the memory footprint remains low.
+Customization is handled through the configuration module. You should modify the settings defined in the configuration source to tailor the behavior of the application to your specific environment.
 
-```typescript
-const buddy = new CodeBuddy({
-  rootDir: './src',
-  exclude: ['**/__tests__/**', '**/dist/**', '**/node_modules/**'],
-  maxDepth: 5,
-  enableCache: true
-});
-```
+> **Developer Tip:** Always run `npm run format:check` before committing changes to ensure your [configuration files](./configuration.md#configuration-files) adhere to the project's style guidelines.
 
-> **Developer Tip:** Create a `.codebuddyignore` file in your root directory to keep your configuration clean; the library automatically detects and respects this file.
+**Sources:** [src/config/user-settings.ts.ts](<repo-url>/src/config/user-settings.ts)
 
-## Next Steps
+## Summary
 
-Finally, now that your server is running, you may want to explore the advanced query capabilities or integrate the CLI tools. These resources will help you leverage the full power of the dependency graph:
-
-*   [API Reference](/docs/api) — Detailed documentation on available endpoints.
-*   [CLI Usage](/docs/cli) — How to generate dependency reports without the server.
-*   [Performance Tuning](/docs/performance) — Strategies for indexing massive codebases.
-
-> **Developer Tip:** Check the server logs on startup; Code Buddy outputs the total number of indexed functions and the time taken, which is useful for benchmarking your CI/CD pipeline.
-
----
-
-**See also:** [Key Concepts](./key-concepts.md) · [Configuration](./configuration.md)
+1.  **Environment Setup:** Use `npm install` to prepare your local environment.
+2.  **Runtime Flexibility:** Choose `npm run dev` for Bun or `npm run dev:node` for Node.js based on your local setup.
+3.  **Build Management:** Use `npm run build` to compile TypeScript, or `npm run build:watch` for continuous development.
+4.  **Code Quality:** Maintain the codebase using `npm run lint` and `npm run format` before pushing changes.
+5.  **Configuration:** Customize application behavior by editing `src/config/user-settings.ts`.
