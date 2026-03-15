@@ -69,7 +69,7 @@ src/
 ├── deploy               # Cloud deployment (2 files)
 ├── desktop              # Desktop (1 files)
 ├── desktop-automation   # Desktop automation (12 files)
-├── docs                 # Documentation generation (2 files)
+├── docs                 # Documentation generation (3 files)
 ├── doctor               # Doctor (1 files)
 ├── elevated-mode        # Elevated mode (1 files)
 ├── email                # Email (4 files)
@@ -185,3 +185,9 @@ src/
 - Add metadata in `src/tools/metadata.ts`
 - Add channels in `src/channels/`
 - Add plugins in `src/plugins/`
+
+---
+
+**See also:** [Overview](./1-overview.md) · [Architecture](./2-architecture.md) · [Subsystems](./3-subsystems.md) · [Tool System](./5-tools.md)
+
+**Key source files:** `src/tools/.ts`, `src/tools/registry/.ts`, `src/tools/metadata.ts`, `src/channels/.ts`, `src/plugins/.ts`

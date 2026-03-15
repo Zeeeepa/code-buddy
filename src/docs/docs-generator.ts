@@ -213,8 +213,79 @@ export async function generateDocs(
     errors,
   };
 
+  // Post-processing: add cross-links and source citations to all files
+  addCrossLinksAndCitations(outputDir, files, graph);
+
   logger.info(`Docs generated: ${files.length} files in ${result.durationMs}ms, ${result.entityCount} entities`);
   return result;
+}
+
+/**
+ * Post-process: add cross-links ("See also") and source citations to each section.
+ */
+function addCrossLinksAndCitations(
+  outputDir: string,
+  files: string[],
+  graph: KnowledgeGraph,
+): void {
+  const sectionMap: Record<string, { file: string; title: string; keywords: string[] }> = {
+    'overview': { file: '1-overview.md', title: 'Overview', keywords: ['project', 'stats', 'capabilities'] },
+    'architecture': { file: '2-architecture.md', title: 'Architecture', keywords: ['agent', 'executor', 'layer', 'flow'] },
+    'subsystems': { file: '3-subsystems.md', title: 'Subsystems', keywords: ['community', 'cluster', 'module'] },
+    'metrics': { file: '4-metrics.md', title: 'Code Quality', keywords: ['dead code', 'coupling', 'refactoring'] },
+    'tools': { file: '5-tools.md', title: 'Tool System', keywords: ['tool', 'registry', 'RAG'] },
+    'security': { file: '6-security.md', title: 'Security', keywords: ['security', 'validation', 'permission', 'sandbox'] },
+    'context': { file: '7-context-memory.md', title: 'Context & Memory', keywords: ['context', 'compression', 'memory', 'token'] },
+    'config': { file: '8-configuration.md', title: 'Configuration', keywords: ['config', 'environment', 'settings'] },
+    'api': { file: '9-api-reference.md', title: 'API Reference', keywords: ['CLI', 'command', 'endpoint', 'API'] },
+    'dev': { file: '10-development.md', title: 'Development Guide', keywords: ['getting started', 'test', 'convention'] },
+  };
+
+  for (const file of files) {
+    if (file === 'index.md' || file.startsWith('11-')) continue;
+    const filePath = path.join(outputDir, file);
+    if (!fs.existsSync(filePath)) continue;
+
+    let content = fs.readFileSync(filePath, 'utf-8');
+    const contentLower = content.toLowerCase();
+
+    // Find related sections based on keyword overlap
+    const related: string[] = [];
+    for (const [key, meta] of Object.entries(sectionMap)) {
+      if (meta.file === file) continue;
+      if (meta.keywords.some(kw => contentLower.includes(kw))) {
+        related.push(`[${meta.title}](./${meta.file})`);
+      }
+    }
+
+    // Add "See also" footer
+    if (related.length > 0) {
+      content += `\n\n---\n\n**See also:** ${related.slice(0, 4).join(' · ')}\n`;
+    }
+
+    // Add source citations: find module names in content and link them
+    const modulePattern = /`(src\/[a-z0-9/.-]+)`/g;
+    let match;
+    const citedModules = new Set<string>();
+    while ((match = modulePattern.exec(content)) !== null) {
+      const mod = match[1].replace(/\.ts$/, '');
+      if (!citedModules.has(mod)) {
+        // Verify module exists in graph
+        const entity = graph.findEntity(mod);
+        if (entity) {
+          citedModules.add(mod);
+        }
+      }
+    }
+
+    // Add key source files footer if any citations found
+    if (citedModules.size > 0) {
+      const sourceList = [...citedModules].slice(0, 8).map(m => `\`${m}.ts\``).join(', ');
+      content += `\n**Key source files:** ${sourceList}\n`;
+    }
+
+    fs.writeFileSync(filePath, content);
+  }
 }
 
 // ============================================================================

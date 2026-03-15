@@ -92,27 +92,41 @@ async function handleGenerateWithLLM(): Promise<DocsCommandResult> {
     const rawResult = await handleGenerate(false, false);
     if (!rawResult.success) return rawResult;
 
-    // Step 2: Set up LLM client for enrichment
-    const { CodeBuddyClient } = await import('../../codebuddy/client.js');
+    // Step 2: Set up LLM client for enrichment (use OpenAI SDK directly for reliability)
     const apiKey = process.env.GROK_API_KEY || process.env.GOOGLE_API_KEY || process.env.OPENAI_API_KEY || '';
     if (!apiKey) {
       return {
         output: rawResult.output + '\n\n(LLM enrichment skipped — no API key. Set GROK_API_KEY, GOOGLE_API_KEY, or OPENAI_API_KEY.)',
-        success: true, // Raw docs were still generated
+        success: true,
       };
     }
-    const model = process.env.GROK_MODEL || process.env.GEMINI_MODEL || 'grok-3-latest';
-    const baseURL = process.env.GROK_BASE_URL || undefined;
-    const client = new CodeBuddyClient(apiKey, model, baseURL);
+
+    // Determine model and base URL
+    let model = process.env.GROK_MODEL || 'grok-3-latest';
+    let baseURL = process.env.GROK_BASE_URL || 'https://api.x.ai/v1';
+    if (process.env.GOOGLE_API_KEY && !process.env.GROK_API_KEY) {
+      model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+      baseURL = 'https://generativelanguage.googleapis.com/v1beta/openai/';
+    }
+    if (process.env.OPENAI_API_KEY && !process.env.GROK_API_KEY && !process.env.GOOGLE_API_KEY) {
+      model = 'gpt-4o-mini';
+      baseURL = 'https://api.openai.com/v1';
+    }
+
+    // Use OpenAI SDK directly (avoids CodeBuddyClient's native Gemini routing issue)
+    const OpenAI = (await import('openai')).default;
+    const openaiClient = new OpenAI({ apiKey, baseURL });
 
     const llmCall = async (systemPrompt: string, userPrompt: string): Promise<string> => {
-      const response = await client.chat(
-        [
+      const response = await openaiClient.chat.completions.create({
+        model,
+        messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        [],
-      );
+        max_tokens: 3000,
+        temperature: 0.3,
+      });
       return response.choices[0]?.message?.content ?? '';
     };
 

@@ -109,8 +109,8 @@ export async function enrichDocs(options: EnrichOptions): Promise<EnrichResult> 
       const enriched = await options.llmCall(ENRICHER_SYSTEM_PROMPT, prompt);
       tokensUsed += Math.ceil((prompt.length + enriched.length) / 4);
 
-      // Validate: enriched should be longer than raw (we're adding, not removing)
-      if (enriched.length >= rawContent.length * 0.8) {
+      // Validate: enriched should be at least 50% of raw (LLM may compress large tables)
+      if (enriched.length >= rawContent.length * 0.5 && enriched.length > 200) {
         fs.writeFileSync(filePath, enriched);
         filesEnriched++;
 

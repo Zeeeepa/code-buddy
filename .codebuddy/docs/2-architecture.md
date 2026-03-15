@@ -1,8 +1,12 @@
 # Architecture
 
-The project follows a layered architecture with a central agent orchestrator coordinating all interactions between user interfaces, LLM providers, tools, and infrastructure services.
+This document outlines the high-level architecture of the project, detailing its layered structure, core components, and the flow of execution. Understanding this architecture is crucial for comprehending how the system processes user requests, interacts with various services, and maintains robustness and extensibility.
 
 ## System Layers
+
+The system is organized into distinct layers, each responsible for a specific set of functionalities. This layered approach promotes modularity, separation of concerns, and easier maintenance and scalability. The following diagram illustrates the primary interaction pathways between these high-level components.
+
+The `User Interfaces` layer (`UI`) encompasses all external interaction points, from command-line interfaces to chat UIs and voice channels. These interfaces communicate directly with the `Core Agent` layer, which is the brain of the system, primarily embodied by the `CodeBuddyAgent` and its `AgentExecutor`. The `Core Agent` orchestrates interactions with the `Tool Ecosystem` for executing actions, and the `Context & Memory` layer for managing conversational state and knowledge. Both `Tools` and `Context` rely on the `Infrastructure` layer for underlying services and the `Security` layer for ensuring safe operations.
 
 ```mermaid
 graph TD
@@ -21,6 +25,10 @@ graph TD
 ```
 
 ## Core Module Dependencies
+
+Delving deeper into the `Core Agent` layer, this section visualizes the intricate dependencies between key modules, particularly those centered around the `src/agent/codebuddy-agent.ts` module. This detailed view helps in understanding the internal structure and interconnections of the agent's core logic and its extensive middleware ecosystem.
+
+The diagram highlights `src/agent/codebuddy-agent.ts` (M0) as the central orchestrator, importing various middleware modules (`src/middleware/`) for pre- and post-processing, `src/knowledge/knowledge-manager.ts` for accessing knowledge, and `src/planner/` components for strategic decision-making. Other modules, such as `src/dev/index.ts` and `src/handlers/channel-handlers.ts`, also depend on the core agent, demonstrating its pervasive role across the system. This complex web of dependencies underscores the agent's central position in managing diverse functionalities.
 
 ```mermaid
 graph LR
@@ -136,11 +144,12 @@ graph LR
     M74 -->|imports| M29
     M75 -->|imports| M29
     M76 -->|imports| M29
-    M77 -->|imports| M29
     style M0 fill:#f9f,stroke:#333,stroke-width:2px
 ```
 
 ## Layer Breakdown
+
+This table provides a quantitative breakdown of the project's codebase by logical layer, indicating the number of modules within each primary directory. This overview helps identify areas of significant development, core functionalities, and potential areas for further modularization or optimization. The `src/agent/` and `src/tools/` directories, for instance, represent the core intelligence and action capabilities of the system.
 
 | Layer | Modules | Description |
 |-------|---------|-------------|
@@ -170,18 +179,13 @@ graph LR
 | `src/advanced/` | 8 | Advanced |
 | `src/daemon/` | 8 | Background daemon service |
 
-## Core Agent Flow
+### Key Methods for Core Agent (`src/agent/`)
 
-```
-User Input → CLI/Chat/Voice/Channel
-  → CodeBuddyAgent.processUserMessage()
-    → AgentExecutor (ReAct loop)
-      1. RAG Tool Selection (~15 from 110+)
-      2. Context Injection (lessons, decisions, graph)
-      3. Middleware Before-Turn (cost, turn limit, reasoning)
-      4. LLM Call (multi-provider)
-      5. Tool Execution (parallel read / serial write)
-      6. Result Processing (masking, TTL, compaction)
-      7. Middleware After-Turn (auto-repair, metrics)
-      8. Loop or Return
-```
+The `src/agent/` directory houses the core logic for the `CodeBuddyAgent` and its `AgentExecutor`. These methods are fundamental to how the agent processes requests, makes decisions, and interacts with the environment.
+
+| Method | Purpose |
+|---|---|
+| `CodeBuddyAgent.processUserMessage(message: string, context: AgentContext)` | Initiates the agent's response to a user message, orchestrating the entire ReAct loop from input parsing to final output. |
+| `AgentExecutor.execute(plan: AgentPlan, tools: Tool[])` | Manages the iterative execution of agent steps, including tool selection, context injection, LLM calls, and result processing. |
+| `AgentExecutor.selectTools(query: string)` | Dynamically selects the most relevant tools from the available `src/tools/` ecosystem based on the current user query and conversational context. |
+| `AgentExecutor.injectContext(context: AgentContext)` | Incorporates relevant historical context, learned lessons, and knowledge graph data from `src/context/` and `src/knowledge/` into the current prompt for the LLM

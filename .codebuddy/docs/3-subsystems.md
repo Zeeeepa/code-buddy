@@ -1,6 +1,6 @@
 # Subsystems
 
-Detected **42** architectural subsystems (modularity: 0.732)
+Detected **44** architectural subsystems (modularity: 0.741)
 
 ## src (16 modules)
 
@@ -30,26 +30,27 @@ graph TD
     style N0 fill:#f9f,stroke:#333,stroke-width:2px
 ```
 
-## src (49 modules)
+## src (51 modules)
 
-- **src/codebuddy/client** (rank: 0.018, 22 functions)
 - **src/agent/codebuddy-agent** (rank: 0.013, 65 functions)
-- **src/optimization/cache-breakpoints** (rank: 0.010, 3 functions)
-- **src/agent/extended-thinking** (rank: 0.010, 8 functions)
 - **src/channels/index** (rank: 0.007, 0 functions)
-- **src/agent/repo-profiling/cartography** (rank: 0.007, 11 functions)
-- **src/agent/repo-profiler** (rank: 0.005, 13 functions)
 - **src/utils/confirmation-service** (rank: 0.005, 21 functions)
-- **src/commands/dev/workflows** (rank: 0.005, 3 functions)
 - **src/agent/specialized/agent-registry** (rank: 0.005, 29 functions)
-- ... and 39 more
+- **src/agent/thinking/extended-thinking** (rank: 0.005, 30 functions)
+- **src/tools/registry** (rank: 0.004, 10 functions)
+- **src/skills/hub** (rank: 0.004, 27 functions)
+- **src/skills/registry** (rank: 0.004, 27 functions)
+- **src/analytics/tool-analytics** (rank: 0.003, 23 functions)
+- **src/agent/repair/fault-localization** (rank: 0.003, 17 functions)
+- ... and 41 more
 
 ```mermaid
 graph TD
-    N0[["hasToolCalls"]]
-    N1["ChunkHandler.hasToolCalls"]
-    N0 --> N0
-    N1 --> N0
+    N0[["CodeBuddyAgent.initializeMemory"]]
+    N1["initializeMemory"]
+    N0 --> N1
+    N1 --> N1
+    N1 --> N2
     style N0 fill:#f9f,stroke:#333,stroke-width:2px
 ```
 
@@ -67,47 +68,124 @@ graph TD
     style N0 fill:#f9f,stroke:#333,stroke-width:2px
 ```
 
-## src (32 modules)
+## src (7 modules)
 
-- **src/memory/enhanced-memory** (rank: 0.009, 28 functions)
-- **src/tools/screenshot-tool** (rank: 0.006, 20 functions)
-- **src/deploy/cloud-configs** (rank: 0.005, 10 functions)
-- **src/memory/coding-style-analyzer** (rank: 0.004, 11 functions)
-- **src/memory/decision-memory** (rank: 0.004, 10 functions)
-- **src/knowledge/knowledge-graph** (rank: 0.004, 25 functions)
-- **src/tools/ocr-tool** (rank: 0.003, 12 functions)
-- **src/deploy/nix-config** (rank: 0.003, 3 functions)
-- **src/personas/persona-manager** (rank: 0.003, 22 functions)
-- **src/utils/settings-manager** (rank: 0.003, 32 functions)
-- ... and 22 more
+- **src/context/jit-context** (rank: 0.002, 2 functions)
+- **src/context/tool-output-masking** (rank: 0.002, 3 functions)
+- **src/context/workspace-context** (rank: 0.002, 4 functions)
+- **src/knowledge/code-graph-context-provider** (rank: 0.002, 9 functions)
+- **src/knowledge/graph-updater** (rank: 0.002, 1 functions)
+- **src/observability/tool-metrics** (rank: 0.002, 9 functions)
+- **src/agent/execution/agent-executor** (rank: 0.002, 25 functions)
 
 ```mermaid
 graph TD
-    N0[["EnhancedMemory.initialize"]]
-    N1["EnhancedMemory.loadMemories"]
-    N2["EnhancedMemory.loadProjects"]
-    N3["EnhancedMemory.loadUserProfile"]
-    N4["EnhancedMemory.loadSummaries"]
-    N5["EnhancedMemory.applyDecay"]
+    N0[["clearJitCache"]]
+    N0 --> N0
+    style N0 fill:#f9f,stroke:#333,stroke-width:2px
+```
+
+## src (14 modules)
+
+- **src/codebuddy/client** (rank: 0.017, 22 functions)
+- **src/optimization/cache-breakpoints** (rank: 0.010, 3 functions)
+- **src/agent/extended-thinking** (rank: 0.010, 8 functions)
+- **src/interpreter/computer/browser** (rank: 0.003, 15 functions)
+- **src/interpreter/computer/files** (rank: 0.003, 33 functions)
+- **src/interpreter/computer/os** (rank: 0.003, 9 functions)
+- **src/commands/research/index** (rank: 0.002, 3 functions)
+- **src/agent/prompt-suggestions** (rank: 0.002, 10 functions)
+- **src/hooks/advanced-hooks** (rank: 0.002, 18 functions)
+- **src/hooks/smart-hooks** (rank: 0.002, 10 functions)
+- ... and 4 more
+
+```mermaid
+graph TD
+    N0[["hasToolCalls"]]
+    N1["ChunkHandler.hasToolCalls"]
+    N0 --> N0
+    N1 --> N0
+    style N0 fill:#f9f,stroke:#333,stroke-width:2px
+```
+
+## src (2 modules)
+
+- **src/agent/flow/planning-flow** (rank: 0.003, 12 functions)
+- **src/commands/flow** (rank: 0.002, 2 functions)
+
+```mermaid
+graph TD
+    N0[["PlanningFlow.plan"]]
+    N1["registerDevCommands"]
+    N2["registerAgentTools"]
+    N3["getBaseSystemPrompt"]
+    N4["addLazyCommandGroup"]
+    N5["CodeBuddyMCPServer.registerAgentTools"]
+    N6["getSystemPromptForMode"]
+    N0 --> N0
+    N1 --> N0
+    N2 --> N0
+    N3 --> N0
+    N1 --> N1
+    N4 --> N1
+    N2 --> N2
+    N5 --> N2
+    N6 --> N3
+    style N0 fill:#f9f,stroke:#333,stroke-width:2px
+```
+
+## src (12 modules)
+
+- **src/tools/screenshot-tool** (rank: 0.006, 20 functions)
+- **src/deploy/cloud-configs** (rank: 0.005, 10 functions)
+- **src/browser-automation/index** (rank: 0.004, 0 functions)
+- **src/desktop-automation/index** (rank: 0.003, 0 functions)
+- **src/tools/ocr-tool** (rank: 0.003, 12 functions)
+- **src/agent/middleware/auto-observation** (rank: 0.003, 6 functions)
+- **src/deploy/nix-config** (rank: 0.003, 3 functions)
+- **src/tools/computer-control-tool** (rank: 0.003, 78 functions)
+- **src/tools/deploy-tool** (rank: 0.003, 8 functions)
+- **src/tools/registry/misc-tools** (rank: 0.002, 51 functions)
+- ... and 2 more
+
+```mermaid
+graph TD
+    N0[["ScreenshotTool.capture"]]
+    N1["ScreenshotTool.captureMacOS"]
+    N2["ScreenshotTool.isWSL"]
+    N3["ScreenshotTool.captureWSL"]
+    N4["ScreenshotTool.captureLinux"]
+    N5["ScreenshotTool.captureWindows"]
+    N6["ScreenshotTool.normalizeForLLM"]
+    N7["ScreenshotTool.formatResult"]
+    N8["getErrorMessage"]
+    N9["ScreenshotTool.captureWindow"]
+    N10["ScreenshotTool.captureRegion"]
+    N11["ScreenshotTool.captureDelayed"]
     N0 --> N1
     N0 --> N2
     N0 --> N3
     N0 --> N4
     N0 --> N5
-    N2 --> N2
-    N2 --> N6
+    N0 --> N6
+    N0 --> N7
+    N0 --> N8
+    N1 --> N1
+    N1 --> N12
     N3 --> N3
+    N4 --> N4
     N5 --> N5
-    N5 --> N7
-    N5 --> N8
+    N5 --> N12
+    N6 --> N6
+    N6 --> N13
+    N8 --> N8
+    N9 --> N0
+    N10 --> N0
+    N11 --> N0
+    N9 --> N9
+    N10 --> N10
     style N0 fill:#f9f,stroke:#333,stroke-width:2px
 ```
-
-## src/agent (3 modules)
-
-- **src/agent/repair/fault-localization** (rank: 0.003, 17 functions)
-- **src/agent/repair/repair-engine** (rank: 0.003, 25 functions)
-- **src/agent/middleware/auto-repair-middleware** (rank: 0.003, 8 functions)
 
 ## src (20 modules)
 
@@ -146,80 +224,81 @@ graph TD
 - **src/agent/observer/screen-observer** (rank: 0.003, 9 functions)
 - **src/daemon/daemon-lifecycle** (rank: 0.002, 10 functions)
 
-## src (6 modules)
+## src (21 modules)
 
-- **src/agent/observer/trigger-registry** (rank: 0.003, 5 functions)
-- **src/daemon/index** (rank: 0.003, 0 functions)
-- **src/scheduler/cron-scheduler** (rank: 0.003, 27 functions)
-- **src/agent/observer/index** (rank: 0.002, 0 functions)
-- **src/daemon/service-installer** (rank: 0.002, 16 functions)
-- **src/commands/cli/daemon-commands** (rank: 0.002, 2 functions)
-
-## src (11 modules)
-
-- **src/skills/hub** (rank: 0.004, 27 functions)
-- **src/identity/identity-manager** (rank: 0.003, 12 functions)
-- **src/webhooks/webhook-manager** (rank: 0.003, 10 functions)
-- **src/auth/profile-manager** (rank: 0.003, 22 functions)
-- **src/channels/group-security** (rank: 0.003, 17 functions)
-- **src/daemon/heartbeat** (rank: 0.003, 12 functions)
-- **src/server/index** (rank: 0.002, 6 functions)
-- **src/agent/proactive/index** (rank: 0.002, 0 functions)
-- **src/analytics/prometheus-exporter** (rank: 0.002, 19 functions)
-- **src/channels/peer-routing** (rank: 0.002, 14 functions)
-- ... and 1 more
+- **src/memory/enhanced-memory** (rank: 0.009, 28 functions)
+- **src/memory/coding-style-analyzer** (rank: 0.004, 11 functions)
+- **src/memory/decision-memory** (rank: 0.004, 10 functions)
+- **src/personas/persona-manager** (rank: 0.003, 22 functions)
+- **src/utils/settings-manager** (rank: 0.003, 32 functions)
+- **src/agent/operating-modes** (rank: 0.002, 27 functions)
+- **src/config/model-tools** (rank: 0.002, 3 functions)
+- **src/context/bootstrap-loader** (rank: 0.002, 7 functions)
+- **src/context/precompaction-flush** (rank: 0.002, 6 functions)
+- **src/memory/auto-capture** (rank: 0.002, 15 functions)
+- ... and 11 more
 
 ```mermaid
 graph TD
-    N0[["computeChecksum"]]
-    N1["SkillsHub.install"]
-    N2["SkillsHub.installFromContent"]
-    N3["SkillsHub.publish"]
-    N4["SkillsHub.sync"]
-    N5["SkillsHub.info"]
-    N6["MigrationManager.computeChecksum"]
-    N7["SkillsHub.update"]
-    N8["registerHubCommands"]
-    N0 --> N0
-    N1 --> N0
-    N2 --> N0
-    N3 --> N0
-    N4 --> N0
-    N5 --> N0
-    N6 --> N0
-    N7 --> N1
+    N0[["EnhancedMemory.initialize"]]
+    N1["EnhancedMemory.loadMemories"]
+    N2["EnhancedMemory.loadProjects"]
+    N3["EnhancedMemory.loadUserProfile"]
+    N4["EnhancedMemory.loadSummaries"]
+    N5["EnhancedMemory.applyDecay"]
+    N0 --> N1
+    N0 --> N2
+    N0 --> N3
+    N0 --> N4
+    N0 --> N5
     N2 --> N2
-    N8 --> N3
+    N2 --> N6
     N3 --> N3
+    N5 --> N5
+    N5 --> N7
+    N5 --> N8
     style N0 fill:#f9f,stroke:#333,stroke-width:2px
 ```
 
 ## src (5 modules)
 
-- **src/skills/registry** (rank: 0.004, 27 functions)
-- **src/agent/reasoning/index** (rank: 0.003, 0 functions)
-- **src/security/permission-modes** (rank: 0.003, 19 functions)
-- **src/agent/tool-handler** (rank: 0.002, 23 functions)
-- **src/tools/skill-discovery-tool** (rank: 0.002, 2 functions)
+- **src/agent/repo-profiling/cartography** (rank: 0.007, 11 functions)
+- **src/agent/repo-profiler** (rank: 0.005, 13 functions)
+- **src/observability/run-store** (rank: 0.003, 21 functions)
+- **src/utils/init-project** (rank: 0.002, 7 functions)
+- **src/tools/registry/lessons-tools** (rank: 0.002, 22 functions)
 
 ```mermaid
 graph TD
-    N0[["SkillRegistry.load"]]
-    N1["SkillRegistry.loadTier"]
-    N2["SkillRegistry.startWatching"]
-    N3["SkillRegistry.reloadAll"]
+    N0[["runCartography"]]
+    N1["normalizeSrcDirs"]
+    N2["emptyResult"]
+    N3["walkAllFiles"]
+    N4["scanFileStats"]
+    N5["scanArchitecture"]
+    N6["scanCombined"]
+    N7["RepoProfiler.computeProfile"]
+    N8["RepoProfiler.refresh"]
+    N9["RepoProfiler.getProfile"]
+    N0 --> N0
     N0 --> N1
     N0 --> N2
+    N0 --> N3
+    N0 --> N4
+    N0 --> N5
+    N0 --> N6
     N1 --> N1
-    N1 --> N4
-    N1 --> N5
-    N1 --> N6
-    N1 --> N7
+    N1 --> N10
     N2 --> N2
-    N2 --> N4
-    N2 --> N8
-    N3 --> N0
     N3 --> N3
+    N4 --> N4
+    N5 --> N5
+    N5 --> N11
+    N6 --> N6
+    N6 --> N11
+    N7 --> N0
+    N8 --> N7
+    N9 --> N7
     style N0 fill:#f9f,stroke:#333,stroke-width:2px
 ```
 
@@ -498,19 +577,19 @@ graph TD
     style N0 fill:#f9f,stroke:#333,stroke-width:2px
 ```
 
-## src (32 modules)
+## src (29 modules)
 
 - **src/nodes/index** (rank: 0.004, 19 functions)
-- **src/providers/provider-manager** (rank: 0.004, 14 functions)
+- **src/observability/run-viewer** (rank: 0.004, 11 functions)
 - **src/talk-mode/providers/audioreader-tts** (rank: 0.004, 7 functions)
 - **src/utils/session-enhancements** (rank: 0.004, 22 functions)
-- **src/workflows/index** (rank: 0.003, 0 functions)
-- **src/workflows/pipeline** (rank: 0.003, 24 functions)
 - **src/commands/cli/approvals-command** (rank: 0.002, 9 functions)
 - **src/commands/cli/device-commands** (rank: 0.002, 1 functions)
 - **src/commands/cli/node-commands** (rank: 0.002, 1 functions)
 - **src/commands/cli/secrets-command** (rank: 0.002, 7 functions)
-- ... and 22 more
+- **src/commands/cli/speak-command** (rank: 0.002, 1 functions)
+- **src/commands/execpolicy** (rank: 0.002, 1 functions)
+- ... and 19 more
 
 ```mermaid
 graph TD
@@ -577,6 +656,27 @@ graph TD
     style N0 fill:#f9f,stroke:#333,stroke-width:2px
 ```
 
+## src/commands/dev (3 modules)
+
+- **src/commands/dev/workflows** (rank: 0.005, 3 functions)
+- **src/commands/dev/issue-pipeline** (rank: 0.003, 4 functions)
+- **src/commands/dev/index** (rank: 0.002, 2 functions)
+
+```mermaid
+graph TD
+    N0[["waitForConfirmation"]]
+    N1["runWorkflow"]
+    N2["MultiAgentSystem.runWorkflow"]
+    N3["registerDevCommands"]
+    N4["runIssuePipeline"]
+    N0 --> N0
+    N1 --> N0
+    N2 --> N1
+    N3 --> N1
+    N4 --> N1
+    style N0 fill:#f9f,stroke:#333,stroke-width:2px
+```
+
 ## src (5 modules)
 
 - **src/utils/interactive-setup** (rank: 0.002, 10 functions)
@@ -606,82 +706,38 @@ graph TD
     style N0 fill:#f9f,stroke:#333,stroke-width:2px
 ```
 
+## src (3 modules)
+
+- **src/workflows/index** (rank: 0.003, 0 functions)
+- **src/workflows/pipeline** (rank: 0.003, 24 functions)
+- **src/commands/pipeline** (rank: 0.002, 3 functions)
+
 ## src (2 modules)
 
-- **src/observability/run-viewer** (rank: 0.004, 11 functions)
-- **src/commands/run-cli/index** (rank: 0.002, 1 functions)
+- **src/providers/provider-manager** (rank: 0.004, 14 functions)
+- **src/commands/provider** (rank: 0.002, 6 functions)
 
 ```mermaid
 graph TD
-    N0[["eventIcon"]]
-    N1["formatEvent"]
-    N2["prettyTimeline"]
-    N3["tailRun"]
-    N4["StreamJsonFormatter.formatEvent"]
-    N0 --> N0
-    N1 --> N0
-    N1 --> N1
-    N2 --> N1
-    N3 --> N1
-    N4 --> N1
+    N0[["ProviderManager.registerProvider"]]
+    N1["ProviderManager.createProvider"]
+    N0 --> N1
     style N0 fill:#f9f,stroke:#333,stroke-width:2px
 ```
 
-## src (16 modules)
+## src (14 modules)
 
-- **src/embeddings/embedding-provider** (rank: 0.005, 20 functions)
 - **src/knowledge/path** (rank: 0.005, 0 functions)
 - **src/knowledge/community-detection** (rank: 0.004, 5 functions)
 - **src/knowledge/graph-analytics** (rank: 0.004, 4 functions)
-- **src/search/usearch-index** (rank: 0.003, 33 functions)
+- **src/knowledge/knowledge-graph** (rank: 0.004, 25 functions)
 - **src/knowledge/mermaid-generator** (rank: 0.003, 7 functions)
 - **src/knowledge/code-graph-deep-populator** (rank: 0.003, 8 functions)
-- **src/docs/docs-generator** (rank: 0.002, 17 functions)
-- **src/docs/llm-docs-generator** (rank: 0.002, 10 functions)
+- **src/docs/docs-generator** (rank: 0.003, 18 functions)
+- **src/docs/llm-enricher** (rank: 0.003, 1 functions)
 - **src/tools/registry/code-graph-tools** (rank: 0.002, 7 functions)
-- ... and 6 more
-
-```mermaid
-graph TD
-    N0[["EmbeddingProvider.initialize"]]
-    N1["EmbeddingProvider.doInitialize"]
-    N2["EmbeddingProvider.embed"]
-    N3["EmbeddingProvider.embedBatch"]
-    N0 --> N1
-    N1 --> N1
-    N1 --> N4
-    N2 --> N0
-    N3 --> N0
-    style N0 fill:#f9f,stroke:#333,stroke-width:2px
-```
-
-## src (6 modules)
-
-- **src/context/bootstrap-loader** (rank: 0.002, 7 functions)
-- **src/prompts/variation-injector** (rank: 0.002, 4 functions)
-- **src/prompts/workflow-rules** (rank: 0.002, 1 functions)
-- **src/rules/rules-loader** (rank: 0.002, 10 functions)
-- **src/skills/index** (rank: 0.002, 8 functions)
-- **src/services/prompt-builder** (rank: 0.002, 2 functions)
-
-```mermaid
-graph TD
-    N0[["BootstrapLoader.load"]]
-    N1["BootstrapLoader.loadFile"]
-    N2["BootstrapLoader.containsDangerousPatterns"]
-    N3["BootstrapLoader.loadHierarchical"]
-    N0 --> N1
-    N0 --> N2
-    N0 --> N3
-    N1 --> N4
-    N2 --> N2
-    N3 --> N3
-    N3 --> N5
-    N3 --> N6
-    N3 --> N4
-    N3 --> N2
-    style N0 fill:#f9f,stroke:#333,stroke-width:2px
-```
+- **src/knowledge/graph-drift** (rank: 0.002, 5 functions)
+- ... and 4 more
 
 ## src (5 modules)
 
@@ -761,6 +817,27 @@ graph TD
     style N0 fill:#f9f,stroke:#333,stroke-width:2px
 ```
 
+## src (4 modules)
+
+- **src/embeddings/embedding-provider** (rank: 0.005, 20 functions)
+- **src/search/usearch-index** (rank: 0.003, 33 functions)
+- **src/knowledge/graph-embeddings** (rank: 0.002, 4 functions)
+- **src/memory/hybrid-search** (rank: 0.002, 20 functions)
+
+```mermaid
+graph TD
+    N0[["EmbeddingProvider.initialize"]]
+    N1["EmbeddingProvider.doInitialize"]
+    N2["EmbeddingProvider.embed"]
+    N3["EmbeddingProvider.embedBatch"]
+    N0 --> N1
+    N1 --> N1
+    N1 --> N4
+    N2 --> N0
+    N3 --> N0
+    style N0 fill:#f9f,stroke:#333,stroke-width:2px
+```
+
 ## src (3 modules)
 
 - **src/voice/voice-activity** (rank: 0.003, 13 functions)
@@ -779,29 +856,6 @@ graph TD
     N1 --> N1
     N2 --> N2
     N3 --> N3
-    style N0 fill:#f9f,stroke:#333,stroke-width:2px
-```
-
-## src/interpreter/computer (4 modules)
-
-- **src/interpreter/computer/browser** (rank: 0.003, 15 functions)
-- **src/interpreter/computer/files** (rank: 0.003, 33 functions)
-- **src/interpreter/computer/os** (rank: 0.003, 9 functions)
-- **src/interpreter/computer/skills** (rank: 0.002, 25 functions)
-
-```mermaid
-graph TD
-    N0[["ComputerBrowser.search"]]
-    N1["ComputerBrowser.getCacheKey"]
-    N2["ComputerBrowser.searchSerper"]
-    N3["ComputerBrowser.searchDuckDuckGo"]
-    N4["ComputerBrowser.setCache"]
-    N0 --> N1
-    N0 --> N2
-    N0 --> N3
-    N0 --> N4
-    N3 --> N5
-    N4 --> N4
     style N0 fill:#f9f,stroke:#333,stroke-width:2px
 ```
 
@@ -936,27 +990,32 @@ graph TD
 
 ```mermaid
 graph LR
-  subgraph C15["src (49 modules)"]
+  subgraph C15["src (51 modules)"]
     N0["agent/codebuddy-agent"]
-    N1["agent/extended-thinking"]
-    N2["flow/planning-flow"]
-    N3["middleware/auto-observation"]
-    N4["middleware/context-warning"]
-    N5["middleware/cost-limit"]
-    more_15["+43 more"]
+    N1["middleware/auto-repair-middleware"]
+    N2["middleware/context-warning"]
+    N3["middleware/cost-limit"]
+    N4["middleware/index"]
+    N5["middleware/quality-gate-middleware"]
+    more_15["+45 more"]
   end
-  subgraph C19["src (32 modules)"]
-    N6["execution/agent-executor"]
-    more_19["+31 more"]
+  subgraph C186["src (29 modules)"]
+    N6["cli/approvals-command"]
+    more_186["+28 more"]
   end
-  C146 -->|"6 imports"| C145
-  C185 -->|"6 imports"| C15
-  C185 -->|"3 imports"| C65
-  C146 -->|"2 imports"| C15
-  C19 -->|"2 imports"| C15
-  C227 -->|"2 imports"| C19
-  C185 -->|"2 imports"| C221
-  C185 -->|"2 imports"| C17
-  C185 -->|"2 imports"| C181
-  C65 -->|"2 imports"| C57
+  C186 -->|"7 imports"| C15
+  C147 -->|"6 imports"| C146
+  C19 -->|"3 imports"| C59
+  C102 -->|"3 imports"| C230
+  C147 -->|"2 imports"| C15
+  C186 -->|"2 imports"| C223
+  C186 -->|"2 imports"| C17
+  C186 -->|"2 imports"| C182
+  C59 -->|"2 imports"| C15
+  C15 -->|"1 imports"| C42
 ```
+
+
+---
+
+**See also:** [Overview](./1-overview.md) · [Architecture](./2-architecture.md) · [Tool System](./5-tools.md) · [Security](./6-security.md)
