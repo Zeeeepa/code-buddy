@@ -212,6 +212,59 @@ export class ContextManagerV2 {
   }
 
   /**
+   * Get a breakdown of context budget usage per layer.
+   * Useful for diagnosing which layer consumes the most context.
+   */
+  getContextBudgetBreakdown(messages: CodeBuddyMessage[]): Record<string, { chars: number; tokens: number; percent: number }> {
+    const layers: Record<string, number> = {
+      system: 0,
+      lessons: 0,
+      decisions: 0,
+      code_graph: 0,
+      tool_results: 0,
+      user_messages: 0,
+      assistant_messages: 0,
+      other: 0,
+    };
+
+    for (const msg of messages) {
+      const content = typeof msg.content === 'string' ? msg.content : '';
+      const chars = content.length;
+
+      if (msg.role === 'system') {
+        if (content.includes('<lessons_context>')) layers.lessons += chars;
+        else if (content.includes('<decisions_context>')) layers.decisions += chars;
+        else if (content.includes('code_graph')) layers.code_graph += chars;
+        else layers.system += chars;
+      } else if (msg.role === 'tool') {
+        layers.tool_results += chars;
+      } else if (msg.role === 'user') {
+        layers.user_messages += chars;
+      } else if (msg.role === 'assistant') {
+        layers.assistant_messages += chars;
+      } else {
+        layers.other += chars;
+      }
+    }
+
+    const totalChars = Object.values(layers).reduce((a, b) => a + b, 0);
+    const totalTokens = this.countTokens(messages);
+    const result: Record<string, { chars: number; tokens: number; percent: number }> = {};
+
+    for (const [layer, chars] of Object.entries(layers)) {
+      if (chars === 0) continue;
+      const proportion = totalChars > 0 ? chars / totalChars : 0;
+      result[layer] = {
+        chars,
+        tokens: Math.round(totalTokens * proportion),
+        percent: Math.round(proportion * 100),
+      };
+    }
+
+    return result;
+  }
+
+  /**
    * Prepare messages for API call, managing context as needed
    * Returns optimized message array that fits within token limits
    *

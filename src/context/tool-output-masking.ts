@@ -172,3 +172,72 @@ export function applyToolOutputMasking(messages: CodeBuddyMessage[]): number {
 
   return masked;
 }
+
+// ============================================================================
+// TTL-Based Tool Result Expiry (DeepWiki Gap #5)
+// ============================================================================
+
+/**
+ * Age-based relevance decay for tool results.
+ *
+ * Tool results older than `maxAgeTurns` are progressively compressed:
+ * - 50-75% age: truncated to head/tail preview
+ * - 75-100% age: replaced with one-line stub
+ * - >100% age: removed entirely
+ *
+ * @param messages - Mutable message array
+ * @param currentTurn - Current tool round number
+ * @param maxAgeTurns - Maximum age before full removal (default 20)
+ * @returns Number of results expired
+ */
+export function expireOldToolResults(
+  messages: CodeBuddyMessage[],
+  currentTurn: number,
+  maxAgeTurns: number = 20,
+): number {
+  let expired = 0;
+
+  // Assign approximate turn numbers based on position
+  // Each assistant+tool pair ≈ 1 turn
+  let turnEstimate = 0;
+  const turnMap = new Map<number, number>(); // message index → estimated turn
+
+  for (let i = 0; i < messages.length; i++) {
+    if (messages[i].role === 'assistant') turnEstimate++;
+    turnMap.set(i, turnEstimate);
+  }
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    if (msg.role !== 'tool' || typeof msg.content !== 'string') continue;
+    if (msg.content.includes(MASKING_TAG)) continue; // Already masked
+
+    const msgTurn = turnMap.get(i) ?? 0;
+    const age = currentTurn - msgTurn;
+
+    if (age <= maxAgeTurns * 0.5) continue; // Fresh enough
+
+    if (age > maxAgeTurns) {
+      // Full removal: replace with stub
+      msg.content = `[Tool result expired: age ${age} turns > ${maxAgeTurns} limit]`;
+      expired++;
+    } else if (age > maxAgeTurns * 0.75) {
+      // Heavy compression: one-line summary
+      const firstLine = msg.content.split('\n')[0]?.substring(0, 100) ?? '';
+      msg.content = `[Aged tool result (${age} turns): ${firstLine}...]`;
+      expired++;
+    } else {
+      // Moderate compression: head/tail preview
+      if (msg.content.length > 500) {
+        msg.content = generatePreview(msg.content);
+        expired++;
+      }
+    }
+  }
+
+  if (expired > 0) {
+    logger.debug(`Tool result TTL: expired ${expired} results (currentTurn=${currentTurn}, maxAge=${maxAgeTurns})`);
+  }
+
+  return expired;
+}

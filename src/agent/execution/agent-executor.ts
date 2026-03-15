@@ -278,10 +278,28 @@ export class AgentExecutor {
   }
 
   /**
+   * Compute adaptive compaction threshold based on the model's context window.
+   * Reserves ~30% of context for tool results; rest for system prompt + history.
+   * Falls back to 70K chars if model info unavailable.
+   */
+  private getAdaptiveCompactionThreshold(): number {
+    try {
+      const modelName = this.deps.client.getCurrentModel();
+      const { getModelToolConfig } = require('../../config/model-tools.js');
+      const config = getModelToolConfig(modelName);
+      const contextChars = (config.contextWindow ?? 128_000) * 4; // ~4 chars/token
+      // Allocate 30% of context window for tool results
+      return Math.max(40_000, Math.floor(contextChars * 0.3));
+    } catch {
+      return 70_000; // Fallback
+    }
+  }
+
+  /**
    * Tool Result Compaction Guard (OpenClaw / Manus AI #13)
    *
    * Before each model call, scan accumulated tool result messages.
-   * If their total size exceeds the threshold (default 70K chars ≈ ~17K tokens),
+   * If their total size exceeds an adaptive threshold (scaled to model context),
    * compress the oldest ones using RestorableCompressor — replacing full content
    * with a compact stub referencing the callId. The content remains restorable
    * via the `restore_context` tool.
@@ -290,8 +308,9 @@ export class AgentExecutor {
    */
   private compactLargeToolResults(
     preparedMessages: CodeBuddyMessage[],
-    maxToolResultChars = 70_000
+    maxToolResultChars?: number
   ): CodeBuddyMessage[] {
+    const threshold = maxToolResultChars ?? this.getAdaptiveCompactionThreshold();
     // Sum characters from tool result messages
     let totalToolChars = 0;
     for (const m of preparedMessages) {
@@ -300,12 +319,12 @@ export class AgentExecutor {
       }
     }
 
-    if (totalToolChars <= maxToolResultChars) return preparedMessages;
+    if (totalToolChars <= threshold) return preparedMessages;
 
     const compressor = getRestorableCompressor();
     // Compress oldest tool results first (front of the list)
     const result = [...preparedMessages];
-    let charsToFree = totalToolChars - maxToolResultChars;
+    let charsToFree = totalToolChars - threshold;
 
     for (let i = 0; i < result.length && charsToFree > 0; i++) {
       const m = result[i];
@@ -489,6 +508,16 @@ export class AgentExecutor {
         }
       }
 
+      // Pre-call cost estimation: warn if estimated cost would exceed limit
+      const estimatedInputTokens = this.deps.tokenCounter.countMessageTokens(
+        preparedMessages as Parameters<typeof this.deps.tokenCounter.countMessageTokens>[0]
+      );
+      if (estimatedInputTokens > 0) {
+        // Rough estimate: input cost + expected output cost (~1/4 of input)
+        const estimatedTotalTokens = estimatedInputTokens + Math.floor(estimatedInputTokens * 0.25);
+        logger.debug(`Pre-call cost estimate: ~${estimatedInputTokens} input tokens, ~${estimatedTotalTokens} total`);
+      }
+
       // Apply response constraint (Manus AI response prefill / tool_choice control)
       const activeConstraint = getResponseConstraintStack().current();
       const toolNames = tools.map(t => t.function.name);
@@ -585,7 +614,13 @@ export class AgentExecutor {
             const newIdx = newEntries.length;
             newEntries.push(toolCallEntry);
 
+            const _toolStartMs = Date.now();
             const result = await this.executeToolViaLane(toolCall);
+            // --- Per-tool metrics (DeepWiki gap #3) ---
+            try {
+              const { getToolMetricsTracker } = await import('../../observability/tool-metrics.js');
+              getToolMetricsTracker().record(toolCall.function.name, result.success, Date.now() - _toolStartMs);
+            } catch { /* metrics are optional */ }
 
             // --- Track file access for code graph context (incremental update) ---
             try {
@@ -704,9 +739,10 @@ export class AgentExecutor {
             this.config.recordSessionCost(inputTokens, totalOutputTokens);
           }
 
-          // Apply tool output masking (backward-scanned FIFO) before compaction
+          // Apply TTL-based tool result expiry + backward-scanned FIFO masking before compaction
           try {
-            const { applyToolOutputMasking } = await import('../../context/tool-output-masking.js');
+            const { applyToolOutputMasking, expireOldToolResults } = await import('../../context/tool-output-masking.js');
+            expireOldToolResults(messages, toolRounds);
             applyToolOutputMasking(messages);
           } catch { /* masking is optional */ }
 
@@ -1089,6 +1125,7 @@ export class AgentExecutor {
 
             // Use streaming execution for tools that support it (bash, reason)
             let result;
+            const _streamToolStartMs = Date.now();
             const STREAMING_TOOLS = ['bash', 'reason'];
             if (STREAMING_TOOLS.includes(toolCall.function.name)) {
               const gen = this.deps.toolHandler.executeToolStreaming(toolCall);
@@ -1115,6 +1152,12 @@ export class AgentExecutor {
             } else {
               result = await this.executeToolViaLane(toolCall);
             }
+
+            // --- Per-tool metrics (streaming path, DeepWiki gap #3) ---
+            try {
+              const { getToolMetricsTracker } = await import('../../observability/tool-metrics.js');
+              getToolMetricsTracker().record(toolCall.function.name, result.success, Date.now() - _streamToolStartMs);
+            } catch { /* metrics are optional */ }
 
             // --- Track file access for code graph context (streaming, incremental update) ---
             try {
