@@ -88,24 +88,18 @@ async function handleGenerate(noDiagrams: boolean, noMetrics: boolean): Promise<
 
 async function handleGenerateWithLLM(): Promise<DocsCommandResult> {
   try {
-    const { getKnowledgeGraph } = await import('../../knowledge/knowledge-graph.js');
-    const graph = getKnowledgeGraph();
+    // Step 1: Generate raw docs first (fast, no LLM needed)
+    const rawResult = await handleGenerate(false, false);
+    if (!rawResult.success) return rawResult;
 
-    if (graph.getStats().tripleCount === 0) {
-      try {
-        const { populateDeepCodeGraph } = await import('../../knowledge/code-graph-deep-populator.js');
-        const added = populateDeepCodeGraph(graph, process.cwd());
-        logger.info(`Docs LLM: populated code graph with ${added} triples`);
-      } catch (e) {
-        return { output: `Code graph empty: ${e}`, success: false };
-      }
-    }
-
-    // Get LLM client
+    // Step 2: Set up LLM client for enrichment
     const { CodeBuddyClient } = await import('../../codebuddy/client.js');
     const apiKey = process.env.GROK_API_KEY || process.env.GOOGLE_API_KEY || process.env.OPENAI_API_KEY || '';
     if (!apiKey) {
-      return { output: 'No API key available. Set GROK_API_KEY, GOOGLE_API_KEY, or OPENAI_API_KEY.', success: false };
+      return {
+        output: rawResult.output + '\n\n(LLM enrichment skipped — no API key. Set GROK_API_KEY, GOOGLE_API_KEY, or OPENAI_API_KEY.)',
+        success: true, // Raw docs were still generated
+      };
     }
     const model = process.env.GROK_MODEL || process.env.GEMINI_MODEL || 'grok-3-latest';
     const baseURL = process.env.GROK_BASE_URL || undefined;
@@ -122,20 +116,22 @@ async function handleGenerateWithLLM(): Promise<DocsCommandResult> {
       return response.choices[0]?.message?.content ?? '';
     };
 
-    const { generateLLMDocs } = await import('../../docs/llm-docs-generator.js');
-    const result = await generateLLMDocs(graph, {
+    // Step 3: Enrich raw docs with LLM prose
+    const docsDir = require('path').join(process.cwd(), '.codebuddy', 'docs');
+    const { enrichDocs } = await import('../../docs/llm-enricher.js');
+    const result = await enrichDocs({
+      docsDir,
       llmCall,
-      onProgress: (section, current, total) => {
-        logger.info(`Docs LLM: [${current}/${total}] ${section}`);
+      onProgress: (file, current, total) => {
+        logger.info(`Enriching [${current}/${total}] ${file}`);
       },
     });
 
     const output = [
-      `LLM Documentation generated in ${(result.durationMs / 1000).toFixed(1)}s:`,
-      `  Files: ${result.files.length} (${result.files.join(', ')})`,
-      `  Entities: ${result.entityCount}`,
+      `Documentation generated and enriched with LLM:`,
+      `  LLM enrichment: ${result.filesEnriched} files enriched in ${(result.durationMs / 1000).toFixed(1)}s`,
       `  Tokens used: ~${result.tokensUsed}`,
-      `  Knowledge file: ${result.knowledgeFilePath}`,
+      `  Knowledge file: ${result.knowledgePath}`,
       `  Output: .codebuddy/docs/`,
       result.errors.length > 0 ? `  Errors: ${result.errors.join('; ')}` : '',
     ].filter(Boolean).join('\n');
