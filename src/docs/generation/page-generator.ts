@@ -46,10 +46,11 @@ NEVER start with "This section details...". Use storytelling.`,
 
   'getting-started': `Generate a getting started guide:
 - Prerequisites (runtime, tools)
-- Installation steps (copy-paste commands)
-- Minimal working example
+- Installation steps (copy-paste commands from the scripts provided)
+- First run using the ACTUAL scripts from package.json (provided in context)
 - Common configuration options
-- "Next steps" links to deeper docs`,
+- "Next steps" links to deeper docs
+CRITICAL: Use ONLY the real npm scripts and commands from the context. Do NOT invent Express middleware, API routes, or import statements that don't exist.`,
 
   'key-concepts': `Generate a key concepts glossary:
 - 10-20 core concepts of this project
@@ -157,18 +158,13 @@ export async function generatePages(
       let content: string;
 
       if (llmCall) {
-        content = await generatePageWithLLM(page, profile, graph, config, llmCall);
+        content = await generatePageWithLLM(page, plan, profile, graph, config, llmCall);
       } else {
         content = generatePageRaw(page, profile, graph, config);
       }
 
-      // Add source file links header (DeepWiki style)
-      if (page.sourceFiles.length > 0 && config.repoUrl) {
-        const sourceLinks = page.sourceFiles.slice(0, 5).map(f =>
-          `- [${f}](${config.repoUrl}/blob/${config.commit || 'main'}/${f}.ts)`
-        ).join('\n');
-        content = content.replace(/^(# .+\n)/, `$1\n## Relevant source files\n${sourceLinks}\n\n`);
-      }
+      // Add DeepWiki-style source files block + Summary if missing
+      content = addDeepWikiStructure(content, page, config);
 
       const filePath = path.join(outputDir, `${page.slug}.md`);
       fs.writeFileSync(filePath, content);
@@ -195,6 +191,7 @@ export async function generatePages(
 
 async function generatePageWithLLM(
   page: DocPage,
+  plan: DocPlan,
   profile: ProjectProfile,
   graph: KnowledgeGraph,
   config: DocsConfig,
@@ -204,24 +201,44 @@ async function generatePageWithLLM(
   const context = buildPageContext(page, profile, graph, config);
   const thinkingLevel = THINKING_LEVELS[page.pageType];
 
-  const systemPrompt = `You are a senior technical writer documenting "${profile.name}".
+  const systemPrompt = `You are a senior technical writer documenting "${profile.name}" in DeepWiki style.
 
-Rules:
-- NEVER start two consecutive paragraphs the same way
-- Explain WHY before HOW
-- Use storytelling: "When X happens, the system does Y because Z"
-- Add ONE developer tip per section
-- Mermaid diagrams: max ${config.maxNodesPerDiagram} nodes
+MANDATORY STRUCTURE for every page:
+1. After the # title, add "For [concept], see [Page]." cross-links to 2-3 related pages
+2. After each ## section, add: **Sources:** [filename.ts:L1-L100](repo-link) citing the actual source files
+3. Mermaid diagrams: max ${config.maxNodesPerDiagram} nodes, use "quotes" for labels
+4. End with ## Summary section containing 3-5 key takeaways as numbered list
+
+CRITICAL RULES:
+- NEVER invent code examples, API signatures, or config options that don't exist in the context data
+- NEVER cite academic papers or external docs — only cite actual source files from the project
+- ONLY use function/class names that appear in the context data below
+- Explain WHY before HOW — use storytelling
+- ONE developer tip per section (max 3 per page)
 - Output complete markdown — your output IS the final page`;
+
+  // Build related page links for cross-references
+  const relatedLinks = page.relatedPages
+    .map(id => plan.pages.find(p => p.id === id))
+    .filter(Boolean)
+    .map(p => `[${p!.title}](./${p!.slug}.md)`)
+    .join(', ');
+
+  const repoBase = config.repoUrl ? `${config.repoUrl}/blob/${config.commit || 'main'}/` : '';
+  const sourceFilesList = page.sourceFiles.slice(0, 5).map(f => `${f}.ts → ${repoBase}${f}.ts`).join('\n');
 
   const userPrompt = `${template}
 
 Project: ${profile.name} (${profile.language}${profile.framework ? ', ' + profile.framework : ''})
 ${profile.metrics.totalModules} modules, ${profile.metrics.totalFunctions} functions
+Repo: ${config.repoUrl || 'local'}
 
 Page: "${page.title}" (${page.description})
+Related pages for cross-links: ${relatedLinks || 'none'}
+Source files to cite:
+${sourceFilesList || 'none'}
 
-Context data:
+Context data (ONLY use facts from this data, do NOT invent):
 ${context}
 
 Generate the full markdown page. Start with # ${page.title}`;
@@ -508,6 +525,17 @@ function buildPageContext(
     contextParts.push(`Patterns: ${profile.patterns.slice(0, 5).map(p => `${p.name}@${p.location}`).join(', ')}`);
   }
 
+  // Add scripts for getting-started page
+  if (page.pageType === 'getting-started') {
+    contextParts.push('');
+    contextParts.push('REAL npm scripts from package.json (use these, do NOT invent others):');
+    for (const [name, cmd] of Object.entries(profile.scripts).slice(0, 15)) {
+      contextParts.push(`  npm run ${name} → ${cmd}`);
+    }
+    contextParts.push(`Repo URL: ${profile.repoUrl || '<repo-url>'}`);
+    contextParts.push(`Project name: ${profile.name}`);
+  }
+
   // Add env vars for config page
   if (page.pageType === 'configuration') {
     contextParts.push('');
@@ -519,6 +547,45 @@ function buildPageContext(
   }
 
   return contextParts.join('\n').substring(0, 6000);
+}
+
+/**
+ * Add DeepWiki structural elements to a generated page:
+ * 1. <details>Relevant source files</details> after title
+ * 2. ## Summary with Key Takeaways at the bottom (if missing)
+ */
+function addDeepWikiStructure(content: string, page: DocPage, config: DocsConfig): string {
+  let result = content;
+  const repoBase = config.repoUrl ? `${config.repoUrl}/blob/${config.commit || 'main'}/` : '';
+
+  // 1. Add source files block after title
+  if (page.sourceFiles.length > 0) {
+    const sourceLinks = page.sourceFiles.slice(0, 8).map(f => {
+      const link = repoBase ? `[${f}.ts](${repoBase}${f}.ts)` : `\`${f}.ts\``;
+      return `- ${link}`;
+    }).join('\n');
+
+    const sourceBlock = [
+      '',
+      '<details>',
+      '<summary>Relevant source files</summary>',
+      '',
+      sourceLinks,
+      '',
+      '</details>',
+      '',
+    ].join('\n');
+
+    result = result.replace(/^(# .+\n)/, `$1${sourceBlock}`);
+  }
+
+  // 2. Add Summary if missing
+  if (!result.includes('## Summary') && !result.includes('## Key Takeaways')) {
+    result += '\n\n## Summary\n\n';
+    result += `The **${page.title}** ${page.description.toLowerCase()}.\n`;
+  }
+
+  return result;
 }
 
 function stripNoise(content: string): string {
