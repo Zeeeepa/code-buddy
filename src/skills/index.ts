@@ -31,6 +31,7 @@ export type {
   SkillRequirements as SkillMdRequirements,
 } from './types.js';
 export { parseSkillFile, validateSkill, serializeSkill } from './parser.js';
+export { isStarterPack, getStarterPacks, findStarterPack, findStarterByKeyword, resolveStarterAlias } from './starter-packs.js';
 export { SkillRegistry, getSkillRegistry, resetSkillRegistry } from './registry.js';
 export { SkillExecutor, getSkillExecutor, resetSkillExecutor } from './executor.js';
 export type { SkillExecutorConfig, ToolExecutorFn, CodeExecutorFn } from './executor.js';

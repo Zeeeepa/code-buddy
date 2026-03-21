@@ -35,15 +35,30 @@ jest.mock('../../src/utils/autonomy-manager', () => {
     enableYOLO: jest.fn(),
     disableYOLO: jest.fn(),
     updateYOLOConfig: jest.fn(),
-    addToYOLOAllowList: jest.fn(),
-    addToYOLODenyList: jest.fn(),
+    addToYOLOAllowList: jest.fn().mockReturnValue({ success: true }),
+    addToYOLODenyList: jest.fn().mockReturnValue({ success: true }),
     formatYOLOStatus: jest.fn(),
     setLevel: jest.fn(),
     getLevel: jest.fn(),
+    setDryRun: jest.fn(),
+    isDryRun: jest.fn().mockReturnValue(false),
+    getExecutionLog: jest.fn().mockReturnValue('No YOLO executions logged yet.'),
+    setToolRule: jest.fn(),
+    getToolRules: jest.fn().mockReturnValue({}),
+    pauseYOLO: jest.fn(),
+    resumeYOLO: jest.fn(),
+    getYoloStartSnapshotId: jest.fn().mockReturnValue(null),
+    getSessionSummary: jest.fn().mockReturnValue('YOLO Session Summary:'),
   };
 
   return {
     getAutonomyManager: jest.fn(function() { return mockAutonomyManager; }),
+    SAFE_MODE_PATHS: [
+      'src/', 'test/', 'tests/', 'lib/', 'app/', 'packages/',
+      'modules/', 'components/', 'pages/', 'views/', 'controllers/',
+      'services/', 'utils/', 'helpers/', 'scripts/', 'cmd/', 'internal/',
+      'pkg/', 'crates/', 'spec/',
+    ],
     AutonomyLevel: {
       SUGGEST: 'suggest',
       CONFIRM: 'confirm',
@@ -98,6 +113,15 @@ describe('Core Handlers', () => {
     formatYOLOStatus: jest.Mock;
     setLevel: jest.Mock;
     getLevel: jest.Mock;
+    setDryRun: jest.Mock;
+    isDryRun: jest.Mock;
+    getExecutionLog: jest.Mock;
+    setToolRule: jest.Mock;
+    getToolRules: jest.Mock;
+    pauseYOLO: jest.Mock;
+    resumeYOLO: jest.Mock;
+    getYoloStartSnapshotId: jest.Mock;
+    getSessionSummary: jest.Mock;
   };
 
   let mockSlashManager: {
@@ -217,11 +241,18 @@ describe('Core Handlers', () => {
       expect(result.handled).toBe(true);
       expect(result.entry?.content).toContain('YOLO MODE: SAFE');
       expect(mockAutonomyManager.enableYOLO).toHaveBeenCalledWith(true);
-      expect(mockAutonomyManager.updateYOLOConfig).toHaveBeenCalledWith({
-        maxAutoEdits: 20,
-        maxAutoCommands: 30,
-        allowedPaths: ['src/', 'test/', 'tests/'],
-      });
+      expect(mockAutonomyManager.updateYOLOConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          maxAutoEdits: 20,
+          maxAutoCommands: 30,
+        })
+      );
+      // Verify allowedPaths includes expanded SAFE_MODE_PATHS
+      const updateCall = mockAutonomyManager.updateYOLOConfig.mock.calls[0][0];
+      expect(updateCall.allowedPaths).toContain('src/');
+      expect(updateCall.allowedPaths).toContain('lib/');
+      expect(updateCall.allowedPaths).toContain('packages/');
+      expect(updateCall.allowedPaths.length).toBeGreaterThan(3);
     });
 
     test('should disable YOLO mode with "off"', () => {

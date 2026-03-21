@@ -344,7 +344,7 @@ describe('Landlock + Seccomp Sandbox', () => {
 
       await sandbox.initialize();
       expect(sandbox.getBackend()).toBe('landlock');
-      expect(sandbox.isAvailable()).toBe(true);
+      expect(await sandbox.isAvailable()).toBe(true);
     });
 
     it('should fall back to none when landlock requested but bwrap unavailable', async () => {

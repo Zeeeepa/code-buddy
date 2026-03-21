@@ -149,18 +149,34 @@ export const CODEBASE_MAP_TOOL: CodeBuddyTool = {
   type: "function",
   function: {
     name: "codebase_map",
-    description: "Build and query a map of the codebase structure, symbols, and dependencies",
+    description: "Build and query a map of the codebase structure, symbols, dependencies, and code graph. Graph operations query the persistent code knowledge graph for import relationships, component locations, architecture layers, and dependency paths.",
     parameters: {
       type: "object",
       properties: {
         operation: {
           type: "string",
-          enum: ["build", "summary", "search", "symbols"],
-          description: "The operation: build (create map), summary (show overview), search (find relevant files), symbols (list exported symbols)"
+          enum: ["build", "summary", "search", "symbols", "graph_query", "graph_neighbors", "graph_path", "graph_stats", "graph_file_functions"],
+          description: "The operation: build (create map), summary (show overview), search (find files), symbols (list exports), graph_query (pattern match on code graph triples), graph_neighbors (ego-graph k-hop around entity), graph_path (shortest dependency path between two entities), graph_stats (code graph statistics), graph_file_functions (list all functions/methods in a file with their call graph)"
         },
         query: {
           type: "string",
-          description: "Search query for finding relevant context"
+          description: "Search query for finding relevant context, or entity name for graph operations (e.g. 'agent-executor', 'CodeBuddyAgent')"
+        },
+        target: {
+          type: "string",
+          description: "Target entity for graph_path operation"
+        },
+        depth: {
+          type: "number",
+          description: "Depth for graph_neighbors (default 2, max 4)"
+        },
+        predicate: {
+          type: "string",
+          description: "Filter by predicate for graph_query (e.g. 'imports', 'usedBy', 'definedIn', 'contains', 'patternOf')"
+        },
+        node_type: {
+          type: "string",
+          description: "Filter by node type for graph_query (e.g. 'module', 'agent', 'tool', 'middleware')"
         },
         deep: {
           type: "boolean",
@@ -664,10 +680,33 @@ export const RUN_SCRIPT_TOOL: CodeBuddyTool = {
 /**
  * All advanced tools as an array
  */
+export const CODE_GRAPH_TOOL: CodeBuddyTool = {
+  type: "function",
+  function: {
+    name: "code_graph",
+    description: "Query the code dependency graph: find callers/callees, impact analysis, generate Mermaid flowcharts, class hierarchies, and dependency paths. Use this when the user asks about code relationships, who calls what, what would break if something changes, or wants a diagram/flowchart of the code.",
+    parameters: {
+      type: "object",
+      properties: {
+        operation: {
+          type: "string",
+          enum: ["who_calls", "what_calls", "impact", "flowchart", "class_tree", "file_map", "find_path", "module_deps", "communities", "semantic_search", "dead_code", "coupling", "refactor", "drift", "snapshot", "visualize", "impact_preview", "stats"],
+          description: "who_calls: find all callers. what_calls: find all callees. impact: transitive impact analysis. flowchart: Mermaid call chain. class_tree: inheritance hierarchy. file_map: file functions with signatures. find_path: dependency path A→B. module_deps: import diagram. communities: architectural clusters. semantic_search: embedding similarity. dead_code: uncalled functions/unimported modules. coupling: inter-module coupling heatmap. refactor: refactoring suggestions. drift: architecture changes vs snapshot. snapshot: save baseline for drift. visualize: interactive D3.js HTML. impact_preview: PR impact from git diff. stats: graph statistics + PageRank."
+        },
+        query: { type: "string", description: "Function, class, or module name (fuzzy matched)" },
+        target: { type: "string", description: "Target entity for find_path operation" },
+        depth: { type: "number", description: "Depth for flowchart/impact/module_deps (default 2, max 6)" },
+      },
+      required: ["operation"],
+    },
+  },
+};
+
 export const ADVANCED_TOOLS: CodeBuddyTool[] = [
   MULTI_EDIT_TOOL,
   GIT_TOOL,
   CODEBASE_MAP_TOOL,
+  CODE_GRAPH_TOOL,
   SUBAGENT_TOOL,
   DOCKER_TOOL,
   KUBERNETES_TOOL,

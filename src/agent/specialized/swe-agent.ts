@@ -280,6 +280,18 @@ export class SWEAgent extends EventEmitter {
       }
     }
 
+    // Inject docs context for architecture awareness
+    try {
+      const { getDocsContextProvider } = await import('../../docs/docs-context-provider.js');
+      const dp = getDocsContextProvider();
+      if (dp.isLoaded) {
+        const docsCtx = dp.getRelevantContext(request, 800);
+        if (docsCtx) {
+          this.memory.push({ role: 'system', content: `<docs_context>\n${docsCtx}\n</docs_context>` });
+        }
+      }
+    } catch { /* docs optional */ }
+
     this.memory.push({ role: 'user', content: request });
 
     this.stateMachine.start(`SWE task: ${request.substring(0, 80)}`);

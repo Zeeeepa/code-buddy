@@ -651,6 +651,67 @@ export class GitHubIntegration extends EventEmitter {
   }
 
   /**
+   * Generate PR description using LLM for semantic understanding.
+   * Falls back to template-based description if LLM callback is not provided or fails.
+   */
+  async generatePRDescriptionWithLLM(
+    baseBranch?: string,
+    llmCallback?: (prompt: string) => Promise<string>,
+  ): Promise<string> {
+    if (!llmCallback) {
+      return this.generatePRDescription(baseBranch);
+    }
+
+    const base = baseBranch || this.config.defaultBranch;
+
+    try {
+      // Get commits since base
+      const commitsResult = await this.bash.execute(`git log ${base}..HEAD --pretty=format:"%h %s" --reverse`);
+      const commits = commitsResult.output?.trim() || '';
+
+      // Get diff (truncated for token budget)
+      const diffResult = await this.bash.execute(`git diff ${base}...HEAD`);
+      const diff = (diffResult.output || '').substring(0, 12000);
+
+      // Get diff stats
+      const statsResult = await this.bash.execute(`git diff ${base}...HEAD --stat`);
+      const stats = statsResult.output || '';
+
+      const prompt = `Write a GitHub Pull Request description based on these changes.
+
+**Commits:**
+${commits}
+
+**Diff stats:**
+${stats}
+
+**Diff (truncated):**
+\`\`\`diff
+${diff}
+\`\`\`
+
+**Output format (markdown, no fences around the whole output):**
+## Summary
+<2-4 bullet points explaining WHAT changed and WHY>
+
+## Changes
+<Categorized list of changes by area/file>
+
+## Test Plan
+<Specific testing steps as a checklist>
+
+## Breaking Changes
+<List any breaking changes, or "None" if none>`;
+
+      const description = await llmCallback(prompt);
+      return description.trim();
+    } catch {
+      // Fallback to template-based description
+      return this.generatePRDescription(baseBranch);
+    }
+  }
+
+  /**
    * Merge PR
    */
   async mergePR(

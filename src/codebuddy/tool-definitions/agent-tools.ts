@@ -143,7 +143,7 @@ export const ASK_HUMAN_TOOL: CodeBuddyTool = {
   type: 'function',
   function: {
     name: 'ask_human',
-    description: "Pause execution and ask the user a clarifying question. Use when you need information that cannot be inferred from context, or when multiple interpretations exist.",
+    description: "Pause execution and ask the user a clarifying question. Use when you need information that cannot be inferred from context, or when multiple interpretations exist. Supports structured multi-choice questions.",
     parameters: {
       type: 'object',
       properties: {
@@ -154,7 +154,24 @@ export const ASK_HUMAN_TOOL: CodeBuddyTool = {
         options: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Optional predefined choices for the user',
+          description: 'Optional predefined choices for the user (legacy, prefer choices)',
+        },
+        choices: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              label: { type: 'string', description: 'Display label for the choice' },
+              value: { type: 'string', description: 'Value returned when selected' },
+              description: { type: 'string', description: 'Optional description shown below the label' },
+            },
+            required: ['label', 'value'],
+          },
+          description: 'Structured choices with labels, values, and optional descriptions. Max 6 choices.',
+        },
+        multiSelect: {
+          type: 'boolean',
+          description: 'If true, user can select multiple choices. Default: false',
         },
         default: {
           type: 'string',
@@ -291,6 +308,10 @@ export const SPAWN_PARALLEL_AGENTS_TOOL: CodeBuddyTool = {
               },
               task: { type: 'string', description: 'The specific instructions for this sub-agent' },
               context: { type: 'string', description: 'Additional context for this specific task' },
+              yield: {
+                type: 'boolean',
+                description: 'If true, parent agent yields its turn and waits for this sub-agent to complete before resuming (default: false)',
+              },
             },
             required: ['task'],
           },

@@ -8,11 +8,20 @@ import { getErrorMessage } from "../types/index.js";
 const execAsync = promisify(exec);
 
 export interface MentionContext {
-  type: "file" | "url" | "image" | "git" | "symbol" | "search";
+  type: "file" | "url" | "image" | "git" | "symbol" | "search" | "web" | "terminal";
   original: string;
   resolved: string;
   content?: string;
   error?: string;
+}
+
+/**
+ * Result from the processMentions() convenience function.
+ * Provides a cleaned user message and structured context blocks.
+ */
+export interface MentionResult {
+  cleanedMessage: string;
+  contextBlocks: { type: string; content: string; source: string }[];
 }
 
 export interface ExpandedInput {
@@ -28,6 +37,10 @@ export class ContextMentionParser {
     git: /@git:(\w+)/g,
     symbol: /@symbol:([^\s]+)/g,
     search: /@search:["']([^"']+)["']/g,
+    // New mention types: @web, @git (extended), @terminal
+    web: /@web\s+(.+?)(?=\s*@\w|\s*$)/g,
+    'git-extended': /@git\s+(log|diff|blame)(?:\s+(.+?))?(?=\s*@\w|\s*$)/g,
+    terminal: /@terminal\b/g,
   };
 
   private maxFileSize = 100 * 1024;  // 100KB max for included files
@@ -37,8 +50,15 @@ export class ContextMentionParser {
     const contexts: MentionContext[] = [];
     let expandedText = input;
 
-    // Process each mention type
+    // Process new-style @web, @git <subcommand>, @terminal FIRST
+    // (before legacy patterns which might partially match)
+    expandedText = await this.processNewMentions(expandedText, contexts);
+
+    // Process each legacy mention type
     for (const [type, pattern] of Object.entries(this.patterns)) {
+      // Skip new-style patterns handled above
+      if (type === 'web' || type === 'git-extended' || type === 'terminal') continue;
+
       // Reset regex
       pattern.lastIndex = 0;
 
@@ -72,6 +92,74 @@ export class ContextMentionParser {
     }
 
     return { text: expandedText, contexts };
+  }
+
+  /**
+   * Process new-style @web, @git <subcommand>, and @terminal mentions.
+   * Returns the cleaned text with mentions removed.
+   */
+  private async processNewMentions(text: string, contexts: MentionContext[]): Promise<string> {
+    let cleaned = text;
+
+    // @terminal — capture recent bash tool history
+    const terminalPattern = /@terminal\b/g;
+    if (terminalPattern.test(cleaned)) {
+      try {
+        const ctx = await this.resolveTerminal();
+        contexts.push(ctx);
+      } catch (error: unknown) {
+        contexts.push({
+          type: 'terminal',
+          original: '@terminal',
+          resolved: 'terminal',
+          error: getErrorMessage(error),
+        });
+      }
+      cleaned = cleaned.replace(/@terminal\b/g, '').trim();
+    }
+
+    // @web <query> — web search
+    const webPattern = /@web\s+(.+?)(?=\s*@\w|\s*$)/g;
+    let webMatch;
+    while ((webMatch = webPattern.exec(text)) !== null) {
+      const original = webMatch[0];
+      const query = webMatch[1].trim();
+      try {
+        const ctx = await this.resolveWeb(query, original);
+        contexts.push(ctx);
+      } catch (error: unknown) {
+        contexts.push({
+          type: 'web',
+          original,
+          resolved: query,
+          error: getErrorMessage(error),
+        });
+      }
+      cleaned = cleaned.replace(original, '').trim();
+    }
+
+    // @git log|diff|blame [args] — extended git with arguments
+    const gitExtPattern = /@git\s+(log|diff|blame)(?:\s+(.+?))?(?=\s*@\w|\s*$)/g;
+    let gitMatch;
+    while ((gitMatch = gitExtPattern.exec(text)) !== null) {
+      const original = gitMatch[0];
+      const subcommand = gitMatch[1];
+      const args = gitMatch[2]?.trim() || '';
+      try {
+        const ctx = await this.resolveGitExtended(subcommand, args, original);
+        contexts.push(ctx);
+      } catch (error: unknown) {
+        contexts.push({
+          type: 'git',
+          original,
+          resolved: `${subcommand} ${args}`.trim(),
+          error: getErrorMessage(error),
+        });
+      }
+      cleaned = cleaned.replace(original, '').trim();
+    }
+
+    return cleaned;
   }
 
   private async resolveMention(
@@ -239,6 +327,149 @@ export class ContextMentionParser {
     }
   }
 
+  /**
+   * @web <query> — perform a web search and inject results as context.
+   * Uses the web_search tool internally (via bash curl or rg the web).
+   */
+  private async resolveWeb(query: string, original: string): Promise<MentionContext> {
+    try {
+      // Try Brave Search if API key available, otherwise fallback to DuckDuckGo HTML
+      const braveKey = process.env.BRAVE_API_KEY;
+      if (braveKey) {
+        const response = await axios.get('https://api.search.brave.com/res/v1/web/search', {
+          params: { q: query, count: 5 },
+          headers: { 'X-Subscription-Token': braveKey, 'Accept': 'application/json' },
+          timeout: 10000,
+        });
+        const results = (response.data?.web?.results || []).slice(0, 5);
+        const formatted = results.map((r: { title: string; url: string; description: string }, i: number) =>
+          `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.description}`
+        ).join('\n\n');
+        return {
+          type: 'web',
+          original,
+          resolved: query,
+          content: `Web search results for "${query}":\n${formatted || '(no results)'}`,
+        };
+      }
+
+      // Fallback: use DuckDuckGo instant answer API
+      const response = await axios.get('https://api.duckduckgo.com/', {
+        params: { q: query, format: 'json', no_html: 1, skip_disambig: 1 },
+        timeout: 10000,
+      });
+      const data = response.data;
+      const abstract = data.AbstractText || data.Abstract || '';
+      const relatedTopics = (data.RelatedTopics || []).slice(0, 5);
+      const topicLines = relatedTopics
+        .filter((t: { Text?: string }) => t.Text)
+        .map((t: { Text: string; FirstURL?: string }, i: number) => `${i + 1}. ${t.Text}`)
+        .join('\n');
+
+      const content = abstract
+        ? `Web search for "${query}":\n${abstract}\n\nRelated:\n${topicLines}`
+        : `Web search for "${query}":\n${topicLines || '(no results — try a more specific query)'}`;
+
+      return { type: 'web', original, resolved: query, content };
+    } catch (error: unknown) {
+      throw new Error(`Web search failed: ${getErrorMessage(error)}`);
+    }
+  }
+
+  /**
+   * @git log|diff|blame [args] — run git commands with custom arguments.
+   */
+  private async resolveGitExtended(subcommand: string, args: string, original: string): Promise<MentionContext> {
+    // Sanitize: only allow safe git subcommands
+    const allowedSubcommands = ['log', 'diff', 'blame'];
+    if (!allowedSubcommands.includes(subcommand)) {
+      throw new Error(`Unsupported git subcommand: ${subcommand}. Allowed: ${allowedSubcommands.join(', ')}`);
+    }
+
+    // Build the command with safe defaults
+    let gitCmd = `git ${subcommand}`;
+    if (args) {
+      // Basic sanitization: disallow shell metacharacters
+      const sanitizedArgs = args.replace(/[;&|`$(){}]/g, '');
+      gitCmd += ` ${sanitizedArgs}`;
+    } else {
+      // Sensible defaults per subcommand
+      switch (subcommand) {
+        case 'log':
+          gitCmd = 'git log --oneline -20';
+          break;
+        case 'diff':
+          gitCmd = 'git diff';
+          break;
+        case 'blame':
+          // blame needs a file argument
+          throw new Error('@git blame requires a file path argument, e.g. @git blame src/index.ts');
+      }
+    }
+
+    try {
+      const { stdout, stderr } = await execAsync(gitCmd, { maxBuffer: 512 * 1024 });
+      const output = (stdout || stderr || '(empty)').slice(0, 50000); // Limit output
+      return {
+        type: 'git',
+        original,
+        resolved: `${subcommand} ${args}`.trim(),
+        content: `Git ${subcommand}${args ? ' ' + args : ''}:\n\`\`\`\n${output}\n\`\`\``,
+      };
+    } catch (error: unknown) {
+      throw new Error(`Git ${subcommand} failed: ${getErrorMessage(error)}`);
+    }
+  }
+
+  /**
+   * @terminal — capture recent terminal output from bash tool history.
+   * Reads the last few commands from .codebuddy/tool-results/ or bash history.
+   */
+  private async resolveTerminal(): Promise<MentionContext> {
+    try {
+      // Try to read recent tool results from .codebuddy/tool-results/
+      const toolResultsDir = path.join(process.cwd(), '.codebuddy', 'tool-results');
+      let output = '';
+
+      if (await fs.pathExists(toolResultsDir)) {
+        const files = await fs.readdir(toolResultsDir);
+        // Sort by modification time (newest last) and take last 5
+        const sortedFiles = files
+          .filter(f => f.endsWith('.txt'))
+          .sort()
+          .slice(-5);
+
+        for (const file of sortedFiles) {
+          const content = await fs.readFile(path.join(toolResultsDir, file), 'utf-8');
+          const truncated = content.slice(0, 5000);
+          output += `--- ${file} ---\n${truncated}\n\n`;
+        }
+      }
+
+      if (!output) {
+        // Fallback: get recent shell history
+        try {
+          const { stdout } = await execAsync(
+            process.platform === 'win32' ? 'doskey /history' : 'history | tail -20',
+            { maxBuffer: 64 * 1024 }
+          );
+          output = stdout || '(no recent terminal output available)';
+        } catch {
+          output = '(no recent terminal output available)';
+        }
+      }
+
+      return {
+        type: 'terminal',
+        original: '@terminal',
+        resolved: 'terminal',
+        content: `Recent terminal output:\n\`\`\`\n${output.slice(0, 30000)}\n\`\`\``,
+      };
+    } catch (error: unknown) {
+      throw new Error(`Terminal context failed: ${getErrorMessage(error)}`);
+    }
+  }
+
   private async resolveSymbol(symbol: string, original: string): Promise<MentionContext> {
     // Search for symbol in codebase using ripgrep
     try {
@@ -360,6 +591,11 @@ export class ContextMentionParser {
   @git:status               Include git status
   @git:diff                 Include git diff
   @git:log                  Include recent commits
+  @git log [args]           Git log with custom args (e.g. @git log --since=1week)
+  @git diff [args]          Git diff with custom args (e.g. @git diff HEAD~3)
+  @git blame <file>         Git blame for a specific file
+  @web <query>              Search the web and inject results
+  @terminal                 Capture recent terminal output as context
   @symbol:MyClass           Find and include symbol definition
   @search:'query here'      Search codebase for pattern
 
@@ -368,6 +604,9 @@ Examples:
   "Implement the design from @url:figma.com/file/xyz"
   "Review @git:diff and suggest improvements"
   "Refactor @symbol:UserService to use dependency injection"
+  "How does this compare to @web React Server Components best practices"
+  "Based on @terminal output, what went wrong?"
+  "@git blame src/index.ts — who wrote this code?"
 `;
   }
 }
@@ -380,4 +619,41 @@ export function getContextMentionParser(): ContextMentionParser {
     contextMentionParserInstance = new ContextMentionParser();
   }
   return contextMentionParserInstance;
+}
+
+/**
+ * Process all @mentions in a user message.
+ *
+ * Detects @web, @git, @terminal (and legacy @file:, @url:, etc.) mentions,
+ * executes the appropriate tool/command, and returns:
+ * - The cleaned message (without the @mentions)
+ * - Structured context blocks to inject into the system prompt or user message
+ */
+export async function processMentions(message: string): Promise<MentionResult> {
+  const parser = getContextMentionParser();
+  const expanded = await parser.expandMentions(message);
+
+  const contextBlocks = expanded.contexts
+    .filter(ctx => ctx.content && !ctx.error)
+    .map(ctx => ({
+      type: ctx.type,
+      content: ctx.content!,
+      source: ctx.resolved,
+    }));
+
+  // Also include error blocks so the user knows what failed
+  for (const ctx of expanded.contexts) {
+    if (ctx.error) {
+      contextBlocks.push({
+        type: ctx.type,
+        content: `Error resolving ${ctx.original}: ${ctx.error}`,
+        source: ctx.original,
+      });
+    }
+  }
+
+  return {
+    cleanedMessage: expanded.text,
+    contextBlocks,
+  };
 }

@@ -28,6 +28,7 @@ import type {
   CompressionMetrics,
   EnhancedCompressionResult,
 } from './types.js';
+import type { ContextEngine } from './context-engine.js';
 
 // Lazy import memory monitor to avoid circular dependencies
 let memoryMonitorModule: typeof import('../utils/memory-monitor.js') | null = null;
@@ -53,6 +54,8 @@ export interface ContextManagerConfig {
   model: string;
   /** Auto-compact threshold in tokens (like mistral-vibe's 200K) */
   autoCompactThreshold: number;
+  /** Auto-compact threshold as percentage of context window (e.g., 80 = 80%). Overrides autoCompactThreshold if set. */
+  autoCompactPercent?: number;
   /** Warning thresholds as percentages (e.g., [50, 75, 90]) */
   warningThresholds: number[];
   /** Enable context warnings */
@@ -120,6 +123,8 @@ export class ContextManagerV2 {
   private sessionId: string;
   /** Lazy-loaded importance scorer for sliding window decisions */
   private _importanceScorer: ImportanceScorer | null = null;
+  /** Pluggable context engine (OpenClaw v2026.3.7 alignment) */
+  private contextEngine: ContextEngine | null = null;
 
   // Memory metrics for monitoring
   /** Maximum number of summaries to keep (prevents unbounded growth) */
@@ -159,6 +164,46 @@ export class ContextManagerV2 {
         this.config.enhancedCompressionConfig
       );
     }
+  }
+
+  /**
+   * Register a pluggable context engine (OpenClaw v2026.3.7 alignment).
+   * When set, prepareMessages() delegates to engine.assemble().
+   */
+  setContextEngine(engine: ContextEngine): void {
+    this.contextEngine = engine;
+    logger.info(`Context engine registered: ${engine.id}`);
+  }
+
+  /**
+   * Get the active context engine (or null for default behavior)
+   */
+  getContextEngine(): ContextEngine | null {
+    return this.contextEngine;
+  }
+
+  /**
+   * Raw message preparation — used by DefaultContextEngine to delegate
+   * back to the built-in compression pipeline without infinite recursion.
+   */
+  prepareMessagesRaw(messages: CodeBuddyMessage[]): CodeBuddyMessage[] {
+    const stats = this.getStats(messages);
+    const shouldSoftCompact =
+      this.config.enableSummarization &&
+      this.effectiveLimit <= 1000 &&
+      messages.length > this.config.recentMessagesCount * 2;
+    const shouldCompact = this.shouldAutoCompact(messages) || stats.isNearLimit || shouldSoftCompact;
+
+    if (!shouldCompact) {
+      this.lastTokenCount = stats.totalTokens;
+      return messages;
+    }
+
+    if (this.config.enableEnhancedCompression && this.enhancedCompressor) {
+      return this.prepareMessagesEnhanced(messages, stats);
+    }
+
+    return this.prepareMessagesLegacy(messages, stats);
   }
 
   /**
@@ -272,6 +317,31 @@ export class ContextManagerV2 {
    * Now supports enhanced compression with key info preservation
    */
   prepareMessages(messages: CodeBuddyMessage[]): CodeBuddyMessage[] {
+    // Delegate to pluggable context engine if registered (OpenClaw v2026.3.7)
+    if (this.contextEngine) {
+      // ownsCompaction: engine controls compaction — skip built-in auto-compact,
+      // delegate directly to engine.assemble() (OpenClaw v2026.3.13-1)
+      if (this.contextEngine.ownsCompaction) {
+        const result = this.contextEngine.assemble(messages, this.effectiveLimit);
+        this.lastTokenCount = result.tokenCount;
+        return result.messages;
+      }
+
+      // Non-owning engine: run built-in compaction first, then assemble
+      const compacted = this.prepareMessagesRaw(messages);
+      const result = this.contextEngine.assemble(compacted, this.effectiveLimit);
+      this.lastTokenCount = result.tokenCount;
+      return result.messages;
+    }
+
+    // Default pipeline (no engine registered)
+    return this.prepareMessagesRaw(messages);
+  }
+
+  /**
+   * @deprecated Use prepareMessages() — this is kept for backwards compatibility
+   */
+  private _prepareMessagesInternal(messages: CodeBuddyMessage[]): CodeBuddyMessage[] {
     const stats = this.getStats(messages);
     const shouldSoftCompact =
       this.config.enableSummarization &&
@@ -675,11 +745,23 @@ export class ContextManagerV2 {
   }
 
   /**
-   * Check if auto-compact should be triggered
-   * Returns true if token count exceeds autoCompactThreshold
+   * Check if auto-compact should be triggered.
+   *
+   * CC17: Supports percentage-based threshold via autoCompactPercent config
+   * or CODEBUDDY_AUTOCOMPACT_PCT env var. Falls back to absolute token threshold.
    */
   shouldAutoCompact(messages: CodeBuddyMessage[]): boolean {
     const stats = this.getStats(messages);
+
+    // CC17: Check percentage-based threshold first
+    const envPct = process.env.CODEBUDDY_AUTOCOMPACT_PCT;
+    const pct = this.config.autoCompactPercent ?? (envPct ? parseFloat(envPct) : undefined);
+    if (pct !== undefined && !isNaN(pct) && pct > 0 && pct <= 100) {
+      const threshold = Math.floor(this.config.maxContextTokens * (pct / 100));
+      return stats.totalTokens >= threshold;
+    }
+
+    // Fallback: absolute token threshold
     return stats.totalTokens >= this.config.autoCompactThreshold;
   }
 

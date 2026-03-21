@@ -36,6 +36,14 @@ import {
   BROWSER_TOOLS,
   CANVAS_TOOLS,
   AGENT_TOOLS,
+  FIRECRAWL_TOOLS,
+  LSP_TOOLS,
+  SECRETS_TOOLS,
+  IMPORT_TOOLS,
+  LOG_ANALYZER_TOOLS,
+  OPENAPI_TOOLS,
+  LICENSE_SCANNER_TOOLS,
+  CODEBASE_REPLACE_TOOLS,
 } from "./tool-definitions/index.js";
 
 /**
@@ -111,6 +119,30 @@ export function initializeToolRegistry(): void {
   registerGroup(BROWSER_TOOLS);
   registerGroup(CANVAS_TOOLS);
   registerGroup(AGENT_TOOLS);
+
+  // Firecrawl tools — gated by API key (OpenClaw v2026.3.14)
+  registerGroup(FIRECRAWL_TOOLS, () => !!process.env.FIRECRAWL_API_KEY);
+
+  // LSP rename/refactor tools
+  registerGroup(LSP_TOOLS);
+
+  // Secrets detector tools
+  registerGroup(SECRETS_TOOLS);
+
+  // Import management tools
+  registerGroup(IMPORT_TOOLS);
+
+  // Log analyzer tools
+  registerGroup(LOG_ANALYZER_TOOLS);
+
+  // OpenAPI generator tools
+  registerGroup(OPENAPI_TOOLS);
+
+  // License scanner tools
+  registerGroup(LICENSE_SCANNER_TOOLS);
+
+  // Codebase replace tools
+  registerGroup(CODEBASE_REPLACE_TOOLS);
 
   isRegistryInitialized = true;
   logger.debug('Tool registry initialized with built-in tools');
@@ -197,15 +229,75 @@ export function convertMCPToolToCodeBuddyTool(mcpTool: MCPTool): CodeBuddyTool {
   };
 }
 
+/** Threshold: defer MCP schemas when there are more than this many MCP tools */
+const DEFERRED_SCHEMA_THRESHOLD = 30;
+
+/** Full MCP tool schemas stored for deferred retrieval */
+let _deferredMCPSchemas: Map<string, CodeBuddyTool> | null = null;
+
+/**
+ * Get the deferred MCP schemas map (for tool_search to resolve full schemas).
+ */
+export function getDeferredMCPSchemas(): Map<string, CodeBuddyTool> {
+  return _deferredMCPSchemas ?? new Map();
+}
+
+/**
+ * Check if deferred MCP schema loading is active.
+ */
+export function isDeferredSchemaMode(): boolean {
+  return _deferredMCPSchemas !== null && _deferredMCPSchemas.size > 0;
+}
+
+/**
+ * Resolve full schemas for MCP tools by name (called by tool_search).
+ */
+export function resolveDeferredSchemas(toolNames: string[]): CodeBuddyTool[] {
+  if (!_deferredMCPSchemas) return [];
+  return toolNames
+    .map(name => _deferredMCPSchemas!.get(name))
+    .filter((t): t is CodeBuddyTool => t !== undefined);
+}
+
 export function addMCPToolsToCodeBuddyTools(baseTools: CodeBuddyTool[]): CodeBuddyTool[] {
   if (!mcpManager) {
     return baseTools;
   }
 
   const mcpTools = mcpManager.getTools();
-  const codebuddyMCPTools = mcpTools.map(convertMCPToolToCodeBuddyTool);
 
-  return [...baseTools, ...codebuddyMCPTools];
+  // If below threshold, include full schemas as before
+  if (mcpTools.length <= DEFERRED_SCHEMA_THRESHOLD) {
+    _deferredMCPSchemas = null;
+    const codebuddyMCPTools = mcpTools.map(convertMCPToolToCodeBuddyTool);
+    return [...baseTools, ...codebuddyMCPTools];
+  }
+
+  // Deferred mode: store full schemas, only send stubs to LLM
+  logger.debug(`Deferred MCP schema loading active: ${mcpTools.length} tools exceed threshold ${DEFERRED_SCHEMA_THRESHOLD}`);
+  _deferredMCPSchemas = new Map();
+
+  const stubs: CodeBuddyTool[] = [];
+  for (const mcpTool of mcpTools) {
+    const full = convertMCPToolToCodeBuddyTool(mcpTool);
+    _deferredMCPSchemas.set(full.function.name, full);
+
+    // Stub: name + description only, no parameters (forces tool_search)
+    stubs.push({
+      type: 'function',
+      function: {
+        name: full.function.name,
+        description: `[Deferred] ${full.function.description} — Use tool_search to get the full schema before calling this tool.`,
+        parameters: {
+          type: 'object',
+          properties: {},
+          required: [],
+        },
+      },
+    });
+  }
+
+  return [...baseTools, ...stubs];
 }
 
 /**

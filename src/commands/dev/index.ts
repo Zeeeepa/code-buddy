@@ -153,6 +153,26 @@ Keep it concise and professional.`;
           }
         }
         console.log('');
+
+        // Generate full PR description using LLM
+        try {
+          const { GitHubIntegration } = await import('../../integrations/github-integration.js');
+          const gh = new GitHubIntegration();
+          const prDescription = await gh.generatePRDescriptionWithLLM(
+            undefined,
+            async (prompt: string) => {
+              let response = '';
+              for await (const chunk of agent.processUserMessageStream(prompt)) {
+                if (chunk.type === 'content' && chunk.content) response += chunk.content;
+              }
+              return response;
+            },
+          );
+          console.log('\n── Full PR Description ─────────────────');
+          console.log(prDescription);
+        } catch {
+          // Non-critical: PR summary was already printed above
+        }
       }
 
       agent.dispose?.();
@@ -163,8 +183,120 @@ Keep it concise and professional.`;
     .command('fix-ci')
     .description('Read CI/test logs and propose patches to fix failures')
     .option('--log <file>', 'path to CI log file (default: stdin)')
+    .option('--run <id>', 'GitHub Actions run ID to fetch logs from')
+    .option('--auto', 'auto-fix: root-cause via LLM, apply fix, run tests, push PR', false)
     .option('-y, --yes', 'skip confirmation prompts', false)
-    .action(async (opts: { log?: string; yes: boolean }) => {
+    .action(async (opts: { log?: string; run?: string; auto: boolean; yes: boolean }) => {
+      // ── Auto-fix path ────────────────────────────────────────
+      if (opts.auto) {
+        const { getCIAutoFixPipeline } = await import('../../integrations/ci-autofix-pipeline.js');
+        const pipeline = getCIAutoFixPipeline();
+
+        // Wire LLM callback via agent
+        const agent = await createAgent();
+        await agent.systemPromptReady;
+
+        pipeline.setLLMCallback(async (prompt: string) => {
+          let response = '';
+          for await (const chunk of agent.processUserMessageStream(prompt)) {
+            if (chunk.type === 'content' && chunk.content) {
+              response += chunk.content;
+              process.stdout.write(chunk.content);
+            }
+          }
+          return response;
+        });
+
+        // Resolve the CIFailure — either from --run or --log/stdin
+        let failure: import('../../integrations/ci-autofix-pipeline.js').CIFailure | null = null;
+
+        if (opts.run) {
+          console.log(`Fetching logs for GitHub Actions run ${opts.run}...`);
+          failure = await pipeline.fetchGitHubActionsLog(opts.run);
+          if (!failure) {
+            console.error(`Could not fetch failed job from run ${opts.run}. Is 'gh' installed and authenticated?`);
+            agent.dispose?.();
+            process.exit(1);
+          }
+        } else {
+          // Read log from --log file or stdin
+          let logContent = '';
+          if (opts.log) {
+            const fs = await import('fs');
+            if (!fs.default.existsSync(opts.log)) {
+              console.error(`Log file not found: ${opts.log}`);
+              agent.dispose?.();
+              process.exit(1);
+            }
+            logContent = fs.default.readFileSync(opts.log, 'utf-8');
+          } else if (!process.stdin.isTTY) {
+            const chunks: Buffer[] = [];
+            for await (const chunk of process.stdin) {
+              chunks.push(chunk as Buffer);
+            }
+            logContent = Buffer.concat(chunks).toString('utf-8');
+          } else {
+            console.error('Auto-fix requires --run <id>, --log <file>, or piped CI output via stdin.');
+            agent.dispose?.();
+            process.exit(1);
+          }
+
+          failure = {
+            provider: 'unknown',
+            runId: `local-${Date.now()}`,
+            jobName: 'ci',
+            log: logContent,
+            branch: 'main',
+            commitSha: '',
+            timestamp: new Date(),
+          };
+
+          // Try to detect branch from git
+          try {
+            const { BashTool } = await import('../../tools/bash/index.js');
+            const bash = new BashTool();
+            const branchResult = await bash.execute('git rev-parse --abbrev-ref HEAD');
+            if (branchResult.success && branchResult.output) {
+              failure.branch = branchResult.output.trim();
+            }
+            const shaResult = await bash.execute('git rev-parse HEAD');
+            if (shaResult.success && shaResult.output) {
+              failure.commitSha = shaResult.output.trim();
+            }
+          } catch {
+            // Non-critical, keep defaults
+          }
+        }
+
+        console.log(`\nAuto-fixing CI failure: ${failure.jobName} on ${failure.branch}`);
+        console.log(`Provider: ${failure.provider} | Run: ${failure.runId}\n`);
+
+        const result = await pipeline.autoFix(failure);
+
+        console.log(`\n── Auto-Fix Result ──────────────────────`);
+        console.log(`Success: ${result.success}`);
+        console.log(`Attempts: ${result.attempts.length}`);
+
+        for (const attempt of result.attempts) {
+          console.log(`\n  Attempt ${attempt.attempt}:`);
+          console.log(`    Root cause: ${attempt.rootCause}`);
+          console.log(`    Files: ${attempt.filesModified.join(', ') || 'none'}`);
+          console.log(`    Tests passed: ${attempt.localTestsPassed}`);
+          console.log(`    Pushed: ${attempt.pushed}`);
+          if (attempt.error) {
+            console.log(`    Error: ${attempt.error.substring(0, 200)}`);
+          }
+        }
+
+        if (result.prUrl) {
+          console.log(`\nPR created: ${result.prUrl}`);
+        }
+
+        agent.dispose?.();
+        return;
+      }
+
+      // ── Original interactive path ────────────────────────────
       let logContent = '';
 
       if (opts.log) {

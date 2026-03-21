@@ -50,6 +50,7 @@ export {
   MULTI_EDIT_TOOL,
   GIT_TOOL,
   CODEBASE_MAP_TOOL,
+  CODE_GRAPH_TOOL,
   SUBAGENT_TOOL,
   DOCKER_TOOL,
   KUBERNETES_TOOL,
@@ -116,6 +117,81 @@ export {
   TASK_VERIFY_TOOL,
   AGENT_TOOLS,
 } from './agent-tools.js';
+
+// Firecrawl tools (OpenClaw v2026.3.14 — web search & scrape)
+export {
+  FIRECRAWL_SEARCH_TOOL,
+  FIRECRAWL_SCRAPE_TOOL,
+  FIRECRAWL_TOOLS,
+} from './firecrawl-tools.js';
+
+// LSP tools (Claude Code-inspired)
+export {
+  LSP_CHECK_TOOL,
+  LSP_GOTO_DEF_TOOL,
+  LSP_FIND_REFS_TOOL,
+} from '../../lsp/lsp-client.js';
+
+// LSP rename/refactor tools
+export {
+  LSP_RENAME_TOOL,
+  LSP_CODE_ACTION_TOOL,
+  LSP_TOOLS,
+} from './lsp-tools.js';
+
+// Bug finder tools (static analysis)
+export {
+  FIND_BUGS_TOOL,
+  BUG_FINDER_TOOLS,
+} from './bug-finder-tools.js';
+
+// Merge conflict tools
+export {
+  RESOLVE_CONFLICTS_TOOL,
+  MERGE_CONFLICT_TOOLS,
+} from './merge-conflict-tools.js';
+
+// Vulnerability scanner tools
+export {
+  SCAN_VULNERABILITIES_TOOL,
+  VULN_SCANNER_TOOLS,
+} from './vuln-scanner-tools.js';
+
+// Secrets detector tools (scan for hardcoded credentials)
+export {
+  SCAN_SECRETS_TOOL,
+  SECRETS_TOOLS,
+} from './secrets-tools.js';
+
+// Import management tools (organize/add/remove imports)
+export {
+  ORGANIZE_IMPORTS_TOOL,
+  IMPORT_TOOLS,
+} from './import-tools.js';
+
+// Log analyzer tools
+export {
+  ANALYZE_LOGS_TOOL,
+  LOG_ANALYZER_TOOLS,
+} from './log-analyzer-tools.js';
+
+// OpenAPI generator tools
+export {
+  GENERATE_OPENAPI_TOOL,
+  OPENAPI_TOOLS,
+} from './openapi-tools.js';
+
+// License scanner tools
+export {
+  SCAN_LICENSES_TOOL,
+  LICENSE_SCANNER_TOOLS,
+} from './license-scanner-tools.js';
+
+// Codebase replace tools (find & replace across files)
+export {
+  CODEBASE_REPLACE_TOOL,
+  CODEBASE_REPLACE_TOOLS,
+} from './codebase-replace-tools.js';
 
 // Re-export CodeBuddyTool from client for convenience
 export type { CodeBuddyTool as Tool } from './types.js';

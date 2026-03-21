@@ -18,6 +18,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { ConversationMiddleware, MiddlewareContext, MiddlewareResult } from './types.js';
 import type { KnowledgeGraph } from '../../knowledge/knowledge-graph.js';
+import { getRepoProfiler } from '../repo-profiler.js';
 
 // Action verbs that indicate non-trivial scope
 const ACTION_VERBS = new Set([
@@ -107,6 +108,55 @@ export function setWorkflowGuardGraphProvider(provider: () => KnowledgeGraph | n
   _graphProvider = provider;
 }
 
+/** Docs context provider for suggesting relevant docs (wired from codebuddy-agent) */
+let _docsProvider: ((message: string) => string | null) | null = null;
+export function setWorkflowGuardDocsProvider(provider: (message: string) => string | null): void {
+  _docsProvider = provider;
+}
+
+/** Starter pack name keywords for lightweight intent detection */
+const STARTER_KEYWORDS: Record<string, string> = {
+  'react native': 'typescript-react-native', 'react-native': 'typescript-react-native',
+  'react': 'typescript-react', 'nextjs': 'typescript-nextjs', 'next.js': 'typescript-nextjs',
+  'vue': 'typescript-vue', 'svelte': 'typescript-svelte', 'angular': 'typescript-angular',
+  'electron': 'typescript-electron',
+  'express': 'typescript-node', 'node': 'typescript-node', 'typescript': 'typescript-node',
+  'python': 'python', 'django': 'python-django', 'flask': 'python-flask', 'fastapi': 'python-fastapi',
+  'rust': 'rust', 'axum': 'rust-axum', 'tauri': 'rust-tauri',
+  'golang': 'go', 'gin': 'go-gin', 'fiber': 'go-fiber',
+  'ruby': 'ruby', 'rails': 'ruby-rails',
+  'php': 'php', 'laravel': 'php-laravel',
+  'java': 'java', 'spring': 'java-spring', 'kotlin': 'kotlin', 'ktor': 'kotlin-ktor',
+  'c#': 'csharp-dotnet', 'csharp': 'csharp-dotnet', '.net': 'csharp-dotnet', 'aspnet': 'csharp-aspnet', 'maui': 'csharp-maui',
+  'elixir': 'elixir', 'phoenix': 'elixir-phoenix',
+  'swift': 'swift', 'vapor': 'swift-vapor',
+  'zig': 'zig',
+};
+
+/** Keywords needing word-boundary matching to avoid false positives */
+const WB_KEYWORDS = new Set(['go']);
+
+/**
+ * Sorted keyword entries: longest first so "react native" matches before "react".
+ * Pre-computed once at module load.
+ */
+const SORTED_STARTER_ENTRIES = Object.entries(STARTER_KEYWORDS)
+  .sort((a, b) => b[0].length - a[0].length);
+
+/** Detect if the text mentions a framework/language that has a starter pack */
+export function detectStarterIntent(text: string): string | null {
+  const lower = text.toLowerCase();
+  for (const [keyword, starterName] of SORTED_STARTER_ENTRIES) {
+    if (WB_KEYWORDS.has(keyword)) {
+      if (new RegExp(`\\b${keyword}\\b`).test(lower)) return starterName;
+    } else {
+      if (lower.includes(keyword)) return starterName;
+    }
+  }
+  return null;
+}
+
+
 export class WorkflowGuardMiddleware implements ConversationMiddleware {
   readonly name = 'workflow-guard';
   readonly priority = 45;
@@ -134,6 +184,19 @@ export class WorkflowGuardMiddleware implements ConversationMiddleware {
           }).join(' ')
         : '';
 
+    // Detect empty project and suggest starter pack
+    if (getRepoProfiler().isEmptyProject()) {
+      const starterHint = detectStarterIntent(text);
+      if (starterHint) {
+        return {
+          action: 'warn',
+          message: `[workflow-guard] Empty project detected. ` +
+            `A "${starterHint}" starter pack is available — it will be auto-injected as guidance. ` +
+            `You can also browse all starters with /starter`,
+        };
+      }
+    }
+
     const verbCount = countDistinctActionVerbs(text);
 
     // Compute structural complexity from graph (if available)
@@ -154,13 +217,25 @@ export class WorkflowGuardMiddleware implements ConversationMiddleware {
       const reason = structuralScore > 8
         ? `structural complexity ${structuralScore} (high fan-in / cross-module)`
         : `${verbCount} distinct actions`;
+      // Suggest relevant docs alongside plan
+      let docsHint = '';
+      if (_docsProvider) {
+        try {
+          const ctx = _docsProvider(text);
+          if (ctx) {
+            const titles = [...ctx.matchAll(/^### (.+)$/gm)].map(m => m[1]).slice(0, 2);
+            if (titles.length > 0) docsHint = ` Relevant docs: ${titles.join(', ')}.`;
+          }
+        } catch { /* docs optional */ }
+      }
+
       return {
         action: 'warn',
         message: [
           `[workflow-guard] This task has ${reason}.`,
           'Consider initialising a plan first: call the `plan` tool with action="init"',
           'or create PLAN.md to break the work into verifiable steps before acting.',
-          'Proceeding without a plan — but be mindful of the Verification Contract.',
+          `Proceeding without a plan — but be mindful of the Verification Contract.${docsHint}`,
         ].join(' '),
       };
     }

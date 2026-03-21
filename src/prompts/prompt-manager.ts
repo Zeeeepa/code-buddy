@@ -14,6 +14,7 @@
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
+import { getGitState, formatGitState } from '../context/git-context.js';
 
 /**
  * Get the builtin prompts directory path
@@ -134,10 +135,18 @@ export function autoSelectPromptId(modelName: string): string {
 // Prompt Manager
 // ============================================================================
 
+/** Parsed YAML frontmatter metadata for a prompt file */
+export interface PromptMeta {
+  description?: string;
+  argumentHint?: string;
+  tags?: string[];
+}
+
 export class PromptManager {
   private userPromptsDir: string;
   private builtinPromptsDir: string;
   private cache: Map<string, string> = new Map();
+  private metaCache: Map<string, PromptMeta> = new Map();
 
   constructor() {
     this.userPromptsDir = path.join(os.homedir(), '.codebuddy', 'prompts');
@@ -157,21 +166,32 @@ export class PromptManager {
     // Try user prompts first
     const userPath = path.join(this.userPromptsDir, `${promptId}.md`);
     if (await fs.pathExists(userPath)) {
-      const content = await fs.readFile(userPath, 'utf-8');
+      const raw = await fs.readFile(userPath, 'utf-8');
+      const { content, meta } = this.parseFrontmatter(raw);
       this.cache.set(promptId, content);
+      if (meta) this.metaCache.set(promptId, meta);
       return content;
     }
 
     // Try builtin prompts
     const builtinPath = path.join(this.builtinPromptsDir, `${promptId}.md`);
     if (await fs.pathExists(builtinPath)) {
-      const content = await fs.readFile(builtinPath, 'utf-8');
+      const raw = await fs.readFile(builtinPath, 'utf-8');
+      const { content, meta } = this.parseFrontmatter(raw);
       this.cache.set(promptId, content);
+      if (meta) this.metaCache.set(promptId, meta);
       return content;
     }
 
     // Fall back to inline default
     return this.getInlinePrompt(promptId);
+  }
+
+  /**
+   * Get cached frontmatter metadata for a prompt.
+   */
+  getPromptMeta(promptId: string): PromptMeta | null {
+    return this.metaCache.get(promptId) ?? null;
   }
 
   /**
@@ -212,14 +232,19 @@ export class PromptManager {
     const basePrompt = await this.loadPrompt(promptId);
     sections.push({ id: 'base', content: basePrompt, priority: 0 });
 
-    // 2. Context section
+    // 2. Context section (enriched: Codex CLI-style environment_context)
     if (includeOsInfo || includeModelInfo) {
       const contextLines: string[] = ['<context>'];
       contextLines.push(`- Current date: ${new Date().toISOString().split('T')[0]}`);
       contextLines.push(`- Working directory: ${cwd}`);
       if (includeOsInfo) {
         contextLines.push(`- Platform: ${process.platform}`);
+        contextLines.push(`- Architecture: ${process.arch}`);
         contextLines.push(`- Shell: ${process.platform === 'win32' ? 'PowerShell' : process.env.SHELL || '/bin/bash'}`);
+        contextLines.push(`- Node.js: ${process.version}`);
+        contextLines.push(`- Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
+        if (process.env.KUBERNETES_SERVICE_HOST) contextLines.push('- Environment: Kubernetes pod');
+        else if (process.env.container || process.env.DOCKER_HOST) contextLines.push('- Environment: Container');
       }
       if (includeModelInfo && modelName) {
         contextLines.push(`- Model: ${modelName}`);
@@ -298,15 +323,15 @@ export class PromptManager {
     try {
       const lines: string[] = ['<project_context>'];
 
-      // Git info
-      const gitDir = path.join(cwd, '.git');
-      if (await fs.pathExists(gitDir)) {
-        lines.push('Git repository detected.');
-        // Could add branch, status, recent commits here
+      // Git info (parallel, 3s timeout)
+      const gitState = await getGitState(cwd, { timeoutMs: 3000, commitCount: 5 });
+      if (gitState.isRepo) {
+        const gitBlock = formatGitState(gitState, 3000);
+        if (gitBlock) lines.push(gitBlock);
       }
 
       // Key files
-      const keyFiles = ['package.json', 'tsconfig.json', 'pyproject.toml', 'Cargo.toml', 'go.mod'];
+      const keyFiles = ['package.json', 'tsconfig.json', 'pyproject.toml', 'Cargo.toml', 'go.mod', 'Makefile'];
       const found: string[] = [];
       for (const file of keyFiles) {
         if (await fs.pathExists(path.join(cwd, file))) {
@@ -322,6 +347,43 @@ export class PromptManager {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Parse YAML frontmatter from a prompt file.
+   */
+  private parseFrontmatter(raw: string): { content: string; meta: PromptMeta | null } {
+    const fmRegex = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/;
+    const match = raw.match(fmRegex);
+    if (!match) return { content: raw, meta: null };
+
+    const yamlBlock = match[1];
+    const content = match[2];
+    const meta: PromptMeta = {};
+
+    for (const line of yamlBlock.split('\n')) {
+      const kv = line.match(/^(\w[\w-]*):\s*(.+)$/);
+      if (!kv) continue;
+      const key = kv[1].trim();
+      const val = kv[2].trim();
+
+      switch (key) {
+        case 'description':
+          meta.description = val.replace(/^["']|["']$/g, '');
+          break;
+        case 'argument-hint':
+        case 'argumentHint':
+          meta.argumentHint = val.replace(/^["']|["']$/g, '');
+          break;
+        case 'tags': {
+          const stripped = val.replace(/^\[|\]$/g, '');
+          meta.tags = stripped.split(',').map(t => t.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+          break;
+        }
+      }
+    }
+
+    return { content: content.trim(), meta: Object.keys(meta).length > 0 ? meta : null };
   }
 
   /**

@@ -1,4 +1,4 @@
-import { CommandHandlerResult } from './branch-handlers.js';
+import type { CommandHandlerResult } from './branch-handlers.js';
 import { getPluginMarketplace } from '../../plugins/marketplace.js';
 import { getPluginManager } from '../../plugins/plugin-manager.js';
 
@@ -171,4 +171,27 @@ export async function handlePlugins(args: string[]): Promise<CommandHandlerResul
       },
     };
   }
+}
+
+/**
+ * /plugin — Owner-gated singular alias for /plugins.
+ * Only available in local terminal sessions (not remote channels).
+ * OpenClaw v2026.3.14 alignment.
+ */
+export async function handlePlugin(args: string[]): Promise<CommandHandlerResult> {
+  // Owner gate: only allow in local (non-channel) sessions
+  const isLocal = !process.env.CODEBUDDY_CHANNEL_ID;
+  if (!isLocal) {
+    return {
+      handled: true,
+      entry: {
+        type: 'assistant',
+        content: '/plugin is restricted to local terminal sessions (owner-only).',
+        timestamp: new Date(),
+      },
+    };
+  }
+
+  // Delegate to /plugins handler
+  return handlePlugins(args);
 }

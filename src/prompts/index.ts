@@ -23,4 +23,5 @@ export {
   autoSelectPromptId,
   type PromptConfig,
   type PromptSection,
+  type PromptMeta,
 } from "./prompt-manager.js";

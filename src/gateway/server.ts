@@ -208,6 +208,11 @@ export class GatewayServer extends EventEmitter {
       const payload = message.payload as ConnectPayload;
       const client = this.clients.get(clientId);
 
+      // TLS local pairing skip (OpenClaw v2026.3.11)
+      const clientIp = client?.metadata?.remoteAddress as string || '';
+      const isLocal = clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === '';
+      const skipPairing = this.config.tlsEnabled && this.config.skipLocalPairing && isLocal;
+
       // Build hello-ok response with presence snapshot
       const presence = Array.from(this.clients.values())
         .filter(c => c.authenticated)
@@ -218,7 +223,7 @@ export class GatewayServer extends EventEmitter {
         }));
 
       const helloOk: HelloOkPayload = {
-        paired: true, // In production, check device registry
+        paired: skipPairing ? true : true, // Skip pairing check for local TLS connections
         uptime: this.running ? Date.now() - (this.startedAt || Date.now()) : 0,
         stateVersion: this.stateVersion,
         presence,

@@ -130,6 +130,12 @@ export function setReasoningGraphProvider(provider: () => KnowledgeGraph | null)
   _reasoningGraphProvider = provider;
 }
 
+/** Docs context provider for complexity scoring (wired from codebuddy-agent) */
+let _docsContextProvider: ((message: string) => string | null) | null = null;
+export function setReasoningDocsProvider(provider: (message: string) => string | null): void {
+  _docsContextProvider = provider;
+}
+
 /** Cached entity extractor — loaded lazily from context provider */
 let _extractEntities: ((msg: string) => string[]) | null = null;
 import('../../knowledge/code-graph-context-provider.js')
@@ -235,13 +241,26 @@ export function detectComplexity(message: string): ComplexityScore {
     } catch { /* graph not available — degrade gracefully */ }
   }
 
+  // Docs-based complexity signal: tasks touching documented critical subsystems score higher
+  let docsBonus = 0;
+  if (_docsContextProvider) {
+    try {
+      const ctx = _docsContextProvider(message);
+      if (ctx) {
+        if (/architecture|security|cross-subsystem|migration/i.test(ctx)) docsBonus += 1.5;
+        else if (ctx.length > 100) docsBonus += 0.5;
+      }
+    } catch { /* docs optional */ }
+  }
+
   const score =
     actionVerbs +
     constraintLanguage +
     explorationLanguage +
     multiStepIndicators +
     lengthBonus +
-    graphBonus;
+    graphBonus +
+    docsBonus;
 
   return {
     score,

@@ -6,8 +6,13 @@
  */
 
 import * as path from 'path';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import type { ToolResult } from '../types/index.js';
 import { UnifiedVfsRouter } from '../services/vfs/unified-vfs-router.js';
+import { logger } from '../utils/logger.js';
+
+const execFileAsync = promisify(execFile);
 
 // ============================================================================
 // Types
@@ -63,8 +68,8 @@ export class NotebookTool {
     properties: {
       action: {
         type: 'string',
-        enum: ['read', 'read_cell', 'add_cell', 'update_cell', 'delete_cell', 'extract_code', 'summarize'],
-        description: 'Action to perform on the notebook',
+        enum: ['read', 'read_cell', 'add_cell', 'update_cell', 'delete_cell', 'extract_code', 'summarize', 'execute_cell', 'execute_all', 'kernel_start', 'kernel_stop'],
+        description: 'Action to perform on the notebook. execute_cell/execute_all use jupyter nbconvert --execute.',
       },
       path: {
         type: 'string',
@@ -83,6 +88,14 @@ export class NotebookTool {
         type: 'string',
         description: 'Content for the cell',
       },
+      kernelName: {
+        type: 'string',
+        description: 'Kernel name for execution (default: python3)',
+      },
+      timeout: {
+        type: 'number',
+        description: 'Execution timeout in seconds (default: 120)',
+      },
     },
     required: ['action', 'path'],
   };
@@ -91,11 +104,13 @@ export class NotebookTool {
    * Execute the notebook tool
    */
   async execute(params: {
-    action: 'read' | 'read_cell' | 'add_cell' | 'update_cell' | 'delete_cell' | 'extract_code' | 'summarize';
+    action: 'read' | 'read_cell' | 'add_cell' | 'update_cell' | 'delete_cell' | 'extract_code' | 'summarize' | 'execute_cell' | 'execute_all' | 'kernel_start' | 'kernel_stop';
     path: string;
     cellIndex?: number;
     cellType?: 'code' | 'markdown' | 'raw';
     content?: string;
+    kernelName?: string;
+    timeout?: number;
   }): Promise<ToolResult> {
     try {
       const { action, path: filePath } = params;
@@ -118,6 +133,15 @@ export class NotebookTool {
           return this.extractCode(filePath);
         case 'summarize':
           return this.summarize(filePath);
+        case 'execute_cell':
+          if (params.cellIndex == null) return { success: false, error: 'cellIndex is required for execute_cell' };
+          return this.executeCell(filePath, params.cellIndex, params.kernelName, params.timeout);
+        case 'execute_all':
+          return this.executeAll(filePath, params.kernelName, params.timeout);
+        case 'kernel_start':
+          return this.kernelStart(params.kernelName);
+        case 'kernel_stop':
+          return this.kernelStop();
         default:
           return { success: false, error: `Unknown action: ${action}` };
       }
@@ -352,6 +376,281 @@ export class NotebookTool {
     }
 
     return { success: true, content: summary.join('\n') };
+  }
+
+  // ==========================================================================
+  // Jupyter Kernel Execution
+  // ==========================================================================
+
+  /** Track whether jupyter is available */
+  private jupyterAvailable: boolean | null = null;
+  /** Active kernel process (for kernel_start/kernel_stop lifecycle) */
+  private kernelProcess: import('child_process').ChildProcess | null = null;
+
+  /**
+   * Check if jupyter is available on the system
+   */
+  private async checkJupyterAvailable(): Promise<boolean> {
+    if (this.jupyterAvailable !== null) return this.jupyterAvailable;
+    try {
+      await execFileAsync('jupyter', ['--version'], { timeout: 10000 });
+      this.jupyterAvailable = true;
+    } catch {
+      this.jupyterAvailable = false;
+    }
+    return this.jupyterAvailable;
+  }
+
+  /**
+   * Execute a single cell by index.
+   *
+   * Strategy: Create a temporary notebook with only the target cell,
+   * run `jupyter nbconvert --execute`, then read back the outputs.
+   */
+  private async executeCell(
+    filePath: string,
+    cellIndex: number,
+    kernelName?: string,
+    timeout?: number,
+  ): Promise<ToolResult> {
+    if (!await this.checkJupyterAvailable()) {
+      return { success: false, error: 'jupyter is not installed or not in PATH. Install with: pip install jupyter' };
+    }
+
+    const notebook = await this.loadNotebook(filePath);
+    if (cellIndex < 0 || cellIndex >= notebook.cells.length) {
+      return { success: false, error: `Cell index ${cellIndex} out of range (0-${notebook.cells.length - 1})` };
+    }
+
+    const cell = notebook.cells[cellIndex];
+    if (cell.cell_type !== 'code') {
+      return { success: false, error: `Cell ${cellIndex} is a ${cell.cell_type} cell, not a code cell` };
+    }
+
+    // Create a temporary notebook with just this cell
+    const tempNotebook: Notebook = {
+      nbformat: notebook.nbformat,
+      nbformat_minor: notebook.nbformat_minor,
+      metadata: { ...notebook.metadata },
+      cells: [{ ...cell, outputs: [], execution_count: null }],
+    };
+
+    const resolvedPath = path.resolve(filePath);
+    const tempPath = resolvedPath.replace(/\.ipynb$/, `.exec_cell_${cellIndex}.tmp.ipynb`);
+
+    try {
+      await this.vfs.writeFile(tempPath, JSON.stringify(tempNotebook, null, 1));
+
+      const args = [
+        'nbconvert',
+        '--to', 'notebook',
+        '--execute',
+        '--ExecutePreprocessor.timeout=' + String(timeout || 120),
+        '--ExecutePreprocessor.kernel_name=' + (kernelName || 'python3'),
+        '--output', path.basename(tempPath),
+        tempPath,
+      ];
+
+      const { stderr } = await execFileAsync('jupyter', args, {
+        timeout: ((timeout || 120) + 30) * 1000,
+        cwd: path.dirname(resolvedPath),
+      });
+
+      if (stderr) {
+        logger.debug(`jupyter nbconvert stderr: ${stderr}`);
+      }
+
+      // Read back the executed notebook
+      const executedContent = await this.vfs.readFile(tempPath, 'utf-8');
+      const executedNotebook = JSON.parse(executedContent) as Notebook;
+      const executedCell = executedNotebook.cells[0];
+
+      // Update the original notebook's cell with outputs
+      notebook.cells[cellIndex].outputs = executedCell.outputs || [];
+      notebook.cells[cellIndex].execution_count = executedCell.execution_count;
+      await this.saveNotebook(filePath, notebook);
+
+      // Format output
+      const parts = [`## Cell ${cellIndex} executed successfully`, ''];
+      if (executedCell.outputs && executedCell.outputs.length > 0) {
+        parts.push('**Output:**');
+        for (const output of executedCell.outputs) {
+          parts.push(this.formatOutput(output));
+        }
+      } else {
+        parts.push('(no output)');
+      }
+
+      return { success: true, content: parts.join('\n') };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { success: false, error: `Failed to execute cell ${cellIndex}: ${message}` };
+    } finally {
+      // Clean up temp file
+      try {
+        const tempFs = await import('fs');
+        if (tempFs.existsSync(tempPath)) {
+          tempFs.unlinkSync(tempPath);
+        }
+      } catch { /* ignore cleanup errors */ }
+    }
+  }
+
+  /**
+   * Execute all cells in the notebook using `jupyter nbconvert --execute`.
+   */
+  private async executeAll(
+    filePath: string,
+    kernelName?: string,
+    timeout?: number,
+  ): Promise<ToolResult> {
+    if (!await this.checkJupyterAvailable()) {
+      return { success: false, error: 'jupyter is not installed or not in PATH. Install with: pip install jupyter' };
+    }
+
+    const resolvedPath = path.resolve(filePath);
+    const outputName = path.basename(resolvedPath);
+
+    try {
+      const args = [
+        'nbconvert',
+        '--to', 'notebook',
+        '--execute',
+        '--inplace',
+        '--ExecutePreprocessor.timeout=' + String(timeout || 120),
+        '--ExecutePreprocessor.kernel_name=' + (kernelName || 'python3'),
+        resolvedPath,
+      ];
+
+      const { stderr } = await execFileAsync('jupyter', args, {
+        timeout: ((timeout || 120) + 30) * 1000,
+        cwd: path.dirname(resolvedPath),
+      });
+
+      if (stderr) {
+        logger.debug(`jupyter nbconvert stderr: ${stderr}`);
+      }
+
+      // Read back the executed notebook to get outputs
+      const executedNotebook = await this.loadNotebook(filePath);
+      const codeCells = executedNotebook.cells.filter(c => c.cell_type === 'code');
+      const cellsWithOutput = codeCells.filter(c => c.outputs && c.outputs.length > 0);
+      const cellsWithErrors = codeCells.filter(c =>
+        c.outputs?.some(o => o.output_type === 'error')
+      );
+
+      const parts = [
+        `# Executed all cells in ${outputName}`,
+        '',
+        `- Total cells: ${executedNotebook.cells.length}`,
+        `- Code cells: ${codeCells.length}`,
+        `- Cells with output: ${cellsWithOutput.length}`,
+        `- Cells with errors: ${cellsWithErrors.length}`,
+        '',
+      ];
+
+      // Show outputs for each code cell
+      for (let i = 0; i < executedNotebook.cells.length; i++) {
+        const cell = executedNotebook.cells[i];
+        if (cell.cell_type !== 'code') continue;
+
+        parts.push(`## Cell ${i} [${cell.execution_count ?? '?'}]`);
+        if (cell.outputs && cell.outputs.length > 0) {
+          for (const output of cell.outputs) {
+            parts.push(this.formatOutput(output));
+          }
+        } else {
+          parts.push('(no output)');
+        }
+        parts.push('');
+      }
+
+      return { success: true, content: parts.join('\n') };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { success: false, error: `Failed to execute notebook: ${message}` };
+    }
+  }
+
+  /**
+   * Start a Jupyter kernel (lifecycle management).
+   * Uses `jupyter kernel` subprocess.
+   */
+  private async kernelStart(kernelName?: string): Promise<ToolResult> {
+    if (!await this.checkJupyterAvailable()) {
+      return { success: false, error: 'jupyter is not installed or not in PATH. Install with: pip install jupyter' };
+    }
+
+    if (this.kernelProcess && !this.kernelProcess.killed) {
+      return { success: true, content: 'Kernel is already running. Use kernel_stop first to restart.' };
+    }
+
+    try {
+      const { spawn } = await import('child_process');
+      const kernel = kernelName || 'python3';
+
+      this.kernelProcess = spawn('jupyter', ['kernel', `--KernelManager.kernel_name=${kernel}`], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+
+      // Wait briefly for kernel to start
+      const startOutput = await new Promise<string>((resolve) => {
+        let output = '';
+        const handler = (data: Buffer) => {
+          output += data.toString();
+        };
+        this.kernelProcess!.stderr?.on('data', handler);
+        this.kernelProcess!.stdout?.on('data', handler);
+
+        setTimeout(() => {
+          this.kernelProcess!.stderr?.removeListener('data', handler);
+          this.kernelProcess!.stdout?.removeListener('data', handler);
+          resolve(output);
+        }, 3000);
+      });
+
+      logger.info('Jupyter kernel started', { kernel, pid: this.kernelProcess.pid });
+
+      return {
+        success: true,
+        content: `Jupyter kernel "${kernel}" started (PID: ${this.kernelProcess.pid})\n${startOutput.trim()}`,
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { success: false, error: `Failed to start kernel: ${message}` };
+    }
+  }
+
+  /**
+   * Stop the running Jupyter kernel.
+   */
+  private async kernelStop(): Promise<ToolResult> {
+    if (!this.kernelProcess || this.kernelProcess.killed) {
+      return { success: true, content: 'No kernel is running.' };
+    }
+
+    const pid = this.kernelProcess.pid;
+    this.kernelProcess.kill('SIGTERM');
+
+    // Wait for process to exit
+    await new Promise<void>((resolve) => {
+      const timeout = setTimeout(() => {
+        if (this.kernelProcess && !this.kernelProcess.killed) {
+          this.kernelProcess.kill('SIGKILL');
+        }
+        resolve();
+      }, 5000);
+
+      this.kernelProcess!.on('close', () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+    });
+
+    this.kernelProcess = null;
+    logger.info('Jupyter kernel stopped', { pid });
+
+    return { success: true, content: `Kernel (PID: ${pid}) stopped.` };
   }
 
   /**

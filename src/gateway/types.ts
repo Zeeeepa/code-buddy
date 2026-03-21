@@ -257,6 +257,18 @@ export interface GatewayConfig {
   maxMessageSize: number;
   /** Maximum clients per session */
   maxClientsPerSession: number;
+  /** Enable TLS (OpenClaw v2026.3.11) */
+  tlsEnabled?: boolean;
+  /** TLS certificate path */
+  tlsCert?: string;
+  /** TLS private key path */
+  tlsKey?: string;
+  /** TLS CA certificate path */
+  tlsCa?: string;
+  /** Skip device pairing for localhost TLS connections (OpenClaw v2026.3.11) */
+  skipLocalPairing?: boolean;
+  /** Trusted proxy IPs allowed to set x-forwarded-* headers (OpenClaw v2026.3.14, GHSA-5wcw-8jjv-m286) */
+  trustedProxies?: string[];
 }
 
 /**
@@ -273,6 +285,8 @@ export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = {
   connectionTimeoutMs: 60000,
   maxMessageSize: 1024 * 1024, // 1MB
   maxClientsPerSession: 10,
+  tlsEnabled: false,
+  skipLocalPairing: false,
 };
 
 /**

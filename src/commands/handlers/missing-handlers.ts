@@ -71,18 +71,66 @@ export async function handleChangeModel(args: string[]): Promise<CommandHandlerR
       lines.push('');
     }
 
-    lines.push('Usage: /model <model-name>');
+    lines.push('Usage: /model <model-name> or /model auto');
     lines.push('');
     lines.push('Examples:');
     lines.push('  /model grok-beta');
     lines.push('  /model grok-3-latest');
     lines.push('  /model llama3.2 (requires GROK_BASE_URL for Ollama)');
+    lines.push('  /model auto          (enable automatic routing by task complexity)');
+    lines.push('  /model auto off      (disable automatic routing)');
 
     return {
       handled: true,
       entry: {
         type: 'assistant',
         content: lines.join('\n'),
+        timestamp: new Date(),
+      },
+    };
+  }
+
+  // Handle "auto" mode — toggle automatic model routing by task complexity
+  if (modelName.toLowerCase() === 'auto') {
+    const { getModelRouter } = await import('../../optimization/model-routing.js');
+    const router = getModelRouter();
+    const secondArg = args[1]?.toLowerCase();
+
+    if (secondArg === 'off') {
+      router.updateConfig({ enabled: false });
+      return {
+        handled: true,
+        entry: {
+          type: 'assistant',
+          content: `Auto model routing disabled.
+
+All requests will use the current model. Use /model <name> to switch manually.`,
+          timestamp: new Date(),
+        },
+      };
+    }
+
+    // Enable auto routing
+    router.updateConfig({ enabled: true });
+    const config = router.getConfig();
+    return {
+      handled: true,
+      entry: {
+        type: 'assistant',
+        content: `Auto model routing enabled.
+
+Models will be selected automatically based on task complexity:
+  simple          -> grok-3-mini (fast, low cost)
+  moderate        -> grok-3 (balanced)
+  complex         -> grok-3 (standard reasoning)
+  reasoning-heavy -> grok-3-reasoning (extended reasoning)
+  vision tasks    -> grok-2-vision
+
+Default Model: ${config.defaultModel}
+Cost Sensitivity: ${config.costSensitivity}
+Min Confidence: ${(config.minConfidence * 100).toFixed(0)}%
+
+Use /model auto off to disable, or /model <name> to switch to a specific model.`,
         timestamp: new Date(),
       },
     };

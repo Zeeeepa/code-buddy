@@ -247,7 +247,7 @@ describe('SlashCommandManager', () => {
         const result = manager.execute('/lint');
 
         expect(result.success).toBe(true);
-        expect(result.prompt).toContain('linter');
+        expect(result.prompt).toMatch(/linter|__LINT__/);
       });
     });
 

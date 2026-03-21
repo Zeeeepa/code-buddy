@@ -11,6 +11,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from '../utils/logger.js';
+import { discoverRulesForPath } from './rules-loader.js';
+import { shouldExcludeInstructionFile } from './instruction-excludes.js';
+import { resolveImportDirectives } from './import-directive-parser.js';
 
 /** Context file names to discover */
 const CONTEXT_FILES = [
@@ -23,6 +26,29 @@ const CONTEXT_FILES = [
 
 /** Directories that may contain context files */
 const CONTEXT_DIRS = ['.codebuddy', '.claude'];
+
+/**
+ * Map of source directory prefixes → relevant doc page slugs.
+ * When a tool accesses a path under a key, the matching doc is auto-discovered.
+ */
+const DOC_DIR_MAP: Record<string, string[]> = {
+  'src/tools': ['tools'],
+  'src/security': ['security'],
+  'src/channels': ['channels', 'communication'],
+  'src/agent': ['agent', 'architecture'],
+  'src/knowledge': ['knowledge'],
+  'src/config': ['configuration', 'config'],
+  'src/docs': ['knowledge', 'docs'],
+  'src/context': ['memory', 'context'],
+  'src/server': ['api-reference', 'api'],
+  'src/deploy': ['deploy', 'tools'],
+  'src/daemon': ['daemon', 'agent'],
+  'src/sandbox': ['security', 'sandbox'],
+  'src/plugins': ['tools', 'plugin'],
+  'src/memory': ['memory', 'context'],
+  'src/checkpoints': ['architecture'],
+  'tests': ['testing'],
+};
 
 /** Set of already-loaded paths (avoid re-loading) */
 const loadedPaths = new Set<string>();
@@ -80,9 +106,20 @@ export function discoverJitContext(
       for (const contextFile of CONTEXT_FILES) {
         const filePath = path.join(currentDir, contextFile);
         if (!loadedPaths.has(filePath) && fs.existsSync(filePath)) {
+          // CC10: Check instruction excludes
+          if (shouldExcludeInstructionFile(filePath, normalizedRoot)) {
+            logger.debug(`JIT context: excluded ${path.relative(normalizedRoot, filePath)}`);
+            loadedPaths.add(filePath); // Mark as "seen" to avoid re-checking
+            continue;
+          }
           try {
-            const content = fs.readFileSync(filePath, 'utf-8');
+            let content = fs.readFileSync(filePath, 'utf-8');
             if (content.trim()) {
+              // CC9: Resolve @import directives
+              content = resolveImportDirectives(content, {
+                baseDir: path.dirname(filePath),
+                projectRoot: normalizedRoot,
+              });
               const relativePath = path.relative(normalizedRoot, filePath).replace(/\\/g, '/');
               discoveredContent.push(`[${relativePath}]\n${content.trim()}`);
               loadedPaths.add(filePath);
@@ -99,9 +136,20 @@ export function discoverJitContext(
           for (const contextFile of CONTEXT_FILES) {
             const filePath = path.join(dirPath, contextFile);
             if (!loadedPaths.has(filePath) && fs.existsSync(filePath)) {
+              // CC10: Check instruction excludes
+              if (shouldExcludeInstructionFile(filePath, normalizedRoot)) {
+                logger.debug(`JIT context: excluded ${path.relative(normalizedRoot, filePath)}`);
+                loadedPaths.add(filePath);
+                continue;
+              }
               try {
-                const content = fs.readFileSync(filePath, 'utf-8');
+                let content = fs.readFileSync(filePath, 'utf-8');
                 if (content.trim()) {
+                  // CC9: Resolve @import directives
+                  content = resolveImportDirectives(content, {
+                    baseDir: path.dirname(filePath),
+                    projectRoot: normalizedRoot,
+                  });
                   const relativePath = path.relative(normalizedRoot, filePath).replace(/\\/g, '/');
                   discoveredContent.push(`[${relativePath}]\n${content.trim()}`);
                   loadedPaths.add(filePath);
@@ -118,6 +166,41 @@ export function discoverJitContext(
       if (parent === currentDir) break; // reached filesystem root
       currentDir = parent;
       depth++;
+    }
+
+    // Auto-discover relevant doc pages based on accessed path
+    const relativePath = path.relative(normalizedRoot, normalizedPath).replace(/\\/g, '/');
+    for (const [prefix, slugPatterns] of Object.entries(DOC_DIR_MAP)) {
+      if (!relativePath.startsWith(prefix)) continue;
+      const docsDir = path.join(normalizedRoot, '.codebuddy', 'docs');
+      if (!fs.existsSync(docsDir)) break;
+      try {
+        const docFiles = fs.readdirSync(docsDir).filter(f => f.endsWith('.md'));
+        for (const pattern of slugPatterns) {
+          const match = docFiles.find(f => f.includes(pattern));
+          if (!match) continue;
+          const docPath = path.join(docsDir, match);
+          if (loadedPaths.has(docPath)) continue;
+          const content = fs.readFileSync(docPath, 'utf-8');
+          // Only inject the first 2 sections (title + first H2) to stay compact
+          const sections = content.split(/(?=^## )/m);
+          const compact = sections.slice(0, 2).join('').trim();
+          if (compact) {
+            const relDoc = path.relative(normalizedRoot, docPath).replace(/\\/g, '/');
+            discoveredContent.push(`[${relDoc}]\n${compact}`);
+            loadedPaths.add(docPath);
+            logger.debug(`JIT context: auto-discovered doc ${relDoc} for ${prefix}`);
+          }
+          break; // One doc per prefix
+        }
+      } catch { /* docs dir not readable */ }
+      break; // One prefix match
+    }
+
+    // Discover path-scoped rules matching this access
+    const rulesContext = discoverRulesForPath(accessedPath, projectRoot);
+    if (rulesContext) {
+      discoveredContent.push(rulesContext);
     }
 
     if (discoveredContent.length === 0) return '';

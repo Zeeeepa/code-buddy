@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Tests-24%2C000%2B-00d26a?style=flat-square&logo=jest" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-26%2C600%2B-00d26a?style=flat-square&logo=jest" alt="Tests"/>
   <img src="https://img.shields.io/badge/Coverage-85%25-48dbfb?style=flat-square" alt="Coverage"/>
   <img src="https://img.shields.io/badge/Build-passing-00d26a?style=flat-square" alt="Build"/>
 </p>
@@ -41,7 +41,7 @@
 
 ## What is Code Buddy?
 
-Code Buddy is an open-source multi-provider AI coding agent that runs in your terminal. It supports **Grok, Claude, ChatGPT, Gemini, LM Studio, and Ollama** via OpenAI-compatible APIs and provider-specific SDKs.
+Code Buddy is an open-source multi-provider AI coding agent that runs in your terminal. It supports **15 LLM providers** — Grok, Claude, ChatGPT, Gemini, Ollama, LM Studio, AWS Bedrock, Azure OpenAI, Groq, Together AI, Fireworks AI, OpenRouter, vLLM, GitHub Copilot, and Mistral — with automatic failover and per-provider circuit breakers.
 
 It works as two things at once:
 
@@ -49,40 +49,35 @@ It works as two things at once:
 - **A personal assistant** — talks to you by voice, remembers your preferences, monitors your screen, sends notifications to your phone via Telegram/Discord/Slack, and runs scheduled tasks 24/7 in the background.
 
 **Key highlights:**
-- 6 AI providers with automatic failover
+- **15 AI providers** with automatic failover and circuit breaker (Grok, Claude, GPT, Gemini, Ollama, LM Studio, AWS Bedrock, Azure OpenAI, Groq, Together, Fireworks, OpenRouter, vLLM, GitHub Copilot, Mistral)
+- **50+ tools** with RAG selection, streaming, and parallel execution
+- **190+ slash commands** including `/dev`, `/pr`, `/lint`, `/switch`, `/bug`, `/suggest`, `/transform`, `/watch`, `/conflicts`, `/vulns`, `/quota`, `/telemetry`, `/coverage`, `/voice-code`, `/replace`
 - 40 bundled skills (PR workflow, DevOps, creative tools, smart home, media)
-- 22+ messaging channels (Terminal, Telegram, Discord, Slack, WhatsApp, Signal, Teams, Matrix, Google Chat, WebChat, IRC, Feishu/Lark, Synology Chat, LINE, Nostr, Zalo, Mattermost, Nextcloud Talk, Twilio Voice, iMessage, Twitch, Gmail)
+- 23+ messaging channels (Terminal, Telegram, Discord, Slack, WhatsApp, Signal, Teams, Matrix, Google Chat, WebChat, IRC, Feishu/Lark, Synology Chat, LINE, Nostr, Zalo, Mattermost, Nextcloud Talk, Twilio Voice, iMessage, Twitch, Gmail)
+- **IDE integration** — VS Code extension (diff view, inline edit, model switch), JetBrains plugin (chat, code actions), LSP server (completions, rename, code actions)
+- **YOLO mode** with 12 guardrails (cost cap $100, deny list, safe mode, per-tool rules, pause/resume, dry-run, undo-all, session limits)
 - Daemon mode for 24/7 background operation
-- Multi-agent orchestration with self-healing
-- Voice conversation with wake word detection
-- OS sandbox with workspace-write mode (read-only / workspace-write / danger-full-access tiers)
-- Docker sandbox for untrusted code execution
-- Knowledge base injection (Knowledge.md files loaded into agent system prompt)
-- Wide Research mode (parallel sub-agents decompose and research topics concurrently)
-- Todo.md attention bias (task list appended to end of every LLM context turn — Manus AI pattern)
-- Lessons.md self-improvement loop (PATTERN/RULE/CONTEXT/INSIGHT lessons injected before every turn — persists corrections across sessions)
-- Workflow orchestration rules in system prompt (concrete plan triggers, auto-correction protocol, verification contract)
-- Restorable context compression (identifiers preserved, full content recoverable on demand)
-- Pre-compaction memory flush (facts saved to MEMORY.md before context is compacted — OpenClaw pattern)
-- Decision memory extraction (architectural choices + rationale persisted during context flush)
-- Coding style learning (auto-analyzes naming, imports, indentation, error handling patterns)
-- Importance-weighted context compression (error messages, decisions, code scored higher than conversation)
-- Auto-repair middleware (detects tool failures, localizes faults, suggests fixes automatically)
-- Quality gate middleware (auto-delegates to CodeGuardian + Security agents after implementation)
-- Issue-to-PR pipeline (`buddy dev issue #42` → branch → implement → test → PR)
-- Anthropic prompt cache breakpoints (stable/dynamic split → 10× token cost savings)
-- Per-channel streaming policies (Telegram, Discord, Slack, WhatsApp each get their own chunking/format rules)
-- SSRF guard on all outbound fetches (IPv4 + IPv6 bypass vector blocking)
-- Tool prefix naming convention (`shell_exec`, `file_read`, `browser_search`, … — Codex-style canonical aliases)
-- Gateway WebSocket protocol (connect/hello-ok handshake, device identity, presence, session patching)
-- Lobster typed workflow engine (DAG pipelines with approval gates, pause/resume tokens)
-- Send policy engine (rule-based deny/allow per channel, chat type, peer)
-- Message preprocessing pipeline (media detection → audio transcription → link extraction → content enrichment)
-- Companion app node system (device pairing, platform capabilities, remote invocation)
-- Encrypted secrets vault (AES-256-GCM with scrypt key derivation)
-- Cross-platform service installer (launchd, systemd, Task Scheduler)
+- Multi-agent orchestration with self-healing (5-tool surface: spawn/send/wait/close/resume)
+- Tree-of-Thought + MCTS reasoning (4 depth levels: shallow/medium/deep/exhaustive)
+- Voice conversation with wake word detection + voice-to-code pipeline
+- OS sandbox (bubblewrap/landlock/seatbelt) + Docker sandbox + OpenShell sandbox
+- **Security**: Guardian Agent (AI risk scoring 0-100), SSRF guard, secrets detector, dependency vuln scanner, license compliance, output sanitizer, env blocklist
+- **Context engineering**: proactive compaction, image pruning, tool output masking, transcript repair, pre-compaction memory flush, restorable compression, importance-weighted sliding window
+- **Git workflow**: auto-commit (Aider-style), `/pr` creation, merge conflict resolver, ghost snapshots (undo/redo), `/dev plan|run|pr|fix-ci`
+- **Code intelligence**: LSP rename/refactor, auto-import management, bug finder (25+ patterns, 6 languages), codebase-wide replace, OpenAPI generator, log analyzer
+- `@web`, `@git`, `@terminal` inline context mentions
+- i18n system (English, French + 4 stub locales)
+- HTTP proxy support (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`)
+- Per-message token usage + cost display
+- Automatic conversation title generation
+- Rate limit / quota display per provider
+- Coverage target configuration (Jest/Vitest/nyc/c8)
+- MCP OAuth (Authorization Code + PKCE, encrypted token storage)
+- Lobster typed workflow engine (DAG pipelines with approval gates)
+- Knowledge graph with PageRank + knowledge base injection
+- Encrypted secrets vault (AES-256-GCM with scrypt KDF)
 - Cloud deployment configs (Fly.io, Railway, Render, Hetzner, Northflank, GCP) + Nix flake
-- Self-update CLI (`buddy update --channel stable|beta|dev`)
+- Self-update CLI (`buddy update --channel stable|beta|dev` or `--tag main` from GitHub)
 - Canvas HTTP serving with A2UI host page
 
 ---
@@ -131,8 +126,11 @@ buddy --prompt "analyze the codebase structure"
 # Use with local LLM (LM Studio)
 buddy --base-url http://localhost:1234/v1 --api-key lm-studio
 
-# Full autonomy mode
-YOLO_MODE=true buddy
+# Full autonomy mode (YOLO)
+buddy --yolo
+
+# Restrict tools
+buddy --disallowed-tools "bash,docker"
 ```
 
 ### Headless Mode (CI / Scripting)
@@ -197,7 +195,7 @@ buddy daemon start              # Run 24/7 in background
 buddy server --port 3000        # Expose REST/WebSocket API
 ```
 
-Code Buddy autonomously reads files, writes code, runs commands, and fixes errors — typically 5-15 tool calls per task (up to 50, or 400 in YOLO mode).
+Code Buddy autonomously reads files, writes code, runs commands, and fixes errors — typically 5-15 tool calls per task (up to 50, or 400 in YOLO mode). After each edit, it can auto-commit (Aider-style), run linters, and execute tests automatically.
 
 ---
 
@@ -211,17 +209,19 @@ Code Buddy operates as an autonomous coding agent. It reads your codebase, makes
 
 | Category | Tools |
 |:---------|:------|
-| **File Operations** | `view_file`, `create_file`, `str_replace_editor`, `edit_file`, `multi_edit` |
-| **Search** | `search`, `codebase_map` |
-| **System** | `bash`, `docker`, `kubernetes` |
-| **CodeAct** | `run_script` (Python/JS/TS in Docker), `plan` (Persistent Planner) |
-| **Web** | `web_search`, `web_fetch`, `browser` |
-| **Patching** | `apply_patch` (unified diff with fuzz factor, Codex-inspired) |
-| **Planning** | `create_todo_list`, `get_todo_list`, `update_todo_list` |
-| **Media** | `screenshot`, `audio`, `video`, `ocr`, `clipboard` |
-| **Documents** | `pdf`, `document`, `archive` |
+| **File Operations** | `view_file`, `create_file`, `str_replace_editor`, `edit_file`, `multi_edit`, `codebase_replace` |
+| **Search** | `search`, `codebase_map`, `tool_search` (BM25) |
+| **System** | `bash`, `docker`, `kubernetes`, `run_script` (Python/JS/TS in Docker) |
+| **Web** | `web_search`, `web_fetch`, `browser`, `firecrawl_search`, `firecrawl_scrape` |
+| **Patching** | `apply_patch` (Codex-style, 4-pass seek), `lsp_rename`, `lsp_code_action` |
+| **Planning** | `plan`, `create_todo_list`, `get_todo_list`, `update_todo_list`, `reason` (ToT/MCTS) |
+| **Media** | `screenshot`, `audio`, `video`, `ocr`, `image_process`, `clipboard` |
+| **Documents** | `pdf`, `document`, `archive`, `notebook` (Jupyter execute) |
+| **Security** | `scan_secrets`, `scan_vulnerabilities`, `scan_licenses`, `find_bugs` |
+| **Code Quality** | `organize_imports`, `analyze_logs`, `generate_openapi`, `resolve_conflicts` |
 | **Knowledge** | `knowledge_search`, `knowledge_add` — search/add knowledge base entries |
 | **Human Input** | `ask_human` — pause execution for mid-task user clarification (120s timeout) |
+| **Agent** | `spawn_agent`, `send_input`, `wait_agent`, `close_agent`, `resume_agent` |
 | **Self-Extension** | `create_skill` — write new SKILL.md files at runtime (self-authoring) |
 | **Self-Improvement** | `lessons_add`, `lessons_search`, `lessons_list` — persist and recall learned patterns across sessions |
 | **Verification** | `task_verify` — run tsc/tests/lint before marking tasks complete (Verification Contract) |
@@ -317,17 +317,21 @@ It combines the **industrial-grade reliability** of OpenClaw (concurrency contro
 
 | Capability | Code Buddy | OpenClaw |
 |:-----------|:-----------|:---------|
+| **Providers** | 15 providers + circuit breaker + fallback chain | Single provider at a time |
 | **Reasoning** | Tree-of-Thought + MCTS (4 depth levels), auto-escalation, `reason` tool | Provider-level thinking only |
 | **Auto-Repair** | `FaultLocalizer` → `IterativeRepair` → `RepairTemplates` (3-pass, AST-based) | No equivalent |
 | **Tool Selection** | RAG embedding filter (~110 tools, top-K per query) | All tools sent every turn |
-| **Context Engineering** | 5 exclusive techniques: pre-compaction flush, restorable compression, observation variator, importance-weighted sliding window, tool result compaction | Basic sliding window |
-| **Specialized Agents** | 7 built-in (PDF, Excel, DataAnalysis, SQL, Archive, CodeGuardian, SecurityReview) | Community skills only |
+| **Context Engineering** | 7 techniques: proactive compaction, image pruning, pre-compaction flush, restorable compression, observation variator, importance-weighted window, tool output masking | Basic sliding window |
+| **Specialized Agents** | 8 built-in (PDF, Excel, DataAnalysis, SQL, Archive, CodeGuardian, SecurityReview, SWE) | Community skills only |
+| **IDE Integration** | VS Code extension + JetBrains plugin + LSP server | VS Code only |
+| **Security Tools** | Secrets scanner, CVE scanner, license compliance, bug finder (25+ patterns) | None built-in |
+| **Git Workflow** | Auto-commit, `/pr`, merge conflict resolver, ghost snapshots | Basic git |
 | **Desktop Automation** | 3 native OS providers (Windows, macOS, Linux) + smart snapshots | Browser-only automation |
 | **Vision / OCR** | Tesseract.js OCR + Sharp image processing (native, offline) | Model-dependent only |
 | **Middleware Pipeline** | 11 composable before/after hooks with priorities | No middleware system |
-| **Observability** | OpenTelemetry + Sentry + Prometheus + JSONL RunStore | Skill-based only |
+| **Observability** | OpenTelemetry + Sentry + Prometheus + JSONL RunStore + telemetry toggle | Skill-based only |
 | **Plugin Isolation** | Worker thread sandboxing with conflict detection | In-process execution |
-| **GPU Monitoring** | Built-in for local LLM deployments (Ollama, LM Studio) | Not available |
+| **i18n** | 6 locales (English, French complete + 4 stubs) | English only |
 | **Security Track Record** | No known CVEs | CVE-2026-25253 (RCE via tool_call) |
 
 ### Code Safety
@@ -534,7 +538,7 @@ buddy trigger remove <id>      # Remove a trigger
 
 ## Multi-Channel Messaging
 
-Code Buddy supports 22+ messaging channels:
+Code Buddy supports 23+ messaging channels:
 
 | Channel | Features |
 |:--------|:---------|

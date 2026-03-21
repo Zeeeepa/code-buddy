@@ -1,6 +1,6 @@
 /**
  * Test the V2 generic docs pipeline on Code Buddy itself.
- * Usage: npx tsx scripts/run-docs-v2.ts [--with-llm]
+ * Usage: npx tsx scripts/run-docs-v2.ts [--with-llm] [--det-plan]
  */
 
 import * as dotenv from 'dotenv';
@@ -12,6 +12,8 @@ const projectRoot = path.resolve(__dirname, '..');
 dotenv.config({ path: path.join(projectRoot, '.env') });
 
 const withLLM = process.argv.includes('--with-llm');
+const detPlan = process.argv.includes('--det-plan');
+const incremental = process.argv.includes('--incremental');
 
 async function main() {
   console.log('=== Docs Pipeline V2 — Generic DeepWiki ===\n');
@@ -50,9 +52,14 @@ async function main() {
   }
 
   const { runDocsPipeline } = await import('../src/docs/docs-pipeline.js');
+  if (detPlan) console.log('Forcing deterministic plan (30 pages) + LLM enrichment');
+  if (incremental) console.log('Incremental mode: skipping unchanged pages');
+  console.log('');
   const result = await runDocsPipeline(graph, {
     cwd: projectRoot,
     llmCall,
+    forceDeterministicPlan: detPlan,
+    incremental,
     onProgress: (phase, detail) => console.log(`  [${phase}] ${detail}`),
   });
 
@@ -60,6 +67,9 @@ async function main() {
   console.log(`  Pages: ${result.pagesGenerated}`);
   console.log(`  Concepts linked: ${result.conceptsLinked}`);
   console.log(`  Files: ${result.files.join(', ')}`);
+  if (result.stats) {
+    console.log(`  Lines: ${result.stats.totalLines} | Mermaid: ${result.stats.mermaidDiagrams} | See-also: ${result.stats.seeAlsoFooters} | Cross-deps: ${result.stats.crossSubsystemDeps}`);
+  }
   if (result.errors.length > 0) console.log(`  Errors: ${result.errors.join('; ')}`);
 }
 

@@ -54,7 +54,18 @@ export class RunScriptTool extends BaseTool {
     const script = input.script as string;
     const language = input.language as string;
     const dependencies = (input.dependencies as string[]) || [];
-    const env = (input.env as Record<string, string>) || {};
+    const env: Record<string, string> = {
+      CODEBUDDY_CLI: process.env.CODEBUDDY_CLI || '1',
+      CODEBUDDY_CLI_VERSION: process.env.CODEBUDDY_CLI_VERSION || '',
+      ...((input.env as Record<string, string>) || {}),
+    };
+
+    // Validate dependency names to prevent command injection
+    for (const dep of dependencies) {
+      if (dep.includes('..') || dep.includes(';') || dep.includes('|') || dep.includes('&') || dep.includes('`') || dep.includes('$') || dep.includes('\n')) {
+        return this.error(`Invalid dependency name: "${dep}" — dependency names cannot contain shell metacharacters`);
+      }
+    }
 
     // Pre-flight syntax validation
     const syntaxCheck = validateSyntax(script, `script.${this.getExtension(language)}`);

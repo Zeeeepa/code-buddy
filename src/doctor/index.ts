@@ -1,11 +1,29 @@
 import { execSync } from 'child_process';
-import { existsSync, statfsSync } from 'fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  statfsSync,
+  unlinkSync,
+  writeFileSync,
+} from 'fs';
 import { join } from 'path';
+import { logger } from '../utils/logger.js';
+
+export interface FixResult {
+  success: boolean;
+  message: string;
+  action: string;
+}
 
 export interface DoctorCheck {
   name: string;
   status: 'ok' | 'warn' | 'error';
   message: string;
+  fixable?: boolean;
+  fix?: () => Promise<FixResult>;
 }
 
 function commandExists(cmd: string): boolean {
@@ -68,10 +86,13 @@ function checkConfigFiles(cwd: string): DoctorCheck[] {
   const checks: DoctorCheck[] = [];
 
   const codeBuddyDir = join(cwd, '.codebuddy');
+  const dirExists = existsSync(codeBuddyDir);
   checks.push({
     name: '.codebuddy directory',
-    status: existsSync(codeBuddyDir) ? 'ok' : 'warn',
-    message: existsSync(codeBuddyDir) ? 'exists' : 'not found',
+    status: dirExists ? 'ok' : 'warn',
+    message: dirExists ? 'exists' : 'not found',
+    fixable: !dirExists,
+    fix: !dirExists ? async () => fixMissingCodebuddyDir(cwd) : undefined,
   });
 
   const configFile = join(cwd, '.codebuddy', 'config.json');
@@ -80,6 +101,56 @@ function checkConfigFiles(cwd: string): DoctorCheck[] {
     status: existsSync(configFile) ? 'ok' : 'warn',
     message: existsSync(configFile) ? 'exists' : 'not found',
   });
+
+  // Check settings.json for corruption
+  const settingsFile = join(cwd, '.codebuddy', 'settings.json');
+  if (existsSync(settingsFile)) {
+    const settingsCorrupt = isJsonCorrupted(settingsFile);
+    checks.push({
+      name: 'settings.json',
+      status: settingsCorrupt ? 'error' : 'ok',
+      message: settingsCorrupt ? 'corrupted (invalid JSON)' : 'valid',
+      fixable: settingsCorrupt,
+      fix: settingsCorrupt ? async () => fixCorruptedSettings(cwd) : undefined,
+    });
+  }
+
+  // Check for config schema migration (missing required sections)
+  if (existsSync(settingsFile) && !isJsonCorrupted(settingsFile)) {
+    const needsMigration = checkSettingsMigration(settingsFile);
+    if (needsMigration) {
+      checks.push({
+        name: 'settings.json schema',
+        status: 'warn',
+        message: 'missing required fields (model, maxToolRounds, theme)',
+        fixable: true,
+        fix: async () => fixSettingsMigration(settingsFile),
+      });
+    }
+  }
+
+  return checks;
+}
+
+function checkStaleLockFiles(cwd: string): DoctorCheck[] {
+  const checks: DoctorCheck[] = [];
+  const staleLockFiles = findStaleLockFiles(cwd);
+
+  if (staleLockFiles.length > 0) {
+    checks.push({
+      name: 'Stale lock files',
+      status: 'warn',
+      message: `${staleLockFiles.length} stale lock file(s) found (>1h old)`,
+      fixable: true,
+      fix: async () => fixStaleLockFiles(staleLockFiles),
+    });
+  } else {
+    checks.push({
+      name: 'Stale lock files',
+      status: 'ok',
+      message: 'none found',
+    });
+  }
 
   return checks;
 }
@@ -124,6 +195,178 @@ function checkGit(cwd: string): DoctorCheck {
   }
 }
 
+// ============================================================================
+// Fix helpers
+// ============================================================================
+
+const DEFAULT_SETTINGS = {
+  model: 'grok-code-fast-1',
+  maxToolRounds: 400,
+  theme: 'default',
+};
+
+function isJsonCorrupted(filePath: string): boolean {
+  try {
+    const content = readFileSync(filePath, 'utf-8');
+    JSON.parse(content);
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+function checkSettingsMigration(filePath: string): boolean {
+  try {
+    const content = readFileSync(filePath, 'utf-8');
+    const parsed = JSON.parse(content);
+    const requiredKeys = ['model', 'maxToolRounds', 'theme'];
+    return requiredKeys.some(key => !(key in parsed));
+  } catch {
+    return false;
+  }
+}
+
+function findStaleLockFiles(cwd: string): string[] {
+  const staleFiles: string[] = [];
+  const oneHourAgo = Date.now() - 60 * 60 * 1000;
+
+  // Check common lock file locations
+  const lockLocations = [
+    join(cwd, '.codebuddy'),
+    join(cwd, '.codebuddy', 'daemon'),
+    join(cwd, '.codebuddy', 'sessions'),
+  ];
+
+  for (const dir of lockLocations) {
+    if (!existsSync(dir)) continue;
+    try {
+      const entries = readdirSync(dir);
+      for (const entry of entries) {
+        if (entry.endsWith('.lock') || entry.endsWith('.pid')) {
+          const fullPath = join(dir, entry);
+          try {
+            const stat = statSync(fullPath);
+            if (stat.mtimeMs < oneHourAgo) {
+              staleFiles.push(fullPath);
+            }
+          } catch {
+            // Skip files we can't stat
+          }
+        }
+      }
+    } catch {
+      // Skip directories we can't read
+    }
+  }
+
+  return staleFiles;
+}
+
+// ============================================================================
+// Fix functions
+// ============================================================================
+
+async function fixMissingCodebuddyDir(cwd: string): Promise<FixResult> {
+  const codeBuddyDir = join(cwd, '.codebuddy');
+  try {
+    mkdirSync(codeBuddyDir, { recursive: true });
+    logger.info(`Created .codebuddy directory at ${codeBuddyDir}`);
+    return {
+      success: true,
+      message: `Created .codebuddy directory at ${codeBuddyDir}`,
+      action: 'create-codebuddy-dir',
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      success: false,
+      message: `Failed to create .codebuddy directory: ${msg}`,
+      action: 'create-codebuddy-dir',
+    };
+  }
+}
+
+async function fixCorruptedSettings(cwd: string): Promise<FixResult> {
+  const settingsFile = join(cwd, '.codebuddy', 'settings.json');
+  try {
+    // Ensure directory exists
+    const dir = join(cwd, '.codebuddy');
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+    writeFileSync(settingsFile, JSON.stringify(DEFAULT_SETTINGS, null, 2));
+    logger.info(`Recreated settings.json with defaults at ${settingsFile}`);
+    return {
+      success: true,
+      message: `Recreated settings.json with defaults`,
+      action: 'recreate-settings',
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      success: false,
+      message: `Failed to recreate settings.json: ${msg}`,
+      action: 'recreate-settings',
+    };
+  }
+}
+
+async function fixSettingsMigration(filePath: string): Promise<FixResult> {
+  try {
+    const content = readFileSync(filePath, 'utf-8');
+    const parsed = JSON.parse(content);
+    const merged = { ...DEFAULT_SETTINGS, ...parsed };
+    writeFileSync(filePath, JSON.stringify(merged, null, 2));
+    logger.info(`Migrated settings.json schema at ${filePath}`);
+    return {
+      success: true,
+      message: 'Added missing fields to settings.json',
+      action: 'migrate-settings-schema',
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      success: false,
+      message: `Failed to migrate settings.json: ${msg}`,
+      action: 'migrate-settings-schema',
+    };
+  }
+}
+
+async function fixStaleLockFiles(lockFiles: string[]): Promise<FixResult> {
+  const deleted: string[] = [];
+  const errors: string[] = [];
+
+  for (const file of lockFiles) {
+    try {
+      unlinkSync(file);
+      deleted.push(file);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`${file}: ${msg}`);
+    }
+  }
+
+  if (errors.length > 0) {
+    return {
+      success: false,
+      message: `Deleted ${deleted.length}/${lockFiles.length} lock files. Errors: ${errors.join('; ')}`,
+      action: 'delete-stale-locks',
+    };
+  }
+
+  logger.info(`Deleted ${deleted.length} stale lock file(s)`);
+  return {
+    success: true,
+    message: `Deleted ${deleted.length} stale lock file(s)`,
+    action: 'delete-stale-locks',
+  };
+}
+
+// ============================================================================
+// Public API
+// ============================================================================
+
 export async function runDoctorChecks(cwd?: string): Promise<DoctorCheck[]> {
   const dir = cwd ?? process.cwd();
   return [
@@ -131,8 +374,29 @@ export async function runDoctorChecks(cwd?: string): Promise<DoctorCheck[]> {
     ...checkDependencies(),
     ...checkApiKeys(),
     ...checkConfigFiles(dir),
+    ...checkStaleLockFiles(dir),
     ...checkTtsProviders(),
     checkDiskSpace(dir),
     checkGit(dir),
   ];
+}
+
+export async function runFixes(checks: DoctorCheck[]): Promise<FixResult[]> {
+  const results: FixResult[] = [];
+  for (const check of checks) {
+    if (check.fixable && check.fix) {
+      try {
+        const result = await check.fix();
+        results.push(result);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        results.push({
+          success: false,
+          message: `Unexpected error fixing "${check.name}": ${msg}`,
+          action: 'unknown',
+        });
+      }
+    }
+  }
+  return results;
 }

@@ -350,6 +350,23 @@ export abstract class BaseAgent extends EventEmitter implements Agent {
     return this.sessionCost >= this.sessionCostLimit;
   }
 
+  /**
+   * Estimate whether the session cost limit would be reached after recording
+   * the given tokens. Does NOT mutate state — safe for pre-checks.
+   */
+  estimateSessionCostLimitReached(inputTokens: number, outputTokens: number): boolean {
+    return this.estimateSessionCostAfter(inputTokens, outputTokens) >= this.sessionCostLimit;
+  }
+
+  /**
+   * Estimate the session cost after hypothetically recording the given tokens.
+   * Does NOT mutate state.
+   */
+  protected estimateSessionCostAfter(_inputTokens: number, _outputTokens: number): number {
+    // Base implementation — subclass overrides with actual cost calculation
+    return this.sessionCost;
+  }
+
   // ============================================================================
   // Checkpoint Management (delegates to sessionFacade)
   // ============================================================================
@@ -436,6 +453,34 @@ export abstract class BaseAgent extends EventEmitter implements Agent {
 
   formatContextStats(): string {
     return this.contextFacade.formatStats(this.historyManager.getMessages());
+  }
+
+  /**
+   * Get context memory metrics (summaries, compressions, tokens saved).
+   */
+  getContextMemoryMetrics(): ContextMemoryMetrics {
+    return this.contextManager.getMemoryMetrics();
+  }
+
+  /**
+   * Get detailed compression statistics.
+   */
+  getCompressionStats(): {
+    totalCompressions: number;
+    totalTokensSaved: number;
+    averageCompressionRatio: number;
+    lastCompression: Date | null;
+    archivesAvailable: number;
+    lastStrategiesUsed: string[];
+  } {
+    return this.contextManager.getCompressionStats();
+  }
+
+  /**
+   * Get context budget breakdown by layer (system, lessons, tool_results, etc.).
+   */
+  getContextBudgetBreakdown(): Record<string, { chars: number; tokens: number; percent: number }> {
+    return this.contextManager.getContextBudgetBreakdown(this.historyManager.getMessages());
   }
 
   updateContextConfig(config: ContextConfig): void {

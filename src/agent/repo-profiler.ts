@@ -12,6 +12,10 @@
 import fs from 'fs';
 import path from 'path';
 import { logger } from '../utils/logger.js';
+import type { CartographyResult } from './repo-profiling/cartography.js';
+import { KnowledgeGraph } from '../knowledge/knowledge-graph.js';
+import { populateCodeGraph } from '../knowledge/code-graph-populator.js';
+import { saveCodeGraph, loadCodeGraph, codeGraphExists } from '../knowledge/code-graph-persistence.js';
 
 export interface RepoProfile {
   detectedAt: string;
@@ -23,6 +27,8 @@ export interface RepoProfile {
     lint?: string;
     format?: string;
     build?: string;
+    typecheck?: string;
+    validate?: string;
   };
   directories: {
     src?: string;
@@ -37,6 +43,34 @@ export interface RepoProfile {
   contextPack: string;
   /** mtime of the primary config file used for cache invalidation */
   _configMtime?: number;
+  /** package.json name */
+  name?: string;
+  /** package.json description */
+  description?: string;
+  /** ESM or CJS module system */
+  moduleType?: 'esm' | 'cjs';
+  /** Detected test framework (Vitest, Jest, etc.) */
+  testFramework?: string;
+  /** Entry points from main/bin */
+  entryPoints?: string[];
+  /** Node.js version constraint from engines */
+  nodeVersion?: string;
+  /** Dockerfile or docker-compose detected */
+  hasDocker?: boolean;
+  /** CI config detected (.github/workflows, etc.) */
+  hasCi?: boolean;
+  /** CLAUDE.md exists in project root */
+  hasClaudeMd?: boolean;
+  /** Detected databases from dependencies */
+  databases?: string[];
+  /** Top-level dependencies (up to 10 most significant) */
+  topDependencies?: string[];
+  /** License from package.json */
+  license?: string;
+  /** Deep cartography scan results (architecture, imports, patterns, API surface) */
+  cartography?: CartographyResult;
+  /** Whether the project directory appears empty/new (no config files or src dir) */
+  isEmpty?: boolean;
 }
 
 const CACHE_FILENAME = '.codebuddy/repoProfile.json';
@@ -60,12 +94,33 @@ export class RepoProfiler {
   async getProfile(): Promise<RepoProfile> {
     const cached = this.loadCache();
     if (cached && !this.isCacheStale(cached)) {
+      // Lazy-load code graph from disk if not already populated
+      const graph = KnowledgeGraph.getInstance();
+      if (graph.getStats().tripleCount === 0 && codeGraphExists(this.cwd)) {
+        loadCodeGraph(graph, this.cwd);
+      }
       return cached;
     }
 
     const profile = await this.computeProfile();
     this.saveCache(profile);
     return profile;
+  }
+
+  /**
+   * Check if the current directory looks like an empty/new project
+   * (no recognized config files and no src directory).
+   */
+  isEmptyProject(): boolean {
+    const configFiles = [
+      'package.json', 'pyproject.toml', 'Cargo.toml', 'go.mod',
+      'pom.xml', 'build.gradle', 'build.gradle.kts', 'composer.json',
+      'Gemfile', 'mix.exs', 'Package.swift', 'build.zig',
+      'tsconfig.json', 'CMakeLists.txt', 'Makefile',
+    ];
+    const hasSrc = fs.existsSync(path.join(this.cwd, 'src'));
+    const hasConfig = configFiles.some(f => fs.existsSync(path.join(this.cwd, f)));
+    return !hasSrc && !hasConfig;
   }
 
   /**
@@ -90,6 +145,17 @@ export class RepoProfiler {
     const conventions: RepoProfile['conventions'] = {};
     let configMtime: number | undefined;
 
+    // Extended profile fields
+    let name: string | undefined;
+    let description: string | undefined;
+    let moduleType: 'esm' | 'cjs' | undefined;
+    let testFramework: string | undefined;
+    let entryPoints: string[] | undefined;
+    let nodeVersion: string | undefined;
+    let license: string | undefined;
+    let topDependencies: string[] | undefined;
+    const databases: string[] = [];
+
     // ── Node / TypeScript ──────────────────────────────────────
     const pkgJsonPath = path.join(this.cwd, 'package.json');
     if (this.exists(pkgJsonPath)) {
@@ -98,6 +164,22 @@ export class RepoProfiler {
 
       try {
         const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf-8'));
+
+        // Package metadata
+        name = pkg.name || undefined;
+        description = pkg.description || undefined;
+        moduleType = pkg.type === 'module' ? 'esm' : 'cjs';
+        license = pkg.license || undefined;
+        nodeVersion = pkg.engines?.node || undefined;
+
+        // Entry points (deduplicated)
+        const eps = new Set<string>();
+        if (pkg.main) eps.add(pkg.main);
+        if (pkg.bin) {
+          if (typeof pkg.bin === 'string') eps.add(pkg.bin);
+          else Object.values(pkg.bin).forEach((v) => eps.add(v as string));
+        }
+        if (eps.size > 0) entryPoints = [...eps];
 
         // Package manager
         if (this.exists(path.join(this.cwd, 'pnpm-lock.yaml'))) {
@@ -117,20 +199,68 @@ export class RepoProfiler {
         if (scripts.lint) commands.lint = `${run} lint`;
         if (scripts.format) commands.format = `${run} format`;
         if (scripts.build) commands.build = `${run} build`;
+        if (scripts.typecheck) commands.typecheck = `${run} typecheck`;
+        if (scripts.validate) commands.validate = `${run} validate`;
 
-        // Framework detection from dependencies
+        // Framework detection from dependencies (order matters: specific before generic)
         const allDeps = {
           ...pkg.dependencies,
           ...pkg.devDependencies,
           ...pkg.peerDependencies,
         };
-        if (allDeps['react'] || allDeps['react-dom']) framework = 'React';
+
+        // Ink uses React internally — check it first
+        if (allDeps['ink']) framework = 'Ink (terminal UI)';
         else if (allDeps['next']) framework = 'Next.js';
-        else if (allDeps['vue']) framework = 'Vue';
+        else if (allDeps['nuxt']) framework = 'Nuxt';
         else if (allDeps['@angular/core']) framework = 'Angular';
-        else if (allDeps['express']) framework = 'Express';
+        else if (allDeps['svelte'] || allDeps['@sveltejs/kit']) framework = 'Svelte';
+        else if (allDeps['vue']) framework = 'Vue';
+        else if (allDeps['react'] || allDeps['react-dom']) framework = 'React';
         else if (allDeps['fastify']) framework = 'Fastify';
-        else if (allDeps['ink']) framework = 'Ink (terminal UI)';
+        else if (allDeps['express']) framework = 'Express';
+
+        // Test framework detection
+        if (allDeps['vitest']) testFramework = 'Vitest';
+        else if (allDeps['jest']) testFramework = 'Jest';
+        else if (allDeps['mocha']) testFramework = 'Mocha';
+        else if (allDeps['ava']) testFramework = 'AVA';
+
+        // Database detection
+        if (allDeps['better-sqlite3'] || allDeps['sqlite3']) databases.push('SQLite');
+        if (allDeps['pg'] || allDeps['postgres']) databases.push('PostgreSQL');
+        if (allDeps['mysql'] || allDeps['mysql2']) databases.push('MySQL');
+        if (allDeps['mongodb'] || allDeps['mongoose']) databases.push('MongoDB');
+        if (allDeps['redis'] || allDeps['ioredis']) databases.push('Redis');
+        if (allDeps['prisma'] || allDeps['@prisma/client']) databases.push('Prisma');
+
+        // Top dependencies — sorted by significance, not alphabetically
+        // Skip internal tooling / types / telemetry / boilerplate
+        const LOW_SIGNAL = new Set([
+          '@types/', '@opentelemetry/', '@sentry/', '@resvg/',
+        ]);
+        const depEntries = Object.keys(pkg.dependencies || {})
+          .filter((d) => !LOW_SIGNAL.has(d) && ![...LOW_SIGNAL].some((p) => d.startsWith(p)));
+        // Score: short names are typically core libs, scoped org packages less so
+        const scored = depEntries.map((d) => {
+          let score = 0;
+          // Well-known significant packages get a boost
+          const CORE = ['react', 'vue', 'angular', 'express', 'fastify', 'ink',
+            'next', 'nuxt', 'svelte', 'commander', 'yargs', 'chalk', 'zod',
+            'prisma', 'drizzle-orm', 'typeorm', 'sequelize', 'mongoose',
+            'openai', 'langchain', 'axios', 'socket.io', 'graphql',
+            'tailwindcss', 'typescript', 'webpack', 'vite', 'esbuild',
+            'electron', 'tauri', 'react-native', 'expo'];
+          if (CORE.includes(d)) score += 100;
+          // Non-scoped packages are usually more recognizable
+          if (!d.startsWith('@')) score += 10;
+          // User's own packages are highly relevant
+          if (pkg.name && d.startsWith(pkg.name.split('/')[0])) score += 50;
+          return { name: d, score };
+        });
+        scored.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+        const significantDeps = scored.slice(0, 10).map((s) => s.name);
+        if (significantDeps.length > 0) topDependencies = significantDeps;
 
         // Naming convention hint
         if (allDeps['eslint'] || pkg.eslintConfig) {
@@ -214,6 +344,42 @@ export class RepoProfiler {
       }
     }
 
+    // ── Infrastructure detection ────────────────────────────────
+    const hasDocker = this.exists(path.join(this.cwd, 'Dockerfile'))
+      || this.exists(path.join(this.cwd, 'docker-compose.yml'))
+      || this.exists(path.join(this.cwd, 'docker-compose.yaml'));
+    const hasCi = this.exists(path.join(this.cwd, '.github', 'workflows'))
+      || this.exists(path.join(this.cwd, '.gitlab-ci.yml'))
+      || this.exists(path.join(this.cwd, '.circleci'));
+    const hasClaudeMd = this.exists(path.join(this.cwd, 'CLAUDE.md'));
+
+    // ── Deep cartography scan ──────────────────────────────────
+    let cartography: CartographyResult | undefined;
+    try {
+      const { runCartography } = await import('./repo-profiling/cartography.js');
+      // Auto-detects source dirs; falls back to directories.src if set
+      cartography = runCartography(this.cwd, directories.src || undefined);
+    } catch (err) {
+      logger.debug('RepoProfiler: cartography scan failed (non-critical)', { err });
+    }
+
+    // ── Populate code graph from cartography ───────────────────
+    if (cartography) {
+      try {
+        const graph = KnowledgeGraph.getInstance();
+        graph.clear(); // Fresh rebuild
+        const tripleCount = populateCodeGraph(graph, cartography);
+        saveCodeGraph(graph, this.cwd);
+
+        // Strip importEdges from profile to keep repoProfile.json lean
+        delete cartography.importEdges;
+
+        logger.debug(`RepoProfiler: code graph populated with ${tripleCount} triples`);
+      } catch (err) {
+        logger.debug('RepoProfiler: code graph population failed (non-critical)', { err });
+      }
+    }
+
     // ── Build contextPack ─────────────────────────────────────
     const profile: RepoProfile = {
       detectedAt: new Date().toISOString(),
@@ -225,6 +391,20 @@ export class RepoProfiler {
       conventions,
       contextPack: '',
       _configMtime: configMtime,
+      name,
+      description,
+      moduleType,
+      testFramework,
+      entryPoints,
+      nodeVersion,
+      hasDocker,
+      hasCi,
+      hasClaudeMd,
+      databases: databases.length > 0 ? databases : undefined,
+      topDependencies,
+      license,
+      cartography,
+      isEmpty: this.isEmptyProject(),
     };
 
     profile.contextPack = this.buildContextPack(profile);

@@ -294,10 +294,10 @@ describe('OSSandbox', () => {
   });
 
   describe('isAvailable', () => {
-    it('should return false before initialization', () => {
+    it('should return false before initialization', async () => {
       const sandbox = new OSSandbox({ backend: 'none' });
       // Before init, backend defaults to 'none'
-      expect(sandbox.isAvailable()).toBe(false);
+      expect(await sandbox.isAvailable()).toBe(false);
     });
   });
 

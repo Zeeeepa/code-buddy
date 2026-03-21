@@ -91,3 +91,13 @@ export {
   type WorkflowDefinition,
   type CICDConfig,
 } from "./cicd-integration.js";
+
+// CI Auto-Fix Pipeline
+export {
+  CIAutoFixPipeline,
+  getCIAutoFixPipeline,
+  resetCIAutoFixPipeline,
+  type CIFailure,
+  type FixAttempt,
+  type AutoFixResult,
+} from "./ci-autofix-pipeline.js";

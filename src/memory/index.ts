@@ -88,3 +88,37 @@ export {
   type RetrievalResult,
   type MemorySearchConfig,
 } from "./semantic-memory-search.js";
+
+// Knowledge Graph (memU-inspired persistent entity/relation memory)
+export {
+  KnowledgeGraph,
+  getKnowledgeGraph,
+  resetKnowledgeGraph,
+  type Entity,
+  type Relation,
+  type EntityType,
+  type RelationType,
+  type GraphQuery,
+  type GraphContext,
+  type MemoryCategory as KGMemoryCategory,
+  computeSalience,
+  contentHash,
+  isTrivialMessage,
+} from "./knowledge-graph.js";
+
+// OCR Memory Pipeline (screenshot/image -> text -> embeddings -> search)
+export {
+  OCRMemoryPipeline,
+  getOCRMemoryPipeline,
+  resetOCRMemoryPipeline,
+  type OCRMemoryEntry,
+} from "./ocr-memory-pipeline.js";
+
+// Cross-Modal Search (text <-> image semantic search)
+export {
+  CrossModalSearch,
+  getCrossModalSearch,
+  resetCrossModalSearch,
+  type CrossModalResult,
+  type CrossModalSearchOptions,
+} from "./cross-modal-search.js";

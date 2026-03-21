@@ -2,6 +2,44 @@ import { ToolRegistration } from '../tools/tool-manager.js';
 import { SlashCommand } from '../commands/slash-commands.js';
 import { Logger } from '../utils/logger.js';
 import type { LLMMessage } from '../providers/types.js';
+import type { ContextEngine } from '../context/context-engine.js';
+
+/**
+ * Provider Onboarding Hooks
+ * 5-phase lifecycle for provider plugin setup:
+ *   1. auth → validate credentials
+ *   2. wizard.onboarding → interactive setup
+ *   3. discovery.run → discover available models
+ *   4. wizard.modelPicker → let user pick a model
+ *   5. onModelSelected → post-selection hook
+ */
+export interface ProviderOnboardingHooks {
+  auth?: () => Promise<{ valid: boolean; error?: string }>;
+  'wizard.onboarding'?: () => Promise<OnboardingResult>;
+  'wizard.modelPicker'?: (models: DiscoveredModel[]) => Promise<string>;
+  'discovery.run'?: () => Promise<DiscoveredModel[]>;
+  onModelSelected?: (modelId: string) => Promise<void>;
+}
+
+/**
+ * Result of a provider onboarding wizard
+ */
+export interface OnboardingResult {
+  success: boolean;
+  config?: Record<string, unknown>;
+  message?: string;
+}
+
+/**
+ * A model discovered by a provider's discovery hook
+ */
+export interface DiscoveredModel {
+  id: string;
+  name: string;
+  contextWindow: number;
+  description?: string;
+  capabilities?: string[];
+}
 
 /**
  * Plugin Provider Type
@@ -24,6 +62,9 @@ export interface PluginProvider {
   priority?: number;
   /** Provider-specific configuration */
   config?: Record<string, unknown>;
+
+  /** Onboarding hooks for the 5-phase provider setup lifecycle */
+  onboarding?: ProviderOnboardingHooks;
 
   /** Initialize the provider (called once during registration) */
   initialize(): Promise<void>;
@@ -124,19 +165,25 @@ export interface PluginPermissions {
 export interface PluginContext {
   /** Logger scoped to this plugin */
   logger: Logger;
-  
+
   /** Configuration for this plugin */
   config: Record<string, unknown>;
-  
+
   /** Register a tool */
   registerTool(tool: ToolRegistration): void;
-  
+
   /** Register a slash command */
   registerCommand(command: SlashCommand): void;
-  
+
   /** Register a provider (e.g., for LLMs, embeddings, search) */
   registerProvider(provider: PluginProvider): void;
-  
+
+  /**
+   * Register a custom context engine (OpenClaw v2026.3.7 alignment).
+   * Replaces the default context pipeline. Only one engine can be active (last wins).
+   */
+  registerContextEngine(engine: ContextEngine): void;
+
   /** Path to plugin's data directory */
   dataDir: string;
 }

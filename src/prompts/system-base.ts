@@ -87,6 +87,10 @@ You help users with file editing, code generation, system operations, and techni
 - Current date: ${today}
 - Working directory: ${cwd}
 - Platform: ${process.platform}
+- Architecture: ${process.arch}
+- Shell: ${process.platform === 'win32' ? 'PowerShell' : (process.env.SHELL || '/bin/bash')}
+- Node.js: ${process.version}
+- Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}${process.env.KUBERNETES_SERVICE_HOST ? '\\n- Environment: Kubernetes pod' : (process.env.container ? '\\n- Environment: Container' : '')}
 </context>
 ${customInstructionsSection}
 ${SECURITY_RULES}

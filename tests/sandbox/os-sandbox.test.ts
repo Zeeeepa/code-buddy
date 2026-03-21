@@ -84,7 +84,7 @@ describe("OSSandbox", () => {
 
     it("should report availability status", async () => {
       await sandbox.initialize();
-      const available = sandbox.isAvailable();
+      const available = await sandbox.isAvailable();
 
       expect(typeof available).toBe("boolean");
     });

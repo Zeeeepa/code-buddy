@@ -4,6 +4,7 @@ export {
   handleBranches,
   handleCheckout,
   handleMerge,
+  handleBranch,
 } from './branch-handlers.js';
 
 // Memory handlers
@@ -30,6 +31,7 @@ export {
   handlePairing,
   handleSecurityReview,
   handleIdentity,
+  handleElevated,
 } from './security-handlers.js';
 
 // Voice handlers
@@ -82,7 +84,13 @@ export {
 // Session handlers
 export {
   handleSessions,
+  cleanupSessions,
 } from './session-handlers.js';
+
+// Clipboard handlers
+export {
+  handleCopy,
+} from './clipboard-handler.js';
 
 // History handlers
 export {
@@ -144,6 +152,7 @@ export {
 // Plugin handlers
 export {
   handlePlugins,
+  handlePlugin,
 } from './plugin-handlers.js';
 
 // Colab handlers (AI Collaboration)
@@ -198,6 +207,114 @@ export {
 export {
   handleTeam,
 } from './team-handlers.js';
+
+// Batch handlers (CC13 — parallel task decomposition)
+export {
+  handleBatchCommand,
+  decomposeBatchGoal,
+  executeBatchPlan,
+  formatBatchPlan,
+  formatBatchResults,
+} from './batch-handlers.js';
+
+// Starter pack handlers
+export {
+  handleStarter,
+} from './starter-handlers.js';
+
+// Fast mode handler (OpenClaw-aligned)
+export {
+  handleFastMode,
+  isFastModeEnabled,
+  getFastModeModel,
+  getFastModeServiceTier,
+  getFastModeState,
+  enableFastMode,
+  disableFastMode,
+  setFastModel,
+} from './fast-mode-handler.js';
+
+// Backup handlers (OpenClaw v2026.3.8 alignment)
+export {
+  handleBackup,
+} from './backup-handlers.js';
+
+// BTW handler (OpenClaw v2026.3.14 alignment)
+export {
+  handleBtw,
+  setBtwClient,
+} from './btw-handler.js';
+
+// PR handlers (GitHub/GitLab PR creation)
+export {
+  handlePR,
+} from './pr-handlers.js';
+
+// Switch handler (mid-conversation model switching)
+export {
+  handleSwitch,
+  setSwitchModelProvider,
+} from './switch-handler.js';
+
+// Watch handler (file watcher trigger)
+export {
+  handleWatch,
+} from './watch-handler.js';
+
+// Conflicts handler (merge conflict resolution)
+export {
+  handleConflicts,
+} from './conflicts-handler.js';
+
+// Vulns handler (dependency vulnerability scanner)
+export {
+  handleVulns,
+} from './vulns-handler.js';
+
+// Bug handler (static analysis bug scanner)
+export {
+  handleBug,
+} from './bug-handler.js';
+
+// Suggest handler (proactive suggestions)
+export {
+  handleSuggest,
+} from './suggest-handler.js';
+
+// Telemetry handler (opt-in/opt-out toggle)
+export {
+  handleTelemetry,
+} from './telemetry-handler.js';
+
+// Quota handler (rate limit display)
+export {
+  handleQuota,
+} from './quota-handler.js';
+
+// Voice-code handler (voice-to-code pipeline)
+export {
+  handleVoiceCode,
+} from './voice-code-handler.js';
+
+// Coverage handler (coverage target checking)
+export {
+  handleCoverage,
+} from './coverage-handler.js';
+
+// Transform handler (code transformation)
+export {
+  handleTransform,
+} from './transform-handler.js';
+
+// Dev handlers (golden-path developer workflows)
+export {
+  handleDev,
+} from './dev-handlers.js';
+
+// Replace handler (codebase-wide find & replace)
+export {
+  handleReplace,
+} from './replace-handler.js';
 
 // Re-export CommandHandlerResult type
 export type { CommandHandlerResult } from './branch-handlers.js';

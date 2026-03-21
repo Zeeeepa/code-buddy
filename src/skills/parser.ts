@@ -92,6 +92,9 @@ function parseMetadata(yamlContent: string, sourcePath: string): SkillMetadata {
       requires: parsed.requires as SkillMetadata['requires'],
       config: parsed.config as SkillMetadata['config'],
       openclaw: parsed.openclaw as SkillMetadata['openclaw'],
+      // CC11: context fork and disable-model-invocation
+      contextFork: parsed.context === 'fork' || parsed.contextFork === true,
+      disableModelInvocation: parsed['disable-model-invocation'] === true || parsed.disableModelInvocation === true,
     };
   } catch (error) {
     throw new Error(

@@ -87,6 +87,18 @@ export interface Artifact {
   metadata?: Record<string, string>;
 }
 
+/** Yield payload for pause/resume orchestration */
+export interface YieldPayload {
+  /** Reason for yielding control */
+  reason: string;
+  /** State snapshot to inject into the next turn */
+  state?: Record<string, unknown>;
+  /** Suggested next action or prompt */
+  resumeHint?: string;
+  /** When the yield was issued */
+  timestamp: number;
+}
+
 export interface Task {
   id: string;
   /** Session grouping for multi-turn interactions */
@@ -96,6 +108,8 @@ export interface Task {
   artifacts: Artifact[];
   metadata?: Record<string, string>;
   history: TaskState[];
+  /** Yield payload for orchestrator pause/resume (sessions_yield) */
+  yieldPayload?: YieldPayload;
 }
 
 /** Callback for executing tasks */
@@ -188,6 +202,64 @@ export class A2AAgentServer extends EventEmitter {
 
     const completed = await this.executor(task);
     return completed;
+  }
+
+  /**
+   * Yield a task — pause execution and save state for later resumption.
+   * The orchestrator can inject a payload into the next turn.
+   */
+  yieldTask(taskId: string, payload: Omit<YieldPayload, 'timestamp'>): boolean {
+    const task = this.tasks.get(taskId);
+    if (!task || task.status.status !== TaskStatus.WORKING) {
+      return false;
+    }
+
+    task.yieldPayload = { ...payload, timestamp: Date.now() };
+    this.updateTaskStatus(task, TaskStatus.INPUT_REQUIRED, `Yielded: ${payload.reason}`);
+    this.emit('task:yielded', { taskId, reason: payload.reason });
+    return true;
+  }
+
+  /**
+   * Resume a yielded task with optional state injection.
+   * Clears the yield payload and re-enters the executor.
+   */
+  async resumeTask(taskId: string, resumeMessage?: A2AMessage, injectedState?: Record<string, unknown>): Promise<Task> {
+    const task = this.tasks.get(taskId);
+    if (!task) throw new Error(`Task not found: ${taskId}`);
+    if (!task.yieldPayload) {
+      throw new Error(`Task ${taskId} was not yielded`);
+    }
+
+    // Inject state into metadata for the executor to consume
+    if (injectedState) {
+      task.metadata = {
+        ...(task.metadata || {}),
+        __yield_state: JSON.stringify(injectedState),
+      };
+    }
+
+    // Clear yield payload
+    task.yieldPayload = undefined;
+
+    if (resumeMessage) {
+      task.messages.push(resumeMessage);
+    }
+
+    this.updateTaskStatus(task, TaskStatus.WORKING, 'Resumed after yield');
+    this.emit('task:resumed', { taskId });
+
+    try {
+      const completed = await this.executor(task);
+      this.updateTaskStatus(completed, TaskStatus.COMPLETED);
+      this.emit('task:completed', { taskId });
+      return completed;
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      this.updateTaskStatus(task, TaskStatus.FAILED, error);
+      this.emit('task:failed', { taskId, error });
+      return task;
+    }
   }
 
   private updateTaskStatus(task: Task, status: TaskStatus, message?: string): void {

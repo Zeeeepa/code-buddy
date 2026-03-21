@@ -5,6 +5,9 @@ import { getModelToolConfig } from "../config/model-tools.js";
 import { logger } from "../utils/logger.js";
 import { retry, RetryStrategies, RetryPredicates } from "../utils/retry.js";
 import { normalizeBaseURL, DEFAULT_BASE_URL } from "../utils/base-url.js";
+import { getCircuitBreaker, CircuitOpenError } from "../providers/circuit-breaker.js";
+import type { CircuitBreakerConfig } from "../providers/circuit-breaker.js";
+import { parseRateLimitHeaders, storeRateLimitInfo } from "../utils/rate-limit-display.js";
 
 export type CodeBuddyMessage = ChatCompletionMessageParam;
 
@@ -38,6 +41,8 @@ interface ChatRequestPayload extends Omit<ChatCompletionCreateParamsNonStreaming
   tool_choice?: "auto" | "none" | "required";
   search_parameters?: SearchParameters;
   thinking?: { type: 'enabled'; budget_tokens: number };
+  /** Anthropic/OpenAI service tier for latency vs quality trade-off */
+  service_tier?: 'auto' | 'default' | 'flex';
 }
 
 /** Streaming chat completion request payload */
@@ -46,6 +51,8 @@ interface ChatRequestPayloadStreaming extends Omit<ChatCompletionCreateParamsStr
   tool_choice?: "auto" | "none" | "required";
   search_parameters?: SearchParameters;
   thinking?: { type: 'enabled'; budget_tokens: number };
+  /** Anthropic/OpenAI service tier for latency vs quality trade-off */
+  service_tier?: 'auto' | 'default' | 'flex';
 }
 
 export interface CodeBuddyToolCall {
@@ -92,6 +99,14 @@ export interface ChatOptions {
   geminiMalformedRetryCount?: number;
   /** Internal: guard against infinite model fallback loops on Gemini */
   geminiModelFallbackTried?: boolean;
+  /** Service tier for latency/quality trade-off (Anthropic/OpenAI fast mode) */
+  service_tier?: 'auto' | 'default' | 'flex';
+  /** Enable circuit breaker for this call (opt-in). Wraps the API call with provider-level circuit breaker. */
+  circuitBreaker?: boolean;
+  /** Response format: 'text' (default) or 'json' for structured JSON output */
+  responseFormat?: 'text' | 'json';
+  /** tool_choice override for this request */
+  tool_choice?: 'auto' | 'none' | 'required';
 }
 
 export interface CodeBuddyResponse {
@@ -107,6 +122,8 @@ export interface CodeBuddyResponse {
     prompt_tokens: number;
     completion_tokens: number;
     total_tokens: number;
+    /** Cached prompt tokens (OpenAI/xAI automatic prefix caching) */
+    cached_tokens?: number;
   };
 }
 
@@ -121,6 +138,43 @@ export class CodeBuddyClient {
   private probePromise: Promise<boolean> | null = null;
   private isGeminiProvider: boolean = false;
   private geminiRequestTimeoutMs: number;
+  private circuitBreakerConfig: Partial<CircuitBreakerConfig> | undefined;
+
+  /** Prompt cache tracking: total cached tokens across all calls */
+  private _promptCacheHits: number = 0;
+  /** Prompt cache tracking: total non-cached prompt tokens */
+  private _promptCacheMisses: number = 0;
+
+  /**
+   * Configure the circuit breaker for this client.
+   * Once configured, calls with `circuitBreaker: true` in ChatOptions
+   * will be wrapped with the circuit breaker for the provider.
+   */
+  setCircuitBreakerConfig(config: Partial<CircuitBreakerConfig>): void {
+    this.circuitBreakerConfig = config;
+  }
+
+  /**
+   * Get the circuit breaker key for this client (based on base URL).
+   */
+  private getCircuitBreakerKey(): string {
+    return `provider:${this.baseURL}`;
+  }
+
+  /**
+   * Wrap a function call with the circuit breaker if enabled.
+   */
+  private async withCircuitBreaker<T>(
+    enabled: boolean | undefined,
+    fn: () => Promise<T>
+  ): Promise<T> {
+    if (!enabled) {
+      return fn();
+    }
+    const key = this.getCircuitBreakerKey();
+    const cb = getCircuitBreaker(key, this.circuitBreakerConfig);
+    return cb.execute(fn);
+  }
 
   private static isGeminiModelName(model: string): boolean {
     return model.toLowerCase().includes('gemini');
@@ -431,6 +485,59 @@ export class CodeBuddyClient {
   }
 
   /**
+   * Derive a human-readable provider name from the base URL.
+   */
+  getProviderName(): string {
+    const url = this.baseURL.toLowerCase();
+    if (url.includes('api.x.ai') || url.includes('xai')) return 'xAI';
+    if (url.includes('openai.com')) return 'OpenAI';
+    if (url.includes('anthropic.com')) return 'Anthropic';
+    if (url.includes('generativelanguage.googleapis.com')) return 'Gemini';
+    if (url.includes('openrouter.ai')) return 'OpenRouter';
+    if (url.includes('groq.com')) return 'Groq';
+    if (url.includes('together.xyz')) return 'Together';
+    if (url.includes('fireworks.ai')) return 'Fireworks';
+    if (url.includes('localhost') || url.includes('127.0.0.1')) return 'Local';
+    return 'API';
+  }
+
+  /**
+   * Get prompt cache statistics
+   */
+  getPromptCacheStats(): { hits: number; misses: number; hitRatio: number } {
+    const total = this._promptCacheHits + this._promptCacheMisses;
+    return {
+      hits: this._promptCacheHits,
+      misses: this._promptCacheMisses,
+      hitRatio: total > 0 ? this._promptCacheHits / total : 0,
+    };
+  }
+
+  /**
+   * Track prompt cache metrics from API response usage
+   */
+  private trackPromptCache(usage?: { prompt_tokens?: number; cached_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } }): void {
+    if (!usage) return;
+    // OpenAI returns cached_tokens in prompt_tokens_details or at top-level
+    let cachedTokens = usage.cached_tokens ?? 0;
+    if (cachedTokens === 0 && usage.prompt_tokens_details) {
+      cachedTokens = usage.prompt_tokens_details.cached_tokens ?? 0;
+    }
+
+    const promptTokens = usage.prompt_tokens ?? 0;
+    if (cachedTokens > 0) {
+      this._promptCacheHits += cachedTokens;
+      this._promptCacheMisses += Math.max(0, promptTokens - cachedTokens);
+      logger.debug(`Prompt cache: ${cachedTokens} cached / ${promptTokens} total tokens`, {
+        source: 'CodeBuddyClient',
+        hitRatio: promptTokens > 0 ? (cachedTokens / promptTokens * 100).toFixed(1) + '%' : '0%',
+      });
+    } else if (promptTokens > 0) {
+      this._promptCacheMisses += promptTokens;
+    }
+  }
+
+  /**
    * Check if using Gemini provider
    */
   isGemini(): boolean {
@@ -580,6 +687,11 @@ export class CodeBuddyClient {
         thinkingLevel: opts.thinkingLevel,
       };
       logger.debug('Gemini thinkingLevel set', { level: opts.thinkingLevel });
+    }
+
+    // JSON mode for Gemini: add responseMimeType
+    if (opts?.responseFormat === 'json') {
+      generationConfig.responseMimeType = 'application/json';
     }
 
     const body: Record<string, unknown> = {
@@ -964,27 +1076,92 @@ export class CodeBuddyClient {
         requestPayload.thinking = thinkingConfig.thinking;
       }
 
-      // Use retry with exponential backoff for API calls
-      const response = await retry(
-        async () => {
-          return await this.client!.chat.completions.create(
-            requestPayload as unknown as ChatCompletionCreateParamsNonStreaming
-          );
-        },
-        {
-          ...RetryStrategies.llmApi,
-          isRetryable: RetryPredicates.llmApiError,
-          onRetry: (error, attempt, delay) => {
-            logger.warn(`API call failed, retrying (attempt ${attempt}) in ${delay}ms...`, {
-              source: 'CodeBuddyClient',
-              error: error instanceof Error ? error.message : String(error),
-            });
-          },
+      // Add service tier for fast mode (Anthropic/OpenAI)
+      if (opts.service_tier) {
+        requestPayload.service_tier = opts.service_tier;
+      }
+
+      // JSON mode: add response_format for OpenAI/xAI providers
+      if (opts.responseFormat === 'json') {
+        (requestPayload as unknown as Record<string, unknown>).response_format = { type: 'json_object' };
+        // For Anthropic, inject JSON instruction into system prompt since no native API
+        if (modelInfo.provider === 'anthropic') {
+          const lastSystemIdx = finalMessages.findLastIndex(m => m.role === 'system');
+          if (lastSystemIdx >= 0) {
+            const sysMsg = finalMessages[lastSystemIdx];
+            if (typeof sysMsg.content === 'string') {
+              finalMessages = [...finalMessages];
+              finalMessages[lastSystemIdx] = {
+                ...sysMsg,
+                content: sysMsg.content + '\n\nIMPORTANT: You must respond with valid JSON only. No markdown, no explanation — just a JSON object.',
+              };
+            }
+          }
         }
+      }
+
+      // Apply tool_choice override from options
+      if (opts.tool_choice && useTools) {
+        requestPayload.tool_choice = opts.tool_choice;
+      }
+
+      // Use retry with exponential backoff for API calls, optionally wrapped with circuit breaker
+      const response = await this.withCircuitBreaker(opts.circuitBreaker, () =>
+        retry(
+          async () => {
+            return await this.client!.chat.completions.create(
+              requestPayload as unknown as ChatCompletionCreateParamsNonStreaming
+            );
+          },
+          {
+            ...RetryStrategies.llmApi,
+            isRetryable: RetryPredicates.llmApiError,
+            onRetry: (error, attempt, delay) => {
+              logger.warn(`API call failed, retrying (attempt ${attempt}) in ${delay}ms...`, {
+                source: 'CodeBuddyClient',
+                error: error instanceof Error ? error.message : String(error),
+              });
+            },
+          }
+        )
       );
 
-      return response as unknown as CodeBuddyResponse;
+      // Track rate limit headers from API response (if available via OpenAI SDK)
+      try {
+        const rawResponse = (response as unknown as { _response?: { headers?: Record<string, string> } })._response;
+        if (rawResponse?.headers) {
+          const providerName = this.getProviderName();
+          const rateLimitInfo = parseRateLimitHeaders(rawResponse.headers, providerName);
+          if (rateLimitInfo.remainingRequests !== undefined || rateLimitInfo.remainingTokens !== undefined) {
+            storeRateLimitInfo(rateLimitInfo);
+          }
+        }
+      } catch {
+        // Non-critical: rate limit tracking is best-effort
+      }
+
+      // Track prompt cache metrics from usage response
+      const codeBuddyResponse = response as unknown as CodeBuddyResponse;
+      const rawUsage = (response as unknown as Record<string, unknown>).usage as Record<string, unknown> | undefined;
+      if (rawUsage) {
+        this.trackPromptCache(rawUsage as { prompt_tokens?: number; cached_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } });
+
+        // Normalize usage to include cached_tokens
+        if (codeBuddyResponse.usage) {
+          const cachedTokens = (rawUsage.cached_tokens as number | undefined)
+            ?? ((rawUsage.prompt_tokens_details as { cached_tokens?: number } | undefined)?.cached_tokens);
+          if (cachedTokens !== undefined) {
+            codeBuddyResponse.usage.cached_tokens = cachedTokens;
+          }
+        }
+      }
+
+      return codeBuddyResponse;
     } catch (error: unknown) {
+      // Re-throw CircuitOpenError directly for caller handling
+      if (error instanceof CircuitOpenError) {
+        throw error;
+      }
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(`CodeBuddy API error: ${message}`);
     }
@@ -1413,31 +1590,39 @@ export class CodeBuddyClient {
         ...searchParams,
         stream: true,
         ...(thinkingConfig.thinking ? { thinking: thinkingConfig.thinking } : {}),
+        ...(opts.service_tier ? { service_tier: opts.service_tier } : {}),
+        ...(opts.responseFormat === 'json' ? { response_format: { type: 'json_object' } } : {}),
       };
 
-      // Use retry with exponential backoff for stream initialization
-      const stream = await retry(
-        async () => {
-          return await this.client!.chat.completions.create(
-            streamingPayload as unknown as ChatCompletionCreateParamsStreaming
-          );
-        },
-        {
-          ...RetryStrategies.llmApi,
-          isRetryable: RetryPredicates.llmApiError,
-          onRetry: (error, attempt, delay) => {
-            logger.warn(`Stream initialization failed, retrying (attempt ${attempt}) in ${delay}ms...`, {
-              source: 'CodeBuddyClient',
-              error: error instanceof Error ? error.message : String(error),
-            });
+      // Use retry with exponential backoff for stream initialization, optionally wrapped with circuit breaker
+      const stream = await this.withCircuitBreaker(opts.circuitBreaker, () =>
+        retry(
+          async () => {
+            return await this.client!.chat.completions.create(
+              streamingPayload as unknown as ChatCompletionCreateParamsStreaming
+            );
           },
-        }
+          {
+            ...RetryStrategies.llmApi,
+            isRetryable: RetryPredicates.llmApiError,
+            onRetry: (error, attempt, delay) => {
+              logger.warn(`Stream initialization failed, retrying (attempt ${attempt}) in ${delay}ms...`, {
+                source: 'CodeBuddyClient',
+                error: error instanceof Error ? error.message : String(error),
+              });
+            },
+          }
+        )
       );
 
       for await (const chunk of stream) {
         yield chunk;
       }
     } catch (error: unknown) {
+      // Re-throw CircuitOpenError directly for caller handling
+      if (error instanceof CircuitOpenError) {
+        throw error;
+      }
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(`CodeBuddy API error: ${message}`);
     }

@@ -24,7 +24,8 @@ export type PageType =
   | 'api-reference'
   | 'configuration'
   | 'security'
-  | 'troubleshooting';
+  | 'troubleshooting'
+  | 'testing';
 
 export interface DocPage {
   id: string;
@@ -33,6 +34,7 @@ export interface DocPage {
   description: string;
   sourceFiles: string[];
   parentId?: string;
+  depth?: number;
   relatedPages: string[];
   pageType: PageType;
 }
@@ -125,6 +127,8 @@ function buildPlanPrompt(profile: ProjectProfile): string {
     hasCLI: profile.scripts.start !== undefined || profile.dependencies.includes('commander'),
     hasAPI: profile.dependencies.includes('express') || profile.dependencies.includes('fastify'),
     envVarCount: profile.envVars.length,
+    testFileCount: profile.testInfo?.totalFiles ?? 0,
+    testFramework: profile.testInfo?.framework ?? 'unknown',
   };
 
   return `Project profile:
@@ -158,7 +162,8 @@ Generate a documentation plan following these rules:
    - sourceFiles: 3-10 relevant source file paths
    - parentId: parent section id (optional)
    - relatedPages: 2-3 related page ids
-   - pageType: one of overview|getting-started|key-concepts|architecture|component|subsystem|api-reference|configuration|security|troubleshooting
+   - 10+ test files → testing page
+   - pageType: one of overview|getting-started|key-concepts|architecture|component|subsystem|api-reference|configuration|security|troubleshooting|testing
 
 Return a JSON array of DocPage objects.`;
 }
@@ -261,11 +266,20 @@ export function generateDeterministicPlan(profile: ProjectProfile): DocPage[] {
   if (m > 50) {
     const subsystemStart = nextId;
     const maxClusters = m > 200 ? 15 : m > 100 ? 10 : 5;
+    const usedTitles = new Set<string>();
     for (const cluster of profile.architecture.clusters.slice(0, maxClusters)) {
       if (cluster.size < 5) continue;
+      // Deduplicate cluster labels — append top module name if duplicate
+      let title = capitalize(cluster.label);
+      if (usedTitles.has(title.toLowerCase())) {
+        const topMod = cluster.topModule?.split('/').pop() ?? '';
+        title = topMod ? `${title} (${capitalize(topMod)})` : `${title} ${nextId}`;
+      }
+      usedTitles.add(title.toLowerCase());
+      const slug = `${nextId}-${title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`;
       pages.push({
-        id: String(nextId), slug: `${nextId}-${cluster.label.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`,
-        title: capitalize(cluster.label),
+        id: String(nextId), slug,
+        title,
         description: `${cluster.size} modules in the ${cluster.label} subsystem`,
         sourceFiles: cluster.members.slice(0, 10),
         relatedPages: [String(subsystemStart)], pageType: 'subsystem',
@@ -328,6 +342,16 @@ export function generateDeterministicPlan(profile: ProjectProfile): DocPage[] {
       id: String(nextId), slug: `${nextId}-api-reference`, title: 'API Reference',
       description: 'CLI commands and HTTP endpoints',
       sourceFiles: [], relatedPages: ['1'], pageType: 'api-reference',
+    });
+    nextId++;
+  }
+
+  // Testing (if significant test suite detected)
+  if (profile.testInfo && profile.testInfo.totalFiles > 10) {
+    pages.push({
+      id: String(nextId), slug: `${nextId}-testing`, title: 'Testing',
+      description: 'Test organization, patterns, and running tests',
+      sourceFiles: [], relatedPages: ['1.1'], pageType: 'testing',
     });
     nextId++;
   }

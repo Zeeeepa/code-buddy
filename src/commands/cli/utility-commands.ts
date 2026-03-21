@@ -15,8 +15,9 @@ export function registerUtilityCommands(program: Command): void {
     .command('doctor')
     .description('Diagnose Code Buddy environment, dependencies, and configuration')
     .option('-v, --verbose', 'Show all checks including passing ones')
-    .action(async (options: { verbose?: boolean }) => {
-      const { runDoctorChecks } = await import('../../doctor/index.js');
+    .option('--fix', 'Auto-fix issues that can be resolved automatically')
+    .action(async (options: { verbose?: boolean; fix?: boolean }) => {
+      const { runDoctorChecks, runFixes } = await import('../../doctor/index.js');
       const checks = await runDoctorChecks(process.cwd());
 
       console.log('\n🔍 Code Buddy Doctor\n');
@@ -25,17 +26,39 @@ export function registerUtilityCommands(program: Command): void {
 
       for (const check of checks) {
         if (options.verbose || check.status !== 'ok') {
-          console.log(`  ${icons[check.status]} ${check.name}: ${check.message}`);
+          const fixTag = check.fixable ? ' [fixable]' : '';
+          console.log(`  ${icons[check.status]} ${check.name}: ${check.message}${fixTag}`);
         }
       }
 
       const errors = checks.filter(c => c.status === 'error').length;
       const warns = checks.filter(c => c.status === 'warn').length;
       const oks = checks.filter(c => c.status === 'ok').length;
+      const fixable = checks.filter(c => c.fixable).length;
 
-      console.log(`\n  Summary: ${oks} passed, ${warns} warnings, ${errors} errors\n`);
+      console.log(`\n  Summary: ${oks} passed, ${warns} warnings, ${errors} errors`);
+      if (fixable > 0 && !options.fix) {
+        console.log(`  ${fixable} issue(s) can be auto-fixed with --fix`);
+      }
+      console.log('');
 
-      if (errors > 0) process.exit(1);
+      if (options.fix && fixable > 0) {
+        console.log('🔧 Running auto-fixes...\n');
+        const fixResults = await runFixes(checks);
+
+        for (const result of fixResults) {
+          const icon = result.success ? '✅' : '❌';
+          console.log(`  ${icon} [${result.action}] ${result.message}`);
+        }
+
+        const fixed = fixResults.filter(r => r.success).length;
+        const failed = fixResults.filter(r => !r.success).length;
+        console.log(`\n  Fix summary: ${fixed} fixed, ${failed} failed\n`);
+
+        if (failed > 0) process.exit(1);
+      } else if (errors > 0) {
+        process.exit(1);
+      }
     });
 
   // Security Audit command

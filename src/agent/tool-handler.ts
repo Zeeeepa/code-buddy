@@ -48,6 +48,10 @@ import {
   createMultimodalTools,
   createAdvancedTools,
   createCanvasTools,
+  createLspTools,
+  createMergeConflictTools,
+  createVulnScannerTools,
+  createCodebaseReplaceTools,
 } from "../tools/registry/index.js";
 import type { FormalToolRegistry, IToolExecutionContext } from "../tools/registry/index.js";
 import { CodeBuddyToolCall } from "../codebuddy/client.js";
@@ -189,6 +193,10 @@ export class ToolHandler {
       ...createMultimodalTools(),
       ...createAdvancedTools(),
       ...createCanvasTools(),
+      ...createLspTools(),
+      ...createMergeConflictTools(),
+      ...createVulnScannerTools(),
+      ...createCodebaseReplaceTools(),
     ];
 
     // Register canonical-prefix alias tools (shell_exec→bash, file_read→view_file, etc.)
@@ -456,6 +464,13 @@ export class ToolHandler {
           hookContext,
           new Error(finalHookResult.error)
         );
+        // CC12: Emit on-tool-failure lifecycle hook
+        try {
+          await this.deps.hooksManager.executeHooks("on-tool-failure", {
+            toolName: toolCall.function.name,
+            error: finalHookResult.error,
+          });
+        } catch { /* hook failure non-fatal */ }
       }
 
       // ── RunStore: emit tool_result event ─────────────────────────

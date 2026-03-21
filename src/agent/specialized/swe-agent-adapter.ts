@@ -40,9 +40,12 @@ export class SWESpecializedAgent extends SpecializedAgent {
       // Lazy import to avoid circular deps
       const { createSWEAgent } = await import('./swe-agent.js');
 
+      // Apply per-agent config overrides from agent_defaults.agents.swe
+      const configOptions = this.getConfig().options ?? {};
+
       const agent = createSWEAgent({
         maxSteps: (task.params?.maxSteps as number) ?? 20,
-        maxObserve: (task.params?.maxObserve as number) ?? 10000,
+        maxObserve: (task.params?.maxObserve as number) ?? (configOptions.maxTokens as number | undefined) ?? 10000,
         llmCall: task.params?.llmCall as any,
         executeTool: task.params?.executeTool as any,
       });

@@ -10,13 +10,18 @@
 // ============================================================================
 
 export type DeviceCapability =
-  | 'camera'
-  | 'screen_record'
-  | 'location'
-  | 'notifications'
-  | 'system_run'
-  | 'file_transfer'
-  | 'screenshot';
+  | 'camera' | 'camera_list' | 'camera_snap'
+  | 'screen_record' | 'screenshot'
+  | 'location' | 'location_tracking'
+  | 'notifications' | 'notification_send' | 'notification_list'
+  | 'system_run' | 'system_info'
+  | 'file_transfer' | 'file_browse'
+  | 'contacts' | 'contacts_search'
+  | 'calendar' | 'calendar_events'
+  | 'sensors' | 'sensor_data'
+  | 'battery' | 'network_info'
+  | 'clipboard' | 'input_text'
+  | 'app_list' | 'app_launch';
 
 export interface ExecuteResult {
   /** Exit code (0 = success) */

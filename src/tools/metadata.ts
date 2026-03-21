@@ -154,6 +154,22 @@ export const TOOL_METADATA: ToolMetadata[] = [
     priority: 7,
     description: 'Fetch web page content'
   },
+  // Firecrawl (OpenClaw v2026.3.14)
+  {
+    name: 'firecrawl_search',
+    category: 'web',
+    keywords: ['search', 'firecrawl', 'crawl', 'web', 'find', 'query', 'results', 'internet'],
+    priority: 8,
+    description: 'Search the web via Firecrawl API'
+  },
+  {
+    name: 'firecrawl_scrape',
+    category: 'web',
+    keywords: ['scrape', 'firecrawl', 'crawl', 'extract', 'web', 'page', 'content', 'markdown', 'fetch'],
+    priority: 8,
+    description: 'Scrape a web page via Firecrawl API'
+  },
+
   {
     name: 'browser',
     category: 'web',
@@ -196,9 +212,16 @@ export const TOOL_METADATA: ToolMetadata[] = [
   {
     name: 'codebase_map',
     category: 'codebase',
-    keywords: ['codebase', 'structure', 'architecture', 'map', 'overview', 'symbols', 'dependencies', 'analyze'],
+    keywords: ['codebase', 'structure', 'architecture', 'map', 'overview', 'symbols', 'dependencies', 'analyze', 'graph', 'imports', 'who imports', 'neighbors', 'path', 'layers', 'components', 'modules', 'relationships', 'calls', 'call graph', 'extends', 'inherits', 'methods', 'flowchart', 'organigramme'],
     priority: 6,
-    description: 'Analyze codebase structure'
+    description: 'Analyze codebase structure and query code graph'
+  },
+  {
+    name: 'code_graph',
+    category: 'codebase',
+    keywords: ['code graph', 'call graph', 'who calls', 'what calls', 'callers', 'callees', 'impact analysis', 'what breaks', 'affected', 'flowchart', 'mermaid', 'diagram', 'organigramme', 'class hierarchy', 'inheritance', 'extends', 'implements', 'file functions', 'methods', 'signatures', 'dependency path', 'module dependencies', 'communities', 'clusters', 'subsystems', 'semantic search', 'embedding', 'similarity', 'pagerank', 'dead code', 'unused', 'uncalled', 'orphan', 'coupling', 'heatmap', 'refactoring', 'god function', 'hub module', 'drift', 'snapshot', 'evolution', 'visualize', 'interactive', 'd3', 'impact preview', 'pr impact', 'diff impact'],
+    priority: 7,
+    description: 'Query code dependency graph: callers, callees, impact analysis, Mermaid flowcharts, class hierarchies'
   },
   {
     name: 'spawn_subagent',
@@ -275,6 +298,15 @@ export const TOOL_METADATA: ToolMetadata[] = [
     keywords: ['reason', 'think', 'plan', 'analyze', 'architecture', 'design', 'debug', 'complex', 'trade-off', 'compare', 'evaluate', 'strategy', 'decision', 'mcts', 'tree-of-thought'],
     priority: 6,
     description: 'Solve complex problems using Tree-of-Thought reasoning with MCTS'
+  },
+
+  // Docs search
+  {
+    name: 'docs_search',
+    category: 'codebase',
+    keywords: ['docs', 'documentation', 'architecture', 'subsystem', 'api', 'security', 'config', 'design', 'how does', 'explain', 'overview'],
+    priority: 5,
+    description: 'Search project documentation for architecture, API, security, and configuration information'
   },
 
   // Plan management
@@ -460,6 +492,49 @@ export const TOOL_METADATA: ToolMetadata[] = [
     description: 'Query code entity relationships and dependencies'
   },
 
+  // LSP rename/refactor
+  {
+    name: 'lsp_rename',
+    category: 'codebase',
+    keywords: ['rename', 'refactor', 'symbol', 'lsp', 'language server', 'cross-file', 'identifier'],
+    priority: 7,
+    description: 'Rename a symbol across the codebase using LSP'
+  },
+  {
+    name: 'lsp_code_action',
+    category: 'codebase',
+    keywords: ['code action', 'quickfix', 'refactor', 'lsp', 'language server', 'suggestion'],
+    priority: 6,
+    description: 'Get available code actions (quick fixes, refactorings) from LSP'
+  },
+
+  // Bug finder (static analysis)
+  {
+    name: 'find_bugs',
+    category: 'codebase',
+    keywords: ['bug', 'find', 'scan', 'analysis', 'static', 'security', 'lint', 'check', 'vulnerability', 'error', 'leak', 'dead code', 'race condition', 'null', 'injection'],
+    priority: 7,
+    description: 'Scan source files for potential bugs using regex-based static analysis'
+  },
+
+  // Merge conflict resolution
+  {
+    name: 'resolve_conflicts',
+    category: 'git',
+    keywords: ['merge', 'conflict', 'resolve', 'git', 'ours', 'theirs', 'rebase', 'cherry-pick', 'markers'],
+    priority: 7,
+    description: 'Detect and resolve Git merge conflicts in files'
+  },
+
+  // Vulnerability scanning
+  {
+    name: 'scan_vulnerabilities',
+    category: 'system',
+    keywords: ['vulnerability', 'security', 'audit', 'dependency', 'npm', 'pip', 'cargo', 'cve', 'scan', 'advisory'],
+    priority: 7,
+    description: 'Scan project dependencies for known security vulnerabilities'
+  },
+
   // Control
   {
     name: 'terminate',
@@ -467,6 +542,60 @@ export const TOOL_METADATA: ToolMetadata[] = [
     keywords: ['terminate', 'finish', 'done', 'complete', 'end', 'stop', 'exit', 'signal'],
     priority: 5,
     description: 'Signal task completion and end the agent loop'
+  },
+
+  // Secrets detection
+  {
+    name: 'scan_secrets',
+    category: 'security' as ToolCategory,
+    keywords: ['secrets', 'credentials', 'api key', 'token', 'password', 'leak', 'scan', 'security', 'hardcoded', 'detect', 'aws', 'github', 'stripe', 'jwt'],
+    priority: 7,
+    description: 'Scan source files for hardcoded secrets, credentials, and API keys'
+  },
+
+  // Import management
+  {
+    name: 'organize_imports',
+    category: 'file_write' as ToolCategory,
+    keywords: ['import', 'organize', 'unused', 'missing', 'add import', 'remove import', 'sort', 'cleanup', 'typescript', 'python'],
+    priority: 6,
+    description: 'Organize, add missing, or remove unused imports in source files'
+  },
+
+  // Log analyzer
+  {
+    name: 'analyze_logs',
+    category: 'utility' as ToolCategory,
+    keywords: ['log', 'analyze', 'parse', 'error', 'warn', 'debug', 'trace', 'pattern', 'anomaly', 'syslog', 'json', 'tail', 'grep', 'monitor'],
+    priority: 7,
+    description: 'Analyze log files — parse entries, detect patterns, find anomalies'
+  },
+
+  // OpenAPI generator
+  {
+    name: 'generate_openapi',
+    category: 'codebase' as ToolCategory,
+    keywords: ['openapi', 'swagger', 'api', 'documentation', 'rest', 'endpoint', 'route', 'spec', 'generate', 'express', 'flask', 'fastapi', 'spring'],
+    priority: 6,
+    description: 'Auto-generate OpenAPI 3.0.3 spec from project source code'
+  },
+
+  // License scanner
+  {
+    name: 'scan_licenses',
+    category: 'codebase' as ToolCategory,
+    keywords: ['license', 'compliance', 'scan', 'spdx', 'dependency', 'copyleft', 'gpl', 'mit', 'legal', 'audit', 'npm'],
+    priority: 6,
+    description: 'Scan project dependencies for license compliance'
+  },
+
+  // Codebase replace
+  {
+    name: 'codebase_replace',
+    category: 'file_write' as ToolCategory,
+    keywords: ['replace', 'find', 'rename', 'refactor', 'codebase', 'search', 'substitute', 'sed', 'bulk', 'mass', 'global'],
+    priority: 7,
+    description: 'Find and replace text across multiple files in the codebase'
   },
 ];
 

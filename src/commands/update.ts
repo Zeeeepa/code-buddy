@@ -9,6 +9,9 @@
  *   buddy update --channel beta     # Switch to beta channel and update
  *   buddy update --check            # Check for updates without installing
  *   buddy update --channel stable   # Switch back to stable
+ *   buddy update --tag main         # Install from GitHub main branch
+ *   buddy update --tag v1.2.3       # Install from GitHub tag/branch
+ *   buddy update --from-source      # Alias for --tag main
  */
 
 import { Command } from 'commander';
@@ -21,7 +24,17 @@ export function createUpdateCommand(): Command {
     .option('--channel <channel>', 'Switch update channel (stable, beta, dev)')
     .option('--check', 'Check for updates without installing')
     .option('--force', 'Force reinstall even if up-to-date')
+    .option('--tag <ref>', 'Install from GitHub ref (branch or tag, e.g. main, v1.2.3)')
+    .option('--from-source', 'Alias for --tag main (install from GitHub main branch)')
     .action(async (opts) => {
+      // Resolve --from-source alias
+      const gitRef = opts.fromSource ? 'main' : opts.tag;
+
+      // GitHub install path — skip channel logic entirely
+      if (gitRef) {
+        return performGitHubInstall(gitRef);
+      }
+
       const { UpdateChannelManager } = await import('../utils/session-enhancements.js');
       const manager = UpdateChannelManager.getInstance();
 
@@ -79,4 +92,34 @@ export function createUpdateCommand(): Command {
     });
 
   return cmd;
+}
+
+const GITHUB_REPO = 'phuetz/grok-cli';
+
+/**
+ * Build the npm install command for a GitHub ref.
+ * Exported for testing.
+ */
+export function buildGitHubInstallCommand(ref: string): string {
+  return `npm install -g github:${GITHUB_REPO}#${ref}`;
+}
+
+/**
+ * Install from a GitHub branch or tag.
+ */
+async function performGitHubInstall(ref: string): Promise<void> {
+  const installCmd = buildGitHubInstallCommand(ref);
+
+  console.warn('\n⚠ Installing from GitHub (development install)');
+  console.log(`  Ref: ${ref}`);
+  console.log(`  Command: ${installCmd}\n`);
+
+  try {
+    execSync(installCmd, { stdio: 'inherit' });
+    console.log('\nUpdate complete. Restart your terminal to use the new version.');
+  } catch (err) {
+    logger.error('GitHub install failed', { err });
+    console.error('GitHub install failed. Check your network and npm permissions.');
+    process.exit(1);
+  }
 }

@@ -9,6 +9,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import * as crypto from 'crypto';
 import { logger } from '../utils/logger.js';
 import type { DeviceTransport, ExecuteResult } from './transports/base-transport.js';
 import { getPlatformCommands, type DevicePlatform } from './platform-commands.js';
@@ -19,9 +20,32 @@ import { getPlatformCommands, type DevicePlatform } from './platform-commands.js
 
 export type DeviceType = 'macos' | 'linux' | 'android' | 'local';
 
-export type DeviceCapability = 'camera' | 'screen_record' | 'location' | 'notifications' | 'system_run' | 'file_transfer' | 'screenshot';
+export type DeviceCapability =
+  | 'camera' | 'camera_list' | 'camera_snap'
+  | 'screen_record' | 'screenshot'
+  | 'location' | 'location_tracking'
+  | 'notifications' | 'notification_send' | 'notification_list'
+  | 'system_run' | 'system_info'
+  | 'file_transfer' | 'file_browse'
+  | 'contacts' | 'contacts_search'
+  | 'calendar' | 'calendar_events'
+  | 'sensors' | 'sensor_data'
+  | 'battery' | 'network_info'
+  | 'clipboard' | 'input_text'
+  | 'app_list' | 'app_launch';
 
 export type TransportType = 'ssh' | 'adb' | 'local';
+
+export interface PairingToken {
+  /** Cryptographically random token */
+  token: string;
+  /** When the token was created */
+  createdAt: number;
+  /** When the token expires (default: 5 minutes) */
+  expiresAt: number;
+  /** Whether the token has been consumed */
+  consumed: boolean;
+}
 
 export interface DeviceNode {
   id: string;
@@ -35,6 +59,8 @@ export interface DeviceNode {
   port?: number;
   username?: string;
   keyPath?: string;
+  /** Ephemeral pairing token (replaces static code) */
+  pairingToken?: PairingToken;
 }
 
 export interface LocationCoords {
@@ -53,6 +79,10 @@ interface PersistedDevices {
 
 const DEVICES_FILE = path.join(os.homedir(), '.codebuddy', 'devices.json');
 const DEVICES_VERSION = 1;
+/** Pairing token expiry: 5 minutes */
+const PAIRING_TOKEN_TTL_MS = 5 * 60 * 1000;
+/** Pairing token length in bytes (produces 32-char hex string) */
+const PAIRING_TOKEN_BYTES = 16;
 
 // ============================================================================
 // DeviceNodeManager
@@ -394,10 +424,55 @@ export class DeviceNodeManager {
     return result;
   }
 
+  /**
+   * @deprecated Use generatePairingToken() instead for ephemeral cryptographic tokens.
+   */
   generatePairingCode(): string {
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    logger.info(`Generated pairing code: ${code}`);
-    return code;
+    return this.generatePairingToken().token;
+  }
+
+  /**
+   * Generate an ephemeral, cryptographically random pairing token.
+   * Token auto-expires after PAIRING_TOKEN_TTL_MS (5 minutes).
+   * Each call rotates any previous token for the same flow.
+   */
+  generatePairingToken(): PairingToken {
+    const token: PairingToken = {
+      token: crypto.randomBytes(PAIRING_TOKEN_BYTES).toString('hex'),
+      createdAt: Date.now(),
+      expiresAt: Date.now() + PAIRING_TOKEN_TTL_MS,
+      consumed: false,
+    };
+    logger.debug(`Generated pairing token (expires in ${PAIRING_TOKEN_TTL_MS / 1000}s)`);
+    return token;
+  }
+
+  /**
+   * Validate a pairing token: checks expiry and single-use.
+   */
+  validatePairingToken(token: PairingToken, providedToken: string): boolean {
+    if (token.consumed) {
+      logger.warn('Pairing token already consumed');
+      return false;
+    }
+    if (Date.now() > token.expiresAt) {
+      logger.warn('Pairing token expired');
+      return false;
+    }
+    // Timing-safe comparison
+    const expected = Buffer.from(token.token, 'utf-8');
+    const actual = Buffer.from(providedToken, 'utf-8');
+    if (expected.length !== actual.length) {
+      return false;
+    }
+    return crypto.timingSafeEqual(expected, actual);
+  }
+
+  /**
+   * Consume a pairing token (mark as used, preventing replay).
+   */
+  consumePairingToken(token: PairingToken): void {
+    token.consumed = true;
   }
 
   updateLastSeen(deviceId: string): boolean {

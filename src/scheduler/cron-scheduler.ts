@@ -97,6 +97,10 @@ export interface CronJob {
   nextRetryAt?: Date;
   /** Enabled flag */
   enabled: boolean;
+  /** Session target: 'current' binds to creating session, 'new' creates fresh session, or specific session ID */
+  sessionTarget?: 'current' | 'new' | string;
+  /** Resolved session ID (populated when sessionTarget='current' at creation time) */
+  resolvedSessionId?: string;
 }
 
 export interface JobRun {
@@ -321,6 +325,7 @@ export class CronScheduler extends EventEmitter {
     maxRuns?: number;
     staggerMs?: number;
     enabled?: boolean;
+    sessionTarget?: CronJob['sessionTarget'];
   }): Promise<CronJob> {
     const id = crypto.randomUUID();
     const now = new Date();
@@ -340,7 +345,13 @@ export class CronScheduler extends EventEmitter {
       maxRuns: params.maxRuns,
       staggerMs: params.staggerMs,
       enabled: params.enabled ?? true,
+      sessionTarget: params.sessionTarget,
     };
+
+    // Resolve 'current' session target to concrete session ID at creation time
+    if (job.sessionTarget === 'current') {
+      job.resolvedSessionId = job.delivery?.sessionKey || `session-${Date.now()}`;
+    }
 
     // Calculate next run
     job.nextRunAt = this.calculateNextRun(job);

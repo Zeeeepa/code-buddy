@@ -2,6 +2,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
 import { EventEmitter } from 'events';
+import semver from 'semver';
 import {
   Plugin,
   PluginManifest,
@@ -18,6 +19,7 @@ import { getToolManager, ToolRegistration } from '../tools/tool-manager.js';
 import { getSlashCommandManager, SlashCommand } from '../commands/slash-commands.js';
 import { createLogger, Logger } from '../utils/logger.js';
 import { IsolatedPluginRunner, createIsolatedPluginRunner } from './isolated-plugin-runner.js';
+import { getBundledProviders } from './bundled/index.js';
 
 // Re-export PluginProvider for backward compatibility
 export type { PluginProvider } from './types.js';
@@ -29,6 +31,10 @@ export interface PluginManagerConfig {
   isolation?: PluginIsolationConfig;
   /** Force isolation for all plugins (ignore manifest.isolated setting) */
   forceIsolation?: boolean;
+  /** Trusted plugin IDs — only these plugins auto-load without confirmation */
+  trustedPlugins?: string[];
+  /** If true, block all non-trusted plugins from loading (no prompt, just deny) */
+  strictTrust?: boolean;
 }
 
 export class PluginManager extends EventEmitter {
@@ -39,6 +45,8 @@ export class PluginManager extends EventEmitter {
   private pluginConfigs: Map<string, Record<string, unknown>> = new Map();
   private config: PluginManagerConfig;
   private logger: Logger;
+  /** Registered context engine from plugins (OpenClaw v2026.3.7 — last wins) */
+  _registeredContextEngine: import('../context/context-engine.js').ContextEngine | null = null;
 
   constructor(config: Partial<PluginManagerConfig> = {}) {
     super();
@@ -48,7 +56,78 @@ export class PluginManager extends EventEmitter {
       autoLoad: config.autoLoad ?? true,
       isolation: config.isolation ?? { timeout: 30000 },
       forceIsolation: config.forceIsolation ?? true, // Default to isolated mode for security
+      trustedPlugins: config.trustedPlugins ?? this.loadTrustedPlugins(),
+      strictTrust: config.strictTrust ?? false,
     };
+  }
+
+  /**
+   * Load bundled provider plugins (OpenClaw v2026.3.14).
+   * Called during initialization to register built-in providers.
+   */
+  async loadBundledProviders(): Promise<void> {
+    const bundled = getBundledProviders();
+    for (const provider of bundled) {
+      try {
+        await provider.initialize?.();
+        await this.registerProvider(provider, 'bundled');
+        this.logger.info(`Bundled provider loaded: ${provider.name}`);
+      } catch (error) {
+        this.logger.warn(`Failed to load bundled provider ${provider.name}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  }
+
+  /**
+   * Load trusted plugins list from .codebuddy/settings.json
+   */
+  private loadTrustedPlugins(): string[] {
+    try {
+      const settingsPath = path.join(process.cwd(), '.codebuddy', 'settings.json');
+      if (fs.existsSync(settingsPath)) {
+        const settings = fs.readJsonSync(settingsPath);
+        if (Array.isArray(settings.trustedPlugins)) {
+          return settings.trustedPlugins.filter((p: unknown) => typeof p === 'string');
+        }
+      }
+    } catch {
+      // Ignore — no settings or parse error
+    }
+    return [];
+  }
+
+  /**
+   * Check if a plugin is trusted for auto-loading.
+   * Untrusted workspace plugins are blocked from implicit loading.
+   */
+  isPluginTrusted(pluginId: string): boolean {
+    return this.config.trustedPlugins?.includes(pluginId) ?? false;
+  }
+
+  /**
+   * Add a plugin to the trusted list and persist to settings.
+   */
+  async trustPlugin(pluginId: string): Promise<void> {
+    if (!this.config.trustedPlugins) {
+      this.config.trustedPlugins = [];
+    }
+    if (!this.config.trustedPlugins.includes(pluginId)) {
+      this.config.trustedPlugins.push(pluginId);
+    }
+
+    // Persist to .codebuddy/settings.json
+    const settingsPath = path.join(process.cwd(), '.codebuddy', 'settings.json');
+    try {
+      let settings: Record<string, unknown> = {};
+      if (await fs.pathExists(settingsPath)) {
+        settings = await fs.readJson(settingsPath);
+      }
+      settings.trustedPlugins = this.config.trustedPlugins;
+      await fs.writeJson(settingsPath, settings, { spaces: 2 });
+      this.logger.info(`Plugin ${pluginId} added to trusted list`);
+    } catch (err) {
+      this.logger.warn(`Failed to persist trusted plugin: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   /**
@@ -211,6 +290,28 @@ export class PluginManager extends EventEmitter {
       }
 
       const manifest = rawManifest as PluginManifest;
+
+      // Security: Plugin trust gate — block untrusted workspace plugins from auto-loading
+      if (!this.isPluginTrusted(manifest.id)) {
+        if (this.config.strictTrust) {
+          this.logger.warn(`Plugin ${manifest.id} is not trusted and strictTrust is enabled — skipping`);
+          this.emit('plugin:untrusted', { pluginId: manifest.id, path: normalizedPath });
+          return false;
+        }
+
+        // Check if plugin is from workspace (not home dir)
+        const homePluginDir = path.join(os.homedir(), '.codebuddy', 'plugins');
+        const isWorkspacePlugin = !normalizedPath.startsWith(homePluginDir);
+
+        if (isWorkspacePlugin) {
+          this.logger.warn(
+            `Workspace plugin "${manifest.id}" is not in the trusted list. ` +
+            `Add it to trustedPlugins in .codebuddy/settings.json or call trustPlugin().`
+          );
+          this.emit('plugin:untrusted', { pluginId: manifest.id, path: normalizedPath });
+          return false;
+        }
+      }
 
       // Security: Verify plugin ID matches directory name
       const dirName = path.basename(normalizedPath);
@@ -499,7 +600,27 @@ export class PluginManager extends EventEmitter {
       
       registerProvider: (provider) => {
         this.registerProvider(provider, metadata.manifest.id);
-      }
+      },
+
+      registerContextEngine: (engine) => {
+        // Security: non-trusted plugins cannot register ownsCompaction engines (OpenClaw v2026.3.14)
+        if (engine.ownsCompaction && !this.isPluginTrusted(metadata.manifest.id)) {
+          this.logger.warn(`Plugin ${metadata.manifest.id} denied ownsCompaction context engine — not trusted`);
+          this.emit('plugin:context-engine-denied', {
+            pluginId: metadata.manifest.id,
+            engineId: engine.id,
+            reason: 'ownsCompaction requires trusted plugin',
+          });
+          return;
+        }
+        this.logger.info(`Plugin ${metadata.manifest.id} registering context engine: ${engine.id}`);
+        this.emit('plugin:context-engine-registered', {
+          pluginId: metadata.manifest.id,
+          engineId: engine.id,
+        });
+        // Store for retrieval by ContextManagerV2
+        this._registeredContextEngine = engine;
+      },
     };
   }
 
@@ -687,6 +808,147 @@ export class PluginManager extends EventEmitter {
    */
   getPlugin(id: string): PluginMetadata | undefined {
     return this.plugins.get(id);
+  }
+
+  /**
+   * Discover and load plugins from npm packages in node_modules.
+   *
+   * Scans for packages matching `codebuddy-plugin-*` that declare a
+   * `codebuddy.extensions` field in their package.json. Checks
+   * `engines.codebuddy` for version compatibility before loading.
+   *
+   * Package.json example:
+   * ```json
+   * {
+   *   "name": "codebuddy-plugin-example",
+   *   "codebuddy": {
+   *     "extensions": ["tools", "llm"]
+   *   },
+   *   "engines": {
+   *     "codebuddy": ">=0.5.0"
+   *   }
+   * }
+   * ```
+   */
+  async discoverNpmPlugins(): Promise<void> {
+    const nodeModulesDir = path.join(process.cwd(), 'node_modules');
+
+    if (!await fs.pathExists(nodeModulesDir)) {
+      this.logger.debug('No node_modules directory found, skipping npm plugin discovery');
+      return;
+    }
+
+    this.logger.debug('Discovering npm plugins in node_modules...');
+    this.emit('npm-plugins:discovering', { dir: nodeModulesDir });
+
+    let discovered = 0;
+    let loaded = 0;
+    let skipped = 0;
+
+    try {
+      const entries = await fs.readdir(nodeModulesDir, { withFileTypes: true });
+
+      // Collect candidate directories: top-level `codebuddy-plugin-*` and
+      // scoped packages like `@scope/codebuddy-plugin-*`
+      const candidates: Array<{ name: string; dir: string }> = [];
+
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+
+        if (entry.name.startsWith('codebuddy-plugin-')) {
+          candidates.push({
+            name: entry.name,
+            dir: path.join(nodeModulesDir, entry.name),
+          });
+        } else if (entry.name.startsWith('@')) {
+          // Check scoped packages
+          const scopeDir = path.join(nodeModulesDir, entry.name);
+          try {
+            const scopeEntries = await fs.readdir(scopeDir, { withFileTypes: true });
+            for (const scopeEntry of scopeEntries) {
+              if (scopeEntry.isDirectory() && scopeEntry.name.startsWith('codebuddy-plugin-')) {
+                candidates.push({
+                  name: `${entry.name}/${scopeEntry.name}`,
+                  dir: path.join(scopeDir, scopeEntry.name),
+                });
+              }
+            }
+          } catch {
+            // Ignore unreadable scope directories
+          }
+        }
+      }
+
+      for (const candidate of candidates) {
+        discovered++;
+
+        try {
+          const pkgJsonPath = path.join(candidate.dir, 'package.json');
+          if (!await fs.pathExists(pkgJsonPath)) {
+            this.logger.debug(`Skipping ${candidate.name}: no package.json`);
+            skipped++;
+            continue;
+          }
+
+          const pkgJson = await fs.readJson(pkgJsonPath);
+
+          // Check for codebuddy.extensions field
+          if (!pkgJson.codebuddy?.extensions || !Array.isArray(pkgJson.codebuddy.extensions)) {
+            this.logger.debug(`Skipping ${candidate.name}: no codebuddy.extensions field`);
+            skipped++;
+            continue;
+          }
+
+          // Check engines.codebuddy version compatibility
+          const requiredVersion = pkgJson.engines?.codebuddy;
+          if (requiredVersion && typeof requiredVersion === 'string') {
+            // Read our own version from package.json
+            const ourPkgPath = path.join(process.cwd(), 'package.json');
+            let ourVersion = '0.0.0';
+            try {
+              const ourPkg = await fs.readJson(ourPkgPath);
+              ourVersion = ourPkg.version || '0.0.0';
+            } catch {
+              // Fall through with 0.0.0
+            }
+
+            if (!semver.satisfies(ourVersion, requiredVersion)) {
+              this.logger.warn(
+                `Skipping npm plugin ${candidate.name}: requires codebuddy ${requiredVersion}, ` +
+                `but current version is ${ourVersion}`
+              );
+              this.emit('npm-plugin:incompatible', {
+                name: candidate.name,
+                required: requiredVersion,
+                current: ourVersion,
+              });
+              skipped++;
+              continue;
+            }
+          }
+
+          this.logger.info(`Loading npm plugin: ${candidate.name} (extensions: ${pkgJson.codebuddy.extensions.join(', ')})`);
+
+          // Load the plugin from its directory
+          const success = await this.loadPlugin(candidate.dir);
+          if (success) {
+            loaded++;
+          } else {
+            skipped++;
+          }
+        } catch (error) {
+          this.logger.warn(
+            `Failed to process npm plugin ${candidate.name}: ${error instanceof Error ? error.message : String(error)}`
+          );
+          skipped++;
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Error scanning node_modules for plugins: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    this.logger.debug(`npm plugin discovery complete: ${discovered} found, ${loaded} loaded, ${skipped} skipped`);
+    this.emit('npm-plugins:discovered', { discovered, loaded, skipped });
   }
 }
 

@@ -8,6 +8,9 @@
 import { execSync, spawn, spawnSync, ChildProcess } from 'child_process';
 import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
+import type { SandboxBackendInterface, SandboxExecOptions, SandboxExecResult } from './sandbox-backend.js';
+// Re-export SandboxExecResult to unify with the local SandboxResult shape
+export type { SandboxExecOptions, SandboxExecResult } from './sandbox-backend.js';
 
 // ============================================================================
 // Types
@@ -28,6 +31,8 @@ export interface SandboxConfig {
   networkEnabled: boolean;
   /** Whether the root filesystem is read-only */
   readOnly: boolean;
+  /** Timezone override (IANA format e.g. 'America/New_York') — OpenClaw v2026.3.8 alignment */
+  timezone?: string;
 }
 
 export interface SandboxResult {
@@ -56,7 +61,8 @@ const DEFAULT_CONFIG: SandboxConfig = {
 // Docker Sandbox
 // ============================================================================
 
-export class DockerSandbox extends EventEmitter {
+export class DockerSandbox extends EventEmitter implements SandboxBackendInterface {
+  readonly name = 'docker';
   private config: SandboxConfig;
   private activeContainers: Set<string> = new Set();
 
@@ -78,9 +84,16 @@ export class DockerSandbox extends EventEmitter {
   }
 
   /**
+   * Instance-level availability check (satisfies SandboxBackendInterface).
+   */
+  async isAvailable(): Promise<boolean> {
+    return DockerSandbox.isAvailable();
+  }
+
+  /**
    * Execute a command in a sandboxed container.
    */
-  async execute(command: string, opts?: Partial<SandboxConfig>): Promise<SandboxResult> {
+  async execute(command: string, opts?: Partial<SandboxConfig> | SandboxExecOptions): Promise<SandboxResult> {
     const merged = { ...this.config, ...opts };
     const containerName = `codebuddy-sandbox-${randomUUID().slice(0, 8)}`;
     const startTime = Date.now();
@@ -321,6 +334,13 @@ export class DockerSandbox extends EventEmitter {
   }
 
   /**
+   * Clean up resources (satisfies SandboxBackendInterface).
+   */
+  async cleanup(): Promise<void> {
+    await this.dispose();
+  }
+
+  /**
    * Build docker run arguments.
    */
   private buildDockerArgs(containerName: string, config: SandboxConfig, command: string): string[] {
@@ -345,6 +365,21 @@ export class DockerSandbox extends EventEmitter {
         throw new Error('Invalid workspace mount path');
       }
       args.push('-v', `${config.workspaceMount}:/workspace`, '-w', '/workspace');
+    }
+
+    // Inject CODEBUDDY_CLI env vars so child processes know they're inside Code Buddy
+    args.push('-e', `CODEBUDDY_CLI=${process.env.CODEBUDDY_CLI || '1'}`);
+    if (process.env.CODEBUDDY_CLI_VERSION) {
+      args.push('-e', `CODEBUDDY_CLI_VERSION=${process.env.CODEBUDDY_CLI_VERSION}`);
+    }
+
+    // Timezone override (OpenClaw v2026.3.8 — CODEBUDDY_TZ env)
+    const tz = config.timezone || process.env.CODEBUDDY_TZ;
+    if (tz) {
+      // Validate IANA timezone format (Continent/City)
+      if (/^[A-Z][a-zA-Z]+\/[A-Za-z_]+(?:\/[A-Za-z_]+)?$/.test(tz)) {
+        args.push('-e', `TZ=${tz}`);
+      }
     }
 
     args.push(config.image, 'sh', '-c', command);

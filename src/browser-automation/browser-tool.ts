@@ -82,10 +82,22 @@ export type BrowserAction =
   | 'set_timezone'
   | 'set_locale'
   // Download
-  | 'download';
+  | 'download'
+  // Batch (OpenClaw v2026.3.13 alignment)
+  | 'batch'
+  // Attach to running Chrome (OpenClaw v2026.3.13)
+  | 'attach';
 
 export interface BrowserToolInput {
   action: BrowserAction;
+  /** Batch actions (for action='batch') — OpenClaw v2026.3.13 */
+  actions?: BrowserToolInput[];
+  /** Stop on first error in batch mode (default: true) */
+  stopOnError?: boolean;
+  /** Multiple selectors for click/fill/type (OpenClaw v2026.3.13) */
+  selectors?: string[];
+  /** Browser profile name ('user', 'chrome-relay', or custom) */
+  profile?: string;
   // Connection
   cdpUrl?: string;
   headless?: boolean;
@@ -321,6 +333,14 @@ export class BrowserTool {
         case 'download':
           return this.download(input);
 
+        // Batch execution (OpenClaw v2026.3.13)
+        case 'batch':
+          return this.executeBatch(input);
+
+        // Attach to running Chrome (OpenClaw v2026.3.13)
+        case 'attach':
+          return this.attachToChrome(input);
+
         default:
           return { success: false, error: `Unknown action: ${action}` };
       }
@@ -328,6 +348,90 @@ export class BrowserTool {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error('Browser action error', { action, error: errorMessage });
       return { success: false, error: errorMessage };
+    }
+  }
+
+  /**
+   * Execute a batch of browser actions (OpenClaw v2026.3.13)
+   */
+  private async executeBatch(input: BrowserToolInput): Promise<ToolResult> {
+    if (!input.actions || !Array.isArray(input.actions) || input.actions.length === 0) {
+      return { success: false, error: 'batch action requires actions[] array' };
+    }
+
+    const stopOnError = input.stopOnError !== false; // default true
+    const results: Array<{ action: string; success: boolean; output?: string; error?: string }> = [];
+
+    for (const subAction of input.actions) {
+      // SSRF check for navigation actions in batch (OpenClaw v2026.3.14)
+      if (subAction.action === 'navigate' && subAction.url) {
+        try {
+          const { assertSafeUrl } = await import('../security/ssrf-guard.js');
+          const check = await assertSafeUrl(subAction.url);
+          if (!check.safe) {
+            results.push({
+              action: subAction.action,
+              success: false,
+              error: `SSRF blocked: ${check.reason || 'URL not allowed'}`,
+            });
+            if (stopOnError) break;
+            continue;
+          }
+        } catch { /* SSRF guard unavailable, proceed */ }
+      }
+
+      const result = await this.execute(subAction);
+      results.push({
+        action: subAction.action,
+        success: result.success,
+        output: result.output,
+        error: result.error,
+      });
+
+      if (!result.success && stopOnError) {
+        break;
+      }
+    }
+
+    const allSuccess = results.every(r => r.success);
+    const output = results.map((r, i) =>
+      `[${i + 1}/${input.actions!.length}] ${r.action}: ${r.success ? 'OK' : 'FAIL'} ${r.output || r.error || ''}`
+    ).join('\n');
+
+    return {
+      success: allSuccess,
+      output: `Batch: ${results.length}/${input.actions.length} actions executed\n${output}`,
+      error: allSuccess ? undefined : 'One or more batch actions failed',
+    };
+  }
+
+  /**
+   * Attach to a running Chrome instance (OpenClaw v2026.3.13)
+   */
+  private async attachToChrome(input: BrowserToolInput): Promise<ToolResult> {
+    try {
+      const { discoverChromeEndpoint } = await import('./chrome-discovery.js');
+      const { getBuiltinProfile } = await import('./builtin-profiles.js');
+
+      // Try discovery first
+      const cdpUrl = discoverChromeEndpoint();
+      if (cdpUrl) {
+        return this.connect({ ...input, cdpUrl });
+      }
+
+      // Fallback to chrome-relay profile
+      const relay = getBuiltinProfile('chrome-relay');
+      if (relay?.userDataDir) {
+        return this.launch({
+          ...input,
+          userDataDir: relay.userDataDir,
+          headless: relay.headless ?? false,
+        } as BrowserToolInput);
+      }
+
+      return { success: false, error: 'No Chrome instance found and chrome-relay profile unavailable' };
+    } catch (error) {
+      return { success: false, error: `Chrome attach failed: ${error instanceof Error ? error.message : String(error)}` };
     }
   }
 

@@ -6,6 +6,7 @@
  */
 
 import type { SlashCommand } from './types.js';
+import { promptCommands } from './prompt-commands.js';
 
 // ============================================================================
 // Core Commands
@@ -96,13 +97,23 @@ const coreCommands: SlashCommand[] = [
 
 const modeCommands: SlashCommand[] = [
   {
+    name: 'fast',
+    description: 'Toggle fast mode (switch to low-latency model with service_tier=flex)',
+    prompt: '__FAST_MODE__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'action', description: 'on, off, toggle, status, model <name>', required: false }
+    ]
+  },
+  {
     name: 'model',
-    description: 'Change the AI model',
+    description: 'Change the AI model (use "auto" for automatic routing by task complexity)',
     prompt: '__CHANGE_MODEL__',
     filePath: '',
     isBuiltin: true,
     arguments: [
-      { name: 'model', description: 'Model name to switch to', required: false }
+      { name: 'model', description: 'Model name to switch to, or "auto" for automatic routing', required: false }
     ]
   },
   {
@@ -123,6 +134,16 @@ const modeCommands: SlashCommand[] = [
     isBuiltin: true,
     arguments: [
       { name: 'action', description: 'status, on, off, models, compare [tokens], sensitivity <level>, stats', required: false }
+    ]
+  },
+  {
+    name: 'switch',
+    description: 'Switch model mid-conversation (use "auto" to revert to default)',
+    prompt: '__SWITCH__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'model', description: 'Model name or "auto" to revert', required: false }
     ]
   }
 ];
@@ -157,6 +178,20 @@ const checkpointCommands: SlashCommand[] = [
     isBuiltin: true
   },
   {
+    name: 'redo',
+    description: 'Redo previously undone changes (restore forward in ghost snapshot timeline)',
+    prompt: '__REDO__',
+    filePath: '',
+    isBuiltin: true
+  },
+  {
+    name: 'timeline',
+    description: 'Show ghost snapshot timeline with current position',
+    prompt: '__TIMELINE__',
+    filePath: '',
+    isBuiltin: true
+  },
+  {
     name: 'diff',
     description: 'Show uncommitted git changes, or diff between checkpoints',
     prompt: '__DIFF__',
@@ -174,6 +209,16 @@ const checkpointCommands: SlashCommand[] = [
 // ============================================================================
 
 const gitCommands: SlashCommand[] = [
+  {
+    name: 'pr',
+    description: 'Create a GitHub/GitLab PR from the current branch',
+    prompt: '__PR__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'title', description: 'PR title (auto-generated if omitted). Use --draft for draft PR.', required: false }
+    ]
+  },
   {
     name: 'review',
     description: 'Quick code review of staged/unstaged changes',
@@ -227,18 +272,13 @@ const devCommands: SlashCommand[] = [
   },
   {
     name: 'lint',
-    description: 'Run linter and fix issues',
-    prompt: `Run the project's linter and help fix any issues:
-
-1. Detect the linter (eslint, prettier, pylint, etc.)
-2. Run the linter
-3. If issues are found:
-   - List all issues by severity
-   - Offer to auto-fix what's possible
-   - Suggest manual fixes for complex issues
-4. Provide a summary`,
+    description: 'Auto-detect and run project linters (eslint, ruff, clippy, golangci-lint, rubocop, phpstan)',
+    prompt: '__LINT__',
     filePath: '',
-    isBuiltin: true
+    isBuiltin: true,
+    arguments: [
+      { name: 'action', description: 'run (default), fix (auto-correct), detect (show detected linters)', required: false }
+    ]
   },
   {
     name: 'fix',
@@ -320,6 +360,47 @@ Be systematic and thorough in your analysis.`,
     arguments: [
       { name: 'options', description: 'quick (skip expensive), full (all tests), tools (test tool calling), stream (test streaming)', required: false }
     ]
+  },
+  {
+    name: 'watch',
+    description: 'Watch source files for changes and trigger actions (lint, test, typecheck)',
+    prompt: '__WATCH__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'action', description: 'start [patterns...], stop, status', required: false }
+    ]
+  },
+  {
+    name: 'conflicts',
+    description: 'Detect and resolve Git merge conflicts',
+    prompt: '__CONFLICTS__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'action', description: 'scan, show <file>, resolve <file> [ours|theirs|both]', required: false }
+    ]
+  },
+  {
+    name: 'vulns',
+    description: 'Scan project dependencies for known security vulnerabilities',
+    prompt: '__VULNS__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'package_manager', description: 'npm, pip, cargo, go (optional, scans all if omitted)', required: false }
+    ]
+  },
+  {
+    name: 'bug',
+    description: 'Scan files or directories for potential bugs using static analysis',
+    prompt: '__BUG__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'path', description: 'File or directory to scan (default: current directory)', required: false },
+      { name: '--severity', description: 'Filter by minimum severity: critical, high', required: false }
+    ]
   }
 ];
 
@@ -360,6 +441,13 @@ const docCommands: SlashCommand[] = [
     arguments: [
       { name: 'file', description: 'File to document', required: false }
     ]
+  },
+  {
+    name: 'docs-generate',
+    description: 'Generate full project documentation (DeepWiki V2 pipeline)',
+    prompt: `__DOCS_GENERATE__`,
+    filePath: '',
+    isBuiltin: true,
   }
 ];
 
@@ -418,6 +506,26 @@ const securityCommands: SlashCommand[] = [
     isBuiltin: true,
     arguments: [
       { name: 'action', description: 'status, approve <code>, revoke <id>, list, pending', required: false }
+    ]
+  },
+  {
+    name: 'elevated',
+    description: 'Toggle elevated permission mode (sudo-like for privileged operations)',
+    prompt: '__ELEVATED__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'action', description: 'on [duration-min], off, status, grants, revoke <id>', required: false }
+    ]
+  },
+  {
+    name: 'secrets-scan',
+    description: 'Scan project for hardcoded secrets, API keys, and credentials',
+    prompt: '__SECRETS_SCAN__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'path', description: 'File or directory path to scan (default: current directory)', required: false }
     ]
   }
 ];
@@ -498,7 +606,27 @@ const sessionCommands: SlashCommand[] = [
     filePath: '',
     isBuiltin: true,
     arguments: [
-      { name: 'action', description: 'list, show <id>, replay <id>, delete <id>', required: false }
+      { name: 'action', description: 'list, show <id>, replay <id>, delete <id>, cleanup [--days N] [--keep N] [--dry-run]', required: false }
+    ]
+  },
+  {
+    name: 'copy',
+    description: 'Copy to clipboard: last response, last code block, or specified text',
+    prompt: '__COPY__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'target', description: '"code" for last code block, or text to copy. Empty copies last response.', required: false }
+    ]
+  },
+  {
+    name: 'branch',
+    description: 'Manage conversation branches (create, switch, list, merge, diff, delete)',
+    prompt: '__BRANCH__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'action', description: 'create [name], switch <id>, list, merge <id>, diff <id>, delete <id>, rename <id> <name>, tree, history [id]', required: false }
     ]
   },
   {
@@ -610,6 +738,16 @@ const memoryCommands: SlashCommand[] = [
     arguments: [
       { name: 'action', description: 'list, add <content>, search <query>, stats', required: false }
     ]
+  },
+  {
+    name: 'knowledge-graph',
+    description: 'View and manage the persistent knowledge graph (memU-style memory)',
+    prompt: '__KNOWLEDGE_GRAPH__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'action', description: 'stats, entities [type], relations [entity], query <name>, decay, clear', required: false }
+    ]
   }
 ];
 
@@ -666,6 +804,16 @@ const autonomyCommands: SlashCommand[] = [
     ]
   },
   {
+    name: 'approvals',
+    description: 'Manage approval pattern learning (patterns, clear, threshold)',
+    prompt: '__APPROVALS__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'action', description: 'patterns (list), clear (reset all), threshold <n>', required: false }
+    ]
+  },
+  {
     name: 'heal',
     description: 'Configure self-healing auto-correction',
     prompt: '__SELF_HEALING__',
@@ -673,6 +821,16 @@ const autonomyCommands: SlashCommand[] = [
     isBuiltin: true,
     arguments: [
       { name: 'action', description: 'on, off, status, or stats', required: false }
+    ]
+  },
+  {
+    name: 'batch-review',
+    description: 'Toggle batch review mode for multi-file changes (consolidate approve/reject)',
+    prompt: '__BATCH_REVIEW__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'action', description: 'on, off, status, show (view pending)', required: false }
     ]
   }
 ];
@@ -682,6 +840,16 @@ const autonomyCommands: SlashCommand[] = [
 // ============================================================================
 
 const toolCommands: SlashCommand[] = [
+  {
+    name: 'starter',
+    description: 'Browse and activate starter pack skills for new projects',
+    prompt: '__STARTER__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'name_or_action', description: 'list, search <query>, or <starter-name>', required: false }
+    ]
+  },
   {
     name: 'tools',
     description: 'List and filter available tools',
@@ -961,8 +1129,47 @@ const workflowCommands: SlashCommand[] = [
     arguments: [
       { name: 'action', description: 'list, search <query>, install <id>, uninstall <id>, update <id>, status', required: false }
     ]
+  },
+  {
+    name: 'plugin',
+    description: 'Manage a single plugin (owner-gated, singular alias for /plugins)',
+    prompt: '__PLUGIN__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'action', description: 'install <id>, uninstall <id>, enable <id>, disable <id>, status', required: false }
+    ]
   }
 ];
+
+// ============================================================================
+// Golden-Path Dev Commands (slash)
+// ============================================================================
+
+const goldenPathCommands: SlashCommand[] = [
+  {
+    name: 'dev',
+    description: 'Golden-path developer workflows (plan, run, pr, fix-ci, status)',
+    prompt: '__DEV__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'action', description: 'plan <objective>, run <objective>, pr <objective>, fix-ci, status', required: false }
+    ]
+  },
+  {
+    name: 'replace',
+    description: 'Codebase-wide find & replace across files',
+    prompt: '__REPLACE__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'search', description: 'Search pattern (text or /regex/)', required: true },
+      { name: 'replacement', description: 'Replacement string', required: true }
+    ]
+  },
+];
+
 // ============================================================================
 // Agent Control Commands
 // ============================================================================
@@ -982,6 +1189,17 @@ const agentControlCommands: SlashCommand[] = [
     isBuiltin: true,
     arguments: [
       { name: 'action', description: 'start [goal], add <role>, remove <id>, status, stop, task [title], assign <task> <member>, complete <task>, send <to> <msg>, inbox', required: false }
+    ]
+  },
+  // CC13: /batch command for parallel task decomposition
+  {
+    name: 'batch',
+    description: 'Decompose a goal into parallel units and execute with separate agents',
+    prompt: '__BATCH__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'instruction', description: 'The goal to decompose and execute in parallel', required: true }
     ]
   },
   {
@@ -1009,6 +1227,81 @@ const agentControlCommands: SlashCommand[] = [
     isBuiltin: true,
     arguments: [
       { name: 'model', description: 'Model to switch to (optional)', required: false }
+    ]
+  },
+  {
+    name: 'btw',
+    description: 'Ask a quick side question without modifying conversation context',
+    prompt: '__BTW__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'question', description: 'Your side question', required: true }
+    ]
+  },
+  {
+    name: 'suggest',
+    description: 'Get proactive suggestions for the current project context',
+    prompt: '__SUGGEST__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'category', description: 'all, code, perf, security, git, testing, docs, workflow', required: false }
+    ]
+  },
+  {
+    name: 'telemetry',
+    description: 'Control telemetry data collection (Sentry, OpenTelemetry)',
+    prompt: '__TELEMETRY__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'action', description: 'on, off, errors-only, full, status', required: false }
+    ]
+  },
+];
+
+// ============================================================================
+// New Feature Commands (quota, coverage, voice-code, transform)
+// ============================================================================
+
+const newFeatureCommands: SlashCommand[] = [
+  {
+    name: 'quota',
+    description: 'Show remaining API rate limit capacity per provider',
+    prompt: '__QUOTA__',
+    filePath: '',
+    isBuiltin: true,
+  },
+  {
+    name: 'coverage',
+    description: 'Check test coverage against configured targets',
+    prompt: '__COVERAGE__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'action', description: 'check (default), targets', required: false }
+    ]
+  },
+  {
+    name: 'voice-code',
+    description: 'Control voice-to-code pipeline (speech to commands/code)',
+    prompt: '__VOICE_CODE__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'action', description: 'on, off, status', required: false }
+    ]
+  },
+  {
+    name: 'transform',
+    description: 'Transform code: modernize, typescript, async, functional, es-modules',
+    prompt: '__TRANSFORM__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'type', description: 'modernize, typescript, async, functional, es-modules', required: false },
+      { name: 'file', description: 'File or directory to transform', required: false }
     ]
   },
 ];
@@ -1040,7 +1333,10 @@ export const builtinCommands: SlashCommand[] = [
   ...themeCommands,
   ...searchCommands,
   ...workflowCommands,
-  ...agentControlCommands
+  ...agentControlCommands,
+  ...promptCommands,
+  ...newFeatureCommands,
+  ...goldenPathCommands,
 ];
 
 /**
@@ -1066,6 +1362,9 @@ export function getCommandsByCategory(): Record<string, SlashCommand[]> {
     theme: themeCommands,
     search: searchCommands,
     workflow: workflowCommands,
-    agentControl: agentControlCommands
+    agentControl: agentControlCommands,
+    prompt: promptCommands,
+    newFeatures: newFeatureCommands,
+    goldenPath: goldenPathCommands,
   };
 }

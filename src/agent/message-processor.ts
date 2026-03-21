@@ -69,23 +69,11 @@ export interface ExtractedToolCalls {
 }
 
 /**
- * LLM output sanitization patterns
+ * Sanitize LLM output by removing control tokens.
+ * Delegates to the extended output-sanitizer module for exhaustive coverage
+ * (GLM-5, DeepSeek, ChatML, LLaMA, zero-width chars).
  */
-const LLM_CONTROL_PATTERNS = [
-  /<\|[^|>]+\|>/g,  // Control tokens like <|channel|>, <|message|>
-  /\[INST\].*?\[\/INST\]/gs,  // Instruction tags
-];
-
-/**
- * Sanitize LLM output by removing control tokens
- */
-export function sanitizeLLMOutput(content: string): string {
-  let sanitized = content;
-  for (const pattern of LLM_CONTROL_PATTERNS) {
-    sanitized = sanitized.replace(pattern, "");
-  }
-  return sanitized;
-}
+export { sanitizeModelOutput as sanitizeLLMOutput } from '../utils/output-sanitizer.js';
 
 /**
  * Extract tool calls from commentary-style patterns in content

@@ -20,6 +20,10 @@ const __dirname = dirname(__filename);
 const packageJson = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'));
 const launchCwd = process.cwd();
 
+// Mark this process as running inside the Code Buddy CLI
+process.env.CODEBUDDY_CLI = '1';
+process.env.CODEBUDDY_CLI_VERSION = packageJson.version;
+
 // Import logger statically since it's used throughout the file synchronously
 import { logger } from "./utils/logger.js";
 // Import graceful shutdown for clean application termination
@@ -132,6 +136,14 @@ async function ensureEnvLoaded(): Promise<void> {
       dotenv.config();
     }
     envLoaded = true;
+
+    // Configure HTTP proxy from env vars (HTTP_PROXY, HTTPS_PROXY, NO_PROXY)
+    try {
+      const { configureProxy } = await import('./utils/proxy-support.js');
+      configureProxy();
+    } catch (_proxyErr) {
+      // Proxy setup is optional — if the module fails to load, proceed without proxy
+    }
   }
 }
 
@@ -996,12 +1008,20 @@ program
     "enable Vim keybindings for input"
   )
   .option(
+    "--permission-mode <mode>",
+    "permission mode: default, plan, acceptEdits, dontAsk, bypassPermissions"
+  )
+  .option(
     "--dangerously-skip-permissions",
     "bypass all permission checks (use in trusted containers without network access)"
   )
   .option(
     "--allowed-tools <patterns>",
     "only enable tools matching patterns (like Claude Code --allowedTools)"
+  )
+  .option(
+    "--disallowed-tools <patterns>",
+    "block tools matching patterns (like Claude Code --disallowedTools)"
   )
   .option(
     "--mcp-debug",
@@ -1054,6 +1074,10 @@ program
   .option(
     "--from-pr <pr>",
     "link session to a GitHub pull request (number or URL)"
+  )
+  .option(
+    "--yolo",
+    "enable YOLO mode (full autonomy with guardrails, $100 cost cap)"
   )
   .action(async (message, options) => {
     // Apply named configuration profile (--profile <name>) before anything else
@@ -1269,6 +1293,21 @@ program
         console.error("✅ Auto-approve: ENABLED (all tool executions will be approved)");
       }
 
+      // CC18: Handle --permission-mode
+      if (options.permissionMode) {
+        const { getPermissionModeManager } = await import("./security/permission-modes.js");
+        const mgr = getPermissionModeManager();
+        const validModes = ['default', 'plan', 'acceptEdits', 'dontAsk', 'bypassPermissions'] as const;
+        if (validModes.includes(options.permissionMode as typeof validModes[number])) {
+          const success = mgr.setMode(options.permissionMode as typeof validModes[number]);
+          if (success) {
+            console.error(`Permission mode: ${options.permissionMode}`);
+          }
+        } else {
+          console.error(`Invalid permission mode: ${options.permissionMode}. Valid: ${validModes.join(', ')}`);
+        }
+      }
+
       // Handle --dangerously-skip-permissions (like Claude Code)
       if (options.dangerouslySkipPermissions) {
         const { ConfirmationService } = await import("./utils/confirmation-service.js");
@@ -1303,13 +1342,21 @@ program
         console.error("Ephemeral mode: ENABLED (session will not be saved)");
       }
 
-      // Handle --allowed-tools (like Claude Code --allowedTools)
-      if (options.allowedTools) {
-        const { setToolFilter, createToolFilter } = await import("./utils/tool-filter.js");
-        setToolFilter(createToolFilter({
-          enabledTools: options.allowedTools,
-        }));
-        console.error(`🔧 Allowed tools: ${options.allowedTools}`);
+      // Handle --allowed-tools / --disallowed-tools (like Claude Code --allowedTools / --disallowedTools)
+      if (options.allowedTools || options.disallowedTools) {
+        const { setToolFilter, createToolFilter, getToolFilter } = await import("./utils/tool-filter.js");
+        const existing = getToolFilter();
+        const newFilter = createToolFilter({
+          enabledTools: options.allowedTools || (existing.enabledPatterns.length > 0 ? existing.enabledPatterns.join(',') : undefined),
+          disabledTools: options.disallowedTools || (existing.disabledPatterns.length > 0 ? existing.disabledPatterns.join(',') : undefined),
+        });
+        setToolFilter(newFilter);
+        if (options.allowedTools) {
+          console.error(`Allowed tools: ${options.allowedTools}`);
+        }
+        if (options.disallowedTools) {
+          console.error(`Disallowed tools: ${options.disallowedTools}`);
+        }
       }
 
       // Handle --mcp-debug
@@ -1336,6 +1383,19 @@ program
         const allTools = await getAllCodeBuddyTools();
         const result = filterTools(allTools, filter);
         console.error(formatFilterResult(result));
+      }
+
+      // Handle --yolo flag (equivalent to /yolo on, skip confirmation in non-interactive)
+      if (options.yolo) {
+        const { getAutonomyManager } = await import("./utils/autonomy-manager.js");
+        const autonomyManager = getAutonomyManager();
+        autonomyManager.enableYOLO(false);
+        autonomyManager.updateYOLOConfig({
+          maxAutoEdits: 50,
+          maxAutoCommands: 100,
+        });
+        process.env.YOLO_MODE = 'true';
+        console.error("YOLO mode: ENABLED (full autonomy, $100 cost cap)");
       }
 
       // Handle vim mode
@@ -1507,6 +1567,53 @@ program
       console.log("🤖 Starting Code Buddy Conversational Assistant...\n");
 
       await ensureUserSettingsDirectory();
+
+      // ── Crash recovery: detect unclean shutdown and offer session resume ──
+      if (!options.resume && !options.continue) {
+        try {
+          const { checkCrashRecovery, clearRecoveryFiles } = await import('./errors/crash-recovery.js');
+          const recovery = await checkCrashRecovery(process.cwd());
+          if (recovery) {
+            const age = Date.now() - new Date(recovery.timestamp).getTime();
+            const mins = Math.round(age / 60000);
+            console.log('== Previous Session Crash Detected ==');
+            console.log(`   Time: ${new Date(recovery.timestamp).toLocaleString()} (${mins} min ago)`);
+            if (recovery.crashReason) {
+              console.log(`   Reason: ${recovery.crashReason}`);
+            }
+            if (recovery.sessionId && recovery.sessionId !== 'unknown') {
+              console.log(`   Session: ${recovery.sessionId}`);
+              // Attempt to auto-resume the crashed session
+              try {
+                const { getSessionStore } = await import('./persistence/session-store.js');
+                const sessionStore = getSessionStore();
+                const session = await sessionStore.getSessionByPartialId(recovery.sessionId);
+                if (session) {
+                  await sessionStore.resumeSession(session.id);
+                  console.log(`   Resuming session: ${session.name} (${session.messages.length} messages)`);
+                } else {
+                  console.log('   Session no longer available — starting fresh.');
+                }
+              } catch (err) {
+                logger.debug('Failed to resume crashed session', { error: String(err) });
+                console.log('   Could not resume session — starting fresh.');
+              }
+            }
+            if (recovery.lastUserMessage) {
+              const preview = recovery.lastUserMessage.length > 80
+                ? recovery.lastUserMessage.substring(0, 80) + '...'
+                : recovery.lastUserMessage;
+              console.log(`   Last message: "${preview}"`);
+            }
+            console.log('');
+            // Clear the recovery marker so we don't show this again
+            await clearRecoveryFiles();
+          }
+        } catch (err) {
+          // Non-fatal — don't block startup if recovery check fails
+          logger.debug('Crash recovery check failed', { error: String(err) });
+        }
+      }
 
       // Support variadic positional arguments for multi-word initial message
       const initialMessage = Array.isArray(message)
@@ -2061,5 +2168,34 @@ addLazyCommandGroup(program, 'deploy', 'Generate cloud deployment configurations
   const { registerDeployCommands } = await import('./commands/cli/deploy-command.js');
   registerDeployCommands(program);
 });
+
+// Backup — local backup management (OpenClaw v2026.3.8 alignment)
+program
+  .command('backup [subcommand] [args...]')
+  .description('Manage .codebuddy/ backups (create, verify, list, restore)')
+  .option('--only-config', 'Only backup configuration files')
+  .option('--no-include-workspace', 'Exclude workspace data')
+  .option('--output <path>', 'Custom output directory')
+  .action(async (subcommand: string | undefined, args: string[], opts: Record<string, unknown>) => {
+    const { handleBackup } = await import('./commands/handlers/backup-handlers.js');
+    const flags: string[] = [];
+    if (opts.onlyConfig) flags.push('--only-config');
+    if (opts.includeWorkspace === false) flags.push('--no-include-workspace');
+    if (opts.output) flags.push('--output', opts.output as string);
+    const fullArgs = [subcommand || 'list', ...(args || []), ...flags].join(' ');
+    const result = await handleBackup(fullArgs);
+    if (result.response) console.log(result.response);
+  });
+
+// Completions — generate or install shell completion scripts
+addLazyCommand(
+  program,
+  'completions',
+  'Generate or install shell completion scripts (bash, zsh, fish, powershell)',
+  async () => {
+    const { createCompletionsCommand } = await import('./commands/cli/completions-command.js');
+    return createCompletionsCommand();
+  },
+);
 
 program.parse();

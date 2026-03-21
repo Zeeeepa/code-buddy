@@ -101,6 +101,7 @@ function createMockConfig(overrides: Partial<ExecutorConfig> = {}): ExecutorConf
     isGrokModel: jest.fn().mockReturnValue(false),
     recordSessionCost: jest.fn(),
     isSessionCostLimitReached: jest.fn().mockReturnValue(false),
+    estimateSessionCostLimitReached: jest.fn().mockReturnValue(false),
     getSessionCost: jest.fn().mockReturnValue(0),
     getSessionCostLimit: jest.fn().mockReturnValue(10),
     ...overrides,
@@ -353,7 +354,8 @@ describe('AgentExecutor', () => {
         usage: { prompt_tokens: 100, completion_tokens: 50 },
       });
 
-      // Cost limit reached after first recording
+      // Cost limit reached — pre-check uses estimate (no side effects)
+      (config.estimateSessionCostLimitReached as jest.Mock).mockReturnValue(true);
       (config.isSessionCostLimitReached as jest.Mock).mockReturnValue(true);
       (config.getSessionCost as jest.Mock).mockReturnValue(10);
       (config.getSessionCostLimit as jest.Mock).mockReturnValue(10);
@@ -738,6 +740,8 @@ describe('AgentExecutor', () => {
         remainingContent: '',
       });
 
+      // Cost limit reached — pre-check uses estimate (no side effects)
+      (config.estimateSessionCostLimitReached as jest.Mock).mockReturnValue(true);
       (config.isSessionCostLimitReached as jest.Mock).mockReturnValue(true);
       (config.getSessionCost as jest.Mock).mockReturnValue(10);
       (config.getSessionCostLimit as jest.Mock).mockReturnValue(10);
@@ -1373,27 +1377,10 @@ describe('AgentExecutor', () => {
       expect(config.recordSessionCost).toHaveBeenCalled();
     });
 
-    it('should stop streaming when cost limit exceeded after tool round', async () => {
-      // Remove pipeline to use legacy cost check path
-      deps.middlewarePipeline = undefined;
-      executor = new AgentExecutor(deps, config);
-
-      const toolCall = makeToolCall('bash', { command: 'echo test' }, 'call_1');
-
-      (deps.streamingHandler.getAccumulatedMessage as jest.Mock)
-        .mockReturnValueOnce({ content: 'Running...', tool_calls: [toolCall] });
-
-      (deps.streamingHandler.extractToolCalls as jest.Mock).mockReturnValue({
-        toolCalls: [],
-        remainingContent: '',
-      });
-
-      // Cost limit reached after tool round
-      let costCheckCount = 0;
-      (config.isSessionCostLimitReached as jest.Mock).mockImplementation(function() {
-        costCheckCount++;
-        return costCheckCount >= 2;
-      });
+    it('should stop streaming when cost limit exceeded at end of loop', async () => {
+      // Cost is now only recorded at end-of-loop (not in legacy inline path)
+      // This tests that end-of-loop recording detects cost limit
+      (config.isSessionCostLimitReached as jest.Mock).mockReturnValue(true);
       (config.getSessionCost as jest.Mock).mockReturnValue(10.5);
       (config.getSessionCostLimit as jest.Mock).mockReturnValue(10);
 

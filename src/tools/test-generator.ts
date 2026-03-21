@@ -359,6 +359,68 @@ export class TestGeneratorTool {
   }
 
   /**
+   * Generate tests using LLM for real assertions (not TODO stubs).
+   * Falls back to scaffold if LLM callback is not provided or fails.
+   */
+  async generateTestWithLLM(
+    sourceFile: string,
+    config: TestGeneratorConfig = {},
+    llmCallback?: (prompt: string) => Promise<string>,
+  ): Promise<{ testFile: string; content: string }> {
+    // Fallback to scaffold if no LLM
+    if (!llmCallback) {
+      return this.generateTestScaffold(sourceFile, config);
+    }
+
+    const framework = config.framework === 'auto' || !config.framework
+      ? await this.detectFramework()
+      : config.framework;
+
+    const analysis = await this.analyzeSourceFile(sourceFile);
+    const sourceContent = await UnifiedVfsRouter.Instance.readFile(sourceFile, 'utf-8');
+    const testFile = await this.getTestFilePath(sourceFile, framework);
+    const relativePath = path.relative(path.dirname(testFile), sourceFile)
+      .replace(/\\/g, '/')
+      .replace(/\.[^.]+$/, '');
+
+    const prompt = `Generate comprehensive unit tests for the following source file.
+
+**Framework:** ${framework}
+**Source file:** ${sourceFile}
+**Import path:** ./${relativePath}
+**Exported symbols:** ${analysis.exports.join(', ') || 'default export'}
+**Functions:** ${analysis.functions.join(', ') || 'none detected'}
+**Classes:** ${analysis.classes.join(', ') || 'none detected'}
+
+**Source code:**
+\`\`\`typescript
+${sourceContent.substring(0, 8000)}
+\`\`\`
+
+**Requirements:**
+- Use ${framework} with TypeScript (${framework === 'vitest' ? "import from 'vitest'" : framework === 'jest' ? "import from '@jest/globals'" : ''})
+- Follow AAA pattern (Arrange, Act, Assert) in every test
+- Write REAL assertions, not TODO comments
+- Test happy path, edge cases, and error conditions
+- Mock external dependencies where needed
+- Import from './${relativePath}'
+- Output ONLY the test file content, no markdown fences or explanation`;
+
+    try {
+      const content = await llmCallback(prompt);
+      // Strip markdown fences if LLM wraps output
+      const cleaned = content
+        .replace(/^```(?:typescript|ts|javascript|js)?\n/m, '')
+        .replace(/\n```\s*$/m, '')
+        .trim();
+      return { testFile, content: cleaned + '\n' };
+    } catch {
+      // Fallback to scaffold on LLM failure
+      return this.generateTestScaffold(sourceFile, config);
+    }
+  }
+
+  /**
    * Run tests
    */
   async runTests(config: TestGeneratorConfig = {}): Promise<ToolResult> {
@@ -501,6 +563,11 @@ export const testGeneratorToolDefinition = {
       target: {
         type: "string",
         description: "Source file to generate tests for, or test file to run",
+      },
+      mode: {
+        type: "string",
+        enum: ["scaffold", "llm"],
+        description: "Generation mode: scaffold (TODO stubs) or llm (AI-generated real tests)",
       },
       framework: {
         type: "string",

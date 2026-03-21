@@ -16,7 +16,24 @@ export interface YOLOConfig {
   blockedPaths: string[];        // Paths where edits are never allowed
   sessionEditCount: number;      // Track edits this session
   sessionCommandCount: number;   // Track commands this session
+  dryRun?: boolean;              // Dry-run mode — show what would execute without executing
+  toolRules?: Record<string, 'auto' | 'prompt' | 'deny'>;  // Per-tool YOLO rules
 }
+
+/** Extended result from shouldYOLOExecute including dry-run info */
+export interface YOLOExecuteResult {
+  allowed: boolean;
+  reason: string;
+  dryRun?: boolean;
+}
+
+/** Safe mode expanded paths — common project directories */
+export const SAFE_MODE_PATHS = [
+  'src/', 'test/', 'tests/', 'lib/', 'app/', 'packages/',
+  'modules/', 'components/', 'pages/', 'views/', 'controllers/',
+  'services/', 'utils/', 'helpers/', 'scripts/', 'cmd/', 'internal/',
+  'pkg/', 'crates/', 'spec/',
+];
 
 export interface AutonomyConfig {
   level: AutonomyLevel;
@@ -105,6 +122,18 @@ const DEFAULT_YOLO_CONFIG: YOLOConfig = {
 export class AutonomyManager {
   private config: AutonomyConfig;
   private configPath: string;
+
+  /** Whether YOLO mode is paused (Fix 12) */
+  private paused: boolean = false;
+
+  /** Snapshot ID captured when YOLO was enabled (Fix 5) */
+  private yoloStartSnapshotId: string | null = null;
+
+  /** Session start timestamp for duration tracking (Fix 3) */
+  private sessionStartTime: number | null = null;
+
+  /** YOLO execution log for /yolo log (Fix 7) */
+  private executionLog: Array<{ timestamp: Date; action: string; allowed: boolean; reason: string }> = [];
 
   constructor() {
     this.configPath = path.join(process.cwd(), ".codebuddy", "autonomy.json");
@@ -279,6 +308,9 @@ export class AutonomyManager {
     this.config.level = "yolo";
     this.config.yolo.enabled = true;
     this.config.yolo.safeMode = safeMode;
+    this.paused = false;
+    this.sessionStartTime = Date.now();
+    this.executionLog = [];
     this.resetSessionCounts();
     this.saveConfig();
   }
@@ -286,6 +318,7 @@ export class AutonomyManager {
   disableYOLO(): void {
     this.config.yolo.enabled = false;
     this.config.level = "confirm";
+    this.paused = false;
     this.saveConfig();
   }
 
@@ -302,11 +335,25 @@ export class AutonomyManager {
     this.saveConfig();
   }
 
-  addToYOLOAllowList(command: string): void {
-    if (!this.config.yolo.allowList.includes(command)) {
-      this.config.yolo.allowList.push(command);
+  /**
+   * Add a command to the YOLO allow list with validation (Fix 6)
+   */
+  addToYOLOAllowList(command: string): { success: boolean; error?: string } {
+    if (!command || command.trim().length === 0) {
+      return { success: false, error: 'Empty command not allowed' };
+    }
+    if (command.length > 200) {
+      return { success: false, error: 'Command too long (max 200 chars)' };
+    }
+    const trimmed = command.trim();
+    if (this.config.yolo.denyList.includes(trimmed)) {
+      return { success: false, error: 'Command already in deny list' };
+    }
+    if (!this.config.yolo.allowList.includes(trimmed)) {
+      this.config.yolo.allowList.push(trimmed);
       this.saveConfig();
     }
+    return { success: true };
   }
 
   removeFromYOLOAllowList(command: string): void {
@@ -317,11 +364,25 @@ export class AutonomyManager {
     }
   }
 
-  addToYOLODenyList(command: string): void {
-    if (!this.config.yolo.denyList.includes(command)) {
-      this.config.yolo.denyList.push(command);
+  /**
+   * Add a command to the YOLO deny list with validation (Fix 6)
+   */
+  addToYOLODenyList(command: string): { success: boolean; error?: string } {
+    if (!command || command.trim().length === 0) {
+      return { success: false, error: 'Empty command not allowed' };
+    }
+    if (command.length > 200) {
+      return { success: false, error: 'Command too long (max 200 chars)' };
+    }
+    const trimmed = command.trim();
+    if (this.config.yolo.allowList.includes(trimmed)) {
+      return { success: false, error: 'Command already in allow list' };
+    }
+    if (!this.config.yolo.denyList.includes(trimmed)) {
+      this.config.yolo.denyList.push(trimmed);
       this.saveConfig();
     }
+    return { success: true };
   }
 
   removeFromYOLODenyList(command: string): void {
@@ -334,15 +395,47 @@ export class AutonomyManager {
 
   /**
    * Check if a command should auto-execute in YOLO mode
+   * Includes dry-run (Fix 4), pause (Fix 12), and per-tool rules (Fix 10)
    */
-  shouldYOLOExecute(command: string, type: "bash" | "edit"): { allowed: boolean; reason: string } {
+  shouldYOLOExecute(command: string, type: "bash" | "edit", toolName?: string): YOLOExecuteResult {
     if (!this.isYOLOEnabled()) {
       return { allowed: false, reason: "YOLO mode not enabled" };
+    }
+
+    // Fix 12: Check pause state
+    if (this.paused) {
+      return { allowed: false, reason: 'YOLO paused' };
+    }
+
+    // Fix 4: Dry-run mode
+    if (this.config.yolo.dryRun) {
+      const logEntry = { timestamp: new Date(), action: command, allowed: false, reason: `Dry-run mode - would execute: ${command}` };
+      this.executionLog.push(logEntry);
+      logger.info(`[YOLO DRY-RUN] Would execute: ${command}`);
+      return { allowed: false, reason: 'Dry-run mode - showing what would execute', dryRun: true };
+    }
+
+    // Fix 10: Per-tool rules override
+    if (toolName && this.config.yolo.toolRules?.[toolName]) {
+      const rule = this.config.yolo.toolRules[toolName];
+      if (rule === 'deny') {
+        this.logExecution(command, false, 'Tool denied by per-tool rule');
+        return { allowed: false, reason: 'Tool denied by per-tool rule' };
+      }
+      if (rule === 'prompt') {
+        this.logExecution(command, false, 'Tool requires prompt by per-tool rule');
+        return { allowed: false, reason: 'Tool requires prompt by per-tool rule' };
+      }
+      if (rule === 'auto') {
+        this.logExecution(command, true, 'Tool auto-approved by per-tool rule');
+        return { allowed: true, reason: 'Tool auto-approved by per-tool rule' };
+      }
     }
 
     // Check deny list first (always blocked)
     for (const denied of this.config.yolo.denyList) {
       if (command.toLowerCase().includes(denied.toLowerCase())) {
+        this.logExecution(command, false, `Command matches deny list: ${denied}`);
         return { allowed: false, reason: `Command matches deny list: ${denied}` };
       }
     }
@@ -352,6 +445,7 @@ export class AutonomyManager {
       const destructive = ["rm", "delete", "drop", "truncate", "format", "mkfs"];
       for (const d of destructive) {
         if (command.toLowerCase().includes(d)) {
+          this.logExecution(command, false, 'Safe mode: destructive command blocked');
           return { allowed: false, reason: `Safe mode: destructive command blocked` };
         }
       }
@@ -359,25 +453,30 @@ export class AutonomyManager {
 
     // Check session limits
     if (type === "edit" && this.config.yolo.sessionEditCount >= this.config.yolo.maxAutoEdits) {
+      this.logExecution(command, false, `Edit limit reached (${this.config.yolo.maxAutoEdits})`);
       return { allowed: false, reason: `Edit limit reached (${this.config.yolo.maxAutoEdits})` };
     }
 
     if (type === "bash" && this.config.yolo.sessionCommandCount >= this.config.yolo.maxAutoCommands) {
+      this.logExecution(command, false, `Command limit reached (${this.config.yolo.maxAutoCommands})`);
       return { allowed: false, reason: `Command limit reached (${this.config.yolo.maxAutoCommands})` };
     }
 
     // Check allow list (fast-track)
     for (const allowed of this.config.yolo.allowList) {
       if (command.toLowerCase().startsWith(allowed.toLowerCase())) {
+        this.logExecution(command, true, `Matches allow list: ${allowed}`);
         return { allowed: true, reason: `Matches allow list: ${allowed}` };
       }
     }
 
     // Default: allow in YOLO mode unless it's dangerous
     if (this.isDangerousOperation(command)) {
+      this.logExecution(command, false, 'Dangerous operation requires confirmation');
       return { allowed: false, reason: "Dangerous operation requires confirmation" };
     }
 
+    this.logExecution(command, true, 'YOLO mode auto-execution');
     return { allowed: true, reason: "YOLO mode auto-execution" };
   }
 
@@ -446,13 +545,174 @@ export class AutonomyManager {
     };
   }
 
+  // =====================
+  // Fix 12: Pause/Resume
+  // =====================
+
+  pauseYOLO(): void {
+    this.paused = true;
+    logger.info('YOLO mode paused - manual approval required');
+  }
+
+  resumeYOLO(): void {
+    this.paused = false;
+    logger.info('YOLO mode resumed - auto-approval active');
+  }
+
+  isPaused(): boolean {
+    return this.paused;
+  }
+
+  // =====================
+  // Fix 5: YOLO undo-all
+  // =====================
+
+  /** Store the ghost snapshot ID captured when YOLO was enabled */
+  setYoloStartSnapshotId(snapshotId: string): void {
+    this.yoloStartSnapshotId = snapshotId;
+  }
+
+  /** Get the ghost snapshot ID from when YOLO was enabled */
+  getYoloStartSnapshotId(): string | null {
+    return this.yoloStartSnapshotId;
+  }
+
+  // =====================
+  // Fix 3: Session summary
+  // =====================
+
+  /**
+   * Returns a formatted YOLO session summary with stats
+   */
+  getSessionSummary(sessionCost?: number): string {
+    const yolo = this.config.yolo;
+    const durationMs = this.sessionStartTime ? Date.now() - this.sessionStartTime : 0;
+    const minutes = Math.floor(durationMs / 60000);
+    const seconds = Math.floor((durationMs % 60000) / 1000);
+    const durationStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+
+    const lines: string[] = [];
+    lines.push('YOLO Session Summary:');
+    lines.push(`  - Edits: ${yolo.sessionEditCount} files modified`);
+    lines.push(`  - Commands: ${yolo.sessionCommandCount} bash commands executed`);
+    if (sessionCost !== undefined) {
+      lines.push(`  - Cost: $${sessionCost.toFixed(2)}`);
+    }
+    lines.push(`  - Duration: ${durationStr}`);
+    if (this.yoloStartSnapshotId) {
+      lines.push(`  - Ghost snapshots: available (undo via /yolo undo-all)`);
+    }
+    return lines.join('\n');
+  }
+
+  // =====================
+  // Fix 4: Dry-run mode
+  // =====================
+
+  setDryRun(enabled: boolean): void {
+    this.config.yolo.dryRun = enabled;
+  }
+
+  isDryRun(): boolean {
+    return this.config.yolo.dryRun === true;
+  }
+
+  // =====================
+  // Fix 7: Execution log
+  // =====================
+
+  private logExecution(action: string, allowed: boolean, reason: string): void {
+    this.executionLog.push({ timestamp: new Date(), action, allowed, reason });
+    // Keep last 100 entries
+    if (this.executionLog.length > 100) {
+      this.executionLog.splice(0, this.executionLog.length - 100);
+    }
+  }
+
+  /**
+   * Get the last N execution log entries formatted for display (Fix 7)
+   */
+  getExecutionLog(count: number = 20): string {
+    const entries = this.executionLog.slice(-count);
+    if (entries.length === 0) {
+      return 'No YOLO executions logged yet.';
+    }
+    const lines: string[] = ['YOLO Execution Log:', ''];
+    for (const entry of entries) {
+      const time = entry.timestamp.toLocaleTimeString();
+      const icon = entry.allowed ? 'APPROVED' : 'BLOCKED';
+      lines.push(`  [${time}] ${icon}: ${entry.action.substring(0, 80)}`);
+      if (!entry.allowed) {
+        lines.push(`           Reason: ${entry.reason}`);
+      }
+    }
+    return lines.join('\n');
+  }
+
+  // =====================
+  // Fix 10: Per-tool rules
+  // =====================
+
+  /**
+   * Set a per-tool YOLO rule
+   */
+  setToolRule(toolName: string, rule: 'auto' | 'prompt' | 'deny'): void {
+    if (!this.config.yolo.toolRules) {
+      this.config.yolo.toolRules = {};
+    }
+    this.config.yolo.toolRules[toolName] = rule;
+    this.saveConfig();
+  }
+
+  /**
+   * Remove a per-tool YOLO rule
+   */
+  removeToolRule(toolName: string): void {
+    if (this.config.yolo.toolRules) {
+      delete this.config.yolo.toolRules[toolName];
+      this.saveConfig();
+    }
+  }
+
+  /**
+   * Get all per-tool rules
+   */
+  getToolRules(): Record<string, 'auto' | 'prompt' | 'deny'> {
+    return { ...(this.config.yolo.toolRules || {}) };
+  }
+
+  // =====================
+  // Fix 9: Confirmation text
+  // =====================
+
+  /**
+   * Returns confirmation text shown before enabling YOLO
+   */
+  getYOLOConfirmationText(): string {
+    return `YOLO Mode will auto-approve operations with these guardrails:
+  - Max edits: ${this.config.yolo.maxAutoEdits} | Max commands: ${this.config.yolo.maxAutoCommands}
+  - Cost limit: $100
+  - Blocked: rm -rf, DROP DATABASE, force push, etc.
+  - Undo available via ghost snapshots
+
+Type 'confirm' to enable:`;
+  }
+
   formatYOLOStatus(): string {
     const yolo = this.config.yolo;
     const remaining = this.getRemainingYOLOExecutions();
 
     let output = `\n⚡ YOLO Mode Status\n${"═".repeat(50)}\n\n`;
-    output += `Status: ${yolo.enabled ? "🟢 ENABLED" : "🔴 DISABLED"}\n`;
-    output += `Safe Mode: ${yolo.safeMode ? "ON (destructive commands blocked)" : "OFF"}\n\n`;
+    output += `Status: ${yolo.enabled ? "🟢 ENABLED" : "🔴 DISABLED"}`;
+    if (yolo.enabled && this.paused) {
+      output += ` (PAUSED)`;
+    }
+    output += `\n`;
+    output += `Safe Mode: ${yolo.safeMode ? "ON (destructive commands blocked)" : "OFF"}\n`;
+    if (yolo.dryRun) {
+      output += `Dry-Run: ON (showing what would execute)\n`;
+    }
+    output += `\n`;
 
     output += `📊 Session Limits:\n`;
     output += `   Edits: ${yolo.sessionEditCount}/${yolo.maxAutoEdits} (${remaining.edits} remaining)\n`;

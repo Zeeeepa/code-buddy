@@ -18,6 +18,7 @@ import { TokenCounter } from "../../utils/token-counter.js";
 import { logger } from "../../utils/logger.js";
 import { getErrorMessage } from "../../errors/index.js";
 import { sanitizeToolResult } from "../../utils/sanitize.js";
+import { sanitizeModelOutput, stripInvisibleChars } from "../../utils/output-sanitizer.js";
 import type { LaneQueue } from "../../concurrency/lane-queue.js";
 import type { MiddlewarePipeline, MiddlewareContext } from "../middleware/index.js";
 import type { MessageQueue } from "../message-queue.js";
@@ -28,6 +29,9 @@ import { getObservationVariator } from "../../context/observation-variator.js";
 import { getRestorableCompressor } from "../../context/restorable-compression.js";
 import { getResponseConstraintStack, resolveToolChoice } from "../response-constraint.js";
 import type { ICMBridge } from "../../memory/icm-bridge.js";
+import { repairToolCallPairs } from "../../context/transcript-repair.js";
+import { shouldCompactBeforeToolExec, estimateToolResultTokens } from "../../context/proactive-compaction.js";
+import { formatTokenUsage, estimateCost } from "../../utils/token-display.js";
 
 // Lazy-loaded workspace context to avoid blocking tests.
 // Includes a 3s hard timeout so git commands never stall the agent loop.
@@ -70,6 +74,14 @@ export function setCodeGraphContextProvider(
   _codeGraphContextProvider = provider;
 }
 
+/** Register a docs context provider for per-turn injection. */
+let _docsContextProvider: ((message: string) => string | null) | null = null;
+export function setDocsContextProvider(
+  provider: (message: string) => string | null
+): void {
+  _docsContextProvider = provider;
+}
+
 /**
  * Register a decision-context provider for the executor.
  * Called externally (e.g., by CodeBuddyAgent) to wire up decision memory
@@ -102,6 +114,8 @@ export interface ExecutorDependencies {
   icmBridgeProvider?: () => ICMBridge | null;
   /** Optional: Code graph context provider */
   codeGraphContextProvider?: (message: string) => string | null;
+  /** Optional: Documentation context provider */
+  docsContextProvider?: (message: string) => string | null;
   /** Optional: Decision memory context provider */
   decisionContextProvider?: (query: string) => Promise<string | null>;
   /** Optional lane queue for serialized tool execution */
@@ -122,10 +136,12 @@ export interface ExecutorConfig {
   maxToolRounds: number;
   /** Returns true if current model is a Grok model (enables web search) */
   isGrokModel: () => boolean;
-  /** Records token usage for cost tracking */
+  /** Records token usage for cost tracking (additive — call once per turn) */
   recordSessionCost: (input: number, output: number) => void;
   /** Returns true if session cost limit has been reached */
   isSessionCostLimitReached: () => boolean;
+  /** Estimate whether cost limit would be reached after recording given tokens (no side effects) */
+  estimateSessionCostLimitReached: (input: number, output: number) => boolean;
   /** Returns current accumulated session cost in USD */
   getSessionCost: () => number;
   /** Returns maximum allowed session cost in USD */
@@ -186,6 +202,11 @@ export class AgentExecutor {
   /** Get code graph context provider (DI first, then global fallback) */
   private getCodeGraphContextProvider(): ((message: string) => string | null) | null {
     return this.deps.codeGraphContextProvider ?? _codeGraphContextProvider;
+  }
+
+  /** Get docs context provider (DI first, then global fallback) */
+  private getDocsContextProvider(): ((message: string) => string | null) | null {
+    return this.deps.docsContextProvider ?? _docsContextProvider;
   }
 
   /** Get decision context provider (DI first, then global fallback) */
@@ -367,6 +388,27 @@ export class AgentExecutor {
     const maxToolRounds = this.config.maxToolRounds;
     let toolRounds = 0;
 
+    // Process @mentions (e.g., @web, @git, @terminal) and inject context
+    try {
+      const { processMentions } = await import('../../input/context-mentions.js');
+      const mentionResult = await processMentions(message);
+      if (mentionResult.contextBlocks.length > 0) {
+        message = mentionResult.cleanedMessage;
+        // Update the last user message in the messages array
+        const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+        if (lastUserMsg && typeof lastUserMsg.content === 'string') {
+          lastUserMsg.content = message;
+        }
+        // Inject context blocks
+        for (const block of mentionResult.contextBlocks) {
+          messages.push({
+            role: 'system' as const,
+            content: `<context type="${block.type}" source="${block.source}">\n${block.content}\n</context>`,
+          });
+        }
+      }
+    } catch { /* mention processing optional */ }
+
     // Track token usage for cost calculation (recalculated each round for accuracy)
     let inputTokens = this.deps.tokenCounter.countMessageTokens(messages as Parameters<typeof this.deps.tokenCounter.countMessageTokens>[0]);
     let totalOutputTokens = 0;
@@ -396,6 +438,16 @@ export class AgentExecutor {
         getPersonaManager().autoSelectPersona({ message });
       } catch { /* persona auto-select optional */ }
 
+      // Auto-extract entities from user message into knowledge graph (background, non-blocking)
+      try {
+        const { getKnowledgeGraph, isTrivialMessage } = await import('../../memory/knowledge-graph.js');
+        if (!isTrivialMessage(message)) {
+          const kg = getKnowledgeGraph();
+          await kg.load();
+          kg.extractFromMessageDeduped(message);
+        }
+      } catch { /* non-critical */ }
+
       // Run before_turn middleware (sequential path)
       const pipeline = this.deps.middlewarePipeline;
       if (pipeline) {
@@ -417,11 +469,17 @@ export class AgentExecutor {
         }
         if (mwResult.action === 'warn' && mwResult.message) {
           logger.warn(`Middleware warning: ${mwResult.message}`);
+          messages.push({
+            role: 'system' as const,
+            content: `<context type="middleware-hint">\n${mwResult.message}\n</context>`,
+          });
         }
       }
 
-      // Apply context management
-      const preparedMessages = this.deps.contextManager.prepareMessages(messages);
+      // Apply context management + transcript repair (OpenClaw v2026.3.11)
+      const preparedMessages = repairToolCallPairs(
+        this.deps.contextManager.prepareMessages(messages)
+      );
 
       // --- Workspace context: git state + directory tree (Codex CLI pattern) ---
       try {
@@ -436,6 +494,18 @@ export class AgentExecutor {
       if (lessonsBlock) {
         preparedMessages.push({ role: 'system', content: `<context type="lessons">\n${lessonsBlock}\n</context>` });
       }
+
+      // --- Knowledge graph context: user preferences, habits, temporal patterns ---
+      // Uses memU intent routing: skips injection for trivial messages (saves ~200 tokens)
+      try {
+        const { getKnowledgeGraph } = await import('../../memory/knowledge-graph.js');
+        const kg = getKnowledgeGraph();
+        await kg.load();
+        const kgBlock = kg.formatContextBlockSmart(message, 600);
+        if (kgBlock) {
+          preparedMessages.push({ role: 'system', content: kgBlock });
+        }
+      } catch { /* knowledge graph is optional */ }
 
       // --- Decision memory context: inject relevant past decisions ---
       if (this.getDecisionContextProvider()) {
@@ -469,6 +539,16 @@ export class AgentExecutor {
             preparedMessages.push({ role: 'system', content: `<context type="code_graph">\n${graphCtx}\n</context>` });
           }
         } catch { /* code graph context optional */ }
+      }
+
+      // --- Documentation context: relevant doc pages for the user's query ---
+      if (this.getDocsContextProvider()) {
+        try {
+          const docsCtx = this.getDocsContextProvider()!(message);
+          if (docsCtx) {
+            preparedMessages.push({ role: 'system', content: `<context type="docs">\n${docsCtx}\n</context>` });
+          }
+        } catch { /* docs context optional */ }
       }
 
       // --- Manus AI attention bias: append todo.md context at END of messages ---
@@ -541,6 +621,13 @@ export class AgentExecutor {
           throw new Error("No response received from AI. The API may be unavailable or the request was incomplete. Please try again.");
         }
 
+        // Sanitize assistant content: strip model control tokens and invisible chars
+        if (assistantMessage.content) {
+          assistantMessage.content = stripInvisibleChars(
+            sanitizeModelOutput(assistantMessage.content)
+          );
+        }
+
         // Track output tokens
         if (currentResponse.usage) {
           totalOutputTokens += currentResponse.usage.completion_tokens || 0;
@@ -569,9 +656,8 @@ export class AgentExecutor {
             tool_calls: assistantMessage.tool_calls,
           });
 
-          // Pre-check cost limit before executing tools
-          this.config.recordSessionCost(inputTokens, totalOutputTokens);
-          if (this.config.isSessionCostLimitReached()) {
+          // Pre-check cost limit before executing tools (estimate only — no side effects)
+          if (this.config.estimateSessionCostLimitReached(inputTokens, totalOutputTokens)) {
             const sessionCost = this.config.getSessionCost();
             const sessionCostLimit = this.config.getSessionCostLimit();
             const costEntry: ChatEntry = {
@@ -603,6 +689,28 @@ export class AgentExecutor {
 
           // Execute tool calls
           for (const toolCall of toolCallsToExecute) {
+            // --- Proactive context compaction: predict overflow before tool runs ---
+            try {
+              const toolArgs = JSON.parse(toolCall.function.arguments || '{}');
+              const estimatedTokens = estimateToolResultTokens(toolCall.function.name, toolArgs);
+              const modelName = this.deps.client.getCurrentModel();
+              const { getModelToolConfig } = await import('../../config/model-tools.js');
+              const modelConfig = getModelToolConfig(modelName);
+              const contextWindow = modelConfig.contextWindow ?? 128_000;
+              if (shouldCompactBeforeToolExec(inputTokens, estimatedTokens, contextWindow)) {
+                logger.debug('Proactive compaction: compacting before tool execution', {
+                  toolName: toolCall.function.name,
+                  inputTokens,
+                  estimatedTokens,
+                  contextWindow,
+                });
+                this.deps.contextManager.prepareMessages(messages);
+                inputTokens = this.deps.tokenCounter.countMessageTokens(
+                  messages as Parameters<typeof this.deps.tokenCounter.countMessageTokens>[0]
+                );
+              }
+            } catch { /* proactive compaction is non-critical */ }
+
             const toolCallEntry: ChatEntry = {
               type: "tool_call",
               content: "Executing...",
@@ -696,6 +804,31 @@ export class AgentExecutor {
               name: toolCall.function.name,
             } as CodeBuddyMessage);
 
+            // --- Auto-commit after file-modifying tools ---
+            if (result.success) {
+              try {
+                const { maybeAutoCommit } = await import('../../tools/auto-commit.js');
+                const acResult = await maybeAutoCommit(
+                  toolCall.function.name,
+                  toolCall.function.arguments || '{}',
+                  rawToolContent.substring(0, 120),
+                );
+                if (acResult?.success) {
+                  logger.debug('Auto-commit:', { hash: acResult.commitHash });
+                }
+              } catch { /* auto-commit is optional */ }
+            }
+
+            // --- Fix 11: YOLO cost display after each tool ---
+            try {
+              const { getAutonomyManager } = await import('../../utils/autonomy-manager.js');
+              if (getAutonomyManager().isYOLOEnabled()) {
+                const sessionCost = this.config.getSessionCost();
+                const sessionCostLimit = this.config.getSessionCostLimit();
+                logger.info(`[YOLO] Cost: $${sessionCost.toFixed(4)} / $${sessionCostLimit}`);
+              }
+            } catch { /* non-critical */ }
+
             // --- Terminate signal detection (OpenManus #5) ---
             // If the tool result starts with the terminate sentinel, break the loop.
             if (rawToolContent.startsWith('__AGENT_TERMINATE__')) {
@@ -710,6 +843,29 @@ export class AgentExecutor {
               newEntries.push(terminateEntry);
               terminateDetected = true;
               break;
+            }
+
+            // --- Yield signal detection (OpenClaw v2026.3.14) ---
+            if (rawToolContent.includes('__SESSIONS_YIELD__')) {
+              const yieldMatch = rawToolContent.match(/"id"\s*:\s*"(agent-\d+)"/);
+              if (yieldMatch) {
+                const childId = yieldMatch[1];
+                try {
+                  const { waitForSingleAgent } = await import('../../agent/multi-agent/agent-tools.js');
+                  const completed = await waitForSingleAgent(childId, 300_000);
+                  const yieldResult = completed.result || 'Sub-agent completed (no result).';
+                  // Inject the sub-agent result as the next context message
+                  messages.push({
+                    role: 'user',
+                    content: `[Sub-agent ${completed.nickname} completed]: ${yieldResult}`,
+                  } as CodeBuddyMessage);
+                } catch (err) {
+                  messages.push({
+                    role: 'user',
+                    content: `[Sub-agent yield timeout]: ${err instanceof Error ? err.message : String(err)}`,
+                  } as CodeBuddyMessage);
+                }
+              }
             }
           }
 
@@ -734,21 +890,20 @@ export class AgentExecutor {
             if (mwResult.action === 'warn' && mwResult.message) {
               logger.warn(`Middleware after-turn warning: ${mwResult.message}`);
             }
-          } else {
-            // Legacy inline cost check when no pipeline
-            this.config.recordSessionCost(inputTokens, totalOutputTokens);
           }
+          // Note: cost is recorded once at end-of-loop, not here (avoids double-counting)
 
-          // Apply TTL-based tool result expiry + backward-scanned FIFO masking before compaction
+          // Apply TTL-based tool result expiry + image pruning + backward-scanned FIFO masking before compaction
           try {
-            const { applyToolOutputMasking, expireOldToolResults } = await import('../../context/tool-output-masking.js');
+            const { applyToolOutputMasking, expireOldToolResults, pruneImageContent } = await import('../../context/tool-output-masking.js');
             expireOldToolResults(messages, toolRounds);
+            pruneImageContent(messages);
             applyToolOutputMasking(messages);
           } catch { /* masking is optional */ }
 
-          // Get next response (with tool result compaction guard)
+          // Get next response (with tool result compaction guard + transcript repair)
           const nextPreparedMessages = this.compactLargeToolResults(
-            this.deps.contextManager.prepareMessages(messages)
+            repairToolCallPairs(this.deps.contextManager.prepareMessages(messages))
           );
 
           // Re-inject lessons and todo context for each tool round (mirroring streaming path)
@@ -756,6 +911,17 @@ export class AgentExecutor {
           if (lessonsBlockNext) {
             nextPreparedMessages.push({ role: 'system', content: `<context type="lessons">\n${lessonsBlockNext}\n</context>` });
           }
+
+          // Re-inject knowledge graph context for each tool round
+          try {
+            const { getKnowledgeGraph } = await import('../../memory/knowledge-graph.js');
+            const kgNext = getKnowledgeGraph();
+            const kgBlockNext = kgNext.formatContextBlock(message, 600);
+            if (kgBlockNext) {
+              nextPreparedMessages.push({ role: 'system', content: kgBlockNext });
+            }
+          } catch { /* knowledge graph is optional */ }
+
           const todoSuffixNext = getTodoTracker(process.cwd()).buildContextSuffix();
           if (todoSuffixNext) {
             nextPreparedMessages.push({ role: 'system', content: `<context type="todo">\n${todoSuffixNext}\n</context>` });
@@ -807,6 +973,14 @@ export class AgentExecutor {
             } catch { /* ICM store optional */ }
           }
 
+          // Context engine afterTurn hook (OpenClaw v2026.3.7)
+          try {
+            const engine = this.deps.contextManager.getContextEngine?.();
+            if (engine) {
+              engine.afterTurn(messages, { role: 'assistant' as const, content: assistantMessage.content || '' });
+            }
+          } catch { /* afterTurn hook optional */ }
+
           break;
         }
       }
@@ -826,17 +1000,35 @@ export class AgentExecutor {
       inputTokens = this.deps.tokenCounter.countMessageTokens(messages as Parameters<typeof this.deps.tokenCounter.countMessageTokens>[0]);
       // Record session cost
       this.config.recordSessionCost(inputTokens, totalOutputTokens);
+
+      // Display per-turn token usage
+      const turnCost = estimateCost(inputTokens, totalOutputTokens);
+      const usageDisplay = formatTokenUsage({ inputTokens, outputTokens: totalOutputTokens, cost: turnCost });
+      logger.info(`Token usage: ${usageDisplay}`);
+
       if (this.config.isSessionCostLimitReached()) {
         const sessionCost = this.config.getSessionCost();
         const sessionCostLimit = this.config.getSessionCostLimit();
         const costEntry: ChatEntry = {
           type: "assistant",
-          content: `💸 Session cost limit reached ($${sessionCost.toFixed(2)} / $${sessionCostLimit.toFixed(2)}). Please start a new session.`,
+          content: `Session cost limit reached ($${sessionCost.toFixed(2)} / $${sessionCostLimit.toFixed(2)}). Please start a new session.`,
           timestamp: new Date(),
         };
         history.push(costEntry);
         messages.push({ role: "assistant", content: costEntry.content });
         newEntries.push(costEntry);
+
+        // Fix 3: YOLO session summary on cost limit
+        try {
+          const { getAutonomyManager } = await import('../../utils/autonomy-manager.js');
+          const am = getAutonomyManager();
+          if (am.isYOLOEnabled()) {
+            const summary = am.getSessionSummary(sessionCost);
+            const summaryEntry: ChatEntry = { type: 'assistant', content: summary, timestamp: new Date() };
+            history.push(summaryEntry);
+            newEntries.push(summaryEntry);
+          }
+        } catch { /* non-critical */ }
       }
 
       return newEntries;
@@ -871,6 +1063,25 @@ export class AgentExecutor {
     messages: CodeBuddyMessage[],
     abortController: AbortController | null
   ): AsyncGenerator<StreamingChunk, void, unknown> {
+    // Process @mentions (e.g., @web, @git, @terminal) and inject context — streaming path
+    try {
+      const { processMentions } = await import('../../input/context-mentions.js');
+      const mentionResult = await processMentions(message);
+      if (mentionResult.contextBlocks.length > 0) {
+        message = mentionResult.cleanedMessage;
+        const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+        if (lastUserMsg && typeof lastUserMsg.content === 'string') {
+          lastUserMsg.content = message;
+        }
+        for (const block of mentionResult.contextBlocks) {
+          messages.push({
+            role: 'system' as const,
+            content: `<context type="${block.type}" source="${block.source}">\n${block.content}\n</context>`,
+          });
+        }
+      }
+    } catch { /* mention processing optional */ }
+
     // Calculate input tokens
     let inputTokens = this.deps.tokenCounter.countMessageTokens(messages as Parameters<typeof this.deps.tokenCounter.countMessageTokens>[0]);
     yield {
@@ -890,6 +1101,16 @@ export class AgentExecutor {
         const { getPersonaManager } = await import('../../personas/persona-manager.js');
         getPersonaManager().autoSelectPersona({ message });
       } catch { /* persona auto-select optional */ }
+
+      // Auto-extract entities from user message into knowledge graph (streaming, background)
+      try {
+        const { getKnowledgeGraph, isTrivialMessage } = await import('../../memory/knowledge-graph.js');
+        if (!isTrivialMessage(message)) {
+          const kgExtract = getKnowledgeGraph();
+          await kgExtract.load();
+          kgExtract.extractFromMessageDeduped(message);
+        }
+      } catch { /* non-critical */ }
 
       let terminateDetectedStreaming = false;
       while (toolRounds < maxToolRounds) {
@@ -916,6 +1137,10 @@ export class AgentExecutor {
           }
           if (mwResult.action === 'warn' && mwResult.message) {
             yield { type: "content", content: `\n${mwResult.message}\n` };
+            messages.push({
+              role: 'system' as const,
+              content: `<context type="middleware-hint">\n${mwResult.message}\n</context>`,
+            });
           }
         }
 
@@ -923,7 +1148,9 @@ export class AgentExecutor {
         const tools = selectionResult.tools;
         if (toolRounds === 0) this.deps.toolSelectionStrategy.cacheTools(tools);
 
-        const preparedMessages = this.deps.contextManager.prepareMessages(messages);
+        const preparedMessages = repairToolCallPairs(
+          this.deps.contextManager.prepareMessages(messages)
+        );
 
         // --- Workspace context: git state + directory tree (streaming path) ---
         try {
@@ -938,6 +1165,18 @@ export class AgentExecutor {
         if (lessonsBlockStream) {
           preparedMessages.push({ role: 'system', content: `<context type="lessons">\n${lessonsBlockStream}\n</context>` });
         }
+
+        // --- Knowledge graph context: user preferences, habits, temporal patterns (streaming path) ---
+        // Uses memU intent routing: skips injection for trivial messages
+        try {
+          const { getKnowledgeGraph } = await import('../../memory/knowledge-graph.js');
+          const kgStream = getKnowledgeGraph();
+          await kgStream.load();
+          const kgBlockStream = kgStream.formatContextBlockSmart(message, 600);
+          if (kgBlockStream) {
+            preparedMessages.push({ role: 'system', content: kgBlockStream });
+          }
+        } catch { /* knowledge graph is optional */ }
 
         // --- Decision memory context: inject relevant past decisions (streaming path) ---
         if (this.getDecisionContextProvider()) {
@@ -971,6 +1210,16 @@ export class AgentExecutor {
               preparedMessages.push({ role: 'system', content: `<context type="code_graph">\n${graphCtxStream}\n</context>` });
             }
           } catch { /* code graph context optional */ }
+        }
+
+        // --- Documentation context: relevant doc pages (streaming path) ---
+        if (this.getDocsContextProvider()) {
+          try {
+            const docsCtxStream = this.getDocsContextProvider()!(message);
+            if (docsCtxStream) {
+              preparedMessages.push({ role: 'system', content: `<context type="docs">\n${docsCtxStream}\n</context>` });
+            }
+          } catch { /* docs context optional */ }
         }
 
         // --- Manus AI attention bias: append todo.md context at END of messages ---
@@ -1053,7 +1302,9 @@ export class AgentExecutor {
         }
 
         const accumulatedMessage = this.deps.streamingHandler.getAccumulatedMessage();
-        const content = accumulatedMessage.content || "Using tools to help you...";
+        // Sanitize streamed assistant content: strip model control tokens and invisible chars
+        const rawStreamedContent = accumulatedMessage.content || "Using tools to help you...";
+        const content = stripInvisibleChars(sanitizeModelOutput(rawStreamedContent));
         const toolCalls = accumulatedMessage.tool_calls;
 
         const assistantEntry: ChatEntry = {
@@ -1068,9 +1319,8 @@ export class AgentExecutor {
         if (toolCalls && toolCalls.length > 0) {
           toolRounds++;
 
-          // Pre-check cost limit before executing tools
-          this.config.recordSessionCost(inputTokens, totalOutputTokens);
-          if (this.config.isSessionCostLimitReached()) {
+          // Pre-check cost limit before executing tools (estimate only — no side effects)
+          if (this.config.estimateSessionCostLimitReached(inputTokens, totalOutputTokens)) {
             const sessionCost = this.config.getSessionCost();
             const sessionCostLimit = this.config.getSessionCostLimit();
             yield { type: "content", content: `\n\nSession cost limit reached ($${sessionCost.toFixed(2)} / $${sessionCostLimit.toFixed(2)}). Stopping before tool execution.` };
@@ -1116,6 +1366,9 @@ export class AgentExecutor {
             yield { type: "tool_calls", toolCalls: streamToolCallsToExecute };
           }
 
+          // Buffer for streaming adapter chunks (cannot yield from inside a callback)
+          const streamChunkBuffer: Array<{ type: "tool_stream"; toolStreamData: { toolCallId: string; toolName: string; delta: string } }> = [];
+
           for (const toolCall of streamToolCallsToExecute) {
             if (abortController?.signal.aborted) {
               yield { type: "content", content: "\n\n[Operation cancelled by user]" };
@@ -1123,7 +1376,29 @@ export class AgentExecutor {
               return;
             }
 
-            // Use streaming execution for tools that support it (bash, reason)
+            // --- Proactive context compaction (streaming path) ---
+            try {
+              const toolArgs = JSON.parse(toolCall.function.arguments || '{}');
+              const estimatedTokens = estimateToolResultTokens(toolCall.function.name, toolArgs);
+              const modelName = this.deps.client.getCurrentModel();
+              const { getModelToolConfig } = await import('../../config/model-tools.js');
+              const modelConfig = getModelToolConfig(modelName);
+              const contextWindow = modelConfig.contextWindow ?? 128_000;
+              if (shouldCompactBeforeToolExec(inputTokens, estimatedTokens, contextWindow)) {
+                logger.debug('Proactive compaction (stream): compacting before tool execution', {
+                  toolName: toolCall.function.name,
+                  inputTokens,
+                  estimatedTokens,
+                  contextWindow,
+                });
+                this.deps.contextManager.prepareMessages(messages);
+                inputTokens = this.deps.tokenCounter.countMessageTokens(
+                  messages as Parameters<typeof this.deps.tokenCounter.countMessageTokens>[0]
+                );
+              }
+            } catch { /* proactive compaction is non-critical */ }
+
+            // Use streaming execution for tools that support it (bash, reason, + adapter-based)
             let result;
             const _streamToolStartMs = Date.now();
             const STREAMING_TOOLS = ['bash', 'reason'];
@@ -1150,7 +1425,35 @@ export class AgentExecutor {
               }
               result = genResult.value ?? { success: false, error: 'Tool returned no result' };
             } else {
-              result = await this.executeToolViaLane(toolCall);
+              // Check if the streaming adapter supports this tool
+              const { getStreamingAdapter } = await import('../../tools/streaming-adapter.js');
+              const streamingAdapter = getStreamingAdapter();
+              if (streamingAdapter.supportsStreaming(toolCall.function.name)) {
+                const tc = toolCall; // capture for closure
+                result = await streamingAdapter.wrapWithStreaming(
+                  tc.function.name,
+                  () => this.executeToolViaLane(tc),
+                  (chunk: string) => {
+                    // We cannot yield from inside a callback, so we accumulate
+                    // chunks and emit them after. Instead, use a buffer approach.
+                    streamChunkBuffer.push({
+                      type: "tool_stream" as const,
+                      toolStreamData: {
+                        toolCallId: tc.id,
+                        toolName: tc.function.name,
+                        delta: chunk,
+                      },
+                    });
+                  },
+                );
+                // Flush buffered streaming chunks
+                for (const chunk of streamChunkBuffer) {
+                  yield chunk;
+                }
+                streamChunkBuffer.length = 0;
+              } else {
+                result = await this.executeToolViaLane(toolCall);
+              }
             }
 
             // --- Per-tool metrics (streaming path, DeepWiki gap #3) ---
@@ -1230,12 +1533,60 @@ export class AgentExecutor {
               name: toolCall.function.name,
             } as CodeBuddyMessage);
 
+            // --- Auto-commit after file-modifying tools (streaming path) ---
+            if (result?.success) {
+              try {
+                const { maybeAutoCommit } = await import('../../tools/auto-commit.js');
+                const acResult = await maybeAutoCommit(
+                  toolCall.function.name,
+                  toolCall.function.arguments || '{}',
+                  rawStreamContent.substring(0, 120),
+                );
+                if (acResult?.success) {
+                  logger.debug('Auto-commit (stream):', { hash: acResult.commitHash });
+                }
+              } catch { /* auto-commit is optional */ }
+            }
+
+            // --- Fix 11: YOLO cost display after each tool (streaming path) ---
+            try {
+              const { getAutonomyManager } = await import('../../utils/autonomy-manager.js');
+              if (getAutonomyManager().isYOLOEnabled()) {
+                const sessionCost = this.config.getSessionCost();
+                const sessionCostLimit = this.config.getSessionCostLimit();
+                logger.info(`[YOLO] Cost: $${sessionCost.toFixed(4)} / $${sessionCostLimit}`);
+              }
+            } catch { /* non-critical */ }
+
             // --- Terminate signal detection (OpenManus #5, streaming path) ---
             if (rawStreamContent.startsWith('__AGENT_TERMINATE__')) {
               const terminateMsg = rawStreamContent.replace('__AGENT_TERMINATE__', '').trim();
               yield { type: "content", content: `\n\n${terminateMsg || 'Task completed.'}` };
               terminateDetectedStreaming = true;
               break;
+            }
+
+            // --- Yield signal detection (OpenClaw v2026.3.14, streaming path) ---
+            if (rawStreamContent.includes('__SESSIONS_YIELD__')) {
+              const yieldMatch = rawStreamContent.match(/"id"\s*:\s*"(agent-\d+)"/);
+              if (yieldMatch) {
+                const childId = yieldMatch[1];
+                try {
+                  const { waitForSingleAgent } = await import('../../agent/multi-agent/agent-tools.js');
+                  yield { type: "content", content: `\n[Waiting for sub-agent to complete...]` };
+                  const completed = await waitForSingleAgent(childId, 300_000);
+                  const yieldResult = completed.result || 'Sub-agent completed (no result).';
+                  messages.push({
+                    role: 'user',
+                    content: `[Sub-agent ${completed.nickname} completed]: ${yieldResult}`,
+                  } as CodeBuddyMessage);
+                } catch (err) {
+                  messages.push({
+                    role: 'user',
+                    content: `[Sub-agent yield timeout]: ${err instanceof Error ? err.message : String(err)}`,
+                  } as CodeBuddyMessage);
+                }
+              }
             }
           }
 
@@ -1260,20 +1611,16 @@ export class AgentExecutor {
             if (mwResult.action === 'warn' && mwResult.message) {
               yield { type: "content", content: `\n${mwResult.message}\n` };
             }
-          } else {
-            // Legacy inline cost check when no pipeline
-            this.config.recordSessionCost(inputTokens, totalOutputTokens);
-            if (this.config.isSessionCostLimitReached()) {
-              const sessionCost = this.config.getSessionCost();
-              const sessionCostLimit = this.config.getSessionCostLimit();
-              yield {
-                type: "content",
-                content: `\n\n💸 Session cost limit reached ($${sessionCost.toFixed(2)} / $${sessionCostLimit.toFixed(2)}).`,
-              };
-              yield { type: "done" };
-              return;
-            }
           }
+          // Note: cost is recorded once at end-of-loop, not here (avoids double-counting)
+
+          // Apply TTL-based tool result expiry + image pruning + backward-scanned FIFO masking (streaming path)
+          try {
+            const { applyToolOutputMasking, expireOldToolResults, pruneImageContent } = await import('../../context/tool-output-masking.js');
+            expireOldToolResults(messages, toolRounds);
+            pruneImageContent(messages);
+            applyToolOutputMasking(messages);
+          } catch { /* masking is optional */ }
         } else {
           // Fire-and-forget auto-capture on final assistant response (streaming)
           try {
@@ -1299,6 +1646,14 @@ export class AgentExecutor {
             } catch { /* ICM store optional */ }
           }
 
+          // Context engine afterTurn hook (OpenClaw v2026.3.7 — streaming path)
+          try {
+            const engine = this.deps.contextManager.getContextEngine?.();
+            if (engine) {
+              engine.afterTurn(messages, { role: 'assistant' as const, content: content || '' });
+            }
+          } catch { /* afterTurn hook optional */ }
+
           break;
         }
       }
@@ -1308,6 +1663,13 @@ export class AgentExecutor {
       }
 
       this.config.recordSessionCost(inputTokens, totalOutputTokens);
+
+      // Display per-turn token usage (streaming path)
+      const streamTurnCost = estimateCost(inputTokens, totalOutputTokens);
+      const streamUsageDisplay = formatTokenUsage({ inputTokens, outputTokens: totalOutputTokens, cost: streamTurnCost });
+      logger.info(`Token usage: ${streamUsageDisplay}`);
+      yield { type: "content", content: `\n${streamUsageDisplay}` };
+
       if (this.config.isSessionCostLimitReached()) {
         const sessionCost = this.config.getSessionCost();
         const sessionCostLimit = this.config.getSessionCostLimit();

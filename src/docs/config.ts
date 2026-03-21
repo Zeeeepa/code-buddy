@@ -56,7 +56,7 @@ export function loadDocsConfig(cwd: string): DocsConfig {
     const { execFileSync } = require('child_process');
     defaults.repoUrl = execFileSync('git', ['remote', 'get-url', 'origin'], { cwd, encoding: 'utf-8', timeout: 3000 }).trim()
       .replace(/\.git$/, '')
-      .replace(/^git@github\.com:/, 'https://github.com/');
+      .replace(/^git@([^:]+):(.+)$/, 'https://$1/$2');
     defaults.commit = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd, encoding: 'utf-8', timeout: 3000 }).trim();
   } catch { /* git not available */ }
 

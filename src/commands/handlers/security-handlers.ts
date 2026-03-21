@@ -5,6 +5,7 @@ import { ConfirmationService } from "../../utils/confirmation-service.js";
 import { getSecurityReviewAgent } from "../../agent/specialized/security-review-agent.js";
 import { getDMPairing } from "../../channels/dm-pairing.js";
 import { getIdentityLinker } from "../../channels/identity-links.js";
+import { getElevatedMode } from "../../elevated-mode/index.js";
 import type { ChannelType } from "../../channels/index.js";
 
 export interface CommandHandlerResult {
@@ -706,6 +707,100 @@ How it works:
 
 Supported channels: ${VALID_PAIRING_CHANNELS.join(', ')}`;
       break;
+  }
+
+  return {
+    handled: true,
+    entry: {
+      type: "assistant",
+      content,
+      timestamp: new Date(),
+    },
+  };
+}
+
+// ============================================================================
+// Elevated Mode Handler (OpenClaw-inspired /elevated on|off|status)
+// ============================================================================
+
+export function handleElevated(args: string[]): CommandHandlerResult {
+  const elevated = getElevatedMode();
+  const action = args[0]?.toLowerCase();
+
+  let content: string;
+
+  switch (action) {
+    case 'on': {
+      const durationMin = parseInt(args[1] || '30', 10);
+      const durationMs = durationMin * 60 * 1000;
+      const success = elevated.elevate('elevated', durationMs);
+      if (success) {
+        content = `Elevated mode ON\n\nLevel: elevated\nDuration: ${durationMin} minutes\nExpires: ${new Date(Date.now() + durationMs).toLocaleTimeString()}\n\nPrivileged operations (process:spawn, file:write, network:connect, etc.) are now allowed without confirmation.\n\nUse /elevated off to drop elevation early.`;
+      } else {
+        content = `Already elevated (level: ${elevated.getLevel()}).\n\nTime remaining: ${Math.ceil(elevated.getElevationTimeRemaining() / 60000)} min`;
+      }
+      break;
+    }
+
+    case 'off': {
+      if (!elevated.isElevated()) {
+        content = 'Not currently elevated. Level: user';
+      } else {
+        elevated.dropElevation();
+        content = 'Elevated mode OFF\n\nDropped back to user level. All session grants cleared.';
+      }
+      break;
+    }
+
+    case 'grants': {
+      const grants = elevated.getGrants();
+      if (grants.length === 0) {
+        content = 'No active permission grants.';
+      } else {
+        const lines = grants.map(g => {
+          const expires = g.expiresAt ? ` (expires ${g.expiresAt.toLocaleTimeString()})` : '';
+          return `  ${g.permission.category}${g.permission.resource ? `:${g.permission.resource}` : ''} [${g.type}]${expires}`;
+        });
+        content = `Active Grants (${grants.length})\n\n${lines.join('\n')}\n\nUse /elevated revoke <grantId> to revoke.`;
+      }
+      break;
+    }
+
+    case 'revoke': {
+      const grantId = args[1];
+      if (!grantId) {
+        content = 'Usage: /elevated revoke <grantId>';
+        break;
+      }
+      const revoked = elevated.revokeGrant(grantId);
+      content = revoked ? `Grant ${grantId} revoked.` : `Grant not found: ${grantId}`;
+      break;
+    }
+
+    case 'status':
+    default: {
+      const session = elevated.getSession();
+      const remaining = elevated.getElevationTimeRemaining();
+      const remainingStr = remaining > 0 ? `${Math.ceil(remaining / 60000)} min` : 'N/A';
+
+      content = `Elevated Mode Status
+
+Level: ${session.level}${elevated.isElevated() ? ' (ELEVATED)' : ''}
+Elevated since: ${session.elevatedAt ? session.elevatedAt.toLocaleTimeString() : 'N/A'}
+Expires: ${session.expiresAt ? session.expiresAt.toLocaleTimeString() : 'N/A'}
+Time remaining: ${remainingStr}
+Active grants: ${session.grantCount}
+Permission requests: ${session.requestCount}
+Pending approvals: ${session.pendingCount}
+
+Commands:
+  /elevated on [minutes]   - Elevate to privileged mode (default: 30 min)
+  /elevated off            - Drop back to user level
+  /elevated grants         - List active permission grants
+  /elevated revoke <id>    - Revoke a specific grant
+  /elevated status         - Show this status`;
+      break;
+    }
   }
 
   return {

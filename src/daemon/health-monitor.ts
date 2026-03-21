@@ -40,6 +40,10 @@ export interface HealthMonitorConfig {
   memoryCriticalThreshold: number;
   /** Max consecutive unhealthy checks before auto-recovery */
   maxUnhealthyChecks: number;
+  /** Stale event threshold — if no events received within this window, emit 'stale' (ms) */
+  staleEventThresholdMs?: number;
+  /** Max total restarts before the monitor gives up */
+  maxTotalRestarts?: number;
 }
 
 const DEFAULT_CONFIG: HealthMonitorConfig = {
@@ -47,6 +51,8 @@ const DEFAULT_CONFIG: HealthMonitorConfig = {
   memoryWarningThreshold: 80,
   memoryCriticalThreshold: 95,
   maxUnhealthyChecks: 3,
+  staleEventThresholdMs: 120000, // 2 minutes
+  maxTotalRestarts: 10,
 };
 
 // ============================================================================
@@ -61,6 +67,9 @@ export class HealthMonitor extends EventEmitter {
   private unhealthyCount: number = 0;
   private lastMetrics: HealthMetrics | null = null;
   private serviceChecks: Map<string, () => boolean> = new Map();
+  private lastEventTime: number = Date.now();
+  private totalRestarts: number = 0;
+  private staleTimer: NodeJS.Timeout | null = null;
 
   constructor(config: Partial<HealthMonitorConfig> = {}) {
     super();
@@ -72,6 +81,20 @@ export class HealthMonitor extends EventEmitter {
    */
   registerServiceCheck(name: string, check: () => boolean): void {
     this.serviceChecks.set(name, check);
+  }
+
+  /**
+   * Record that an event was received (resets stale timer)
+   */
+  recordEvent(): void {
+    this.lastEventTime = Date.now();
+  }
+
+  /**
+   * Get total restart count
+   */
+  getTotalRestarts(): number {
+    return this.totalRestarts;
   }
 
   /**
@@ -92,6 +115,10 @@ export class HealthMonitor extends EventEmitter {
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
+    }
+    if (this.staleTimer) {
+      clearTimeout(this.staleTimer);
+      this.staleTimer = null;
     }
     this.running = false;
     logger.debug('Health monitor stopped');
@@ -157,8 +184,21 @@ export class HealthMonitor extends EventEmitter {
 
     // Auto-recovery trigger
     if (this.unhealthyCount >= this.config.maxUnhealthyChecks) {
-      this.emit('recovery-needed', { metrics, unhealthyCount: this.unhealthyCount });
+      this.totalRestarts++;
+      const maxRestarts = this.config.maxTotalRestarts ?? 10;
+      if (this.totalRestarts > maxRestarts) {
+        this.emit('max-restarts-exceeded', { totalRestarts: this.totalRestarts, maxRestarts });
+        this.stop();
+      } else {
+        this.emit('recovery-needed', { metrics, unhealthyCount: this.unhealthyCount });
+      }
       this.unhealthyCount = 0;
+    }
+
+    // Stale event detection
+    const staleThreshold = this.config.staleEventThresholdMs ?? 120000;
+    if (Date.now() - this.lastEventTime > staleThreshold) {
+      this.emit('stale', { lastEventTime: this.lastEventTime, elapsed: Date.now() - this.lastEventTime });
     }
 
     this.emit('check', metrics);

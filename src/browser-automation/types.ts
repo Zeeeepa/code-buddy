@@ -31,7 +31,7 @@ export interface BrowserProfile {
   /** Profile name */
   name: string;
   /** Profile type */
-  type: 'managed' | 'extension' | 'remote';
+  type: 'managed' | 'remote';
   /** User data directory */
   userDataDir?: string;
   /** CDP endpoint URL */

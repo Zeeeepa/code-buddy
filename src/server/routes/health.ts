@@ -541,4 +541,53 @@ router.get(
   })
 );
 
+// ============================================================================
+// Kubernetes-standard aliases (/healthz, /readyz, /livez)
+// These are registered at the top-level in server/index.ts
+// ============================================================================
+
+/**
+ * Create a separate router with K8s-standard health aliases.
+ * Mount at root level: app.use(k8sHealthAliases)
+ */
+export function createK8sHealthAliases(): Router {
+  const k8s = Router();
+
+  // /healthz → same as GET /api/health
+  k8s.get('/healthz', asyncHandler(async (req: Request, res: Response) => {
+    const checks = {
+      database: checkDatabase(),
+      api: checkApi(),
+      memory: checkMemory(),
+    };
+    const checksOk = Object.values(checks).filter((c) => c === 'ok').length;
+    const totalChecks = Object.values(checks).length;
+    const status = checksOk === totalChecks ? 'ok' : checksOk > 0 ? 'degraded' : 'error';
+    res.status(status === 'error' ? 503 : 200).json({ status, checks });
+  }));
+
+  // /readyz → same as GET /api/health/ready (lightweight)
+  k8s.get('/readyz', asyncHandler(async (_req: Request, res: Response) => {
+    const apiKeyOk = !!process.env.GROK_API_KEY;
+    const memOk = process.memoryUsage().heapUsed < 1024 * 1024 * 1024;
+    const ready = apiKeyOk && memOk;
+    res.status(ready ? 200 : 503).json({
+      ready,
+      checks: { apiKey: apiKeyOk, memory: memOk },
+    });
+  }));
+
+  // /livez → same as GET /api/health/live
+  k8s.get('/livez', asyncHandler(async (_req: Request, res: Response) => {
+    res.json({
+      alive: true,
+      status: 'ok',
+      pid: process.pid,
+      uptime: Math.floor((Date.now() - serverStartTime) / 1000),
+    });
+  }));
+
+  return k8s;
+}
+
 export default router;

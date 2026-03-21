@@ -22,6 +22,8 @@ import { getCodeGuardianAgent } from './code-guardian-agent.js';
 import { getSecurityReviewAgent } from './security-review-agent.js';
 import { getSWEAgent } from './swe-agent-adapter.js';
 import { getErrorMessage } from '../../types/index.js';
+import { getAgentParams } from '../../config/agent-defaults.js';
+import { logger } from '../../utils/logger.js';
 
 // ============================================================================
 // Types
@@ -80,11 +82,22 @@ export class AgentRegistry extends EventEmitter {
   }
 
   /**
-   * Register a specialized agent
+   * Register a specialized agent.
+   * Applies per-agent parameter overrides from config if present.
    */
   register(agent: SpecializedAgent): void {
-    this.agents.set(agent.getId(), agent);
-    this.emit('agent:registered', { id: agent.getId(), name: agent.getName() });
+    const agentId = agent.getId();
+    const params = getAgentParams(agentId);
+    if (params) {
+      const overrides: Record<string, unknown> = {};
+      if (params.temperature !== undefined) overrides.temperature = params.temperature;
+      if (params.maxTokens !== undefined) overrides.maxTokens = params.maxTokens;
+      if (params.model !== undefined) overrides.model = params.model;
+      agent.setOptions(overrides);
+      logger.debug(`Applied config overrides for agent "${agentId}": ${JSON.stringify(params)}`, { source: 'AgentRegistry' });
+    }
+    this.agents.set(agentId, agent);
+    this.emit('agent:registered', { id: agentId, name: agent.getName() });
   }
 
   /**

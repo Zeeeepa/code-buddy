@@ -35,6 +35,7 @@ export type HookType =
   | "post-response"
   | "on-error"
   | "on-tool-call"
+  | "on-tool-failure"
   | "command:new"
   | "command:reset"
   | "command:stop"
@@ -45,7 +46,16 @@ export type HookType =
   | "message:received"
   | "message:transcribed"
   | "message:preprocessed"
-  | "message:sent";
+  | "message:sent"
+  // CC12: New events for Claude Code parity
+  | "user-prompt-submit"
+  | "model:request"
+  | "model:response"
+  | "instructions:loaded"
+  | "worktree:create"
+  | "worktree:remove"
+  | "task:completed"
+  | "teammate:idle";
 
 /**
  * Hook execution context

@@ -15,6 +15,8 @@ import { EventEmitter } from 'events';
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
+import { sanitizeEnvVars } from '../security/env-blocklist.js';
+import type { SandboxBackendInterface, SandboxExecOptions, SandboxExecResult } from './sandbox-backend.js';
 
 // ============================================================================
 // Types
@@ -256,7 +258,9 @@ async function execBubblewrap(
     HOME: '/tmp',
     PATH: '/usr/local/bin:/usr/bin:/bin',
     TERM: process.env.TERM || 'xterm',
-    ...config.env,
+    CODEBUDDY_CLI: process.env.CODEBUDDY_CLI || '1',
+    CODEBUDDY_CLI_VERSION: process.env.CODEBUDDY_CLI_VERSION || '',
+    ...sanitizeEnvVars(config.env),
   };
 
   for (const [key, value] of Object.entries(envVars)) {
@@ -570,7 +574,9 @@ async function execLandlock(
       HOME: '/tmp',
       PATH: '/usr/local/bin:/usr/bin:/bin',
       TERM: process.env.TERM || 'xterm',
-      ...config.env,
+      CODEBUDDY_CLI: process.env.CODEBUDDY_CLI || '1',
+      CODEBUDDY_CLI_VERSION: process.env.CODEBUDDY_CLI_VERSION || '',
+      ...sanitizeEnvVars(config.env),
     };
 
     for (const [key, value] of Object.entries(envVars)) {
@@ -681,7 +687,8 @@ function execWithSeccomp(
 // OS Sandbox Class
 // ============================================================================
 
-export class OSSandbox extends EventEmitter {
+export class OSSandbox extends EventEmitter implements SandboxBackendInterface {
+  readonly name = 'os-sandbox';
   private config: OSSandboxConfig;
   private backend: SandboxBackend = 'none';
   private initialized = false;
@@ -734,9 +741,12 @@ export class OSSandbox extends EventEmitter {
   }
 
   /**
-   * Check if sandboxing is available
+   * Check if sandboxing is available (satisfies SandboxBackendInterface).
    */
-  isAvailable(): boolean {
+  async isAvailable(): Promise<boolean> {
+    if (!this.initialized) {
+      await this.initialize();
+    }
     return this.backend !== 'none';
   }
 
@@ -879,7 +889,7 @@ export class OSSandbox extends EventEmitter {
       return execUnsandboxed(shell, [shellArg, shellCommand], this.config.timeout);
     }
 
-    if (!this.isAvailable() && this.config.allowUnsandboxed) {
+    if (!(await this.isAvailable()) && this.config.allowUnsandboxed) {
       this.stats.commandsBypassed++;
       const shell = os.platform() === 'win32' ? 'cmd' : 'sh';
       const shellArg = os.platform() === 'win32' ? '/c' : '-c';
@@ -888,6 +898,54 @@ export class OSSandbox extends EventEmitter {
 
     this.stats.commandsSandboxed++;
     return this.execShell(shellCommand);
+  }
+
+  // --------------------------------------------------------------------------
+  // SandboxBackendInterface adapter methods
+  // --------------------------------------------------------------------------
+
+  /**
+   * Execute a command in the sandbox (satisfies SandboxBackendInterface).
+   * Adapts the SandboxExecOptions to the native exec API.
+   */
+  async execute(command: string, opts?: SandboxExecOptions): Promise<SandboxExecResult> {
+    if (opts?.workDir) {
+      this.updateConfig({ workDir: opts.workDir });
+    }
+    if (opts?.env) {
+      this.updateConfig({ env: opts.env });
+    }
+    if (opts?.timeout) {
+      this.updateConfig({ timeout: opts.timeout });
+    }
+    if (opts?.networkEnabled !== undefined) {
+      this.updateConfig({ allowNetwork: opts.networkEnabled });
+    }
+
+    const result = await this.execShell(command);
+    return {
+      success: result.exitCode === 0 && !result.timedOut,
+      output: result.stdout,
+      error: result.stderr || undefined,
+      exitCode: result.exitCode,
+      durationMs: result.duration,
+    };
+  }
+
+  /**
+   * Kill a running sandbox instance (satisfies SandboxBackendInterface).
+   * OS-level sandboxes are process-based; kill is not directly applicable.
+   */
+  async kill(_containerId: string): Promise<boolean> {
+    // OS-level sandboxes don't use container IDs — processes are managed via spawn
+    return false;
+  }
+
+  /**
+   * Clean up resources (satisfies SandboxBackendInterface).
+   */
+  async cleanup(): Promise<void> {
+    this.removeAllListeners();
   }
 }
 

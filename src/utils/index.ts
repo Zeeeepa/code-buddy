@@ -246,6 +246,8 @@ export {
   sanitizeJSON,
   sanitizePort,
   sanitizeLLMOutput,
+  sanitizeModelOutput,
+  stripInvisibleChars,
   ExtractedToolCall,
   extractCommentaryToolCalls,
 } from "./sanitize.js";

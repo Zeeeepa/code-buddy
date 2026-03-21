@@ -18,6 +18,7 @@ import type {
   ClientState,
 } from './types.js';
 import { DEFAULT_GATEWAY_CONFIG } from './types.js';
+import { logger } from '../utils/logger.js';
 
 // ============================================================================
 // WebSocket Transport Configuration
@@ -55,7 +56,7 @@ export const DEFAULT_WS_CONFIG: WebSocketTransportConfig = {
   heartbeatInterval: 30000,
   clientTimeout: 60000,
   binaryMode: false,
-  corsOrigins: ['*'],
+  corsOrigins: ['http://localhost:*', 'http://127.0.0.1:*'],
 };
 
 // ============================================================================
@@ -72,6 +73,29 @@ interface WebSocketClient {
   isAlive: boolean;
   ip?: string;
   userAgent?: string;
+}
+
+// ============================================================================
+// Origin Validation (GHSA-5wcw-8jjv-m286)
+// ============================================================================
+
+/**
+ * Check if an origin is allowed by a list of allowed origin patterns.
+ * Supports wildcard patterns like `http://localhost:*`.
+ */
+export function isOriginAllowed(origin: string, allowedOrigins: string[]): boolean {
+  if (!origin) return false;
+  for (const pattern of allowedOrigins) {
+    if (pattern === '*') return true;
+    if (pattern === origin) return true;
+    // Support wildcard patterns (e.g. http://localhost:*)
+    if (pattern.includes('*')) {
+      const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+      const regex = new RegExp(`^${escaped}$`);
+      if (regex.test(origin)) return true;
+    }
+  }
+  return false;
 }
 
 // ============================================================================
@@ -121,13 +145,37 @@ export class WebSocketGateway extends GatewayServer {
       perMessageDeflate: this.wsConfig.perMessageDeflate,
       maxPayload: this.wsConfig.maxPayload,
       verifyClient: (info, callback) => {
-        // CORS check
-        const origin = info.origin;
-        const allowed = this.wsConfig.corsOrigins.includes('*') ||
-          this.wsConfig.corsOrigins.includes(origin);
+        // GHSA-5wcw-8jjv-m286: Strip proxy headers from untrusted sources
+        const sourceIp = info.req.socket.remoteAddress || '';
+        const trustedProxies = this.wsConfig.trustedProxies || [];
+        const hasProxyHeaders = !!(
+          info.req.headers['x-forwarded-host'] ||
+          info.req.headers['x-forwarded-proto']
+        );
+
+        if (hasProxyHeaders && !trustedProxies.includes(sourceIp)) {
+          // Untrusted source sending proxy headers — strip them and use raw origin
+          delete info.req.headers['x-forwarded-host'];
+          delete info.req.headers['x-forwarded-proto'];
+        }
+
+        // CORS origin check with wildcard support
+        const allowed = isOriginAllowed(info.origin, this.wsConfig.corsOrigins);
         callback(allowed, allowed ? undefined : 403, allowed ? undefined : 'Origin not allowed');
       },
     });
+
+    // GHSA-5wcw-8jjv-m286: Warn if corsOrigins is wildcard with auth enabled
+    if (
+      this.wsConfig.corsOrigins.length === 1 &&
+      this.wsConfig.corsOrigins[0] === '*' &&
+      this.wsConfig.authEnabled
+    ) {
+      logger.warn(
+        'Gateway WebSocket: corsOrigins is set to ["*"] with authentication enabled. ' +
+        'This allows any origin to connect. Consider restricting corsOrigins to trusted domains.'
+      );
+    }
 
     // Handle new connections
     this.wss.on('connection', (socket, request) => {

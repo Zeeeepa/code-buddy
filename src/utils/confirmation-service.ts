@@ -2,6 +2,8 @@ import { spawn } from 'child_process';
 import { EventEmitter } from 'events';
 import path from 'path';
 import type { RemoteApprovalService } from '../security/remote-approval.js';
+import { checkDeclarativePermission } from '../security/declarative-rules.js';
+import { getPermissionModeManager } from '../security/permission-modes.js';
 
 export interface ConfirmationOptions {
   operation: string;
@@ -205,6 +207,30 @@ export class ConfirmationService extends EventEmitter {
         confirmed: false,
         feedback: `[DRY-RUN] Operation logged but not executed: ${options.operation}`,
       };
+    }
+
+    // CC18: Check permission mode before other checks
+    const toolName = operationType === 'bash' ? 'Bash' : 'Edit';
+    const permMgr = getPermissionModeManager();
+    const modeDecision = permMgr.checkPermission(options.operation, toolName.toLowerCase());
+    if (!modeDecision.allowed) {
+      return { confirmed: false, feedback: modeDecision.reason };
+    }
+    if (!modeDecision.prompted) {
+      // Mode says auto-approve (e.g., acceptEdits for edits, dontAsk for non-destructive)
+      return { confirmed: true };
+    }
+
+    // Check declarative permission rules (fast O(n) check before Guardian)
+    const toolArgs = operationType === 'bash'
+      ? { command: options.filename }
+      : { file_path: options.filename };
+    const declarativeDecision = checkDeclarativePermission(toolName, toolArgs);
+    if (declarativeDecision === 'allow') {
+      return { confirmed: true };
+    }
+    if (declarativeDecision === 'deny') {
+      return { confirmed: false, feedback: 'Blocked by declarative permission rule' };
     }
 
     // Check session flags — but require re-confirmation for large changes

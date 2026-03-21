@@ -17,6 +17,30 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./plugin-sdk": {
+      "import": "./dist/plugin-sdk/index.js",
+      "types": "./dist/plugin-sdk/index.d.ts"
+    },
+    "./plugin-sdk/core": {
+      "import": "./dist/plugin-sdk/core.js",
+      "types": "./dist/plugin-sdk/core.d.ts"
+    },
+    "./plugin-sdk/llm": {
+      "import": "./dist/plugin-sdk/llm.js",
+      "types": "./dist/plugin-sdk/llm.d.ts"
+    },
+    "./plugin-sdk/channel": {
+      "import": "./dist/plugin-sdk/channel.js",
+      "types": "./dist/plugin-sdk/channel.d.ts"
+    },
+    "./plugin-sdk/tool": {
+      "import": "./dist/plugin-sdk/tool.js",
+      "types": "./dist/plugin-sdk/tool.d.ts"
+    },
+    "./plugin-sdk/testing": {
+      "import": "./dist/plugin-sdk/testing.js",
+      "types": "./dist/plugin-sdk/testing.d.ts"
     }
   },
   "bin": {
@@ -148,6 +172,7 @@
     "tar": "^7.5.3",
     "tree-sitter": "^0.21.1",
     "tree-sitter-bash": "^0.23.3",
+    "tree-sitter-typescript": "^0.23.2",
     "usearch": "^2.21.4",
     "ws": "^8.18.0",
     "xlsx": "^0.18.5"

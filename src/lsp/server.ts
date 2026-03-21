@@ -35,6 +35,8 @@ import {
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { CodeBuddyClient, CodeBuddyMessage } from '../codebuddy/client.js';
 import { logger } from '../utils/logger.js';
+import { CompletionCache } from './completion-cache.js';
+import { gatherCompletionContext } from './context-gatherer.js';
 
 // Create connection
 const connection = createConnection(ProposedFeatures.all);
@@ -64,8 +66,8 @@ const defaultSettings: CodeBuddyLSPSettings = {
 
 let globalSettings: CodeBuddyLSPSettings = defaultSettings;
 
-// Cache for completions
-const completionCache = new Map<string, CompletionItem[]>();
+// LRU cache for completions (100 entries, 5s TTL)
+const completionCacheLRU = new CompletionCache({ maxEntries: 100, ttlMs: 5000 });
 
 connection.onInitialize((_params: InitializeParams): InitializeResult => {
   logger.info('Code Buddy LSP server initializing...');
@@ -209,7 +211,7 @@ function mapSeverity(severity: string): DiagnosticSeverity {
 // Completions
 connection.onCompletion(
   async (params: TextDocumentPositionParams): Promise<CompletionItem[]> => {
-    if (!codebuddyClient || !globalSettings.enableCompletions) {
+    if (!globalSettings.enableCompletions) {
       return [];
     }
 
@@ -219,29 +221,41 @@ connection.onCompletion(
     }
 
     const text = document.getText();
-    const offset = document.offsetAt(params.position);
-    const prefix = text.slice(Math.max(0, offset - 500), offset);
-    const suffix = text.slice(offset, Math.min(text.length, offset + 200));
-    const languageId = document.languageId;
+    const filePath = params.textDocument.uri;
+    const { line, character } = params.position;
 
-    // Check cache
-    const cacheKey = `${prefix.slice(-50)}|${params.position.line}`;
-    if (completionCache.has(cacheKey)) {
-      return completionCache.get(cacheKey)!;
+    // Gather structured context
+    const ctx = gatherCompletionContext(text, filePath, line, character);
+
+    // Check LRU cache (key = filePath:line:prefix)
+    const cacheKey = `${filePath}:${line}:${ctx.prefix}`;
+    const cached = completionCacheLRU.get(cacheKey);
+    if (cached) {
+      return cached as CompletionItem[];
+    }
+
+    // If no LLM client, return empty (don't block the editor)
+    if (!codebuddyClient) {
+      return [];
     }
 
     try {
+      const contextLines = [
+        ...ctx.linesBefore.slice(-10),
+        ctx.prefix + '<CURSOR>' + ctx.suffix,
+        ...ctx.linesAfter.slice(0, 3),
+      ].join('\n');
+
       const messages: CodeBuddyMessage[] = [
         {
           role: 'system',
-          content: `You are a ${languageId} code completion engine. Suggest completions.`,
+          content: `You are a ${ctx.language} code completion engine. Suggest completions. Context: ${ctx.triggerKind}.`,
         },
         {
           role: 'user',
-          content: `Complete this ${languageId} code. Provide 3-5 suggestions.
-Prefix: ${prefix}
-<CURSOR>
-Suffix: ${suffix}
+          content: `Complete this ${ctx.language} code. Provide 3-5 suggestions.
+
+${contextLines}
 
 Return JSON: [{"label": "<completion>", "detail": "<description>", "kind": "function|variable|class|property|method"}]`,
         },
@@ -262,15 +276,14 @@ Return JSON: [{"label": "<completion>", "detail": "<description>", "kind": "func
         kind?: string;
       }, i: number) => ({
         label: s.label,
-        detail: s.detail,
+        detail: s.detail ? `${s.detail} \u2728 Code Buddy` : '\u2728 Code Buddy',
         kind: mapCompletionKind(s.kind),
         sortText: String(i).padStart(3, '0'),
         data: i,
       }));
 
-      // Cache results
-      completionCache.set(cacheKey, completions);
-      setTimeout(() => completionCache.delete(cacheKey), 30000);
+      // Cache results in LRU cache (auto-expires via TTL)
+      completionCacheLRU.set(cacheKey, completions);
 
       return completions;
     } catch (error) {

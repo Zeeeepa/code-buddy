@@ -143,6 +143,9 @@ export class KnowledgeManager {
       await this.loadFile(localKnowledge, 'local');
     }
 
+    // Auto-register generated docs as low-priority knowledge entries
+    await this.loadGeneratedDocs();
+
     // Sort by priority ascending (lower priority first, so higher priority
     // content is appended later = closer to the query in the context window)
     this.entries.sort((a, b) => a.priority - b.priority);
@@ -168,6 +171,55 @@ export class KnowledgeManager {
     } catch {
       // Skip unreadable files silently
     }
+  }
+
+  /**
+   * Auto-register generated docs (.codebuddy/docs/) as low-priority knowledge entries.
+   * Only loads overview, architecture, and key-concepts pages (highest value).
+   */
+  private async loadGeneratedDocs(): Promise<void> {
+    const docsDir = path.join(process.cwd(), '.codebuddy', 'docs');
+    if (!existsSync(docsDir)) return;
+
+    const priorityPages: Record<string, { priority: number; tags: string[] }> = {
+      'overview': { priority: 10, tags: ['architecture', 'overview'] },
+      'architecture': { priority: 20, tags: ['architecture', 'design'] },
+      'key-concepts': { priority: 15, tags: ['concepts', 'glossary'] },
+      'security': { priority: 30, tags: ['security'] },
+      'configuration': { priority: 25, tags: ['config', 'environment'] },
+      'testing': { priority: 35, tags: ['testing', 'quality'] },
+    };
+
+    try {
+      const files = await fs.readdir(docsDir);
+      for (const file of files) {
+        if (!file.endsWith('.md') || file === 'index.md') continue;
+        // Check if this page matches a priority slug
+        const matchedKey = Object.keys(priorityPages).find(key => file.includes(key));
+        if (!matchedKey) continue;
+
+        const filePath = path.join(docsDir, file);
+        const raw = await fs.readFile(filePath, 'utf-8');
+        // Strip <details> blocks and footers to keep it compact
+        const content = raw
+          .replace(/<details>[\s\S]*?<\/details>\s*/g, '')
+          .replace(/\n---\n\n\*\*(?:See also|Referenced by):\*\*[^\n]*/g, '')
+          .trim();
+
+        const titleMatch = content.match(/^# (.+)$/m);
+        const { priority, tags } = priorityPages[matchedKey];
+
+        this.entries.push({
+          path: filePath,
+          title: titleMatch?.[1] ?? file.replace('.md', ''),
+          tags,
+          scope: [],
+          priority,
+          content: content.substring(0, 3000), // Cap at 3KB per entry
+          source: 'project',
+        });
+      }
+    } catch { /* docs not readable */ }
   }
 
   // --------------------------------------------------------------------------

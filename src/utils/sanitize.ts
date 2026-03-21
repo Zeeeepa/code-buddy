@@ -4,6 +4,7 @@
  */
 
 import { ValidationError } from './errors.js';
+import { sanitizeModelOutput, stripInvisibleChars } from './output-sanitizer.js';
 
 /**
  * Sanitize a file path to prevent directory traversal attacks
@@ -323,8 +324,11 @@ export function sanitizePort(port: string | number): number {
 }
 
 /**
- * Sanitize LLM output by removing control tokens and internal markers
- * These tokens can leak from models like Grok and should not be displayed
+ * Sanitize LLM output by removing control tokens and internal markers.
+ * Delegates to the extended output-sanitizer module for exhaustive pattern
+ * coverage (GLM-5, DeepSeek, ChatML, LLaMA, zero-width chars), then applies
+ * legacy commentary/tool-call stripping on top.
+ *
  * @param content - The LLM output content to sanitize
  * @returns Sanitized content without control tokens
  */
@@ -333,16 +337,13 @@ export function sanitizeLLMOutput(content: string): string {
     return '';
   }
 
-  let sanitized = content;
+  // Phase 1: Extended model output sanitization (GLM-5, DeepSeek, ChatML, LLaMA, etc.)
+  let sanitized = sanitizeModelOutput(content);
 
-  // Control tokens pattern from Grok and other models
-  // Matches: <|token_name|>, <|token_name|>content, etc.
-  sanitized = sanitized.replace(/<\|[^|>]+\|>/g, '');
+  // Phase 2: Strip invisible/zero-width characters
+  sanitized = stripInvisibleChars(sanitized);
 
-  // JSON-escaped control tokens: \u003c|token|\u003e
-  sanitized = sanitized.replace(/\\u003c\|[^|>]+\|\\u003e/gi, '');
-
-  // Internal commentary/tool call patterns (multiple formats)
+  // Phase 3: Legacy commentary/tool-call patterns specific to this project
   // Format 1: "commentary to=action json{...}" or "commentary to=action{...}"
   sanitized = sanitized.replace(/\bcommentary\s+to=\w+\s*(?:json)?\s*\{[^]*?\}(?:\s*\n)?/gi, '');
 
@@ -363,6 +364,9 @@ export function sanitizeLLMOutput(content: string): string {
 
   return sanitized;
 }
+
+// Re-export extended sanitizer for direct use
+export { sanitizeModelOutput, stripInvisibleChars } from './output-sanitizer.js';
 
 /**
  * Sanitize tool result content before sending back to the LLM.

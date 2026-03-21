@@ -158,6 +158,20 @@ export class CronAgentBridge extends EventEmitter {
       false // no RAG for cron jobs
     );
 
+    // Session binding: load existing session if resolvedSessionId is set
+    if (job.resolvedSessionId && job.sessionTarget !== 'new') {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const agentAny = agent as any;
+        if (typeof agentAny.loadSession === 'function') {
+          await agentAny.loadSession(job.resolvedSessionId);
+          logger.debug(`Cron job ${job.id}: resumed session ${job.resolvedSessionId}`);
+        }
+      } catch {
+        logger.debug(`Cron job ${job.id}: could not load session ${job.resolvedSessionId}, starting fresh`);
+      }
+    }
+
     const entries = await agent.processUserMessage(job.task.message);
     const assistantEntries = entries.filter(e => e.type === 'assistant');
     return assistantEntries.map(e => e.content).join('\n') || 'No response';

@@ -1,5 +1,5 @@
 import { ChatEntry } from "../../agent/codebuddy-agent.js";
-import { getAutonomyManager, AutonomyLevel } from "../../utils/autonomy-manager.js";
+import { getAutonomyManager, SAFE_MODE_PATHS, type AutonomyLevel } from "../../utils/autonomy-manager.js";
 import { getSlashCommandManager } from "../slash-commands.js";
 import { getSkillManager } from "../../skills/skill-manager.js";
 import { getConversationExporter } from "../../utils/conversation-export.js";
@@ -117,41 +117,44 @@ export function handleYoloMode(args: string[]): CommandHandlerResult {
         maxAutoEdits: 50,
         maxAutoCommands: 100,
       });
-      content = `🚀 YOLO MODE: ENABLED
+      content = `YOLO MODE: ENABLED
 
-⚡ Auto-approval is ON for all operations
-⚠️  Guardrails: 50 auto-edits, 100 commands per session
+Auto-approval is ON for all operations
+Guardrails: 50 auto-edits, 100 commands per session, $100 cost cap
 
 Use /yolo off to disable, /yolo safe for restricted mode`;
       break;
 
-    case "safe":
+    case "safe": {
       autonomyManager.enableYOLO(true);
       autonomyManager.updateYOLOConfig({
         maxAutoEdits: 20,
         maxAutoCommands: 30,
-        allowedPaths: ["src/", "test/", "tests/"],
+        allowedPaths: [...SAFE_MODE_PATHS],
       });
-      content = `🛡️ YOLO MODE: SAFE
+      content = `YOLO MODE: SAFE
 
-✅ Auto-approval ON with restrictions:
-   • Max 20 edits, 30 commands
-   • Allowed paths: src/, test/, tests/
+Auto-approval ON with restrictions:
+   - Max 20 edits, 30 commands
+   - Allowed paths: ${SAFE_MODE_PATHS.slice(0, 6).join(', ')} and ${SAFE_MODE_PATHS.length - 6} more
 
 Use /yolo on for full mode, /yolo off to disable`;
       break;
+    }
 
     case "off":
       autonomyManager.disableYOLO();
-      content = `⏸️ YOLO MODE: DISABLED
+      content = `YOLO MODE: DISABLED
 
 Manual approval is now required for operations.`;
       break;
 
     case "allow":
       if (args[1]) {
-        autonomyManager.addToYOLOAllowList(args[1]);
-        content = `✅ Added "${args[1]}" to YOLO allowed commands`;
+        const result = autonomyManager.addToYOLOAllowList(args[1]);
+        content = result.success
+          ? `Added "${args[1]}" to YOLO allowed commands`
+          : `Failed: ${result.error}`;
       } else {
         content = `Usage: /yolo allow <command>`;
       }
@@ -159,11 +162,70 @@ Manual approval is now required for operations.`;
 
     case "deny":
       if (args[1]) {
-        autonomyManager.addToYOLODenyList(args[1]);
-        content = `🚫 Added "${args[1]}" to YOLO denied commands`;
+        const result = autonomyManager.addToYOLODenyList(args[1]);
+        content = result.success
+          ? `Added "${args[1]}" to YOLO denied commands`
+          : `Failed: ${result.error}`;
       } else {
         content = `Usage: /yolo deny <command>`;
       }
+      break;
+
+    // Fix 4: Dry-run mode
+    case "dry-run":
+      autonomyManager.setDryRun(!autonomyManager.isDryRun());
+      content = autonomyManager.isDryRun()
+        ? `YOLO dry-run: ENABLED - showing what would execute without executing`
+        : `YOLO dry-run: DISABLED - commands will execute normally`;
+      break;
+
+    // Fix 7: Execution log viewer
+    case "log":
+      content = autonomyManager.getExecutionLog(20);
+      break;
+
+    // Fix 10: Per-tool rules
+    case "tool":
+      if (args[1] && args[2]) {
+        const toolName = args[1];
+        const rule = args[2].toLowerCase();
+        if (['auto', 'prompt', 'deny'].includes(rule)) {
+          autonomyManager.setToolRule(toolName, rule as 'auto' | 'prompt' | 'deny');
+          content = `Tool rule set: ${toolName} = ${rule}`;
+        } else {
+          content = `Invalid rule. Usage: /yolo tool <name> auto|prompt|deny`;
+        }
+      } else {
+        const rules = autonomyManager.getToolRules();
+        const entries = Object.entries(rules);
+        if (entries.length === 0) {
+          content = `No per-tool rules set.\nUsage: /yolo tool <name> auto|prompt|deny`;
+        } else {
+          content = `Per-tool YOLO rules:\n${entries.map(([k, v]) => `  ${k}: ${v}`).join('\n')}`;
+        }
+      }
+      break;
+
+    // Fix 12: Pause/Resume
+    case "pause":
+      autonomyManager.pauseYOLO();
+      content = `YOLO mode PAUSED - manual approval required until /yolo resume`;
+      break;
+
+    case "resume":
+      autonomyManager.resumeYOLO();
+      content = `YOLO mode RESUMED - auto-approval active`;
+      break;
+
+    // Fix 5: Undo-all
+    case "undo-all":
+      content = autonomyManager.getYoloStartSnapshotId()
+        ? `Restoring to YOLO start snapshot: ${autonomyManager.getYoloStartSnapshotId()}\nUse /restore ${autonomyManager.getYoloStartSnapshotId()} to complete.`
+        : `No YOLO start snapshot available. YOLO may not have been enabled via /yolo on.`;
+      break;
+
+    case "summary":
+      content = autonomyManager.getSessionSummary();
       break;
 
     case "status":

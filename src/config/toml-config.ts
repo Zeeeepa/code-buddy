@@ -117,6 +117,22 @@ export interface AgentBehaviorConfig {
   self_healing?: boolean;
   /** Default system prompt ID */
   default_prompt?: string;
+  /** Architect model for planning/reasoning tasks */
+  architect_model?: string;
+  /** Editor model for tool execution and edits */
+  editor_model?: string;
+}
+
+/**
+ * Model pairs configuration for architect/editor split.
+ * The architect model handles planning and reasoning while
+ * the editor model handles code edits and tool execution.
+ */
+export interface ModelPairsConfig {
+  /** Model used for planning and design (the "thinker") */
+  architect?: string;
+  /** Model used for code edits and execution (the "doer") */
+  editor?: string;
 }
 
 /**
@@ -129,6 +145,28 @@ export interface IntegrationsConfig {
   rtk_min_output_length?: number;
   /** Enable ICM MCP server for persistent memory */
   icm_enabled?: boolean;
+}
+
+/**
+ * Per-agent parameter overrides (OpenClaw v2026.3.11)
+ */
+export interface AgentParamsOverride {
+  /** Temperature for LLM calls (0.0–2.0) */
+  temperature?: number;
+  /** Maximum output tokens */
+  maxTokens?: number;
+  /** Model to use for this agent */
+  model?: string;
+}
+
+/**
+ * Agent defaults configuration (OpenClaw v2026.3.14)
+ */
+export interface AgentDefaultsConfig {
+  /** Model to use for image generation (e.g., 'dall-e-3', 'stable-diffusion-xl') */
+  imageGenerationModel?: string;
+  /** Per-agent parameter overrides keyed by agent ID */
+  agents?: Record<string, AgentParamsOverride>;
 }
 
 /**
@@ -165,6 +203,10 @@ export interface CodeBuddyConfig {
   agent: AgentBehaviorConfig;
   /** External integrations */
   integrations: IntegrationsConfig;
+  /** Model pairs for architect/editor split */
+  model_pairs?: ModelPairsConfig;
+  /** Agent defaults (model preferences) — OpenClaw v2026.3.14 */
+  agent_defaults?: AgentDefaultsConfig;
   /** Named configuration profiles (activated via --profile <name>) */
   profiles?: Record<string, ProfileConfig>;
 }
@@ -651,6 +693,9 @@ class ConfigManager {
     if (partial.integrations) {
       this.config.integrations = { ...this.config.integrations, ...partial.integrations };
     }
+    if (partial.model_pairs) {
+      this.config.model_pairs = { ...this.config.model_pairs, ...partial.model_pairs };
+    }
   }
 
   /**
@@ -806,6 +851,31 @@ class ConfigManager {
     if (!existsSync(CONFIG_FILE)) {
       writeFileSync(CONFIG_FILE, serializeTOML(DEFAULT_CONFIG));
     }
+  }
+
+  /**
+   * Set a config value by dot-notation key path.
+   * Delegates to config-mutator for validation, SecretRef resolution, and persistence.
+   */
+  async setConfigValue(
+    keyPath: string,
+    value: unknown,
+    opts?: { dryRun?: boolean; json?: boolean },
+  ): Promise<import('./config-mutator.js').ConfigSetResult> {
+    const { setConfigValue: mutatorSet } = await import('./config-mutator.js');
+    return mutatorSet(keyPath, value, opts);
+  }
+
+  /**
+   * Set multiple config values from a batch JSON object.
+   * Delegates to config-mutator.
+   */
+  async setConfigBatch(
+    batch: Record<string, unknown>,
+    opts?: { dryRun?: boolean; json?: boolean },
+  ): Promise<import('./config-mutator.js').ConfigSetResult[]> {
+    const { setConfigBatch: mutatorBatch } = await import('./config-mutator.js');
+    return mutatorBatch(batch, opts);
   }
 }
 

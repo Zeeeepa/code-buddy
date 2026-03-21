@@ -100,7 +100,7 @@ export class PromptBuilder {
           promptId: systemPromptId,
           includeModelInfo: true,
           includeOsInfo: true,
-          includeProjectContext: false, // Don't include by default (expensive)
+          includeProjectContext: true, // Codex CLI pattern: git state in system prompt
           includeToolPrompts: true,
           userInstructions: customInstructions || undefined,
           cwd: this.config.cwd,
@@ -181,6 +181,19 @@ export class PromptBuilder {
           logger.debug('Injected knowledge base into system prompt');
         }
       } catch { /* knowledge module optional */ }
+
+      // Inject generated documentation architecture summary
+      try {
+        const { getDocsContextProvider } = await import('../docs/docs-context-provider.js');
+        const docsProvider = getDocsContextProvider();
+        if (!docsProvider.isLoaded) {
+          await docsProvider.loadDocsIndex();
+        }
+        const architectureSummary = docsProvider.getArchitectureSummary();
+        if (architectureSummary) {
+          systemPrompt += `\n\n<project_docs>\n${architectureSummary}\n</project_docs>`;
+        }
+      } catch { /* docs context module optional */ }
 
       // Inject modular rules (.codebuddy/rules/)
       try {

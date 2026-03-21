@@ -90,9 +90,15 @@ export abstract class SpecializedAgent extends EventEmitter {
     this.config = config;
   }
 
-  /** Get agent configuration */
+  /** Get agent configuration (shallow copy) */
   getConfig(): SpecializedAgentConfig {
     return { ...this.config };
+  }
+
+  /** Set option overrides on the agent config */
+  setOptions(options: Record<string, unknown>): void {
+    if (!this.config.options) this.config.options = {};
+    Object.assign(this.config.options, options);
   }
 
   /** Get agent ID */

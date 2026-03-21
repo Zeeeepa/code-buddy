@@ -1,4 +1,6 @@
 /**
+ * @deprecated V1 generator — use docs-pipeline.ts (V2) instead.
+ *
  * Documentation Generator — DeepWiki-style
  *
  * Generates a full markdown documentation site from the codebase,

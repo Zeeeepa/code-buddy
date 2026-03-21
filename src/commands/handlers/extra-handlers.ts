@@ -201,7 +201,29 @@ export async function handleDiff(_args: string[]): Promise<CommandHandlerResult>
 
 export async function handleContextStats(
   _args: string[],
-  agent?: { getContextStats: () => unknown; formatContextStats: () => string; getCurrentModel: () => string }
+  agent?: {
+    getContextStats: () => unknown;
+    formatContextStats: () => string;
+    getCurrentModel: () => string;
+    getContextMemoryMetrics?: () => {
+      summaryCount: number;
+      summaryTokens: number;
+      peakMessageCount: number;
+      compressionCount: number;
+      totalTokensSaved: number;
+      lastCompressionTime: Date | null;
+      warningsTriggered: number;
+    };
+    getCompressionStats?: () => {
+      totalCompressions: number;
+      totalTokensSaved: number;
+      averageCompressionRatio: number;
+      lastCompression: Date | null;
+      archivesAvailable: number;
+      lastStrategiesUsed: string[];
+    };
+    getContextBudgetBreakdown?: () => Record<string, { chars: number; tokens: number; percent: number }>;
+  }
 ): Promise<CommandHandlerResult> {
   if (!agent) {
     return {
@@ -233,7 +255,7 @@ export async function handleContextStats(
 
     const lines = [
       'Context Window Statistics',
-      '=' .repeat(50),
+      '='.repeat(50),
       '',
       `  Model:           ${model}`,
       `  Status:          ${statusIcon} ${status}`,
@@ -244,12 +266,81 @@ export async function handleContextStats(
       `  ${bar}`,
       '',
       `  Messages:        ${stats.messageCount}`,
-      `  Compressions:    ${stats.summarizedSessions}`,
+      `  Summarized:      ${stats.summarizedSessions}`,
+    ];
+
+    // Memory metrics section
+    if (agent.getContextMemoryMetrics) {
+      try {
+        const mem = agent.getContextMemoryMetrics();
+        lines.push(
+          '',
+          '-'.repeat(50),
+          'Memory Metrics',
+          '-'.repeat(50),
+          '',
+          `  Summaries Stored:    ${mem.summaryCount}`,
+          `  Summary Tokens:      ${mem.summaryTokens.toLocaleString()}`,
+          `  Peak Messages:       ${mem.peakMessageCount}`,
+          `  Warnings Triggered:  ${mem.warningsTriggered}`,
+        );
+      } catch {
+        // Memory metrics not available — skip silently
+      }
+    }
+
+    // Compression stats section
+    if (agent.getCompressionStats) {
+      try {
+        const comp = agent.getCompressionStats();
+        lines.push(
+          '',
+          '-'.repeat(50),
+          'Compression Statistics',
+          '-'.repeat(50),
+          '',
+          `  Total Compressions:  ${comp.totalCompressions}`,
+          `  Total Tokens Saved:  ${comp.totalTokensSaved.toLocaleString()}`,
+          `  Avg Ratio:           ${comp.averageCompressionRatio.toFixed(2)}x`,
+          `  Archives Available:  ${comp.archivesAvailable}`,
+          `  Last Compression:    ${comp.lastCompression ? comp.lastCompression.toISOString() : 'Never'}`,
+          `  Last Strategies:     ${comp.lastStrategiesUsed.length > 0 ? comp.lastStrategiesUsed.join(', ') : 'None'}`,
+        );
+      } catch {
+        // Compression stats not available — skip silently
+      }
+    }
+
+    // Budget breakdown section
+    if (agent.getContextBudgetBreakdown) {
+      try {
+        const breakdown = agent.getContextBudgetBreakdown();
+        const entries = Object.entries(breakdown).sort((a, b) => b[1].percent - a[1].percent);
+        if (entries.length > 0) {
+          lines.push(
+            '',
+            '-'.repeat(50),
+            'Budget Breakdown by Layer',
+            '-'.repeat(50),
+            '',
+          );
+          for (const [layer, info] of entries) {
+            const label = layer.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            const layerBar = createProgressBar(info.percent, 20);
+            lines.push(`  ${label.padEnd(20)} ${info.tokens.toLocaleString().padStart(8)} tok  ${layerBar}`);
+          }
+        }
+      } catch {
+        // Budget breakdown not available — skip silently
+      }
+    }
+
+    lines.push(
       '',
-      '=' .repeat(50),
+      '='.repeat(50),
       '',
       'Tip: Use /compact to compress conversation history.',
-    ];
+    );
 
     return {
       handled: true,

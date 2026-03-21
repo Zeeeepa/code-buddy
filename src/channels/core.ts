@@ -194,6 +194,13 @@ export interface OutboundMessage {
   silent?: boolean;
   /** Buttons/keyboard */
   buttons?: MessageButton[];
+  /** Channel-specific data passthrough (OpenClaw v2026.3.12 alignment) */
+  channelData?: {
+    slack?: {
+      blocks?: unknown[];
+    };
+    [channel: string]: unknown;
+  };
 }
 
 /**

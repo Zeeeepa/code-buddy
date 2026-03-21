@@ -176,9 +176,30 @@ export class ToolSearchTool extends BaseTool {
       return this.success(`No tools found matching "${query}".`);
     }
 
-    const lines = results.map((r, i) =>
-      `${i + 1}. **${r.name}** (score: ${r.score.toFixed(2)})\n   ${r.description}`
-    );
+    // Check if deferred MCP schema loading is active
+    let deferredSchemas: Map<string, unknown> | null = null;
+    try {
+      const { getDeferredMCPSchemas, isDeferredSchemaMode } = await import('../codebuddy/tools.js');
+      if (isDeferredSchemaMode()) {
+        deferredSchemas = getDeferredMCPSchemas();
+      }
+    } catch {
+      // tools.js not available — skip deferred schema resolution
+    }
+
+    const lines = results.map((r, i) => {
+      let line = `${i + 1}. **${r.name}** (score: ${r.score.toFixed(2)})\n   ${r.description}`;
+
+      // If deferred, include the full schema so the LLM can call it
+      if (deferredSchemas?.has(r.name)) {
+        const fullTool = deferredSchemas.get(r.name) as { function: { parameters: unknown } };
+        if (fullTool?.function?.parameters) {
+          line += `\n   Schema: ${JSON.stringify(fullTool.function.parameters)}`;
+        }
+      }
+
+      return line;
+    });
 
     return this.success(`Found ${results.length} tools:\n\n${lines.join('\n\n')}`);
   }

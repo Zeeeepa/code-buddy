@@ -17,11 +17,21 @@
       {"command": "codeBuddy.refactorCode", "title": "Refactor Selected Code", "category": "Code Buddy"},
       {"command": "codeBuddy.generateTests", "title": "Generate Tests", "category": "Code Buddy"},
       {"command": "codeBuddy.fixError", "title": "Fix Error at Cursor", "category": "Code Buddy"},
-      {"command": "codeBuddy.commitChanges", "title": "Generate Commit Message", "category": "Code Buddy"}
+      {"command": "codeBuddy.commitChanges", "title": "Generate Commit Message", "category": "Code Buddy"},
+      {"command": "codeBuddy.showDiff", "title": "Show Proposed Changes", "category": "Code Buddy"},
+      {"command": "codeBuddy.applyChanges", "title": "Apply Proposed Changes", "category": "Code Buddy"},
+      {"command": "codeBuddy.rejectChanges", "title": "Reject Proposed Changes", "category": "Code Buddy"},
+      {"command": "codeBuddy.switchModel", "title": "Switch AI Model", "category": "Code Buddy"},
+      {"command": "codeBuddy.contextRefresh", "title": "Refresh Context Tree", "category": "Code Buddy", "icon": "$(refresh)"},
+      {"command": "codeBuddy.contextClear", "title": "Clear Context", "category": "Code Buddy", "icon": "$(clear-all)"},
+      {"command": "codeBuddy.contextRemoveFile", "title": "Remove from Context", "category": "Code Buddy", "icon": "$(close)"}
     ],
     "keybindings": [
       {"command": "codeBuddy.askQuestion", "key": "ctrl+shift+a", "mac": "cmd+shift+a"},
-      {"command": "codeBuddy.explainCode", "key": "ctrl+shift+e", "mac": "cmd+shift+e", "when": "editorHasSelection"}
+      {"command": "codeBuddy.explainCode", "key": "ctrl+shift+e", "mac": "cmd+shift+e", "when": "editorHasSelection"},
+      {"command": "codeBuddy.applyChanges", "key": "ctrl+enter", "mac": "cmd+enter", "when": "codeBuddy.proposedDiffVisible"},
+      {"command": "codeBuddy.rejectChanges", "key": "escape", "when": "codeBuddy.proposedDiffVisible"},
+      {"command": "codeBuddy.switchModel", "key": "ctrl+shift+m", "mac": "cmd+shift+m"}
     ],
     "configuration": {
       "title": "Code Buddy",
@@ -33,7 +43,21 @@
       }
     },
     "viewsContainers": {"activitybar": [{"id": "codeBuddy", "title": "Code Buddy", "icon": "images/icon.svg"}]},
-    "views": {"codeBuddy": [{"id": "codeBuddy.chat", "name": "Chat", "type": "webview"}]}
+    "views": {
+      "codeBuddy": [
+        {"id": "codeBuddy.chat", "name": "Chat", "type": "webview"},
+        {"id": "codeBuddy.context", "name": "Context", "type": "tree"}
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {"command": "codeBuddy.contextRefresh", "when": "view == codeBuddy.context", "group": "navigation"},
+        {"command": "codeBuddy.contextClear", "when": "view == codeBuddy.context", "group": "navigation"}
+      ],
+      "view/item/context": [
+        {"command": "codeBuddy.contextRemoveFile", "when": "view == codeBuddy.context && viewItem == contextFile", "group": "inline"}
+      ]
+    }
   },
   "scripts": {
     "compile": "tsc -p ./",

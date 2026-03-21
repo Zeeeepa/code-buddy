@@ -13,6 +13,8 @@ import type {
   SkillToolInvocation,
   SkillCodeBlock,
 } from './types.js';
+import { SkillVariableResolver, type SkillContext } from './skill-enhancements.js';
+import { resolveBashInjections } from './bash-injection.js';
 
 // ============================================================================
 // Types
@@ -77,6 +79,27 @@ export class SkillExecutor extends EventEmitter {
           error: `Requirements not met: ${reqCheck.missing.join(', ')}`,
           duration: Date.now() - startTime,
         };
+      }
+
+      // CC11: Resolve $ARGUMENTS and other skill variables in raw markdown
+      const resolver = new SkillVariableResolver();
+      const skillCtx: SkillContext = {
+        arguments: context.request ? context.request.split(/\s+/) : [],
+        workingDir: context.cwd,
+      };
+      if (skill.content.rawMarkdown) {
+        skill.content.rawMarkdown = resolver.resolve(skill.content.rawMarkdown, skillCtx);
+      }
+      if (skill.content.description) {
+        skill.content.description = resolver.resolve(skill.content.description, skillCtx);
+      }
+
+      // CC11: Resolve !`command` bash injections
+      if (skill.content.rawMarkdown) {
+        skill.content.rawMarkdown = resolveBashInjections(skill.content.rawMarkdown, context.cwd);
+      }
+      if (skill.content.description) {
+        skill.content.description = resolveBashInjections(skill.content.description, context.cwd);
       }
 
       // Execute based on skill content

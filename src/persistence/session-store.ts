@@ -226,6 +226,17 @@ export class SessionStore {
     session.messages.push(message);
     session.lastAccessedAt = new Date();
 
+    // Auto-generate title from first user message if session has default name
+    if (entry.type === 'user' && session.messages.filter(m => m.type === 'user').length === 1) {
+      try {
+        const { generateConversationTitle } = await import('../utils/conversation-title.js');
+        const title = generateConversationTitle(entry.content);
+        if (title && title !== 'New conversation') {
+          session.name = title;
+        }
+      } catch { /* title generation optional */ }
+    }
+
     // Store in SQLite if enabled
     if (this.dbRepository) {
       const dbMessage: Omit<DBMessage, 'id' | 'created_at'> = {

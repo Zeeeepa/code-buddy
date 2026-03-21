@@ -29,6 +29,10 @@ export interface SkillMetadata {
   config?: SkillConfigSchema;
   /** OpenClaw-specific metadata */
   openclaw?: OpenClawMetadata;
+  /** CC11: If true, skill runs in a forked context (isolated sub-agent) */
+  contextFork?: boolean;
+  /** CC11: If true, skill content is returned directly without LLM invocation */
+  disableModelInvocation?: boolean;
 }
 
 export interface SkillRequirements {

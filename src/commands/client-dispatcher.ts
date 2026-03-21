@@ -190,6 +190,9 @@ export class ClientCommandDispatcher {
       getContextStats: () => context.agent.getContextStats(),
       formatContextStats: () => context.agent.formatContextStats(),
       getCurrentModel: () => context.agent.getCurrentModel(),
+      getContextMemoryMetrics: () => context.agent.getContextMemoryMetrics(),
+      getCompressionStats: () => context.agent.getCompressionStats(),
+      getContextBudgetBreakdown: () => context.agent.getContextBudgetBreakdown(),
     });
 
     const args = overrideArgs ?? originalInput.trim().split(" ").slice(1);

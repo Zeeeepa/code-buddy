@@ -1,0 +1,73 @@
+<idea-plugin>
+    <id>com.codebuddy.plugin</id>
+    <name>Code Buddy</name>
+    <vendor>Code Buddy</vendor>
+    <description><![CDATA[
+        AI coding assistant powered by Code Buddy.<br/>
+        Connects to a running Code Buddy server to provide AI-powered code assistance
+        directly in your JetBrains IDE.<br/><br/>
+        Features:
+        <ul>
+            <li>Chat with AI about your code</li>
+            <li>Explain selected code</li>
+            <li>AI-powered code review</li>
+            <li>Generate unit tests</li>
+            <li>Fix errors at cursor</li>
+        </ul>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="Code Buddy"
+                    secondary="true"
+                    anchor="right"
+                    factoryClass="com.codebuddy.plugin.ui.ChatToolWindowFactory"
+                    icon="AllIcons.Actions.Preview"/>
+        <statusBarWidgetFactory id="CodeBuddyStatus"
+                                implementation="com.codebuddy.plugin.ui.CodeBuddyStatusBarWidgetFactory"
+                                order="after Position"/>
+        <applicationConfigurable parentId="tools"
+                                 instance="com.codebuddy.plugin.settings.CodeBuddyConfigurable"
+                                 id="com.codebuddy.plugin.settings"
+                                 displayName="Code Buddy"/>
+        <applicationService serviceImplementation="com.codebuddy.plugin.settings.CodeBuddySettings"/>
+        <notificationGroup id="Code Buddy" displayType="BALLOON"/>
+    </extensions>
+
+    <actions>
+        <group id="CodeBuddy.Menu" text="Code Buddy" popup="true">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <action id="CodeBuddy.AskQuestion"
+                    class="com.codebuddy.plugin.actions.AskQuestionAction"
+                    text="Ask Code Buddy"
+                    description="Ask AI about code"
+                    icon="AllIcons.Actions.Help">
+                <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift B"/>
+            </action>
+            <action id="CodeBuddy.ExplainCode"
+                    class="com.codebuddy.plugin.actions.ExplainCodeAction"
+                    text="Explain Code"
+                    description="Explain selected code"/>
+            <action id="CodeBuddy.ReviewFile"
+                    class="com.codebuddy.plugin.actions.ReviewFileAction"
+                    text="Review File"
+                    description="AI code review for current file"/>
+            <action id="CodeBuddy.GenerateTests"
+                    class="com.codebuddy.plugin.actions.GenerateTestsAction"
+                    text="Generate Tests"
+                    description="Generate unit tests for selected code"/>
+            <action id="CodeBuddy.FixError"
+                    class="com.codebuddy.plugin.actions.FixErrorAction"
+                    text="Fix Error"
+                    description="Fix error at cursor position"/>
+        </group>
+        <group id="CodeBuddy.EditorPopup" text="Code Buddy" popup="true">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <reference ref="CodeBuddy.ExplainCode"/>
+            <reference ref="CodeBuddy.ReviewFile"/>
+            <reference ref="CodeBuddy.GenerateTests"/>
+            <reference ref="CodeBuddy.FixError"/>
+        </group>
+    </actions>
+</idea-plugin>

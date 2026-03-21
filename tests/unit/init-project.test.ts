@@ -4,35 +4,66 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { initCodeBuddyProject, formatInitResult, generateCODEBUDDYMdContent } from '../../src/utils/init-project.js';
+import {
+  initCodeBuddyProject,
+  formatInitResult,
+  generateCODEBUDDYMdContent,
+  generateContextMdContent,
+} from '../../src/utils/init-project.js';
 
 jest.mock('../../src/agent/repo-profiler.js', () => ({
   RepoProfiler: jest.fn().mockImplementation(function() { return {
     getProfile: jest.fn().mockResolvedValue({
-      languages: ['typescript'],
-      framework: 'express',
-      commands: { test: 'npm test', lint: 'npm run lint', build: 'npm run build' },
-      directories: { src: 'src/', tests: 'tests/' },
-      contextPack: 'TypeScript | express',
+      languages: ['TypeScript', 'JavaScript'],
+      framework: 'Express',
+      packageManager: 'npm',
+      commands: { test: 'npm test', lint: 'npm run lint', build: 'npm run build', typecheck: 'npm run typecheck' },
+      directories: { src: 'src', tests: 'tests', docs: 'docs' },
+      conventions: { naming: 'camelCase (JS/TS)', lintRules: ['eslint'] },
+      contextPack: 'TypeScript | Express',
+      name: 'test-project',
+      description: 'A test project for unit testing',
+      moduleType: 'esm',
+      testFramework: 'Vitest',
+      entryPoints: ['dist/index.js'],
+      hasDocker: true,
+      hasCi: true,
+      hasClaudeMd: true,
+      databases: ['SQLite'],
+      topDependencies: ['express', 'zod', 'chalk'],
+      license: 'MIT',
+    }),
+    refresh: jest.fn().mockResolvedValue({
+      languages: ['TypeScript', 'JavaScript'],
+      framework: 'Express',
+      packageManager: 'npm',
+      commands: { test: 'npm test', lint: 'npm run lint', build: 'npm run build', typecheck: 'npm run typecheck' },
+      directories: { src: 'src', tests: 'tests', docs: 'docs' },
+      conventions: { naming: 'camelCase (JS/TS)', lintRules: ['eslint'] },
+      contextPack: 'TypeScript | Express',
+      name: 'test-project',
+      description: 'A test project for unit testing',
+      moduleType: 'esm',
+      testFramework: 'Vitest',
+      entryPoints: ['dist/index.js'],
+      hasDocker: true,
+      hasCi: true,
+      hasClaudeMd: true,
+      databases: ['SQLite'],
+      topDependencies: ['express', 'zod', 'chalk'],
+      license: 'MIT',
     }),
   }; }),
-}));
-
-jest.mock('../../src/context/context-files.js', () => ({
-  initContextFile: jest.fn().mockImplementation(async (dir: string) => {
-    const p = path.join(dir, '.codebuddy', 'CONTEXT.md');
-    fs.mkdirSync(path.dirname(p), { recursive: true });
-    if (!fs.existsSync(p)) {
-      fs.writeFileSync(p, '# Project Context\n');
-    }
-    return p;
-  }),
 }));
 
 
 function makeTmpDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'cb-init-test-'));
 }
+
+// ============================================================================
+// generateCODEBUDDYMdContent
+// ============================================================================
 
 describe('generateCODEBUDDYMdContent', () => {
   it('returns generic template for null profile', () => {
@@ -44,16 +75,16 @@ describe('generateCODEBUDDYMdContent', () => {
 
   it('returns TypeScript-specific content for ts profile', () => {
     const content = generateCODEBUDDYMdContent({
-      languages: ['typescript'],
-      framework: 'express',
+      languages: ['TypeScript'],
+      framework: 'Express',
       commands: { test: 'bun test', lint: 'eslint .', build: 'tsc' },
-      directories: { src: 'src/', tests: 'tests/' },
+      directories: { src: 'src', tests: 'tests' },
     });
     expect(content).toContain('TypeScript');
     expect(content).toContain('bun test');
     expect(content).toContain('eslint .');
     expect(content).toContain('tsc');
-    expect(content).toContain('express');
+    expect(content).toContain('Express');
   });
 
   it('returns Python-specific content for python profile', () => {
@@ -83,7 +114,196 @@ describe('generateCODEBUDDYMdContent', () => {
     expect(content).toContain('cargo fmt');
     expect(content).toContain('cargo test');
   });
+
+  it('fills About section with project description when available', () => {
+    const content = generateCODEBUDDYMdContent({
+      languages: ['TypeScript'],
+      name: 'my-tool',
+      description: 'A CLI tool for developers',
+      framework: 'Ink (terminal UI)',
+      packageManager: 'npm',
+      testFramework: 'Vitest',
+      moduleType: 'esm',
+    });
+    expect(content).toContain('A CLI tool for developers');
+    expect(content).toContain('Ink (terminal UI)');
+    expect(content).toContain('Vitest');
+    expect(content).toContain('ESM');
+    expect(content).not.toContain('This project is...');
+  });
+
+  it('references CLAUDE.md when hasClaudeMd is true', () => {
+    const content = generateCODEBUDDYMdContent({
+      languages: ['TypeScript'],
+      hasClaudeMd: true,
+    });
+    expect(content).toContain('CLAUDE.md');
+    expect(content).toContain('detailed instructions');
+  });
+
+  it('does not reference CLAUDE.md when hasClaudeMd is false', () => {
+    const content = generateCODEBUDDYMdContent({
+      languages: ['TypeScript'],
+      hasClaudeMd: false,
+    });
+    expect(content).not.toContain('CLAUDE.md');
+  });
+
+  it('includes ESM note for ESM projects', () => {
+    const content = generateCODEBUDDYMdContent({
+      languages: ['TypeScript'],
+      moduleType: 'esm',
+    });
+    expect(content).toContain('.js` extension');
+  });
+
+  it('includes typecheck and validate commands when available', () => {
+    const content = generateCODEBUDDYMdContent({
+      languages: ['TypeScript'],
+      commands: { test: 'npm test', lint: 'npm run lint', build: 'npm run build', typecheck: 'npm run typecheck', validate: 'npm run validate' },
+    });
+    expect(content).toContain('npm run typecheck');
+    expect(content).toContain('npm run validate');
+  });
 });
+
+// ============================================================================
+// generateContextMdContent
+// ============================================================================
+
+describe('generateContextMdContent', () => {
+  it('returns minimal template for null profile', () => {
+    const content = generateContextMdContent(null);
+    expect(content).toContain('Project Context');
+    expect(content).toContain('<!-- Describe your project here -->');
+  });
+
+  it('generates rich content from profile', () => {
+    const content = generateContextMdContent({
+      languages: ['TypeScript', 'JavaScript'],
+      framework: 'Ink (terminal UI)',
+      packageManager: 'npm',
+      commands: { test: 'npm test', lint: 'npm run lint', build: 'npm run build', typecheck: 'npm run typecheck', validate: 'npm run validate' },
+      directories: { src: 'src', tests: 'tests', docs: 'docs' },
+      name: 'code-buddy',
+      description: 'Multi-provider AI coding agent for the terminal',
+      moduleType: 'esm',
+      testFramework: 'Vitest',
+      entryPoints: ['dist/index.js'],
+      nodeVersion: '>=18.0.0',
+      hasDocker: true,
+      hasCi: true,
+      hasClaudeMd: true,
+      databases: ['SQLite'],
+      topDependencies: ['chalk', 'commander', 'express', 'ink'],
+      license: 'MIT',
+      conventions: { naming: 'camelCase (JS/TS)', lintRules: ['eslint'] },
+    });
+
+    // Project name in header
+    expect(content).toContain('code-buddy');
+    // Description
+    expect(content).toContain('Multi-provider AI coding agent');
+    // Metadata
+    expect(content).toContain('TypeScript, JavaScript');
+    expect(content).toContain('Ink (terminal UI)');
+    expect(content).toContain('ESM');
+    expect(content).toContain('npm');
+    expect(content).toContain('Vitest');
+    expect(content).toContain('>=18.0.0');
+    expect(content).toContain('MIT');
+    expect(content).toContain('Docker');
+    expect(content).toContain('SQLite');
+    // Dependencies
+    expect(content).toContain('chalk');
+    expect(content).toContain('commander');
+    // Architecture
+    expect(content).toContain('src/');
+    expect(content).toContain('tests/');
+    expect(content).toContain('docs/');
+    expect(content).toContain('dist/index.js');
+    // Commands use npm (not bun)
+    expect(content).toContain('npm run build');
+    expect(content).toContain('npm test');
+    expect(content).toContain('npm run lint');
+    // CLAUDE.md reference
+    expect(content).toContain('CLAUDE.md');
+  });
+
+  it('uses package manager consistently in commands', () => {
+    const content = generateContextMdContent({
+      languages: ['TypeScript'],
+      packageManager: 'pnpm',
+      commands: { test: 'pnpm test', build: 'pnpm build', lint: 'pnpm lint' },
+    });
+    expect(content).toContain('pnpm test');
+    expect(content).toContain('pnpm build');
+    expect(content).not.toContain('bun');
+  });
+
+  it('renders Component Map section from cartography.components', () => {
+    const content = generateContextMdContent({
+      languages: ['TypeScript'],
+      name: 'test-app',
+      cartography: {
+        fileStats: { byExtension: { '.ts': 100 }, locEstimate: { TypeScript: 5000 }, totalSourceFiles: 80, totalTestFiles: 20, largestFiles: [] },
+        architecture: { layers: [{ name: 'Core', directory: 'src/core', fileCount: 30 }], style: 'modular', maxDepth: 3 },
+        importGraph: { hotModules: [], circularRisks: [], orphanModules: [] },
+        apiSurface: { restRoutes: [], wsEvents: [], endpointCount: 0 },
+        patterns: { singletons: ['Foo'], registries: [], factories: [], facades: ['AppFacade'], middlewares: [], observers: [] },
+        components: {
+          agents: [{ name: 'PDFAgent', file: 'src/agents/pdf-agent.ts' }],
+          tools: [{ name: 'BashTool', file: 'src/tools/bash.ts' }, { name: 'GitTool', file: 'src/tools/git.ts' }],
+          channels: [{ name: 'SlackChannel', file: 'src/channels/slack.ts' }],
+          facades: [{ name: 'AppFacade', file: 'src/facades/app-facade.ts' }],
+          middlewares: [
+            { name: 'AuthMiddleware', file: 'src/middleware/auth.ts', priority: 10 },
+            { name: 'LogMiddleware', file: 'src/middleware/log.ts', priority: 20 },
+          ],
+          keyExports: [{ module: 'core', exports: ['AppManager', 'Router', 'Config'] }],
+        },
+      },
+    });
+
+    // Component Map section header
+    expect(content).toContain('## Component Map');
+    // Facades
+    expect(content).toContain('AppFacade');
+    expect(content).toContain('src/facades/app-facade.ts');
+    // Middleware with priorities
+    expect(content).toContain('| 10 | AuthMiddleware');
+    expect(content).toContain('| 20 | LogMiddleware');
+    // Agents
+    expect(content).toContain('PDFAgent');
+    // Tools
+    expect(content).toContain('BashTool');
+    expect(content).toContain('GitTool');
+    // Channels
+    expect(content).toContain('SlackChannel');
+    // Key exports
+    expect(content).toContain('AppManager');
+    expect(content).toContain('Router');
+  });
+
+  it('omits Component Map when components is undefined', () => {
+    const content = generateContextMdContent({
+      languages: ['TypeScript'],
+      name: 'test-app',
+      cartography: {
+        fileStats: { byExtension: { '.ts': 10 }, locEstimate: { TypeScript: 500 }, totalSourceFiles: 10, totalTestFiles: 5, largestFiles: [] },
+        architecture: { layers: [], style: 'flat', maxDepth: 1 },
+        importGraph: { hotModules: [], circularRisks: [], orphanModules: [] },
+        apiSurface: { restRoutes: [], wsEvents: [], endpointCount: 0 },
+        patterns: { singletons: [], registries: [], factories: [], facades: [], middlewares: [], observers: [] },
+      },
+    });
+    expect(content).not.toContain('## Component Map');
+  });
+});
+
+// ============================================================================
+// initCodeBuddyProject
+// ============================================================================
 
 describe('initCodeBuddyProject', () => {
   let tmpDir: string;
@@ -186,6 +406,33 @@ describe('initCodeBuddyProject', () => {
     // Should have exactly one "# Code Buddy" marker
     const occurrences = (content.match(/# Code Buddy/g) ?? []).length;
     expect(occurrences).toBe(1);
+  });
+
+  it('CONTEXT.md contains profile-aware content', async () => {
+    await initCodeBuddyProject(tmpDir);
+    const content = fs.readFileSync(path.join(tmpDir, '.codebuddy', 'CONTEXT.md'), 'utf-8');
+    // Profile mock returns description "A test project for unit testing"
+    expect(content).toContain('A test project for unit testing');
+    expect(content).toContain('TypeScript');
+    expect(content).toContain('Express');
+  });
+
+  it('hooks.json uses profile commands', async () => {
+    await initCodeBuddyProject(tmpDir);
+    const hooks = JSON.parse(
+      fs.readFileSync(path.join(tmpDir, '.codebuddy', 'hooks.json'), 'utf-8')
+    );
+    const preCommit = hooks.hooks.find((h: { type: string }) => h.type === 'pre-commit');
+    expect(preCommit.command).toContain('npm run lint');
+    expect(preCommit.command).toContain('npm test');
+    const postEdit = hooks.hooks.find((h: { type: string }) => h.type === 'post-edit');
+    expect(postEdit.command).toContain('npm run typecheck');
+  });
+
+  it('CODEBUDDY.md references CLAUDE.md when detected', async () => {
+    await initCodeBuddyProject(tmpDir);
+    const content = fs.readFileSync(path.join(tmpDir, '.codebuddy', 'CODEBUDDY.md'), 'utf-8');
+    expect(content).toContain('CLAUDE.md');
   });
 });
 

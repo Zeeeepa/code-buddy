@@ -90,10 +90,23 @@ export class PlanTool extends BaseTool {
   private async initPlan(goal: string): Promise<ToolResult> {
     if (!goal) return this.error('Goal is required for init');
 
+    // Inject relevant architecture context from docs if available
+    let contextSection = '';
+    try {
+      const { getDocsContextProvider } = await import('../docs/docs-context-provider.js');
+      const dp = getDocsContextProvider();
+      if (dp.isLoaded) {
+        const ctx = dp.getRelevantContext(goal, 800);
+        if (ctx) {
+          contextSection = `\n## Architecture Context\n\n${ctx}\n`;
+        }
+      }
+    } catch { /* docs optional */ }
+
     const content = `# Execution Plan
 
 **Goal:** ${goal}
-
+${contextSection}
 ## Steps
 `;
     await fs.writeFile(this.planPath, content);

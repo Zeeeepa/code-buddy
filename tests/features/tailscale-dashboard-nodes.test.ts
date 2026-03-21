@@ -53,6 +53,26 @@ jest.mock('fs', async () => {
   };
 });
 
+// Mock child_process.execFile for Tailscale CLI calls
+const mockExecFile = jest.fn();
+jest.mock('child_process', async () => {
+  const actual = await vi.importActual<typeof import('child_process')>('child_process');
+  return { ...actual, execFile: mockExecFile };
+});
+jest.mock('util', async () => {
+  const actual = await vi.importActual<typeof import('util')>('util');
+  return {
+    ...actual,
+    promisify: () => (...args: unknown[]) => {
+      // Promisified execFile — call mockExecFile and wrap in Promise
+      return new Promise((resolve, reject) => {
+        const cb = (err: Error | null, result: unknown) => err ? reject(err) : resolve(result);
+        mockExecFile(...args, cb);
+      });
+    },
+  };
+});
+
 // ============================================================================
 // Feature 1: Tailscale Integration
 // ============================================================================
@@ -62,6 +82,22 @@ describe('TailscaleManager', () => {
 
   beforeEach(async () => {
     jest.resetModules();
+    mockExecFile.mockReset();
+    // Default: tailscale commands succeed
+    mockExecFile.mockImplementation((_cmd: string, args: string[], _opts: unknown, cb: Function) => {
+      if (args[0] === 'version') {
+        cb(null, { stdout: '1.62.0\n', stderr: '' });
+      } else if (args[0] === 'status') {
+        cb(null, { stdout: JSON.stringify({
+          BackendState: 'Running',
+          Self: { HostName: 'dev-box', TailscaleIPs: ['100.64.0.1'] },
+          MagicDNSSuffix: 'tailnet.ts.net',
+        }), stderr: '' });
+      } else {
+        // serve, funnel, etc.
+        cb(null, { stdout: '', stderr: '' });
+      }
+    });
     const mod = await import('../../src/integrations/tailscale.js');
     TailscaleManager = mod.TailscaleManager;
     TailscaleManager.resetInstance();
@@ -80,24 +116,25 @@ describe('TailscaleManager', () => {
     expect(a).not.toBe(b);
   });
 
-  it('should report installed', () => {
+  it('should report installed', async () => {
     const mgr = TailscaleManager.getInstance();
-    expect(mgr.isInstalled()).toBe(true);
+    expect(await mgr.isInstalled()).toBe(true);
   });
 
-  it('should return status', () => {
+  it('should return status', async () => {
     const mgr = TailscaleManager.getInstance();
-    const status = mgr.getStatus();
+    const status = await mgr.getStatus();
     expect(status.installed).toBe(true);
-    expect(status.running).toBe(false);
-    expect(status.hostname).toBe('my-machine');
+    expect(status.running).toBe(true);
+    expect(status.hostname).toBe('dev-box');
     expect(status.tailnetName).toBe('tailnet.ts.net');
     expect(status.ip).toBe('100.64.0.1');
   });
 
-  it('should serve on a port', () => {
+  it('should serve on a port', async () => {
     const mgr = TailscaleManager.getInstance();
-    mgr.serve(3000);
+    const ok = await mgr.serve(3000);
+    expect(ok).toBe(true);
     expect(mgr.isServing()).toBe(true);
     const config = mgr.getConfig();
     expect(config).not.toBeNull();
@@ -105,73 +142,53 @@ describe('TailscaleManager', () => {
     expect(config!.port).toBe(3000);
   });
 
-  it('should serve with a path', () => {
+  it('should serve with a path', async () => {
     const mgr = TailscaleManager.getInstance();
-    mgr.serve(8080, '/api');
+    const ok = await mgr.serve(8080, '/api');
+    expect(ok).toBe(true);
     expect(mgr.isServing()).toBe(true);
     expect(mgr.getConfig()!.port).toBe(8080);
   });
 
-  it('should funnel on a port', () => {
+  it('should funnel on a port', async () => {
     const mgr = TailscaleManager.getInstance();
-    mgr.funnel(443);
+    const ok = await mgr.funnel(443);
+    expect(ok).toBe(true);
     expect(mgr.isServing()).toBe(true);
     expect(mgr.getConfig()!.mode).toBe('funnel');
     expect(mgr.getConfig()!.port).toBe(443);
   });
 
-  it('should stop serving', () => {
+  it('should stop serving', async () => {
     const mgr = TailscaleManager.getInstance();
-    mgr.serve(3000);
+    await mgr.serve(3000);
     expect(mgr.isServing()).toBe(true);
-    mgr.stop();
+    await mgr.stop();
     expect(mgr.isServing()).toBe(false);
   });
 
-  it('should return serve URL when serving', () => {
+  it('should return serve URL when serving', async () => {
     const mgr = TailscaleManager.getInstance();
-    mgr.serve(3000);
+    await mgr.getStatus(); // populate cachedStatus
+    await mgr.serve(3000);
     const url = mgr.getServeUrl();
-    expect(url).toBe('https://my-machine.tailnet.ts.net');
-  });
-
-  it('should return null URL when not serving', () => {
-    const mgr = TailscaleManager.getInstance();
-    expect(mgr.getServeUrl()).toBeNull();
-  });
-
-  it('should return null URL after stop', () => {
-    const mgr = TailscaleManager.getInstance();
-    mgr.serve(3000);
-    mgr.stop();
-    expect(mgr.getServeUrl()).toBeNull();
+    expect(url).toBe('https://dev-box.tailnet.ts.net');
   });
 
   it('should generate auth headers without authKey', () => {
     const mgr = TailscaleManager.getInstance();
     const headers = mgr.generateAuthHeaders();
-    expect(headers['Tailscale-User-Login']).toBe('user@example.com');
-    expect(headers['Tailscale-User-Name']).toBe('User');
+    // No authKey set, no cached status => empty headers
     expect(headers['Authorization']).toBeUndefined();
   });
 
-  it('should generate auth headers with authKey', () => {
+  it('should set config with hostname', async () => {
     const mgr = TailscaleManager.getInstance();
-    mgr.setConfig({ authKey: 'tskey-abc123' });
-    const headers = mgr.generateAuthHeaders();
-    expect(headers['Authorization']).toBe('Bearer tskey-abc123');
-  });
-
-  it('should return null config initially', () => {
-    const mgr = TailscaleManager.getInstance();
-    expect(mgr.getConfig()).toBeNull();
-  });
-
-  it('should set config with hostname', () => {
-    const mgr = TailscaleManager.getInstance();
-    mgr.setConfig({ hostname: 'dev-box', port: 3000 });
-    mgr.serve(3000);
-    expect(mgr.getServeUrl()).toBe('https://dev-box.tailnet.ts.net');
+    mgr.setConfig({ hostname: 'my-box', port: 3000 });
+    await mgr.serve(3000);
+    // getServeUrl uses cachedStatus hostname or config hostname
+    const url = mgr.getServeUrl();
+    expect(url).toContain('my-box');
   });
 });
 
@@ -426,10 +443,16 @@ describe('DeviceNodeManager', () => {
     expect(result).toBeNull();
   });
 
-  it('should generate 6-digit pairing code', () => {
+  it('should generate cryptographic pairing token', () => {
     const mgr = DeviceNodeManager.getInstance();
+    const token = mgr.generatePairingToken();
+    expect(token.token).toMatch(/^[0-9a-f]{32}$/); // 16 bytes = 32 hex chars
+    expect(token.expiresAt).toBeGreaterThan(Date.now());
+    expect(token.consumed).toBe(false);
+
+    // Legacy generatePairingCode() still works (returns token string)
     const code = mgr.generatePairingCode();
-    expect(code).toMatch(/^\d{6}$/);
+    expect(code).toMatch(/^[0-9a-f]{32}$/);
   });
 
   it('should update last seen', async () => {

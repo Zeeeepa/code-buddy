@@ -4,11 +4,13 @@
  *
  * Provides a cross-platform directory listing without spawning a shell process.
  * Returns formatted output with name, type, size, and modification time.
+ * Respects .gitignore patterns by default to reduce noise.
  */
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import type { ToolResult } from '../types/index.js';
+import { matchGlob } from '../utils/glob-utils.js';
 
 /**
  * Entry representing a single file or directory in the listing.
@@ -44,6 +46,89 @@ function formatDate(date: Date): string {
 }
 
 /**
+ * Default patterns to always filter out, even without a .gitignore file.
+ */
+const DEFAULT_IGNORE_PATTERNS = [
+  'node_modules',
+  '.git',
+  'dist',
+  '__pycache__',
+  '.next',
+  '.cache',
+  '.DS_Store',
+  'Thumbs.db',
+];
+
+/**
+ * Load .gitignore patterns from the closest .gitignore in or above the directory.
+ * Returns an array of glob patterns. Empty array if no .gitignore found.
+ */
+export function loadGitignorePatterns(directory: string): string[] {
+  const patterns: string[] = [];
+  let current = path.resolve(directory);
+
+  // Walk up to find .gitignore files (closest first)
+  for (let depth = 0; depth < 20; depth++) {
+    const gitignorePath = path.join(current, '.gitignore');
+    if (existsSync(gitignorePath)) {
+      try {
+        const content = readFileSync(gitignorePath, 'utf-8');
+        const lines = content.split('\n')
+          .map(line => line.trim())
+          .filter(line => line && !line.startsWith('#'));
+        patterns.push(...lines);
+      } catch {
+        // Ignore read errors
+      }
+    }
+
+    const parent = path.dirname(current);
+    if (parent === current) break; // Reached filesystem root
+    current = parent;
+  }
+
+  return patterns;
+}
+
+/**
+ * Check if a file/directory name should be ignored based on gitignore patterns.
+ */
+export function shouldIgnoreEntry(
+  name: string,
+  isDirectory: boolean,
+  patterns: string[],
+  relativePath?: string,
+): boolean {
+  const testPath = relativePath ? `${relativePath}/${name}` : name;
+  const testPathDir = isDirectory ? `${testPath}/` : testPath;
+
+  for (const pattern of patterns) {
+    // Handle negation patterns (skip them — they unignore)
+    if (pattern.startsWith('!')) continue;
+
+    // Strip trailing slash from pattern (indicates directory-only match)
+    const cleanPattern = pattern.endsWith('/') ? pattern.slice(0, -1) : pattern;
+    const dirOnlyPattern = pattern.endsWith('/');
+
+    // If pattern is directory-only but entry is a file, skip
+    if (dirOnlyPattern && !isDirectory) continue;
+
+    // Simple name match (no path separator in pattern)
+    if (!cleanPattern.includes('/')) {
+      if (matchGlob(name, cleanPattern)) return true;
+      // Also try with directory marker
+      if (isDirectory && matchGlob(name, cleanPattern)) return true;
+    } else {
+      // Path-based pattern
+      if (matchGlob(testPath, cleanPattern)) return true;
+      if (matchGlob(testPathDir, cleanPattern)) return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Dedicated LS tool that lists directory contents without requiring bash.
  */
 export class LsTool {
@@ -51,9 +136,15 @@ export class LsTool {
    * List files and directories at the given path.
    *
    * @param directory - Directory path to list (default: current working directory)
+   * @param options - Optional settings for filtering
    * @returns ToolResult with formatted directory listing
    */
-  async execute(directory: string = '.'): Promise<ToolResult> {
+  async execute(
+    directory: string = '.',
+    options?: { respectGitignore?: boolean },
+  ): Promise<ToolResult> {
+    const respectGitignore = options?.respectGitignore ?? true;
+
     try {
       // Resolve to absolute path
       const resolvedPath = path.resolve(directory);
@@ -75,12 +166,26 @@ export class LsTool {
         };
       }
 
+      // Build ignore patterns
+      let ignorePatterns: string[] = [];
+      if (respectGitignore) {
+        ignorePatterns = [...DEFAULT_IGNORE_PATTERNS, ...loadGitignorePatterns(resolvedPath)];
+      }
+
       // Read directory entries
       const dirents = await fs.readdir(resolvedPath, { withFileTypes: true });
 
       // Collect entry details
       const entries: DirEntry[] = [];
       for (const dirent of dirents) {
+        // Filter out ignored entries
+        if (respectGitignore) {
+          const isDir = dirent.isDirectory();
+          if (shouldIgnoreEntry(dirent.name, isDir, ignorePatterns)) {
+            continue;
+          }
+        }
+
         const entryPath = path.join(resolvedPath, dirent.name);
         try {
           const entryStat = await fs.stat(entryPath);

@@ -2,11 +2,19 @@
  * Feishu (Lark) Channel Adapter
  *
  * Connects to Feishu/Lark API for messaging within the Feishu ecosystem.
- * Supports text, rich text, interactive cards, and file uploads.
+ * Supports text, rich text, interactive cards, file uploads,
+ * interactive approval cards, and reasoning stream hooks.
+ *
+ * OpenClaw v2026.3.11 alignment: approval cards, reasoning streams,
+ * identity-aware headers, full thread context.
  */
 
 import { logger } from '../../utils/logger.js';
 import { BaseChannel, ChannelConfig, DeliveryResult, OutboundMessage } from '../core.js';
+
+// ============================================================================
+// Types
+// ============================================================================
 
 export interface FeishuConfig {
   appId: string;
@@ -14,7 +22,33 @@ export interface FeishuConfig {
   verificationToken?: string;
   encryptKey?: string;
   port?: number;
+  /** Agent name for card headers (identity-aware) */
+  agentName?: string;
+  /** Agent avatar image key */
+  agentAvatar?: string;
 }
+
+/**
+ * Action button for interactive approval/launcher cards.
+ */
+export interface FeishuCardAction {
+  /** Button label */
+  label: string;
+  /** Action identifier (sent back in card callback) */
+  actionId: string;
+  /** Button style: primary, danger, or default */
+  style?: 'primary' | 'danger' | 'default';
+}
+
+/**
+ * Reasoning stream handler — called during LLM reasoning.
+ */
+export type ReasoningStreamHandler = (chunk: string) => void;
+
+/**
+ * Reasoning end handler — called when reasoning completes.
+ */
+export type ReasoningEndHandler = (fullReasoning: string) => void;
 
 export interface FeishuChannelConfig extends ChannelConfig {
   appId: string;
@@ -113,6 +147,136 @@ export class FeishuAdapter {
   getAccessToken(): string | null {
     return this.accessToken;
   }
+
+  // ============================================================================
+  // Interactive Cards (OpenClaw v2026.3.11)
+  // ============================================================================
+
+  /**
+   * Build an interactive approval card with approve/reject actions.
+   */
+  buildApprovalCard(
+    title: string,
+    description: string,
+    actions: FeishuCardAction[],
+  ): Record<string, unknown> {
+    const header: Record<string, unknown> = {
+      title: { tag: 'plain_text', content: title },
+      template: 'blue',
+    };
+    // Identity-aware: inject agent name/avatar if configured
+    if (this.config.agentName) {
+      header.subtitle = { tag: 'plain_text', content: this.config.agentName };
+    }
+
+    return {
+      config: { wide_screen_mode: true },
+      header,
+      elements: [
+        { tag: 'div', text: { tag: 'lark_md', content: description } },
+        { tag: 'hr' },
+        {
+          tag: 'action',
+          actions: actions.map(a => ({
+            tag: 'button',
+            text: { tag: 'plain_text', content: a.label },
+            type: a.style ?? 'default',
+            value: { action_id: a.actionId },
+          })),
+        },
+      ],
+    };
+  }
+
+  /**
+   * Build an action launcher card with multiple buttons.
+   */
+  buildActionLauncherCard(
+    title: string,
+    buttons: FeishuCardAction[],
+  ): Record<string, unknown> {
+    return {
+      config: { wide_screen_mode: true },
+      header: {
+        title: { tag: 'plain_text', content: title },
+        template: 'green',
+      },
+      elements: [
+        {
+          tag: 'action',
+          actions: buttons.map(b => ({
+            tag: 'button',
+            text: { tag: 'plain_text', content: b.label },
+            type: b.style ?? 'default',
+            value: { action_id: b.actionId },
+          })),
+        },
+      ],
+    };
+  }
+
+  // ============================================================================
+  // Reasoning Streams (OpenClaw v2026.3.11)
+  // ============================================================================
+
+  private reasoningStreamHandlers: ReasoningStreamHandler[] = [];
+  private reasoningEndHandlers: ReasoningEndHandler[] = [];
+
+  /**
+   * Register a handler for reasoning stream chunks.
+   */
+  onReasoningStream(handler: ReasoningStreamHandler): void {
+    this.reasoningStreamHandlers.push(handler);
+  }
+
+  /**
+   * Register a handler for reasoning completion.
+   */
+  onReasoningEnd(handler: ReasoningEndHandler): void {
+    this.reasoningEndHandlers.push(handler);
+  }
+
+  /**
+   * Emit a reasoning stream chunk to all registered handlers.
+   */
+  emitReasoningStream(chunk: string): void {
+    for (const handler of this.reasoningStreamHandlers) {
+      try {
+        handler(chunk);
+      } catch (err) {
+        logger.debug(`Feishu reasoning stream handler error: ${err}`);
+      }
+    }
+  }
+
+  /**
+   * Emit reasoning end to all registered handlers.
+   */
+  emitReasoningEnd(fullReasoning: string): void {
+    for (const handler of this.reasoningEndHandlers) {
+      try {
+        handler(fullReasoning);
+      } catch (err) {
+        logger.debug(`Feishu reasoning end handler error: ${err}`);
+      }
+    }
+  }
+
+  // ============================================================================
+  // Thread Context (OpenClaw v2026.3.11)
+  // ============================================================================
+
+  /**
+   * Fetch full thread messages including bot replies.
+   */
+  async getThreadMessages(chatId: string): Promise<FeishuMessage[]> {
+    if (!this.running) {
+      throw new Error('FeishuAdapter is not running');
+    }
+    logger.debug('FeishuAdapter: get thread messages', { chatId });
+    // Returns empty — real implementation would call Feishu API
+    return [];
+  }
 }
 
 export class FeishuChannel extends BaseChannel {
@@ -148,7 +312,22 @@ export class FeishuChannel extends BaseChannel {
       return { success: false, error: 'Not connected', timestamp: new Date() };
     }
     const chatId = message.channelId || '';
+
+    // Send as card if channelData.feishu.card is provided
+    const feishuData = (message as { channelData?: { feishu?: { card?: Record<string, unknown> } } }).channelData?.feishu;
+    if (feishuData?.card) {
+      const result = await this.adapter.sendCard(chatId, feishuData.card);
+      return { success: result.success, messageId: result.messageId, timestamp: new Date() };
+    }
+
     const result = await this.adapter.sendText(chatId, message.content);
     return { success: result.success, messageId: result.messageId, timestamp: new Date() };
+  }
+
+  /**
+   * Get the underlying adapter (for direct card/reasoning API access).
+   */
+  getAdapter(): FeishuAdapter | null {
+    return this.adapter;
   }
 }

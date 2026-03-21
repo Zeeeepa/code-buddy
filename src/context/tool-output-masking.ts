@@ -241,3 +241,188 @@ export function expireOldToolResults(
 
   return expired;
 }
+
+// ============================================================================
+// Image-Only Tool Result Pruning (OpenClaw Vague 4 Phase 3)
+// ============================================================================
+
+/** Number of most-recent image tool results to keep intact */
+const IMAGE_KEEP_RECENT = 2;
+
+/** Chars-per-token estimate for base64 content (~0.75 chars/token for base64) */
+const BASE64_CHARS_PER_TOKEN = 0.75;
+
+/** Tools known to produce image outputs */
+const IMAGE_TOOLS = new Set([
+  'browser_screenshot',
+  'screenshot',
+  'computer_use',
+  'image_process',
+  'ocr_extract',
+]);
+
+/** Regex to detect data URI base64 inline images in text content */
+const DATA_URI_REGEX = /data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]{100,}/;
+
+/**
+ * Check whether a content part is an OpenAI multimodal image_url part.
+ */
+function isImageUrlPart(part: unknown): part is { type: 'image_url'; image_url: { url: string } } {
+  if (!part || typeof part !== 'object') return false;
+  const p = part as Record<string, unknown>;
+  return p.type === 'image_url' &&
+    typeof p.image_url === 'object' &&
+    p.image_url !== null &&
+    typeof (p.image_url as Record<string, unknown>).url === 'string';
+}
+
+/**
+ * Estimate token count for an image content part or data URI.
+ */
+function estimateImageTokens(content: string): number {
+  return Math.ceil(content.length * BASE64_CHARS_PER_TOKEN);
+}
+
+/**
+ * Check whether a message content contains image data.
+ * Returns true if content is an array with image_url parts,
+ * or a string containing a data URI base64 image.
+ */
+function hasImageContent(content: unknown): boolean {
+  if (Array.isArray(content)) {
+    return content.some(part => isImageUrlPart(part));
+  }
+  if (typeof content === 'string') {
+    return DATA_URI_REGEX.test(content);
+  }
+  return false;
+}
+
+/**
+ * Prune image-only tool results from conversation messages.
+ *
+ * Keeps the 2 most recent image tool results intact and replaces
+ * older ones with lightweight stubs, estimating tokens saved.
+ *
+ * Handles two image formats:
+ * - OpenAI multimodal: content arrays with `{ type: 'image_url', image_url: { url: '...' } }`
+ * - Data URI base64 inline: `data:image/...;base64,...` in text content
+ *
+ * @param messages - Array of conversation messages (modified in place)
+ * @returns Object with the modified messages, count pruned, and estimated tokens saved
+ */
+export function pruneImageContent(
+  messages: CodeBuddyMessage[],
+): { messages: CodeBuddyMessage[]; prunedCount: number; tokensSaved: number } {
+  if (!messages || messages.length === 0) {
+    return { messages, prunedCount: 0, tokensSaved: 0 };
+  }
+
+  // Collect indices of tool messages that contain image data
+  const imageToolIndices: Array<{
+    index: number;
+    toolName: string;
+    estimatedTokens: number;
+  }> = [];
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    if (msg.role !== 'tool') continue;
+
+    // Extract tool name from preceding assistant message
+    let toolName = '';
+    const toolCallId = (msg as { tool_call_id?: string }).tool_call_id;
+    for (let j = i - 1; j >= 0; j--) {
+      const prev = messages[j];
+      if (prev.role === 'assistant' && 'tool_calls' in prev && Array.isArray(prev.tool_calls)) {
+        const tc = (prev.tool_calls as Array<{ id: string; function?: { name: string } }>)
+          .find(t => t.id === toolCallId);
+        if (tc) {
+          toolName = tc.function?.name ?? '';
+        }
+        break;
+      }
+    }
+
+    // Check if this tool result contains image data
+    const content = msg.content;
+    if (!hasImageContent(content)) continue;
+
+    // Estimate tokens for the image content
+    let estimatedTokens = 0;
+    if (Array.isArray(content)) {
+      for (const part of content) {
+        if (isImageUrlPart(part)) {
+          estimatedTokens += estimateImageTokens(
+            (part as unknown as { image_url: { url: string } }).image_url.url
+          );
+        }
+      }
+    } else if (typeof content === 'string') {
+      const matches = content.match(new RegExp(DATA_URI_REGEX.source, 'g'));
+      if (matches) {
+        for (const match of matches) {
+          estimatedTokens += estimateImageTokens(match);
+        }
+      }
+    }
+
+    imageToolIndices.push({ index: i, toolName, estimatedTokens });
+  }
+
+  // Nothing to prune
+  if (imageToolIndices.length <= IMAGE_KEEP_RECENT) {
+    return { messages, prunedCount: 0, tokensSaved: 0 };
+  }
+
+  // Keep the N most recent, prune the rest
+  const toPrune = imageToolIndices.slice(0, imageToolIndices.length - IMAGE_KEEP_RECENT);
+  let totalTokensSaved = 0;
+
+  for (const { index, toolName, estimatedTokens } of toPrune) {
+    if (index < 0 || index >= messages.length) continue;
+    const msg = messages[index];
+    if (!msg) continue;
+
+    totalTokensSaved += estimatedTokens;
+
+    const displayName = toolName || (IMAGE_TOOLS.has(toolName) ? toolName : 'unknown');
+    const stub = `[Image pruned: ${displayName}, saved ~${estimatedTokens} tokens]`;
+
+    // Replace content: if it's an array, filter out image parts and add stub
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mutableMsg = msg as any;
+    if (Array.isArray(mutableMsg.content)) {
+      const nonImageParts = (mutableMsg.content as unknown[])
+        .filter(part => !isImageUrlPart(part));
+      if (nonImageParts.length > 0) {
+        // Keep text parts, add stub
+        mutableMsg.content = [
+          ...nonImageParts,
+          { type: 'text', text: stub },
+        ];
+      } else {
+        // All parts were images
+        mutableMsg.content = stub;
+      }
+    } else if (typeof mutableMsg.content === 'string') {
+      // Replace data URIs with stub
+      mutableMsg.content = mutableMsg.content.replace(
+        new RegExp(DATA_URI_REGEX.source, 'g'),
+        stub,
+      );
+    }
+  }
+
+  if (toPrune.length > 0) {
+    logger.debug(
+      `Image pruning: pruned ${toPrune.length} image results, saved ~${totalTokensSaved} tokens`
+    );
+  }
+
+  return {
+    messages,
+    prunedCount: toPrune.length,
+    tokensSaved: totalTokensSaved,
+  };
+}

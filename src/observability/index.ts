@@ -5,6 +5,7 @@
 import * as Sentry from '@sentry/node';
 import { logger } from '../utils/logger.js';
 import { initTracing } from './tracing.js';
+import { isTelemetryEnabled } from '../utils/telemetry-config.js';
 
 export * from "./dashboard.js";
 export * from "./tracing.js";
@@ -12,6 +13,12 @@ export * from "./tracing.js";
 let isSentryInitialized = false;
 
 export function initObservability() {
+  // Check telemetry config before initializing
+  if (!isTelemetryEnabled()) {
+    logger.debug('Telemetry is disabled — skipping Sentry and OTEL initialization');
+    return;
+  }
+
   // Initialize OpenTelemetry
   initTracing();
 

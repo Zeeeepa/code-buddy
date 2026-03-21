@@ -83,6 +83,13 @@ function getLogLevelFromEnv(): LogLevel {
   return 'info';
 }
 
+/** Default max log file size: 10MB */
+const DEFAULT_LOG_MAX_SIZE = 10 * 1024 * 1024;
+/** Default max rotated log files */
+const DEFAULT_LOG_MAX_FILES = 5;
+/** Check rotation every N writes to avoid stat() on every line */
+const ROTATION_CHECK_INTERVAL = 100;
+
 /**
  * Structured Logger class
  */
@@ -91,6 +98,15 @@ export class Logger {
   private logHistory: LogEntry[] = [];
   private maxHistorySize = 1000;
   private fileStream?: fs.WriteStream;
+
+  /** Log rotation: max file size in bytes */
+  private logMaxSize: number;
+  /** Log rotation: max rotated files to keep */
+  private logMaxFiles: number;
+  /** Counter for batched rotation checks */
+  private writesSinceRotationCheck: number = 0;
+  /** Guard against concurrent rotation */
+  private isRotating: boolean = false;
 
   constructor(options: Partial<LoggerOptions> = {}) {
     this.options = {
@@ -102,6 +118,17 @@ export class Logger {
       logFile: process.env.LOG_FILE,
       ...options,
     };
+
+    // Parse rotation config from environment
+    const envMaxSize = Number(process.env.LOG_MAX_SIZE);
+    this.logMaxSize = Number.isFinite(envMaxSize) && envMaxSize > 0
+      ? envMaxSize
+      : DEFAULT_LOG_MAX_SIZE;
+
+    const envMaxFiles = Number(process.env.LOG_MAX_FILES);
+    this.logMaxFiles = Number.isFinite(envMaxFiles) && envMaxFiles > 0
+      ? envMaxFiles
+      : DEFAULT_LOG_MAX_FILES;
 
     // Initialize file stream if configured
     if (this.options.logFile) {
@@ -119,6 +146,11 @@ export class Logger {
         fs.mkdirSync(logDir, { recursive: true });
       }
       this.fileStream = fs.createWriteStream(logFile, { flags: 'a' });
+      // Attach error handler to prevent uncaught exceptions during rotation/cleanup
+      this.fileStream.on('error', () => {
+        // Silently discard write errors — the stream may be closed during rotation
+        this.fileStream = undefined;
+      });
     } catch (err) {
       console.error(`Failed to initialize log file: ${logFile}`, err);
     }
@@ -269,6 +301,13 @@ export class Logger {
         ...entry.context,
       });
       this.fileStream.write(jsonEntry + '\n');
+
+      // Check log rotation every ROTATION_CHECK_INTERVAL writes
+      this.writesSinceRotationCheck++;
+      if (this.writesSinceRotationCheck >= ROTATION_CHECK_INTERVAL) {
+        this.writesSinceRotationCheck = 0;
+        this.rotateIfNeeded();
+      }
     }
   }
 
@@ -287,6 +326,89 @@ export class Logger {
       this.fileStream.end();
       this.fileStream = undefined;
     }
+  }
+
+  /**
+   * Rotate log files if the current file exceeds the max size.
+   *
+   * Rotation scheme:
+   *   codebuddy.log -> codebuddy.1.log
+   *   codebuddy.1.log -> codebuddy.2.log
+   *   ... up to logMaxFiles
+   *   Oldest file beyond logMaxFiles is deleted.
+   *
+   * Non-blocking: rotation errors are silently ignored so logging continues.
+   */
+  private rotateIfNeeded(): void {
+    const logFile = this.options.logFile;
+    if (!logFile || this.isRotating) return;
+
+    try {
+      // Check current file size
+      const stat = fs.statSync(logFile);
+      if (stat.size < this.logMaxSize) return;
+
+      this.isRotating = true;
+
+      // Close current stream before rotation
+      if (this.fileStream) {
+        this.fileStream.end();
+        this.fileStream = undefined;
+      }
+
+      // Shift existing rotated files (N -> N+1)
+      for (let i = this.logMaxFiles - 1; i >= 1; i--) {
+        const src = this.getRotatedPath(logFile, i);
+        const dst = this.getRotatedPath(logFile, i + 1);
+        try {
+          if (fs.existsSync(src)) {
+            if (i + 1 > this.logMaxFiles) {
+              // Delete the oldest file beyond max
+              fs.unlinkSync(src);
+            } else {
+              fs.renameSync(src, dst);
+            }
+          }
+        } catch {
+          // Ignore individual file rotation errors
+        }
+      }
+
+      // Delete the file that would exceed max count
+      try {
+        const overflow = this.getRotatedPath(logFile, this.logMaxFiles + 1);
+        if (fs.existsSync(overflow)) {
+          fs.unlinkSync(overflow);
+        }
+      } catch {
+        // Ignore
+      }
+
+      // Rename current log to .1.log
+      try {
+        const firstRotated = this.getRotatedPath(logFile, 1);
+        fs.renameSync(logFile, firstRotated);
+      } catch {
+        // If rename fails, continue with a fresh file
+      }
+
+      // Reopen the file stream (fresh file)
+      this.initializeFileLogging(logFile);
+    } catch {
+      // stat failed or other error — file may not exist yet, skip rotation
+    } finally {
+      this.isRotating = false;
+    }
+  }
+
+  /**
+   * Get the path for a rotated log file.
+   * Example: codebuddy.log -> codebuddy.1.log
+   */
+  private getRotatedPath(logFile: string, index: number): string {
+    const ext = path.extname(logFile);
+    const base = logFile.slice(0, logFile.length - ext.length);
+    return `${base}.${index}${ext}`;
   }
 
   /**

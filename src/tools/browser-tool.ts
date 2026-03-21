@@ -1,6 +1,11 @@
 /**
  * Browser Automation Tool
  *
+ * @deprecated Use `src/tools/browser/playwright-tool.ts` instead.
+ * This legacy implementation is superseded by the modular browser tools
+ * in `src/tools/browser/` and `src/tools/registry/browser-tools.ts`.
+ * Kept temporarily for backwards compatibility — do not add new features here.
+ *
  * Provides headless browser capabilities using Playwright for:
  * - Web page navigation and interaction
  * - Form filling and button clicking

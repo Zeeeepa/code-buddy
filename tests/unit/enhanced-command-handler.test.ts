@@ -59,6 +59,9 @@ jest.mock('../../src/commands/handlers/index.js', () => ({
   handleHooks: jest.fn().mockResolvedValue({ handled: true }),
   handlePromptCache: jest.fn().mockResolvedValue({ handled: true }),
   handleTrack: jest.fn().mockResolvedValue({ handled: true }),
+  handleBtw: jest.fn().mockResolvedValue({ handled: true }),
+  setBtwClient: jest.fn(),
+  handlePlugin: jest.fn().mockResolvedValue({ handled: true }),
 }));
 
 import * as handlers from '../../src/commands/handlers/index.js';

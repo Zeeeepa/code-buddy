@@ -80,6 +80,123 @@ const ALWAYS_DANGEROUS_PATTERNS = [
 ];
 
 // ============================================================================
+// Unicode Obfuscation Detection (CVE mitigation)
+// ============================================================================
+
+/**
+ * Cyrillic → Latin homoglyph map.
+ * These characters look identical to Latin letters but are different codepoints,
+ * used to bypass command allowlists (e.g., "rм" looks like "rm").
+ */
+const HOMOGLYPH_MAP: Record<string, string> = {
+  '\u0430': 'a', // Cyrillic а
+  '\u0435': 'e', // Cyrillic е
+  '\u043E': 'o', // Cyrillic о
+  '\u0440': 'p', // Cyrillic р
+  '\u0441': 'c', // Cyrillic с
+  '\u0443': 'y', // Cyrillic у
+  '\u0445': 'x', // Cyrillic х
+  '\u0410': 'A', // Cyrillic А
+  '\u0412': 'B', // Cyrillic В
+  '\u0415': 'E', // Cyrillic Е
+  '\u041A': 'K', // Cyrillic К
+  '\u041C': 'M', // Cyrillic М
+  '\u041D': 'H', // Cyrillic Н
+  '\u041E': 'O', // Cyrillic О
+  '\u0420': 'P', // Cyrillic Р
+  '\u0421': 'C', // Cyrillic С
+  '\u0422': 'T', // Cyrillic Т
+  '\u0425': 'X', // Cyrillic Х
+  // Greek homoglyphs
+  '\u03B1': 'a', // Greek α
+  '\u03BF': 'o', // Greek ο
+  '\u03C1': 'p', // Greek ρ
+  '\u03C5': 'u', // Greek υ
+  '\u0391': 'A', // Greek Α
+  '\u0392': 'B', // Greek Β
+  '\u0395': 'E', // Greek Ε
+  '\u0397': 'H', // Greek Η
+  '\u039A': 'K', // Greek Κ
+  '\u039C': 'M', // Greek Μ
+  '\u039D': 'N', // Greek Ν
+  '\u039F': 'O', // Greek Ο
+  '\u03A1': 'P', // Greek Ρ
+  '\u03A4': 'T', // Greek Τ
+  '\u03A7': 'X', // Greek Χ
+};
+
+/** Invisible/formatting Unicode characters that should never appear in commands */
+const INVISIBLE_CHARS = /[\u200B\u200C\u200D\u200E\u200F\u2028\u2029\u202A-\u202E\u2060\u2061\u2062\u2063\u2064\uFEFF\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180E]/;
+
+/** Bidirectional override characters (Trojan Source attack) */
+const BIDI_OVERRIDES = /[\u202A\u202B\u202C\u202D\u202E\u2066\u2067\u2068\u2069]/;
+
+export interface UnicodeObfuscationResult {
+  /** Whether any obfuscation was detected */
+  obfuscated: boolean;
+  /** Specific findings */
+  findings: string[];
+  /** The command with homoglyphs normalized to Latin equivalents */
+  normalized: string;
+}
+
+/**
+ * Detect Unicode obfuscation in a command string.
+ * Checks for homoglyphs, invisible characters, and BiDi overrides.
+ */
+export function detectUnicodeObfuscation(command: string): UnicodeObfuscationResult {
+  const findings: string[] = [];
+  let normalized = command;
+  let hasHomoglyphs = false;
+
+  // Check for homoglyphs
+  for (const [glyph, latin] of Object.entries(HOMOGLYPH_MAP)) {
+    if (command.includes(glyph)) {
+      hasHomoglyphs = true;
+      normalized = normalized.replaceAll(glyph, latin);
+      findings.push(`Homoglyph detected: U+${glyph.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')} looks like '${latin}'`);
+    }
+  }
+
+  // Check for invisible characters
+  if (INVISIBLE_CHARS.test(command)) {
+    findings.push('Invisible Unicode characters detected (ZWJ, ZWNJ, soft hyphen, etc.)');
+  }
+
+  // Check for BiDi overrides (Trojan Source attack vector)
+  if (BIDI_OVERRIDES.test(command)) {
+    findings.push('Bidirectional text override characters detected (Trojan Source attack vector)');
+  }
+
+  // Check for mixed scripts within a single token (e.g., "rм" mixing Latin and Cyrillic)
+  const tokens = command.split(/\s+/);
+  for (const token of tokens) {
+    let hasLatin = false;
+    let hasNonLatin = false;
+    for (const char of token) {
+      const cp = char.codePointAt(0)!;
+      if ((cp >= 0x41 && cp <= 0x5A) || (cp >= 0x61 && cp <= 0x7A)) {
+        hasLatin = true;
+      } else if (
+        (cp >= 0x0400 && cp <= 0x04FF) || // Cyrillic
+        (cp >= 0x0370 && cp <= 0x03FF)     // Greek
+      ) {
+        hasNonLatin = true;
+      }
+    }
+    if (hasLatin && hasNonLatin) {
+      findings.push(`Mixed-script token: "${token}" contains both Latin and non-Latin characters`);
+    }
+  }
+
+  return {
+    obfuscated: findings.length > 0,
+    findings,
+    normalized: hasHomoglyphs ? normalized : command,
+  };
+}
+
+// ============================================================================
 // System prompt
 // ============================================================================
 
@@ -136,6 +253,20 @@ function quickEval(ctx: GuardianContext): GuardianEvaluation | null {
       decision: 'approve',
       risks: [],
     };
+  }
+
+  // Unicode obfuscation detection — block commands with homoglyphs/invisible chars
+  if (ctx.toolName === 'bash' || ctx.toolName === 'shell_exec' || ctx.toolName === 'execute_command') {
+    const unicode = detectUnicodeObfuscation(ctx.content);
+    if (unicode.obfuscated) {
+      logger.warn('Unicode obfuscation detected in command', { findings: unicode.findings });
+      return {
+        riskScore: 95,
+        reasoning: `Unicode obfuscation detected: ${unicode.findings.join('; ')}`,
+        decision: 'deny',
+        risks: unicode.findings,
+      };
+    }
   }
 
   // Always dangerous

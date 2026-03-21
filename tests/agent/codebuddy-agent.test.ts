@@ -243,6 +243,7 @@ jest.mock('../../src/concurrency/lane-queue.js', () => ({
 
 jest.mock('../../src/skills/index.js', () => ({
   findSkill: jest.fn().mockReturnValue(null),
+  findStarterPack: jest.fn().mockReturnValue(null),
 }));
 
 jest.mock('../../src/skills/adapters/index.js', () => ({
@@ -507,10 +508,10 @@ describe('CodeBuddyAgent', () => {
       expect((agent as any).maxToolRounds).toBe(50);
     });
 
-    it('should set sessionCostLimit to Infinity when YOLO is on', () => {
+    it('should set sessionCostLimit to $100 hard cap when YOLO is on', () => {
       agent = new CodeBuddyAgent('test-api-key');
       agent.setYoloMode(true);
-      expect((agent as any).sessionCostLimit).toBe(Infinity);
+      expect((agent as any).sessionCostLimit).toBe(100);
     });
 
     it('should restore sessionCostLimit to $10 when YOLO is off', () => {

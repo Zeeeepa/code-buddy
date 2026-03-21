@@ -421,6 +421,121 @@ export async function handleConfig(args: string[]): Promise<CommandHandlerResult
         break;
       }
 
+      case 'set': {
+        // Set a config value: /config set [--dry-run] [--json] <key> <value>
+        // Or batch: /config set --json '{"key": "value", ...}'
+        const setArgs = args.slice(1);
+        const isDryRun = setArgs.includes('--dry-run');
+        const isJson = setArgs.includes('--json');
+
+        // Remove flags from args
+        const cleanArgs = setArgs.filter(a => a !== '--dry-run' && a !== '--json');
+
+        if (cleanArgs.length === 0) {
+          lines.push('Usage: /config set [--dry-run] [--json] <key> <value>');
+          lines.push('');
+          lines.push('Set a TOML config value by dot-notation key path.');
+          lines.push('');
+          lines.push('Options:');
+          lines.push('  --dry-run  Preview the change without writing');
+          lines.push('  --json     Batch JSON mode or structured output');
+          lines.push('');
+          lines.push('Examples:');
+          lines.push('  /config set middleware.max_turns 200');
+          lines.push('  /config set ui.streaming false');
+          lines.push('  /config set active_model grok-4');
+          lines.push('  /config set agent.yolo_mode true');
+          lines.push('  /config set --dry-run middleware.max_cost 50');
+          lines.push('  /config set --json \'{"middleware.max_turns": 200, "ui.theme": "dark"}\'');
+          lines.push('');
+          lines.push('SecretRef values:');
+          lines.push('  /config set providers.xai.api_key_env ${env:MY_API_KEY}');
+          break;
+        }
+
+        const { setConfigValue, setConfigBatch } = await import('../../config/config-mutator.js');
+
+        // Batch JSON mode: single argument is a JSON string
+        if (isJson && cleanArgs.length === 1) {
+          try {
+            const batch = JSON.parse(cleanArgs[0]) as Record<string, unknown>;
+            const results = await setConfigBatch(batch, { dryRun: isDryRun, json: isJson });
+
+            lines.push(isDryRun ? 'Config Set (Dry Run)' : 'Config Set (Batch)');
+            lines.push('='.repeat(50));
+            lines.push('');
+
+            for (const result of results) {
+              if (result.success) {
+                lines.push(`  [OK] ${result.key}: ${JSON.stringify(result.oldValue)} -> ${JSON.stringify(result.newValue)}`);
+                if (result.warning) {
+                  lines.push(`       Warning: ${result.warning}`);
+                }
+              } else {
+                lines.push(`  [FAIL] ${result.key}: ${result.error}`);
+              }
+            }
+
+            const successCount = results.filter(r => r.success).length;
+            lines.push('');
+            lines.push(`${successCount}/${results.length} values ${isDryRun ? 'would be ' : ''}set successfully.`);
+          } catch (parseErr) {
+            lines.push(`Error: Invalid JSON — ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`);
+          }
+          break;
+        }
+
+        // Single key-value: /config set <key> <value>
+        if (cleanArgs.length < 2) {
+          lines.push('Error: /config set requires <key> <value>');
+          lines.push('');
+          lines.push('Example: /config set middleware.max_turns 200');
+          break;
+        }
+
+        const keyPath = cleanArgs[0];
+        // Join remaining args as value (handles values with spaces)
+        const rawValue = cleanArgs.slice(1).join(' ');
+
+        // Try to parse as JSON value for objects/arrays, otherwise treat as string
+        let parsedValue: unknown = rawValue;
+        try {
+          // Try JSON parse for objects, arrays, numbers, booleans
+          const jsonParsed = JSON.parse(rawValue);
+          parsedValue = jsonParsed;
+        } catch {
+          // Not valid JSON — keep as string
+        }
+
+        const result = await setConfigValue(keyPath, parsedValue, { dryRun: isDryRun, json: isJson });
+
+        if (isJson) {
+          lines.push(JSON.stringify(result, null, 2));
+        } else if (result.success) {
+          lines.push(isDryRun ? 'Config Set (Dry Run Preview)' : 'Config Set');
+          lines.push('='.repeat(50));
+          lines.push('');
+          lines.push(`  Key:       ${result.key}`);
+          lines.push(`  Old value: ${JSON.stringify(result.oldValue)}`);
+          lines.push(`  New value: ${JSON.stringify(result.newValue)}`);
+          if (isDryRun) {
+            lines.push('');
+            lines.push('  (No changes written — dry run mode)');
+          }
+          if (result.warning) {
+            lines.push('');
+            lines.push(`  Warning: ${result.warning}`);
+          }
+        } else {
+          lines.push('Config Set Failed');
+          lines.push('='.repeat(50));
+          lines.push('');
+          lines.push(`  Key:   ${result.key}`);
+          lines.push(`  Error: ${result.error}`);
+        }
+        break;
+      }
+
       case 'defaults': {
         // Show default values for a schema
         const schemaName = args[1] || 'settings.json';
@@ -473,15 +588,20 @@ export async function handleConfig(args: string[]): Promise<CommandHandlerResult
         lines.push('Usage: /config <action> [options]');
         lines.push('');
         lines.push('Actions:');
-        lines.push('  validate         - Validate all configuration files');
-        lines.push('  show             - Show current configuration values');
-        lines.push('  defaults <name>  - Show default values for a schema');
-        lines.push('  docs <name>      - Show documentation for a schema');
-        lines.push('  schemas          - List available configuration schemas');
+        lines.push('  validate              - Validate all configuration files');
+        lines.push('  show                  - Show current configuration values');
+        lines.push('  set <key> <value>     - Set a config value (dot-notation)');
+        lines.push('  set --dry-run <k> <v> - Preview a config change');
+        lines.push('  set --json \'{}\'       - Batch set from JSON');
+        lines.push('  defaults <name>       - Show default values for a schema');
+        lines.push('  docs <name>           - Show documentation for a schema');
+        lines.push('  schemas               - List available configuration schemas');
         lines.push('');
         lines.push('Examples:');
         lines.push('  /config validate');
         lines.push('  /config show');
+        lines.push('  /config set middleware.max_turns 200');
+        lines.push('  /config set --dry-run ui.streaming false');
         lines.push('  /config defaults settings.json');
         lines.push('  /config docs user-settings.json');
     }

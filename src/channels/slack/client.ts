@@ -513,29 +513,34 @@ export class SlackChannel extends BaseChannel {
         params.thread_ts = message.replyTo;
       }
 
-      // Build blocks for rich content
-      const blocks: SlackBlock[] = [];
+      // Passthrough channelData.slack.blocks (OpenClaw v2026.3.12 alignment)
+      if (message.channelData?.slack?.blocks && Array.isArray(message.channelData.slack.blocks)) {
+        params.blocks = message.channelData.slack.blocks;
+      } else {
+        // Build blocks for rich content
+        const blocks: SlackBlock[] = [];
 
-      // Add buttons as action block
-      if (message.buttons && message.buttons.length > 0) {
-        blocks.push(this.buildActionsBlock(message.buttons));
-      }
+        // Add buttons as action block
+        if (message.buttons && message.buttons.length > 0) {
+          blocks.push(this.buildActionsBlock(message.buttons));
+        }
 
-      // Add image attachments
-      if (message.attachments) {
-        for (const attachment of message.attachments) {
-          if (attachment.type === 'image' && attachment.url) {
-            blocks.push({
-              type: 'image',
-              image_url: attachment.url,
-              alt_text: attachment.caption || 'Image',
-            });
+        // Add image attachments
+        if (message.attachments) {
+          for (const attachment of message.attachments) {
+            if (attachment.type === 'image' && attachment.url) {
+              blocks.push({
+                type: 'image',
+                image_url: attachment.url,
+                alt_text: attachment.caption || 'Image',
+              });
+            }
           }
         }
-      }
 
-      if (blocks.length > 0) {
-        params.blocks = blocks;
+        if (blocks.length > 0) {
+          params.blocks = blocks;
+        }
       }
 
       const result = await this.apiRequest<{

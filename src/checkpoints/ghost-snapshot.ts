@@ -50,6 +50,8 @@ export class GhostSnapshotManager {
   private cwd: string;
   private turnCounter = 0;
   private snapshots: GhostSnapshot[] = [];
+  private redoStack: GhostSnapshot[] = [];
+  private currentIndex = -1;
   private isGitRepo = false;
   private initialized = false;
 
@@ -102,6 +104,8 @@ export class GhostSnapshotManager {
           timestamp: new Date(), turn: this.turnCounter,
         };
         this.snapshots.push(snapshot);
+        this.redoStack = [];
+        this.currentIndex = this.snapshots.length - 1;
         return snapshot;
       }
 
@@ -127,6 +131,8 @@ export class GhostSnapshotManager {
         timestamp: new Date(), turn: this.turnCounter,
       };
       this.snapshots.push(snapshot);
+      this.redoStack = [];
+      this.currentIndex = this.snapshots.length - 1;
 
       // Prune old snapshots
       if (this.snapshots.length > MAX_GHOST_SNAPSHOTS) {
@@ -171,13 +177,51 @@ export class GhostSnapshotManager {
 
   /**
    * Undo to the last ghost snapshot (most recent before current turn).
+   * Pushes the current snapshot onto the redo stack before restoring.
    */
   async undoLastTurn(): Promise<GhostSnapshot | null> {
-    if (this.snapshots.length === 0) return null;
+    if (this.snapshots.length === 0 || this.currentIndex < 0) return null;
 
-    const latest = this.snapshots[this.snapshots.length - 1];
-    const restored = await this.restoreSnapshot(latest.id);
-    return restored ? latest : null;
+    const current = this.snapshots[this.currentIndex];
+    const targetIndex = this.currentIndex - 1;
+    if (targetIndex < 0) return null;
+
+    const target = this.snapshots[targetIndex];
+    const restored = await this.restoreSnapshot(target.id);
+    if (restored) {
+      this.redoStack.push(current);
+      this.currentIndex = targetIndex;
+      return target;
+    }
+    return null;
+  }
+
+  /**
+   * Redo a previously undone change (restore forward in timeline).
+   * Pops from the redo stack and restores it.
+   */
+  async redoLastTurn(): Promise<GhostSnapshot | null> {
+    if (this.redoStack.length === 0) return null;
+
+    const snapshot = this.redoStack.pop()!;
+    const restored = await this.restoreSnapshot(snapshot.id);
+    if (restored) {
+      this.currentIndex++;
+      return snapshot;
+    }
+    return null;
+  }
+
+  /**
+   * Get the full timeline of snapshots with navigation state.
+   */
+  getTimeline(): { snapshots: GhostSnapshot[]; currentIndex: number; canUndo: boolean; canRedo: boolean } {
+    return {
+      snapshots: [...this.snapshots],
+      currentIndex: this.currentIndex,
+      canUndo: this.currentIndex > 0,
+      canRedo: this.redoStack.length > 0,
+    };
   }
 
   /**

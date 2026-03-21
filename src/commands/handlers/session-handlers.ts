@@ -4,6 +4,9 @@
  * Manage session history with replay capability (Mistral Vibe-style).
  */
 
+import { existsSync, readFileSync, readdirSync, statSync, unlinkSync, rmdirSync } from 'fs';
+import { join } from 'path';
+import { homedir } from 'os';
 import { ChatEntry } from '../../agent/codebuddy-agent.js';
 import {
   InteractionLogger,
@@ -95,6 +98,147 @@ function formatSessionForReplay(session: SessionData): string {
   }
 
   return lines.join('\n');
+}
+
+/**
+ * Clean up old sessions based on age or count.
+ *
+ * @param options - Cleanup configuration
+ * @returns Summary of the cleanup operation
+ */
+export function cleanupSessions(options: {
+  days?: number;
+  keep?: number;
+  dryRun?: boolean;
+}): { deletedCount: number; freedBytes: number; sessionIds: string[] } {
+  const LOG_DIR = join(homedir(), '.codebuddy', 'logs');
+  if (!existsSync(LOG_DIR)) {
+    return { deletedCount: 0, freedBytes: 0, sessionIds: [] };
+  }
+
+  // Collect all session files with metadata
+  const allFiles: Array<{
+    path: string;
+    size: number;
+    startedAt: Date;
+    shortId: string;
+  }> = [];
+
+  const dateDirs = readdirSync(LOG_DIR).filter(d => {
+    try {
+      return statSync(join(LOG_DIR, d)).isDirectory();
+    } catch {
+      return false;
+    }
+  });
+
+  for (const dateDir of dateDirs) {
+    const dir = join(LOG_DIR, dateDir);
+    let files: string[];
+    try {
+      files = readdirSync(dir).filter(f => f.endsWith('.json'));
+    } catch {
+      continue;
+    }
+
+    for (const file of files) {
+      const filePath = join(dir, file);
+      try {
+        const fileStat = statSync(filePath);
+        const content = readFileSync(filePath, 'utf-8');
+        const session = JSON.parse(content) as SessionData;
+        allFiles.push({
+          path: filePath,
+          size: fileStat.size,
+          startedAt: new Date(session.metadata.started_at),
+          shortId: session.metadata.short_id,
+        });
+      } catch {
+        // Include invalid files for cleanup too, using file mtime
+        try {
+          const fileStat = statSync(filePath);
+          allFiles.push({
+            path: filePath,
+            size: fileStat.size,
+            startedAt: fileStat.mtime,
+            shortId: file.replace('.json', '').substring(0, 8),
+          });
+        } catch {
+          // Skip completely unreadable files
+        }
+      }
+    }
+  }
+
+  // Sort by date (newest first)
+  allFiles.sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
+
+  // Determine which files to delete
+  const toDelete: typeof allFiles = [];
+  const now = new Date();
+
+  if (options.keep !== undefined) {
+    // Keep only the N most recent
+    if (allFiles.length > options.keep) {
+      toDelete.push(...allFiles.slice(options.keep));
+    }
+  } else {
+    // Delete by age (default: 7 days)
+    const maxAge = (options.days ?? 7) * 24 * 60 * 60 * 1000;
+    for (const file of allFiles) {
+      if (now.getTime() - file.startedAt.getTime() > maxAge) {
+        toDelete.push(file);
+      }
+    }
+  }
+
+  // Perform deletion (or dry run)
+  let freedBytes = 0;
+  const deletedIds: string[] = [];
+
+  for (const file of toDelete) {
+    freedBytes += file.size;
+    deletedIds.push(file.shortId);
+    if (!options.dryRun) {
+      try {
+        unlinkSync(file.path);
+      } catch {
+        // Ignore deletion errors
+      }
+    }
+  }
+
+  // Clean up empty date directories
+  if (!options.dryRun) {
+    for (const dateDir of dateDirs) {
+      const dir = join(LOG_DIR, dateDir);
+      try {
+        const remaining = readdirSync(dir);
+        if (remaining.length === 0) {
+          rmdirSync(dir);
+        }
+      } catch {
+        // Ignore
+      }
+    }
+  }
+
+  return {
+    deletedCount: toDelete.length,
+    freedBytes,
+    sessionIds: deletedIds,
+  };
+}
+
+/**
+ * Format bytes into a human-readable size string.
+ */
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / Math.pow(1024, exponent);
+  return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[exponent]}`;
 }
 
 /**
@@ -274,12 +418,91 @@ export function handleSessions(args: string[]): CommandHandlerResult {
       };
     }
 
+    case 'cleanup': {
+      // Parse cleanup options from args
+      const cleanupArgs = args.slice(1);
+      let days: number | undefined;
+      let keep: number | undefined;
+      let dryRun = false;
+
+      for (let i = 0; i < cleanupArgs.length; i++) {
+        const arg = cleanupArgs[i];
+        if (arg === '--days' && cleanupArgs[i + 1]) {
+          days = parseInt(cleanupArgs[i + 1], 10);
+          if (isNaN(days) || days < 1) {
+            return {
+              handled: true,
+              entry: {
+                type: 'assistant',
+                content: 'Invalid --days value. Must be a positive integer.',
+                timestamp: new Date(),
+              },
+            };
+          }
+          i++;
+        } else if (arg === '--keep' && cleanupArgs[i + 1]) {
+          keep = parseInt(cleanupArgs[i + 1], 10);
+          if (isNaN(keep) || keep < 0) {
+            return {
+              handled: true,
+              entry: {
+                type: 'assistant',
+                content: 'Invalid --keep value. Must be a non-negative integer.',
+                timestamp: new Date(),
+              },
+            };
+          }
+          i++;
+        } else if (arg === '--dry-run') {
+          dryRun = true;
+        }
+      }
+
+      // Default to 7 days if neither --days nor --keep specified
+      const result = cleanupSessions({ days, keep, dryRun });
+
+      if (result.deletedCount === 0) {
+        return {
+          handled: true,
+          entry: {
+            type: 'assistant',
+            content: 'No sessions to clean up.',
+            timestamp: new Date(),
+          },
+        };
+      }
+
+      const verb = dryRun ? 'Would delete' : 'Deleted';
+      const sizeStr = formatBytes(result.freedBytes);
+      const lines = [
+        `${verb} ${result.deletedCount} session${result.deletedCount !== 1 ? 's' : ''}, freed ${sizeStr}.`,
+      ];
+
+      if (dryRun) {
+        lines.push('(dry run - no files were actually deleted)');
+      }
+
+      if (result.deletedCount <= 20) {
+        lines.push('');
+        lines.push(`Session IDs: ${result.sessionIds.join(', ')}`);
+      }
+
+      return {
+        handled: true,
+        entry: {
+          type: 'assistant',
+          content: lines.join('\n'),
+          timestamp: new Date(),
+        },
+      };
+    }
+
     default:
       return {
         handled: true,
         entry: {
           type: 'assistant',
-          content: `Unknown action: ${action}\n\nAvailable actions:\n  list [n]       - List recent sessions (default: 10)\n  show <id>      - Show session details\n  replay <id>    - Format session for AI context\n  delete <id>    - Delete a session\n  latest         - Show the most recent session\n  search <text>  - Search sessions by partial ID`,
+          content: `Unknown action: ${action}\n\nAvailable actions:\n  list [n]       - List recent sessions (default: 10)\n  show <id>      - Show session details\n  replay <id>    - Format session for AI context\n  delete <id>    - Delete a session\n  latest         - Show the most recent session\n  search <text>  - Search sessions by partial ID\n  cleanup        - Delete old sessions (--days N, --keep N, --dry-run)`,
           timestamp: new Date(),
         },
       };

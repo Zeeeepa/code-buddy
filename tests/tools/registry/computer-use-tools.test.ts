@@ -337,7 +337,7 @@ describe('Computer Use Tool Adapters', () => {
   describe('createMiscTools', () => {
     it('should return all tool types', () => {
       const tools = createMiscTools();
-      expect(tools).toHaveLength(8);
+      expect(tools).toHaveLength(9);
 
       const names = tools.map(t => t.name);
       expect(names).toContain('browser');
@@ -348,6 +348,7 @@ describe('Computer Use Tool Adapters', () => {
       expect(names).toContain('device_manage');
       expect(names).toContain('deploy');
       expect(names).toContain('knowledge_graph');
+      expect(names).toContain('docs_search');
     });
 
     it('should return ITool-compliant instances', () => {
@@ -357,9 +358,10 @@ describe('Computer Use Tool Adapters', () => {
         expect(tool.description).toBeDefined();
         expect(typeof tool.execute).toBe('function');
         expect(typeof tool.getSchema).toBe('function');
-        expect(typeof tool.validate).toBe('function');
-        expect(typeof tool.getMetadata).toBe('function');
-        expect(typeof tool.isAvailable).toBe('function');
+        // validate, getMetadata, isAvailable are optional in ITool interface
+        if (tool.validate) expect(typeof tool.validate).toBe('function');
+        if (tool.getMetadata) expect(typeof tool.getMetadata).toBe('function');
+        if (tool.isAvailable) expect(typeof tool.isAvailable).toBe('function');
       }
     });
   });

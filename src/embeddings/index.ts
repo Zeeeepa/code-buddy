@@ -20,3 +20,13 @@ export {
   initializeEmbeddingProvider,
   resetEmbeddingProvider,
 } from './embedding-provider.js';
+
+// Multimodal Embeddings (Gemini — text + image in shared vector space)
+export {
+  MultimodalEmbeddingProvider,
+  getMultimodalEmbeddingProvider,
+  resetMultimodalEmbeddingProvider,
+  type EmbeddingInput,
+  type EmbeddingResult as MultimodalEmbeddingResult,
+  type MultimodalEmbeddingConfig,
+} from './multimodal-embedding-provider.js';

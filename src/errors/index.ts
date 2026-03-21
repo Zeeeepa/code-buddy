@@ -22,6 +22,17 @@ export {
   AuthenticationError,
 } from './provider-error.js';
 
+// Circuit breaker errors
+export { CircuitOpenError } from '../providers/circuit-breaker.js';
+
+// Crash recovery
+export {
+  checkCrashRecovery,
+  clearRecoveryFiles,
+  saveRecoveryCheckpoint,
+} from './crash-recovery.js';
+export type { RecoveryInfo as CrashRecoveryInfo } from './crash-recovery.js';
+
 import { CodeBuddyError } from './base-error.js';
 import { ApiError, RateLimitError, AuthenticationError } from './provider-error.js';
 

@@ -30,7 +30,7 @@ import {
   errorHandler,
   notFoundHandler,
 } from './middleware/index.js';
-import { chatRoutes, toolsRoutes, sessionsRoutes, memoryRoutes, healthRoutes, metricsRoutes, createWorkflowApiRouter, createA2AProtocolRoutes } from './routes/index.js';
+import { chatRoutes, toolsRoutes, sessionsRoutes, memoryRoutes, healthRoutes, metricsRoutes, createWorkflowApiRouter, createA2AProtocolRoutes, createACPRoutes, createK8sHealthAliases, createDashboardRouter } from './routes/index.js';
 import { setupWebSocket, closeAllConnections, getConnectionStats } from './websocket/index.js';
 import { logger } from '../utils/logger.js';
 import { initMetrics, getMetrics as _getMetrics } from '../metrics/index.js';
@@ -167,6 +167,9 @@ function createApp(config: ServerConfig): Application {
   // Health routes (no auth required)
   app.use('/api/health', healthRoutes);
 
+  // Kubernetes-standard health aliases (no auth required)
+  app.use(createK8sHealthAliases());
+
   // Metrics routes (no auth required for monitoring)
   app.use('/api/metrics', metricsRoutes);
 
@@ -180,6 +183,7 @@ function createApp(config: ServerConfig): Application {
   app.use('/api/memory', memoryRoutes);
   app.use('/api/workflows', createWorkflowApiRouter());
   app.use('/api/a2a', createA2AProtocolRoutes());
+  app.use('/api/acp', createACPRoutes());
 
   // OpenAI-compatible alias
   app.use('/v1/chat', chatRoutes);
@@ -623,7 +627,8 @@ function createApp(config: ServerConfig): Application {
       docs: '/api/docs',
       health: '/api/health',
       metrics: '/api/metrics',
-      dashboard: '/api/metrics/dashboard',
+      dashboard: '/__codebuddy__/dashboard/',
+      metricsDashboard: '/api/metrics/dashboard',
     });
   });
 
@@ -702,9 +707,38 @@ function createApp(config: ServerConfig): Application {
         '/api/workflows/{id}/optimize': {
           get: { summary: 'Run AFlow optimization on a workflow', tags: ['Workflows'] },
         },
+        '/api/acp/send': {
+          post: { summary: 'Send a message to an agent', tags: ['ACP'] },
+        },
+        '/api/acp/agents': {
+          get: { summary: 'List available agents', tags: ['ACP'] },
+        },
+        '/api/acp/request': {
+          post: { summary: 'Submit a task to an agent', tags: ['ACP'] },
+        },
+        '/api/acp/tasks/{id}': {
+          get: { summary: 'Get task status', tags: ['ACP'] },
+        },
+        '/api/acp/tasks/{id}/yield': {
+          post: { summary: 'Yield (pause) a task', tags: ['ACP'] },
+        },
+        '/api/acp/tasks/{id}/resume': {
+          post: { summary: 'Resume a yielded task', tags: ['ACP'] },
+        },
+        '/api/acp/sessions': {
+          get: { summary: 'List named sessions', tags: ['ACP'] },
+          post: { summary: 'Create a named session', tags: ['ACP'] },
+        },
+        '/api/acp/sessions/{name}': {
+          get: { summary: 'Get session with tasks', tags: ['ACP'] },
+          delete: { summary: 'Delete a session', tags: ['ACP'] },
+        },
       },
     });
   });
+
+  // Dashboard SPA
+  app.use('/__codebuddy__/dashboard', createDashboardRouter());
 
   // 404 handler
   app.use(notFoundHandler);
@@ -758,7 +792,8 @@ export async function startServer(userConfig: Partial<ServerConfig> = {}): Promi
       logger.info(`API Server started on http://${config.host}:${config.port}`);
       logger.info(`Health: http://${config.host}:${config.port}/api/health`);
       logger.info(`Metrics: http://${config.host}:${config.port}/api/metrics`);
-      logger.info(`Dashboard: http://${config.host}:${config.port}/api/metrics/dashboard`);
+      logger.info(`Dashboard: http://${config.host}:${config.port}/__codebuddy__/dashboard/`);
+      logger.info(`Metrics Dashboard: http://${config.host}:${config.port}/api/metrics/dashboard`);
       logger.info(`Docs: http://${config.host}:${config.port}/api/docs`);
       logger.info(`WebSocket: ${config.websocketEnabled ? 'Enabled (/ws)' : 'Disabled'}`);
       logger.info(`Auth: ${config.authEnabled ? 'Enabled' : 'Disabled'}`);

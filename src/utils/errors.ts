@@ -414,17 +414,10 @@ export function isCodeBuddyError(error: unknown): error is CodeBuddyError {
 }
 
 /**
- * Safely extracts error message from any error type
+ * Safely extracts error message from any error type.
+ * Canonical implementation in src/errors/index.ts — re-exported here for convenience.
  */
-export function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  if (typeof error === 'string') {
-    return error;
-  }
-  return 'An unknown error occurred';
-}
+export { getErrorMessage } from '../errors/index.js';
 
 /**
  * Wraps a promise with timeout

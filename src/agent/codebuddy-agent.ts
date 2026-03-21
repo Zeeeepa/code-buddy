@@ -11,7 +11,7 @@ import { getRepoProfiler } from "./repo-profiler.js";
 import { getToolSelectionStrategy, ToolSelectionStrategy } from "./execution/tool-selection-strategy.js";
 import { PromptBuilder } from "../services/prompt-builder.js";
 import { StreamingHandler } from "./streaming/index.js";
-import { AgentExecutor, setDecisionContextProvider, setICMBridgeProvider, setCodeGraphContextProvider } from "./execution/agent-executor.js";
+import { AgentExecutor, setDecisionContextProvider, setICMBridgeProvider, setCodeGraphContextProvider, setDocsContextProvider } from "./execution/agent-executor.js";
 import { ToolHandler } from "./tool-handler.js";
 import { BaseAgent } from "./base-agent.js";
 import { createAgentInfrastructureSync, AgentInfrastructure } from "./infrastructure/index.js";
@@ -20,7 +20,7 @@ import type { SessionStore } from "../persistence/session-store.js";
 import type { CostTracker } from "../utils/cost-tracker.js";
 import { getLaneQueue } from "../concurrency/lane-queue.js";
 import type { RouteAgentConfig } from "../channels/peer-routing.js";
-import { findSkill } from "../skills/index.js";
+import { findSkill, findStarterPack } from "../skills/index.js";
 import { skillMdToUnified } from "../skills/adapters/index.js";
 import { MessageQueue, type MessageQueueMode } from "./message-queue.js";
 import { CostPredictor } from "../analytics/cost-predictor.js";
@@ -212,6 +212,7 @@ export class CodeBuddyAgent extends BaseAgent {
       isGrokModel: this.isGrokModel.bind(this),
       recordSessionCost: this.recordSessionCost.bind(this),
       isSessionCostLimitReached: this.isSessionCostLimitReached.bind(this),
+      estimateSessionCostLimitReached: this.estimateSessionCostLimitReached.bind(this),
       getSessionCost: this.getSessionCost.bind(this),
       getSessionCostLimit: this.getSessionCostLimit.bind(this),
     });
@@ -453,12 +454,52 @@ export class CodeBuddyAgent extends BaseAgent {
         }
       });
     }).catch((e) => { logger.debug('Code graph context provider load failed (optional)', { error: String(e) }); });
+
+    // Wire docs context provider into executor + reasoning middleware
+    import('../docs/docs-context-provider.js').then(async ({ getDocsContextProvider }) => {
+      const docsProvider = getDocsContextProvider();
+      await docsProvider.loadDocsIndex(process.cwd());
+      if (docsProvider.isLoaded) {
+        const provider = (message: string) => docsProvider.getRelevantContext(message);
+        setDocsContextProvider(provider);
+        // Also wire into reasoning middleware + workflow guard
+        import('./middleware/reasoning-middleware.js').then(({ setReasoningDocsProvider }) => {
+          setReasoningDocsProvider(provider);
+        }).catch(() => {});
+        import('./middleware/workflow-guard.js').then(({ setWorkflowGuardDocsProvider }) => {
+          setWorkflowGuardDocsProvider(provider);
+        }).catch(() => {});
+        logger.debug('Docs context provider wired into executor + reasoning');
+      }
+    }).catch(() => { /* docs context optional */ });
   }
 
   private applySkillMatching(message: string): void {
     try {
-      const match = findSkill(message);
-      if (match && match.confidence >= 0.3) {
+      // Guard: if the message was already injected by /starter, skip re-matching
+      if (message.startsWith('[Starter Pack:')) {
+        return;
+      }
+
+      // For empty projects, try starter packs first (tag-filtered, lower threshold)
+      let match = null;
+      const isEmpty = getRepoProfiler().isEmptyProject();
+      if (isEmpty) {
+        const starterMatch = findStarterPack(message);
+        if (starterMatch && starterMatch.confidence >= 0.2) {
+          match = starterMatch;
+        }
+      }
+
+      // Fall back to general skill matching
+      if (!match) {
+        match = findSkill(message);
+        if (match && match.confidence < 0.3) {
+          match = null;
+        }
+      }
+
+      if (match) {
         const unifiedSkill = skillMdToUnified(match.skill);
 
         // Set active skill on the tool selection strategy so required tools are included
@@ -924,8 +965,17 @@ export class CodeBuddyAgent extends BaseAgent {
    */
   setYoloMode(enabled: boolean): void {
     this.yoloMode = enabled;
-    this.maxToolRounds = enabled ? 400 : 50;
-    this.sessionCostLimit = enabled ? Infinity : 10;
+    const YOLO_HARD_LIMIT = 100;
+    const maxCostEnv = process.env.MAX_COST ? parseFloat(process.env.MAX_COST) : null;
+    if (enabled) {
+      this.sessionCostLimit = maxCostEnv !== null
+        ? Math.min(maxCostEnv, YOLO_HARD_LIMIT * 10)
+        : YOLO_HARD_LIMIT;
+      this.maxToolRounds = 400;
+    } else {
+      this.sessionCostLimit = maxCostEnv !== null ? maxCostEnv : 10;
+      this.maxToolRounds = 50;
+    }
 
     // Update prompt builder config
     this.promptBuilder.updateConfig({ yoloMode: enabled });
@@ -987,6 +1037,16 @@ export class CodeBuddyAgent extends BaseAgent {
     if (this.sessionCostLimit !== Infinity) {
       this.budgetAlertManager.check(this.sessionCost, this.sessionCostLimit);
     }
+  }
+
+  /**
+   * Estimate session cost after hypothetically recording the given tokens.
+   * Does NOT mutate state — safe for pre-checks.
+   */
+  protected override estimateSessionCostAfter(inputTokens: number, outputTokens: number): number {
+    const model = this.codebuddyClient.getCurrentModel();
+    const cost = this.costTracker.calculateCost(inputTokens, outputTokens, model);
+    return this.sessionCost + cost;
   }
 
   /**

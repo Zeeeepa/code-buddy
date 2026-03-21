@@ -1027,6 +1027,32 @@ export class KnowledgeGraphQueryTool implements ITool {
 /**
  * Create all miscellaneous tool instances
  */
+export class DocsSearchExecuteTool implements ITool {
+  readonly name = 'docs_search';
+  readonly description = 'Search project documentation for architecture, API, security, and configuration information';
+
+  async execute(input: Record<string, unknown>): Promise<ToolResult> {
+    const { DocsSearchTool } = await import('../docs-search-tool.js');
+    const tool = new DocsSearchTool();
+    return tool.execute(input);
+  }
+
+  getSchema(): ToolSchema {
+    return {
+      name: this.name,
+      description: this.description,
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Search query (e.g., "security model", "authentication flow")' },
+          scope: { type: 'string', enum: ['all', 'architecture', 'api', 'security', 'config', 'testing'], description: 'Limit to a category (default: all)' },
+        },
+        required: ['query'],
+      },
+    };
+  }
+}
+
 export function createMiscTools(): ITool[] {
   return [
     new BrowserExecuteTool(),
@@ -1037,5 +1063,6 @@ export function createMiscTools(): ITool[] {
     new DeviceExecuteTool(),
     new DeployExecuteTool(),
     new KnowledgeGraphQueryTool(),
+    new DocsSearchExecuteTool(),
   ];
 }

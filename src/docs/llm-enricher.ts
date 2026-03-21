@@ -27,22 +27,24 @@ export type ThinkingLevel = 'minimal' | 'low' | 'medium' | 'high';
 /** LLM call with optional thinking level */
 export type LLMCall = (systemPrompt: string, userPrompt: string, thinkingLevel?: ThinkingLevel) => Promise<string>;
 
-/** Thinking strategy per enrichment task */
-const THINKING_STRATEGY: Record<string, ThinkingLevel> = {
-  '11-changelog.md': 'minimal',       // Mechanical — just format the log
-  '5-tools.md': 'minimal',            // Data extraction, no reasoning needed
-  '8-configuration.md': 'low',        // Describe configs
-  '9-api-reference.md': 'low',        // Describe endpoints
-  '10-development.md': 'low',         // Describe setup
-  '4-metrics.md': 'medium',           // Analyze metrics, suggest actions
-  '7-context-memory.md': 'medium',    // Explain strategies
-  '6-security.md': 'medium',          // Explain security layers
-  '1-overview.md': 'high',            // Narrate the full project story
-  '2-architecture.md': 'high',        // Explain architectural decisions
+/** Thinking strategy per page type (generic — no hardcoded filenames) */
+const THINKING_BY_TYPE: Record<string, ThinkingLevel> = {
+  'changelog': 'minimal',
+  'tools': 'minimal',
+  'configuration': 'low',
+  'api-reference': 'low',
+  'getting-started': 'low',
+  'troubleshooting': 'medium',
+  'component': 'medium',
+  'subsystem': 'medium',
+  'key-concepts': 'medium',
+  'security': 'medium',
+  'overview': 'high',
+  'architecture': 'high',
 };
 
-/** Files that get multi-pass enrichment (improvement D) */
-const MULTI_PASS_FILES = new Set(['1-overview.md', '2-architecture.md']);
+/** Page types that get multi-pass enrichment (improvement D) */
+const MULTI_PASS_TYPES = new Set(['overview', 'architecture']);
 
 export interface EnrichOptions {
   /** Directory containing raw .md files */
@@ -167,7 +169,8 @@ export async function enrichDocs(options: EnrichOptions): Promise<EnrichResult> 
       tokensUsed += Math.ceil((rawContent.length + enriched.length) / 4);
 
       // Improvement D: Multi-pass for critical sections
-      if (MULTI_PASS_FILES.has(file)) {
+      const fileSlug = file.replace(/^\d+[a-z]?-/, '').replace(/\.md$/, '');
+      if ([...MULTI_PASS_TYPES].some(t => fileSlug.includes(t))) {
         logger.info(`  Review pass for ${file}`);
         const reviewed = await reviewPass(enriched, rawContent, options);
         if (reviewed.length >= enriched.length * 0.8) {
@@ -468,12 +471,11 @@ function findClosestMethod(methodName: string, className: string, entities: Set<
 // Helpers
 // ============================================================================
 
-/** Get thinking level for a file, handling split subsystem files (3a-, 3b-, etc.) */
+/** Get thinking level for a file by matching its slug to page types */
 function getThinkingLevel(file: string): ThinkingLevel {
-  if (THINKING_STRATEGY[file]) return THINKING_STRATEGY[file];
-
-  // Handle split subsystem files
-  if (file.match(/^3[a-z]-subsystem/)) return 'medium';
-
+  const slug = file.replace(/^\d+[a-z]?-/, '').replace(/\.md$/, '');
+  for (const [type, level] of Object.entries(THINKING_BY_TYPE)) {
+    if (slug.includes(type)) return level;
+  }
   return 'medium';
 }

@@ -34,6 +34,10 @@ export interface ProviderConfig {
 // Provider Registry
 // ============================================================================
 
+/**
+ * @deprecated Providers are being migrated to bundled plugins (OpenClaw v2026.3.14).
+ * See src/plugins/bundled/ for the new plugin-based providers.
+ */
 export const ADDITIONAL_PROVIDERS: ProviderConfig[] = [
   {
     id: 'mistral',

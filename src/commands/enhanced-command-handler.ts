@@ -8,6 +8,7 @@ import {
   handleBranches,
   handleCheckout,
   handleMerge,
+  handleBranch,
   // Memory handlers
   handleMemory,
   handleRemember,
@@ -79,6 +80,7 @@ import {
   handleTrack,
   // Plugin handlers
   handlePlugins,
+  handlePlugin,
   // Missing handlers (colab, diff)
   handleColab,
   handleDiffCheckpoints,
@@ -94,6 +96,22 @@ import {
   handleThink,
   // Team handler (Agent Teams multi-agent coordination)
   handleTeam,
+  // Batch handler (CC13 — parallel task decomposition)
+  handleBatchCommand,
+  // Starter pack handler
+  handleStarter,
+  // Fast mode handler (OpenClaw-aligned)
+  handleFastMode,
+  // BTW handler (OpenClaw v2026.3.14 alignment)
+  handleBtw,
+  setBtwClient,
+  // Clipboard handler
+  handleCopy,
+  // PR handler (GitHub/GitLab PR creation)
+  handlePR,
+  // Switch handler (mid-conversation model switching)
+  handleSwitch,
+  setSwitchModelProvider,
   // Commands previously only handled in client-dispatcher
   handleChangeModel,
   handleChangeMode,
@@ -104,10 +122,35 @@ import {
   handleListCheckpoints,
   handleRestoreCheckpoint,
   handleInitGrok,
+  // Watch handler (file watcher trigger)
+  handleWatch,
+  // Conflicts handler (merge conflict resolution)
+  handleConflicts,
+  // Vulns handler (dependency vulnerability scanner)
+  handleVulns,
+  // Bug handler (static analysis bug scanner)
+  handleBug,
+  // Suggest handler (proactive suggestions)
+  handleSuggest,
+  // Telemetry handler (opt-in/opt-out toggle)
+  handleTelemetry,
+  // Quota handler (rate limit display)
+  handleQuota,
+  // Voice-code handler (voice-to-code pipeline)
+  handleVoiceCode,
+  // Coverage handler (coverage target checking)
+  handleCoverage,
+  // Transform handler (code transformation)
+  handleTransform,
+  // Dev handlers (golden-path developer workflows)
+  handleDev,
+  // Replace handler (codebase-wide find & replace)
+  handleReplace,
 } from "./handlers/index.js";
 
 import { handleLessonsCommand } from "./handlers/lessons-handler.js";
 import { handleContextStats } from "./handlers/extra-handlers.js";
+import { handlePromptCommand as handlePromptCommandRaw } from "./slash/prompt-commands.js";
 import {
   handleShortcuts,
   handleDebugMode,
@@ -115,12 +158,62 @@ import {
   handleSecurityReview,
   handleIdentity,
   handlePairing,
+  handleElevated,
 } from "./handlers/index.js";
 
 import type { CommandHandlerResult } from "./handlers/index.js";
 
 // Re-export CommandHandlerResult for external consumers
 export type { CommandHandlerResult };
+
+/** Handler for /docs-generate — runs the DeepWiki V2 docs pipeline */
+async function handleDocsGenerate(): Promise<CommandHandlerResult> {
+  try {
+    const { getKnowledgeGraph } = await import('../knowledge/knowledge-graph.js');
+    const { populateDeepCodeGraph } = await import('../knowledge/code-graph-deep-populator.js');
+    const { runDocsPipeline } = await import('../docs/docs-pipeline.js');
+
+    const graph = getKnowledgeGraph();
+    if (graph.getStats().tripleCount < 100) {
+      populateDeepCodeGraph(graph, process.cwd());
+    }
+    if (graph.getStats().tripleCount < 10) {
+      return {
+        handled: true,
+        entry: { type: 'assistant', content: 'Cannot generate docs: code graph is empty. Ensure source files exist.', timestamp: new Date() },
+      };
+    }
+
+    const result = await runDocsPipeline(graph, {
+      cwd: process.cwd(),
+      forceDeterministicPlan: true,
+      onProgress: (phase, detail) => {
+        process.stdout.write(`  [${phase}] ${detail}\n`);
+      },
+    });
+
+    const msg = `Documentation generated: ${result.pagesGenerated} pages, ${result.conceptsLinked} links in ${(result.durationMs / 1000).toFixed(1)}s → .codebuddy/docs/` +
+      (result.errors.length > 0 ? `\nErrors: ${result.errors.join('; ')}` : '');
+
+    return {
+      handled: true,
+      entry: { type: 'assistant', content: msg, timestamp: new Date() },
+    };
+  } catch (err) {
+    return {
+      handled: true,
+      entry: { type: 'assistant', content: `Documentation generation failed: ${err instanceof Error ? err.message : String(err)}`, timestamp: new Date() },
+    };
+  }
+}
+
+async function handlePromptCommand(args: string): Promise<CommandHandlerResult> {
+  const output = await handlePromptCommandRaw(args);
+  return {
+    handled: true,
+    entry: { type: 'assistant', content: output, timestamp: new Date() },
+  };
+}
 
 /**
  * Handler function type for command dispatch.
@@ -135,6 +228,24 @@ export interface AgentContextProxy {
   getContextStats: () => unknown;
   formatContextStats: () => string;
   getCurrentModel: () => string;
+  getContextMemoryMetrics?: () => {
+    summaryCount: number;
+    summaryTokens: number;
+    peakMessageCount: number;
+    compressionCount: number;
+    totalTokensSaved: number;
+    lastCompressionTime: Date | null;
+    warningsTriggered: number;
+  };
+  getCompressionStats?: () => {
+    totalCompressions: number;
+    totalTokensSaved: number;
+    averageCompressionRatio: number;
+    lastCompression: Date | null;
+    archivesAvailable: number;
+    lastStrategiesUsed: string[];
+  };
+  getContextBudgetBreakdown?: () => Record<string, { chars: number; tokens: number; percent: number }>;
 }
 
 /**
@@ -181,6 +292,7 @@ export class EnhancedCommandHandler {
     ['__BRANCHES__', () => handleBranches()],
     ['__CHECKOUT__', (args) => handleCheckout(args)],
     ['__MERGE__', (args) => handleMerge(args)],
+    ['__BRANCH__', (args) => handleBranch(args)],
 
     // Memory & TODOs
     ['__MEMORY__', (args) => handleMemory(args)],
@@ -191,7 +303,9 @@ export class EnhancedCommandHandler {
     // Context & Workspace
     ['__WORKSPACE__', () => handleWorkspace()],
     ['__ADD_CONTEXT__', (args) => handleAddContext(args)],
-    ['__CONTEXT__', (args) => handleContext(args)],
+    ['__CONTEXT__', (args) => args[0]?.toLowerCase() === 'stats'
+      ? handleContextStats(args.slice(1), this.agentProxy ?? undefined)
+      : handleContext(args)],
 
     // Export (context-dependent: conversationHistory)
     ['__SAVE_CONVERSATION__', (args) => handleSaveConversation(args, this.conversationHistory)],
@@ -244,6 +358,7 @@ export class EnhancedCommandHandler {
     // Track System (Conductor-inspired)
     ['__TRACK__', (args) => handleTrack(args)],
     ['__PLUGINS__', (args) => handlePlugins(args)],
+    ['__PLUGIN__', (args) => handlePlugin(args)],
 
     // Collaboration & Diff
     ['__COLAB__', (args) => handleColab(args)],
@@ -257,12 +372,24 @@ export class EnhancedCommandHandler {
     ['__FIX__', (args) => handleFix(args)],
     ['__REVIEW__', (args) => handleReview(args)],
     ['__PERSONA__', (args) => handlePersonaCommand(args.join(' '))],
+    ['__PROMPT__', (args) => handlePromptCommand(args.join(' '))],
 
     // Tree-of-Thought reasoning
     ['__THINK__', (args) => handleThink(args)],
 
     // Agent Teams multi-agent coordination
     ['__TEAM__', (args) => handleTeam(args)],
+
+    // CC13: Batch parallel task decomposition
+    ['__BATCH__', (args) => {
+      const result = handleBatchCommand(args.join(' '));
+      // handleBatchCommand is async, wrap in a sync-compatible result
+      return {
+        handled: true,
+        entry: { type: 'assistant' as const, content: 'Batch command initiated...', timestamp: new Date() },
+        asyncAction: result,
+      };
+    }],
 
     // Commands previously handled inline in client-dispatcher
     ['__CLEAR_CHAT__', () => handleClearChat()],
@@ -286,6 +413,70 @@ export class EnhancedCommandHandler {
     ['__SECURITY_REVIEW__', (args) => handleSecurityReview(args)],
     ['__IDENTITY__', (args) => handleIdentity(args)],
     ['__PAIRING__', (args) => handlePairing(args)],
+    ['__ELEVATED__', (args) => handleElevated(args)],
+
+    // Documentation V2 pipeline
+    ['__DOCS_GENERATE__', () => handleDocsGenerate()],
+
+    // Starter packs
+    ['__STARTER__', (args) => handleStarter(args)],
+
+    // Fast mode (OpenClaw-aligned)
+    ['__FAST_MODE__', (args) => handleFastMode(args)],
+
+    // BTW side-question (OpenClaw v2026.3.14 alignment)
+    ['__BTW__', (args) => handleBtw(args)],
+
+    // Clipboard (copy last response, code block, or text)
+    ['__COPY__', (args) => handleCopy(args, this.conversationHistory)],
+
+    // PR creation (GitHub/GitLab)
+    ['__PR__', (args) => handlePR(args)],
+
+    // Mid-conversation model switching
+    ['__SWITCH__', (args) => handleSwitch(args)],
+
+    // Multi-language lint runner
+    ['__LINT__', (args) => this.handleLint(args)],
+
+    // File watcher trigger
+    ['__WATCH__', (args) => handleWatch(args)],
+
+    // Merge conflict resolution
+    ['__CONFLICTS__', (args) => handleConflicts(args)],
+
+    // Dependency vulnerability scanner
+    ['__VULNS__', (args) => handleVulns(args)],
+
+    // Secrets scan
+    ['__SECRETS_SCAN__', (args) => this.handleSecretsScan(args)],
+
+    // Bug scanner (static analysis)
+    ['__BUG__', (args) => handleBug(args)],
+
+    // Proactive suggestions
+    ['__SUGGEST__', (args) => handleSuggest(args)],
+
+    // Telemetry opt-in/opt-out
+    ['__TELEMETRY__', (args) => handleTelemetry(args)],
+
+    // Rate limit / quota display
+    ['__QUOTA__', () => handleQuota()],
+
+    // Voice-to-code pipeline
+    ['__VOICE_CODE__', (args) => handleVoiceCode(args)],
+
+    // Coverage target checking
+    ['__COVERAGE__', (args) => handleCoverage(args)],
+
+    // Code transformation
+    ['__TRANSFORM__', (args) => handleTransform(args)],
+
+    // Golden-path developer workflows
+    ['__DEV__', (args) => handleDev(args)],
+
+    // Codebase-wide find & replace
+    ['__REPLACE__', (args) => handleReplace(args)],
   ]);
 
   /**
@@ -307,6 +498,114 @@ export class EnhancedCommandHandler {
    */
   setCodeBuddyClient(client: CodeBuddyClient): void {
     this.codebuddyClient = client;
+    setBtwClient(client);
+  }
+
+  /**
+   * Handle /lint command using the multi-language lint runner.
+   */
+  private async handleLint(args: string[]): Promise<CommandHandlerResult> {
+    try {
+      const { createLintRunner, formatLintResults, formatDetectedLinters } = await import('../tools/lint-runner.js');
+      const runner = createLintRunner();
+      const cwd = process.cwd();
+      const action = args[0]?.toLowerCase() || 'run';
+
+      const configs = await runner.detect(cwd);
+
+      if (action === 'detect') {
+        return {
+          handled: true,
+          entry: {
+            type: 'assistant',
+            content: formatDetectedLinters(configs),
+            timestamp: new Date(),
+          },
+        };
+      }
+
+      if (configs.length === 0) {
+        return {
+          handled: true,
+          entry: {
+            type: 'assistant',
+            content: 'No linters detected for this project.\n\nSupported: eslint, ruff, clippy, golangci-lint, rubocop, phpstan.',
+            timestamp: new Date(),
+          },
+        };
+      }
+
+      const availableConfigs = configs.filter((c: { available: boolean }) => c.available);
+      if (availableConfigs.length === 0) {
+        return {
+          handled: true,
+          entry: {
+            type: 'assistant',
+            content: formatDetectedLinters(configs) + '\n\nNo linter CLIs are installed. Install one to use /lint.',
+            timestamp: new Date(),
+          },
+        };
+      }
+
+      const files = args.slice(1);
+      const results = [];
+
+      for (const config of availableConfigs) {
+        if (action === 'fix') {
+          results.push(await runner.fix(config, files.length > 0 ? files : undefined));
+        } else {
+          results.push(await runner.run(config, files.length > 0 ? files : undefined));
+        }
+      }
+
+      return {
+        handled: true,
+        entry: {
+          type: 'assistant',
+          content: formatLintResults(results),
+          timestamp: new Date(),
+        },
+      };
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      return {
+        handled: true,
+        entry: {
+          type: 'assistant',
+          content: `Lint error: ${msg}`,
+          timestamp: new Date(),
+        },
+      };
+    }
+  }
+
+  /**
+   * Handle /secrets-scan command — scans project for hardcoded secrets.
+   */
+  private async handleSecretsScan(args: string[]): Promise<CommandHandlerResult> {
+    try {
+      const { scanForSecrets, formatFindings } = await import('../security/secrets-detector.js');
+      const targetPath = args[0] || process.cwd();
+      const findings = await scanForSecrets(targetPath);
+      return {
+        handled: true,
+        entry: {
+          type: 'assistant',
+          content: formatFindings(findings),
+          timestamp: new Date(),
+        },
+      };
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      return {
+        handled: true,
+        entry: {
+          type: 'assistant',
+          content: `Secrets scan error: ${msg}`,
+          timestamp: new Date(),
+        },
+      };
+    }
   }
 
   /**

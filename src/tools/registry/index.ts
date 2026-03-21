@@ -205,6 +205,71 @@ export {
   resetControlInstances,
 } from './control-tools.js';
 
+// Tool Adapters - Firecrawl (firecrawl_search, firecrawl_scrape)
+export {
+  FirecrawlSearchExecuteTool,
+  FirecrawlScrapeExecuteTool,
+  createFirecrawlTools,
+  resetFirecrawlInstances,
+} from './firecrawl-tools.js';
+
+// Tool Adapters - LSP (lsp_rename, lsp_code_action)
+export {
+  LspRenameExecuteTool,
+  LspCodeActionExecuteTool,
+  createLspTools,
+  resetLspInstances,
+} from './lsp-tools.js';
+
+// Tool Adapters - Bug Finder (find_bugs)
+export {
+  BugFinderExecuteTool,
+  createBugFinderTools,
+  resetBugFinderInstances,
+} from './bug-finder-tools.js';
+
+// Tool Adapters - Merge Conflict (resolve_conflicts)
+export {
+  ResolveConflictsExecuteTool,
+  createMergeConflictTools,
+  resetMergeConflictInstances,
+} from './merge-conflict-tools.js';
+
+// Tool Adapters - Vulnerability Scanner (scan_vulnerabilities)
+export {
+  VulnScannerExecuteTool,
+  createVulnScannerTools,
+  resetVulnScannerInstances,
+} from './vuln-scanner-tools.js';
+
+// Tool Adapters - Log Analyzer (analyze_logs)
+export {
+  LogAnalyzerTool,
+  createLogAnalyzerTools,
+  resetLogAnalyzerInstances,
+} from './log-analyzer-tools.js';
+
+// Tool Adapters - OpenAPI Generator (generate_openapi)
+export {
+  OpenAPIGeneratorTool,
+  createOpenAPITools,
+  resetOpenAPIInstances,
+} from './openapi-tools.js';
+
+// Tool Adapters - License Scanner (scan_licenses)
+export {
+  LicenseScannerTool,
+  createLicenseScannerTools,
+  resetLicenseScannerInstances,
+} from './license-scanner-tools.js';
+
+// Tool Adapters - Codebase Replace (codebase_replace)
+export {
+  CodebaseReplaceTool,
+  createCodebaseReplaceTools,
+  resetCodebaseReplaceInstances,
+} from './codebase-replace-tools.js';
+
 // Tool Prefix Naming Convention — Codex-inspired canonical aliases
 export {
   createAliasTools,
@@ -270,6 +335,14 @@ export async function createAllToolsAsync(): Promise<ITool[]> {
   const { createMemoryTools } = await import('./memory-tools.js');
   const { createParallelTools } = await import('./parallel-tools.js');
   const { createControlTools } = await import('./control-tools.js');
+  const { createFirecrawlTools } = await import('./firecrawl-tools.js');
+  const { createLspTools } = await import('./lsp-tools.js');
+  const { createBugFinderTools } = await import('./bug-finder-tools.js');
+  const { createMergeConflictTools } = await import('./merge-conflict-tools.js');
+  const { createVulnScannerTools } = await import('./vuln-scanner-tools.js');
+  const { createLogAnalyzerTools } = await import('./log-analyzer-tools.js');
+  const { createOpenAPITools } = await import('./openapi-tools.js');
+  const { createLicenseScannerTools } = await import('./license-scanner-tools.js');
 
   const primaryTools: ITool[] = [
     ...createTextEditorTools(),
@@ -295,6 +368,14 @@ export async function createAllToolsAsync(): Promise<ITool[]> {
     ...createAdvancedTools(),
     ...createCanvasTools(),
     ...createControlTools(),
+    ...createFirecrawlTools(),
+    ...createLspTools(),
+    ...createBugFinderTools(),
+    ...createMergeConflictTools(),
+    ...createVulnScannerTools(),
+    ...createLogAnalyzerTools(),
+    ...createOpenAPITools(),
+    ...createLicenseScannerTools(),
   ];
 
   // Register backward-compat canonical-prefix aliases (shell_exec, file_read, etc.)

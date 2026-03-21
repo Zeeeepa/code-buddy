@@ -38,11 +38,12 @@ export function resetLsInstance(): void {
  */
 export class ListDirectoryTool implements ITool {
   readonly name = 'list_directory';
-  readonly description = 'List files and directories at a given path. Returns name, type, size, and modification time. Auto-approved read-only operation.';
+  readonly description = 'List files and directories at a given path. Returns name, type, size, and modification time. Auto-approved read-only operation. Respects .gitignore by default.';
 
   async execute(input: Record<string, unknown>): Promise<ToolResult> {
     const directory = (input.path as string) || '.';
-    return await getLsTool().execute(directory);
+    const respectGitignore = input.respectGitignore !== false;
+    return await getLsTool().execute(directory, { respectGitignore });
   }
 
   getSchema(): ToolSchema {
@@ -55,6 +56,10 @@ export class ListDirectoryTool implements ITool {
           path: {
             type: 'string',
             description: 'Directory path to list (default: current directory)',
+          },
+          respectGitignore: {
+            type: 'boolean',
+            description: 'Filter out files matching .gitignore patterns (default: true). Set to false to show all files.',
           },
         },
         required: [],
