@@ -38,7 +38,10 @@ export function saveCodeGraph(graph: KnowledgeGraph, cwd: string): void {
       triples: graph.toJSON(),
     };
 
-    fs.writeFileSync(filePath, JSON.stringify(data));
+    // Atomic write: write to temp file then rename to prevent corruption
+    const tmpPath = filePath + '.tmp';
+    fs.writeFileSync(tmpPath, JSON.stringify(data));
+    fs.renameSync(tmpPath, filePath);
     logger.debug(`CodeGraph: saved ${data.tripleCount} triples to ${CODE_GRAPH_FILENAME}`);
   } catch (err) {
     logger.debug('CodeGraph: failed to save', { err });
@@ -67,7 +70,9 @@ export function loadCodeGraph(graph: KnowledgeGraph, cwd: string): boolean {
     logger.debug(`CodeGraph: loaded ${data.tripleCount} triples from ${CODE_GRAPH_FILENAME}`);
     return true;
   } catch (err) {
-    logger.debug('CodeGraph: failed to load', { err });
+    logger.warn('CodeGraph: failed to load (file may be corrupted)', { error: String(err) });
+    // Remove corrupted file so next save creates a clean one
+    try { fs.unlinkSync(filePath); } catch { /* ignore */ }
     return false;
   }
 }

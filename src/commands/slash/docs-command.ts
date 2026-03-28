@@ -59,6 +59,17 @@ async function handleGenerate(noDiagrams: boolean, noMetrics: boolean): Promise<
     const { getKnowledgeGraph } = await import('../../knowledge/knowledge-graph.js');
     const graph = getKnowledgeGraph();
 
+    // Load cached graph from disk if empty
+    if (graph.getStats().tripleCount === 0) {
+      try {
+        const { loadCodeGraph, codeGraphExists } = await import('../../knowledge/code-graph-persistence.js');
+        if (codeGraphExists(process.cwd())) {
+          loadCodeGraph(graph, process.cwd());
+          logger.info(`Docs: loaded ${graph.getStats().tripleCount} cached triples`);
+        }
+      } catch { /* persistence optional */ }
+    }
+
     if (graph.getStats().tripleCount === 0) {
       // Try to populate the graph first
       try {
@@ -226,6 +237,15 @@ async function handleGenerateV2(withLLM: boolean, thinkingLevel?: 'minimal' | 'l
     // Populate graph
     const { getKnowledgeGraph } = await import('../../knowledge/knowledge-graph.js');
     const graph = getKnowledgeGraph();
+    // Load cached graph from disk
+    if (graph.getStats().tripleCount === 0) {
+      try {
+        const { loadCodeGraph, codeGraphExists } = await import('../../knowledge/code-graph-persistence.js');
+        if (codeGraphExists(process.cwd())) {
+          loadCodeGraph(graph, process.cwd());
+        }
+      } catch { /* persistence optional */ }
+    }
     if (graph.getStats().tripleCount === 0) {
       try {
         const { populateDeepCodeGraph } = await import('../../knowledge/code-graph-deep-populator.js');

@@ -179,9 +179,31 @@ async function handleDocsGenerate(): Promise<CommandHandlerResult> {
     const { runDocsPipeline } = await import('../docs/docs-pipeline.js');
 
     const graph = getKnowledgeGraph();
-    if (graph.getStats().tripleCount < 100) {
-      populateDeepCodeGraph(graph, process.cwd());
+
+    // Load cached graph from disk if singleton is empty
+    if (graph.getStats().tripleCount === 0) {
+      try {
+        const { loadCodeGraph, codeGraphExists } = await import('../knowledge/code-graph-persistence.js');
+        if (codeGraphExists(process.cwd())) {
+          loadCodeGraph(graph, process.cwd());
+          process.stdout.write(`  [graph] Loaded ${graph.getStats().tripleCount} cached triples\n`);
+        }
+      } catch { /* persistence module optional */ }
     }
+
+    // Populate if still low
+    if (graph.getStats().tripleCount < 100) {
+      process.stdout.write('  [graph] Scanning source files...\n');
+      const added = populateDeepCodeGraph(graph, process.cwd());
+      process.stdout.write(`  [graph] Added ${added} triples from source scan\n`);
+
+      // Persist the newly built graph
+      try {
+        const { saveCodeGraph } = await import('../knowledge/code-graph-persistence.js');
+        saveCodeGraph(graph, process.cwd());
+      } catch { /* persistence optional */ }
+    }
+
     if (graph.getStats().tripleCount < 10) {
       return {
         handled: true,

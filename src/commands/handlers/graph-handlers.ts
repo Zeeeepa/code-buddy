@@ -7,6 +7,25 @@
  */
 
 import type { CommandHandlerResult } from './branch-handlers.js';
+import type { KnowledgeGraph } from '../../knowledge/knowledge-graph.js';
+
+/** Ensure the graph is loaded from disk cache then populated if still empty */
+async function ensureGraphLoaded(graph: KnowledgeGraph): Promise<void> {
+  if (graph.getStats().tripleCount === 0) {
+    try {
+      const { loadCodeGraph, codeGraphExists } = await import('../../knowledge/code-graph-persistence.js');
+      if (codeGraphExists(process.cwd())) {
+        loadCodeGraph(graph, process.cwd());
+      }
+    } catch { /* persistence optional */ }
+  }
+  if (graph.getStats().tripleCount === 0) {
+    try {
+      const { populateDeepCodeGraph } = await import('../../knowledge/code-graph-deep-populator.js');
+      populateDeepCodeGraph(graph, process.cwd());
+    } catch { /* ignore */ }
+  }
+}
 
 /**
  * /impact <symbol> [--direction up|down|both] [--depth N]
@@ -35,15 +54,7 @@ export async function handleImpact(args: string[]): Promise<CommandHandlerResult
   const { analyzeImpact } = await import('../../knowledge/impact-analyzer.js');
 
   const graph = getKnowledgeGraph();
-  if (graph.getStats().tripleCount === 0) {
-    // Try to populate
-    try {
-      const { populateDeepCodeGraph } = await import('../../knowledge/code-graph-deep-populator.js');
-      populateDeepCodeGraph(graph, process.cwd());
-    } catch {
-      // Ignore
-    }
-  }
+  await ensureGraphLoaded(graph);
 
   if (graph.getStats().tripleCount === 0) {
     return {
@@ -117,14 +128,7 @@ export async function handleProcesses(args: string[]): Promise<CommandHandlerRes
   const { detectProcesses } = await import('../../knowledge/process-detector.js');
 
   const graph = getKnowledgeGraph();
-  if (graph.getStats().tripleCount === 0) {
-    try {
-      const { populateDeepCodeGraph } = await import('../../knowledge/code-graph-deep-populator.js');
-      populateDeepCodeGraph(graph, process.cwd());
-    } catch {
-      // Ignore
-    }
-  }
+  await ensureGraphLoaded(graph);
 
   if (graph.getStats().tripleCount === 0) {
     return {
@@ -198,14 +202,7 @@ export async function handleCommunities(args: string[]): Promise<CommandHandlerR
   const { detectCommunities } = await import('../../knowledge/community-detector.js');
 
   const graph = getKnowledgeGraph();
-  if (graph.getStats().tripleCount === 0) {
-    try {
-      const { populateDeepCodeGraph } = await import('../../knowledge/code-graph-deep-populator.js');
-      populateDeepCodeGraph(graph, process.cwd());
-    } catch {
-      // Ignore
-    }
-  }
+  await ensureGraphLoaded(graph);
 
   if (graph.getStats().tripleCount === 0) {
     return {
