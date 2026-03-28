@@ -1079,7 +1079,23 @@ program
     "--yolo",
     "enable YOLO mode (full autonomy with guardrails, $100 cost cap)"
   )
+  .option(
+    "--quiet",
+    "suppress informational logs (only show errors and responses)"
+  )
+  .option(
+    "--verbose",
+    "enable verbose/debug output"
+  )
   .action(async (message, options) => {
+    // Apply --quiet / --verbose flags
+    if (options.quiet) {
+      process.env.LOG_LEVEL = 'error';
+    }
+    if (options.verbose) {
+      process.env.VERBOSE = 'true';
+      process.env.DEBUG = 'true';
+    }
     // Apply named configuration profile (--profile <name>) before anything else
     if (options.profile) {
       try {

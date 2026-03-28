@@ -42,8 +42,8 @@ const {
   mockFormatYOLOStatus: vi.fn(),
   mockGetLevel: vi.fn(),
   mockSetLevel: vi.fn(),
-  mockAddToYOLOAllowList: vi.fn(),
-  mockAddToYOLODenyList: vi.fn(),
+  mockAddToYOLOAllowList: vi.fn().mockReturnValue({ success: true }),
+  mockAddToYOLODenyList: vi.fn().mockReturnValue({ success: true }),
   mockGetAvailableSkills: vi.fn(),
   mockGetActiveSkill: vi.fn(),
   mockGetSkill: vi.fn(),
@@ -78,6 +78,7 @@ vi.mock('../../src/utils/autonomy-manager', () => ({
     full: 'full',
     yolo: 'yolo',
   },
+  SAFE_MODE_PATHS: ['src/', 'test/', 'tests/'],
 }));
 
 vi.mock('../../src/skills/skill-manager', () => ({

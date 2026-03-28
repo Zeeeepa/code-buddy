@@ -52,6 +52,13 @@ const coreCommands: SlashCommand[] = [
     isBuiltin: true
   },
   {
+    name: 'reinit',
+    description: 'Reset and re-initialize .codebuddy from scratch (deletes existing config)',
+    prompt: '__REINIT_GROK__',
+    filePath: '',
+    isBuiltin: true
+  },
+  {
     name: 'features',
     description: 'Display research-based features implemented in Code Buddy',
     prompt: '__FEATURES__',

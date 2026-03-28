@@ -754,6 +754,83 @@ export async function handleInitGrok(): Promise<CommandHandlerResult> {
 }
 
 // ============================================================================
+// /reinit - Re-initialize Code Buddy Project from scratch
+// ============================================================================
+
+export async function handleReinitGrok(): Promise<CommandHandlerResult> {
+  try {
+    const fs = await import('fs');
+    const path = await import('path');
+    const cwd = process.cwd();
+    const codebuddyDir = path.default.join(cwd, '.codebuddy');
+
+    // Preserve files the user likely wants to keep
+    const preserveFiles = ['settings.json', 'settings.local.json', 'hooks.json', 'rules'];
+    const preserved: string[] = [];
+    const backups = new Map<string, string>();
+
+    // Backup preserved files
+    for (const name of preserveFiles) {
+      const filePath = path.default.join(codebuddyDir, name);
+      if (fs.default.existsSync(filePath)) {
+        const stat = fs.default.statSync(filePath);
+        if (stat.isFile()) {
+          backups.set(name, fs.default.readFileSync(filePath, 'utf-8'));
+          preserved.push(name);
+        } else if (stat.isDirectory()) {
+          // Skip directory backup — will survive the selective delete
+          preserved.push(name + '/');
+        }
+      }
+    }
+
+    // Delete .codebuddy contents (except preserved dirs)
+    if (fs.default.existsSync(codebuddyDir)) {
+      const entries = fs.default.readdirSync(codebuddyDir);
+      for (const entry of entries) {
+        if (preserveFiles.includes(entry)) continue;
+        const entryPath = path.default.join(codebuddyDir, entry);
+        fs.default.rmSync(entryPath, { recursive: true, force: true });
+      }
+    }
+
+    // Run fresh init with force
+    const { initCodeBuddyProject, formatInitResult } = await import('../../utils/init-project.js');
+    const initResult = await initCodeBuddyProject(cwd, { force: true });
+
+    // Restore preserved files
+    for (const [name, content] of backups) {
+      const filePath = path.default.join(codebuddyDir, name);
+      fs.default.writeFileSync(filePath, content);
+    }
+
+    const output = [
+      '♻️ Re-initialized Code Buddy project from scratch.',
+      '',
+      formatInitResult(initResult),
+      '',
+      preserved.length > 0
+        ? `Preserved: ${preserved.join(', ')}`
+        : '',
+    ].filter(Boolean).join('\n');
+
+    return {
+      handled: true,
+      entry: { type: 'assistant', content: output, timestamp: new Date() },
+    };
+  } catch (error) {
+    return {
+      handled: true,
+      entry: {
+        type: 'assistant',
+        content: `Error re-initializing: ${error instanceof Error ? error.message : String(error)}`,
+        timestamp: new Date(),
+      },
+    };
+  }
+}
+
+// ============================================================================
 // /status - Show key configuration info at a glance
 // ============================================================================
 

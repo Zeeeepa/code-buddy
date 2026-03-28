@@ -11,6 +11,63 @@ import { join, dirname } from 'path';
 import { logger } from '../utils/logger.js';
 
 // ============================================================================
+// JSONC Utilities
+// ============================================================================
+
+/**
+ * Strip JSON comments (single-line // and multi-line /* *​/) from a string.
+ * Respects strings — comments inside quoted strings are preserved.
+ */
+export function stripJsonComments(input: string): string {
+  let result = '';
+  let inString = false;
+  let i = 0;
+
+  while (i < input.length) {
+    // Handle string literals
+    if (input[i] === '"' && (i === 0 || input[i - 1] !== '\\')) {
+      inString = !inString;
+      result += input[i];
+      i++;
+      continue;
+    }
+
+    if (inString) {
+      result += input[i];
+      i++;
+      continue;
+    }
+
+    // Single-line comment
+    if (input[i] === '/' && i + 1 < input.length && input[i + 1] === '/') {
+      // Skip until end of line
+      while (i < input.length && input[i] !== '\n') {
+        i++;
+      }
+      continue;
+    }
+
+    // Multi-line comment
+    if (input[i] === '/' && i + 1 < input.length && input[i + 1] === '*') {
+      i += 2;
+      while (i < input.length) {
+        if (input[i] === '*' && i + 1 < input.length && input[i + 1] === '/') {
+          i += 2;
+          break;
+        }
+        i++;
+      }
+      continue;
+    }
+
+    result += input[i];
+    i++;
+  }
+
+  return result;
+}
+
+// ============================================================================
 // Configuration Types
 // ============================================================================
 

@@ -173,6 +173,7 @@ export {
   handleListCheckpoints,
   handleRestoreCheckpoint,
   handleInitGrok,
+  handleReinitGrok,
 } from './missing-handlers.js';
 
 // Debug handlers (enhanced debug mode)

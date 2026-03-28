@@ -49,6 +49,26 @@ const DEFAULT_MODEL_CONFIGS: ModelToolConfig[] = [
     maxOutputTokens: 32768,
     patchFormat: 'unified',
   },
+  // o3-mini (reasoning model)
+  {
+    model: 'o3-mini*',
+    supportsReasoning: true,
+    supportsToolCalls: true,
+    supportsVision: false,
+    contextWindow: 200000,
+    maxOutputTokens: 100000,
+    patchFormat: 'unified',
+  },
+  // o1 / o1-mini (reasoning models)
+  {
+    model: 'o1*',
+    supportsReasoning: true,
+    supportsToolCalls: true,
+    supportsVision: false,
+    contextWindow: 200000,
+    maxOutputTokens: 100000,
+    patchFormat: 'unified',
+  },
   // GPT-4o
   {
     model: 'gpt-4o*',

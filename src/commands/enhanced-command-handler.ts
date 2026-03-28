@@ -122,6 +122,7 @@ import {
   handleListCheckpoints,
   handleRestoreCheckpoint,
   handleInitGrok,
+  handleReinitGrok,
   // Watch handler (file watcher trigger)
   handleWatch,
   // Conflicts handler (merge conflict resolution)
@@ -404,6 +405,7 @@ export class EnhancedCommandHandler {
     ['__LIST_CHECKPOINTS__', (args) => handleListCheckpoints(args)],
     ['__RESTORE_CHECKPOINT__', (args) => handleRestoreCheckpoint(args)],
     ['__INIT_GROK__', () => handleInitGrok()],
+    ['__REINIT_GROK__', () => handleReinitGrok()],
     ['__FEATURES__', () => handleFeatures()],
     ['__LESSONS__', (args) => handleLessonsCommand(args.join(' '))],
     ['__CONTEXT_STATS__', (args) => handleContextStats(args, this.agentProxy ?? undefined)],

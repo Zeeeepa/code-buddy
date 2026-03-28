@@ -64,12 +64,7 @@ function ChatInterfaceWithAgent({
   const confirmationService = ConfirmationService.getInstance();
   const keyboardHelp = useKeyboardHelp();
 
-  // Handle keyboard shortcut for help overlay (?)
-  useInput((input) => {
-    if (input === '?' && !isProcessing && !confirmationOptions) {
-      keyboardHelp.toggle();
-    }
-  });
+  // Help overlay now triggered via /help command (? removed — it interfered with typing)
 
   // Keyboard shortcuts with accessibility support
   useKeyboardShortcuts([
