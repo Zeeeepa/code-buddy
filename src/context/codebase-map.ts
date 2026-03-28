@@ -167,12 +167,26 @@ export class CodebaseMapper {
       );
       return stdout.trim().split("\n").filter(Boolean);
     } catch (_error) {
-      // Fallback to simpler find
-      const { stdout } = await execAsync(
-        `find "${this.rootDir}" -type f -not -path "*/node_modules/*" -not -path "*/.git/*" | head -${this.maxFiles}`,
-        { maxBuffer: 10 * 1024 * 1024 }
-      );
-      return stdout.trim().split("\n").filter(Boolean);
+      // Fallback: cross-platform recursive file listing via Node.js fs
+      const results: string[] = [];
+      const walk = async (dir: string) => {
+        if (results.length >= this.maxFiles) return;
+        try {
+          const entries = await fs.readdir(dir, { withFileTypes: true });
+          for (const entry of entries) {
+            if (results.length >= this.maxFiles) return;
+            if (IGNORED_DIRS.includes(entry.name)) continue;
+            const fullPath = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+              await walk(fullPath);
+            } else if (entry.isFile()) {
+              results.push(fullPath);
+            }
+          }
+        } catch { /* permission denied, etc */ }
+      };
+      await walk(this.rootDir);
+      return results;
     }
   }
 
