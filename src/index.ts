@@ -399,25 +399,24 @@ async function saveCommandLineSettings(
 async function loadModel(): Promise<string | undefined> {
   await ensureEnvLoaded();
 
-  // Check environment-detected provider first
+  // 1. Explicit env var takes highest priority
+  if (process.env.GROK_MODEL) return process.env.GROK_MODEL;
+
+  // 2. Project/user settings override auto-detection
+  try {
+    const getSettingsManager = await lazyImport.settingsManager();
+    const manager = getSettingsManager();
+    const settingsModel = manager.getCurrentModel();
+    if (settingsModel) return settingsModel;
+  } catch (_err) {
+    logger.debug('Failed to load model from settings manager', { error: _err });
+  }
+
+  // 3. Fallback to auto-detected provider's default model
   const detected = await getDetectedProvider();
   if (detected) return detected.defaultModel;
 
-  // First check environment variables
-  let model = process.env.GROK_MODEL;
-
-  if (!model) {
-    // Use the unified model loading from settings manager
-    try {
-      const getSettingsManager = await lazyImport.settingsManager();
-      const manager = getSettingsManager();
-      model = manager.getCurrentModel();
-    } catch (_err) {
-      logger.debug('Failed to load model from settings manager', { error: _err });
-    }
-  }
-
-  return model;
+  return undefined;
 }
 
 // Handle commit-and-push command in headless mode

@@ -139,6 +139,7 @@ export class CodeBuddyClient {
   private isGeminiProvider: boolean = false;
   private geminiRequestTimeoutMs: number;
   private circuitBreakerConfig: Partial<CircuitBreakerConfig> | undefined;
+  private defaultThinkingLevel: GeminiThinkingLevel | undefined;
 
   /** Prompt cache tracking: total cached tokens across all calls */
   private _promptCacheHits: number = 0;
@@ -150,6 +151,14 @@ export class CodeBuddyClient {
    * Once configured, calls with `circuitBreaker: true` in ChatOptions
    * will be wrapped with the circuit breaker for the provider.
    */
+  /**
+   * Set default thinking level for Gemini 3.x models (from settings).
+   */
+  setDefaultThinkingLevel(level: GeminiThinkingLevel): void {
+    this.defaultThinkingLevel = level;
+    logger.debug('Default Gemini thinkingLevel set from settings', { level });
+  }
+
   setCircuitBreakerConfig(config: Partial<CircuitBreakerConfig>): void {
     this.circuitBreakerConfig = config;
   }
@@ -682,11 +691,13 @@ export class CodeBuddyClient {
     };
 
     // Add thinkingLevel for Gemini 3.x models (never mix with budget_tokens)
-    if (opts?.thinkingLevel) {
+    // Use explicitly passed level, or fall back to the default from settings
+    const effectiveThinkingLevel = opts?.thinkingLevel || this.defaultThinkingLevel;
+    if (effectiveThinkingLevel) {
       generationConfig.thinkingConfig = {
-        thinkingLevel: opts.thinkingLevel,
+        thinkingLevel: effectiveThinkingLevel,
       };
-      logger.debug('Gemini thinkingLevel set', { level: opts.thinkingLevel });
+      logger.debug('Gemini thinkingLevel set', { level: effectiveThinkingLevel });
     }
 
     // JSON mode for Gemini: add responseMimeType

@@ -153,6 +153,10 @@ export const SettingsSchema = z.object({
   enableTelemetry: z.boolean()
     .default(false)
     .describe('Enable anonymous usage telemetry'),
+
+  thinkingLevel: z.enum(['off', 'minimal', 'low', 'medium', 'high'])
+    .optional()
+    .describe('Gemini 3.x thinking/reasoning depth level'),
 }).strict();
 
 export type Settings = z.infer<typeof SettingsSchema>;

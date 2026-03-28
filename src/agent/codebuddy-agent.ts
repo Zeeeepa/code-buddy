@@ -171,6 +171,16 @@ export class CodeBuddyAgent extends BaseAgent {
     // Initialize client
     this.codebuddyClient = new CodeBuddyClient(apiKey, modelToUse, baseURL);
 
+    // Apply thinkingLevel from settings if configured
+    try {
+      import('../utils/settings-manager.js').then(({ getSettingsManager }) => {
+        const settings = getSettingsManager().loadProjectSettings();
+        if (settings?.thinkingLevel) {
+          this.codebuddyClient.setDefaultThinkingLevel(settings.thinkingLevel as import('../codebuddy/client.js').GeminiThinkingLevel);
+        }
+      }).catch(() => { /* settings optional */ });
+    } catch { /* settings optional */ }
+
     // Forward repair events from RepairCoordinator (store refs for cleanup)
     this.repairListeners = {
       start: (data: unknown) => this.emit('repair:start', data),
