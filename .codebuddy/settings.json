@@ -1,26 +1,3 @@
 {
-  "model": "gemini-2.5-flash",
-  "mcpServers": {
-    "new-server": {
-      "name": "new-server",
-      "transport": {
-        "type": "http",
-        "url": "http://localhost:8080"
-      }
-    },
-    "first-server": {
-      "name": "first-server",
-      "transport": {
-        "type": "stdio",
-        "command": "python"
-      }
-    },
-    "overwrite-me": {
-      "name": "overwrite-me",
-      "transport": {
-        "type": "http",
-        "url": "http://new-url"
-      }
-    }
-  }
+  "model": "gemini-2.5-flash"
 }

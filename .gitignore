@@ -1,3 +1,29 @@
+# Test/debug artifacts
+*.log
+*.txt
+!LICENSE
+!README.md
+full-test-log*.txt
+vitest-full*.log
+lint-*.txt
+whatsapp-log*.txt
+test-report.md
+test-run-output.txt
+jest-results.json
+is-even.*
+test.ts
+test1.ts
+test.svg
+refactor-test.tmp.js
+test-commander.cjs
+package.json.backup
+tmp/
+tmp_*/
+_test-*/
+test-app/
+test-scripts/
+C\:Users*/
+
 # Dependencies
 node_modules/
 npm-debug.log*

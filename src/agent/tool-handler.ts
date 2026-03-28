@@ -442,6 +442,9 @@ export class ToolHandler {
           generate_diagram: 'Use the "diagram" tool to generate diagrams',
           create_diagram: 'Use the "diagram" tool to generate diagrams',
           make_diagram: 'Use the "diagram" tool to generate diagrams',
+          generate_openapi: 'Use the "bash" tool with "buddy docs generate" or the openapi_generator tool if available',
+          create_openapi: 'Use the "bash" tool with "buddy docs generate"',
+          generate_docs: 'Use the "bash" tool with "buddy docs generate"',
         };
         const suggestion = suggestions[toolName.toLowerCase()];
         result = {
