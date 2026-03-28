@@ -1,0 +1,173 @@
+# Infrastructure
+
+## HTTP Server
+
+Start the server:
+
+```bash
+buddy server --port 3000
+```
+
+Default: port 3000, CORS enabled, rate-limit 100 req/min, JWT auth required in production (`JWT_SECRET`).
+
+### Key Endpoints
+
+| Endpoint | Method | Description |
+|:---------|:-------|:------------|
+| `/api/health` | GET | Health check |
+| `/api/metrics` | GET | Prometheus metrics |
+| `/api/chat` | POST | Chat completion |
+| `/api/chat/completions` | POST | OpenAI-compatible completions |
+| `/api/sessions` | GET/POST | Session management |
+| `/api/memory` | GET/POST | Memory entries |
+| `/api/tools` | GET | List available tools |
+| `/api/tools/{name}/execute` | POST | Execute a tool |
+| `/api/daemon/status` | GET | Daemon status |
+| `/api/cron/jobs` | GET/POST | Cron job management |
+| `/api/hub/search` | GET | Search skills marketplace |
+| `/api/hub/installed` | GET | List installed skills |
+| `/api/identity` | GET | List identity files |
+| `/api/groups/status` | GET | Group security status |
+| `/api/auth-profiles` | GET/POST/DELETE | Auth profile CRUD |
+| `/__codebuddy__/canvas/:id` | GET | Canvas content serving |
+| `/__codebuddy__/a2ui/` | GET | A2UI host page |
+
+### WebSocket Events
+
+```javascript
+const ws = new WebSocket('ws://localhost:3000/ws');
+ws.send(JSON.stringify({ type: 'authenticate', payload: { token: 'jwt' } }));
+ws.send(JSON.stringify({ type: 'chat_stream', payload: { messages: [...] } }));
+```
+
+Events: `authenticate`, `chat_stream`, `tool_execute`, `ping/pong`.
+
+### ACPX Sessions
+
+Advanced session management:
+- Prompt queue with 202 status and `queuePosition`
+- Cancel: `POST /sessions/:name/cancel`
+- Soft-close: `POST /sessions/:name/close`
+- `resumeSessionId` for session continuation
+- `fireAndForget` mode
+
+## WebSocket Gateway
+
+Separate gateway on port 3001 for multi-client communication:
+
+```
+Client -> connect (deviceId, role, protocolVersion)
+Server -> hello_ok (paired, uptime, stateVersion, presence[], health, authRequired)
+Client -> auth (token or password)
+Server -> auth_success
+Client -> chat / session_create / session_join / session_patch / presence
+```
+
+- **Auth modes**: `token` (JWT), `password`, `none`
+- **Bind modes**: `loopback` (127.0.0.1), `all` (0.0.0.0), `tailscale`
+- **TLS support**: `tlsEnabled`, `tlsCert`, `tlsKey`, `tlsCa`, `skipLocalPairing`
+- **Security**: GHSA-5wcw-8jjv-m286 fix, default `corsOrigins` localhost-only, `trustedProxies` config
+- Device identity with challenge nonce verification
+- Presence tracking (online/offline/away/typing)
+
+## Daemon Mode
+
+Run Code Buddy 24/7 in the background:
+
+```bash
+buddy daemon start [--detach]         # Start background daemon
+buddy daemon start --install-daemon   # Install as OS service
+buddy daemon stop                     # Stop daemon
+buddy daemon restart                  # Restart
+buddy daemon status                   # Show status
+buddy daemon logs [--lines N]         # View logs
+```
+
+Features:
+- PID file management with stale detection
+- Auto-restart on crash (max 3 retries)
+- **Heartbeat engine**: periodic agent wake with HEARTBEAT.md checklist, smart suppression, active hours
+- **Daily session reset**: automatic context boundary at configurable time (default 04:00)
+- **Session maintenance**: auto-prune, rotate, cap max entries
+- **Cross-platform service installer**: launchd (macOS), systemd (Linux), Task Scheduler (Windows)
+
+## Cron and Scheduling
+
+```bash
+buddy trigger add time:*/30 action:run-tests    # Run tests every 30 min
+buddy trigger add webhook:deploy action:notify   # Notify on deploy webhook
+```
+
+Session binding: `sessionTarget: 'current'|'new'|<id>` binds cron jobs to specific sessions.
+
+Webhook triggers use HMAC-SHA256 verification with template placeholders.
+
+## Cloud Background Agents
+
+Cloud-based agents run scheduled tasks via event triggers. Configurable per-provider and per-channel.
+
+## Device Nodes
+
+Companion app management for mobile/remote devices:
+
+```bash
+buddy nodes list              # List connected devices
+buddy nodes pair              # Start pairing (short codes)
+buddy nodes approve <code>    # Approve a device
+buddy nodes invoke <id> <cap> # Remote invocation
+```
+
+Platform capability maps (20+ capabilities): camera, location, clipboard, notifications, and more.
+
+## Canvas and A2UI
+
+- **Canvas**: Push arbitrary content (HTML, Markdown, JSON, SVGs) to `/__codebuddy__/canvas/:id`
+- **A2UI**: Agent-generated UI components at `/__codebuddy__/a2ui/`
+- **Eval endpoint**: `POST /__codebuddy__/a2ui/eval` for dynamic content
+
+## Cloud Deployment
+
+Generate deployment configs for 6 platforms:
+
+```bash
+buddy deploy platforms        # List supported platforms
+buddy deploy init             # Generate deployment config
+buddy deploy nix              # Generate Nix flake
+```
+
+Supported: Fly.io, Railway, Render, Hetzner, Northflank, GCP.
+
+## MCP Servers
+
+Pre-configured MCP servers (disabled by default):
+
+```bash
+buddy mcp add brave-search    # Brave Web Search
+buddy mcp add playwright      # Browser automation
+buddy mcp add exa-search      # Exa neural search
+buddy mcp add icm             # Infinite Context Memory
+buddy mcp list                # Show configured servers
+```
+
+MCP OAuth support: Authorization Code + PKCE, local callback server, AES-256-GCM token storage, auto-refresh.
+
+## Plugin System
+
+Plugins extend Code Buddy with tools, commands, providers, and hooks:
+
+```
+~/.codebuddy/plugins/my-plugin/
+  manifest.json
+  index.js
+```
+
+Worker thread isolation via `isolated-plugin-runner.ts` with conflict detection. Plugin types: Tool, Provider (LLM/embedding/search), Command, Hook.
+
+## Observability
+
+- **RunStore**: JSONL per run in `.codebuddy/runs/`, 30-run auto-prune
+- **OpenTelemetry**: via `OTEL_EXPORTER_OTLP_ENDPOINT`
+- **Sentry**: via `SENTRY_DSN`
+- **Telemetry toggle**: `/telemetry on|off|errors-only`
+- **Per-message display**: `[tokens: X in / Y out | cost: $Z]` after each response
+- **Prompt cache stats**: tracks OpenAI/xAI cached_tokens and hit ratio
