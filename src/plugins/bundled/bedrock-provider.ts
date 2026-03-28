@@ -220,7 +220,7 @@ async function createAwsAuthHeaders(
  * SHA-256 hash helper (returns hex string).
  */
 async function hashSHA256(data: Uint8Array): Promise<string> {
-  const hash = await globalThis.crypto.subtle.digest('SHA-256', data as unknown as ArrayBuffer);
+  const hash = await globalThis.crypto.subtle.digest('SHA-256', data as unknown as BufferSource);
   return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
@@ -230,9 +230,9 @@ async function hashSHA256(data: Uint8Array): Promise<string> {
 async function hmacSHA256(key: Uint8Array, data: string): Promise<Uint8Array> {
   const encoder = new TextEncoder();
   const cryptoKey = await globalThis.crypto.subtle.importKey(
-    'raw', key as unknown as ArrayBuffer, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
+    'raw', key as unknown as BufferSource, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
   );
-  const sig = await globalThis.crypto.subtle.sign('HMAC', cryptoKey, encoder.encode(data) as unknown as ArrayBuffer);
+  const sig = await globalThis.crypto.subtle.sign('HMAC', cryptoKey, encoder.encode(data) as unknown as BufferSource);
   return new Uint8Array(sig);
 }
 

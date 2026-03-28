@@ -13,6 +13,7 @@
  */
 
 import { ConversationMiddleware, MiddlewareContext, MiddlewareResult } from './types.js';
+import { hasToolCalls } from '../../codebuddy/client.js';
 import { logger } from '../../utils/logger.js';
 
 // ============================================================================
@@ -65,7 +66,7 @@ export class AutoObservationMiddleware implements ConversationMiddleware {
 
   private config: AutoObservationConfig;
   private observationsThisTurn = 0;
-  private previousDesktopSnapshot: unknown = null;
+  private previousDesktopSnapshot: import('../../desktop-automation/smart-snapshot.js').Snapshot | null = null;
   private previousBrowserSnapshot: unknown = null;
 
   constructor(config: Partial<AutoObservationConfig> = {}) {
@@ -159,8 +160,8 @@ export class AutoObservationMiddleware implements ConversationMiddleware {
 
     for (const msg of recentMessages) {
       // Check tool_calls in assistant messages
-      if (msg.role === 'assistant' && Array.isArray((msg as any).tool_calls)) {
-        for (const tc of (msg as any).tool_calls) {
+      if (hasToolCalls(msg)) {
+        for (const tc of msg.tool_calls) {
           const name = tc?.function?.name;
           let args: Record<string, unknown> = {};
           try {
@@ -197,7 +198,7 @@ export class AutoObservationMiddleware implements ConversationMiddleware {
 
       // Compute diff if we have a previous snapshot
       if (previousSnapshot) {
-        const diff = snapshotManager.compareTo(previousSnapshot as any);
+        const diff = snapshotManager.compareTo(previousSnapshot!);
         if (diff.hasChanges) {
           parts.push(`Changes detected (similarity: ${(diff.similarity * 100).toFixed(0)}%):`);
           if (diff.newElements.length > 0) {

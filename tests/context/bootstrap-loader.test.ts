@@ -109,11 +109,11 @@ describe('BootstrapLoader', () => {
     it('should check all default file names', async () => {
       await loader.load(CWD);
 
+      // TOOLS.md removed — no longer loaded by BootstrapLoader (handled separately by tool system)
       const expectedFiles = [
         'BOOTSTRAP.md',
         'AGENTS.md',
         'SOUL.md',
-        'TOOLS.md',
         'IDENTITY.md',
         'USER.md',
         'HEARTBEAT.md',

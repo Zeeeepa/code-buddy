@@ -9,6 +9,7 @@
  */
 
 import type { CodeBuddyMessage } from '../codebuddy/client.js';
+import { hasToolCalls } from '../codebuddy/client.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -23,8 +24,8 @@ export function repairToolCallPairs(messages: CodeBuddyMessage[]): CodeBuddyMess
   // Collect all tool_call IDs from assistant messages
   const toolCallIds = new Set<string>();
   for (const msg of messages) {
-    if (msg.role === 'assistant' && 'tool_calls' in msg && Array.isArray((msg as unknown as Record<string, unknown>).tool_calls)) {
-      for (const tc of (msg as { tool_calls: Array<{ id: string }> }).tool_calls) {
+    if (hasToolCalls(msg)) {
+      for (const tc of msg.tool_calls) {
         if (tc.id) toolCallIds.add(tc.id);
       }
     }
@@ -59,8 +60,8 @@ export function repairToolCallPairs(messages: CodeBuddyMessage[]): CodeBuddyMess
   for (const msg of filtered) {
     result.push(msg);
 
-    if (msg.role === 'assistant' && 'tool_calls' in msg && Array.isArray((msg as unknown as Record<string, unknown>).tool_calls)) {
-      const calls = (msg as { tool_calls: Array<{ id: string; function?: { name?: string } }> }).tool_calls;
+    if (hasToolCalls(msg) && msg.tool_calls.length > 0) {
+      const calls = msg.tool_calls;
       for (const tc of calls) {
         if (tc.id && !toolResultIds.has(tc.id)) {
           // Inject a synthetic result so the provider doesn't reject the transcript

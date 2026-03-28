@@ -1483,7 +1483,9 @@ program
         }
       }
 
+      recordStartupPhase('agent-create-start');
       const agent = new CodeBuddyAgent(apiKey, baseURL, model, maxToolRounds, true, systemPromptId);
+      recordStartupPhase('agent-create-done');
 
       // Apply custom agent system prompt if configured
       if (customAgentConfig?.systemPrompt) {
@@ -1566,7 +1568,9 @@ program
 
       console.log("🤖 Starting Code Buddy Conversational Assistant...\n");
 
+      recordStartupPhase('user-settings-start');
       await ensureUserSettingsDirectory();
+      recordStartupPhase('user-settings-done');
 
       // ── Crash recovery: detect unclean shutdown and offer session resume ──
       if (!options.resume && !options.continue) {
@@ -1629,6 +1633,13 @@ program
       // Log startup metrics before UI render
       recordStartupPhase('ui-render');
       logStartupMetrics();
+
+      const totalStartupMs = Date.now() - STARTUP_TIME;
+      if (totalStartupMs > 5000) {
+        logger.warn(`Slow startup detected: ${totalStartupMs}ms. Run with PERF_TIMING=true for phase breakdown.`);
+      } else {
+        logger.debug(`Startup completed in ${totalStartupMs}ms`);
+      }
 
       // Configure Ink render options
       const inkOptions: Record<string, unknown> = { exitOnCtrlC: true };

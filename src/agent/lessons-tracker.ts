@@ -54,6 +54,10 @@ export function getLessonsTracker(workDir: string = process.cwd()): LessonsTrack
   const key = path.resolve(workDir);
   if (!registry.has(key)) {
     registry.set(key, new LessonsTracker(key));
+    if (registry.size > 20) {
+      const firstKey = registry.keys().next().value;
+      if (firstKey) registry.delete(firstKey);
+    }
   }
   return registry.get(key)!;
 }
@@ -67,6 +71,8 @@ export class LessonsTracker {
   private globalPath: string;
   private items: LessonItem[] = [];
   private loaded = false;
+  private _cachedBlock: string | null = null;
+  private _cacheTime = 0;
 
   constructor(private workDir: string) {
     const projectDir = path.join(workDir, '.codebuddy');
@@ -125,6 +131,7 @@ export class LessonsTracker {
       source,
     };
     this.items.push(item);
+    this._cachedBlock = null;
     this.save();
     return item;
   }
@@ -134,6 +141,7 @@ export class LessonsTracker {
     const idx = this.items.findIndex(i => i.id === id);
     if (idx === -1) return false;
     this.items.splice(idx, 1);
+    this._cachedBlock = null;
     this.save();
     return true;
   }
@@ -144,6 +152,7 @@ export class LessonsTracker {
     this.items = category
       ? this.items.filter(i => i.category !== category)
       : [];
+    this._cachedBlock = null;
     this.save();
     return before - this.items.length;
   }
@@ -170,6 +179,9 @@ export class LessonsTracker {
    * Returns null when there are no lessons (avoids noisy injections).
    */
   buildContextBlock(): string | null {
+    if (this._cachedBlock !== null && Date.now() - this._cacheTime < 5000) {
+      return this._cachedBlock;
+    }
     this.load();
     if (this.items.length === 0) return null;
 
@@ -197,7 +209,10 @@ export class LessonsTracker {
     }
 
     lines.push('</lessons_context>');
-    return lines.join('\n');
+    const result = lines.join('\n');
+    this._cachedBlock = result;
+    this._cacheTime = Date.now();
+    return result;
   }
 
   // --------------------------------------------------------------------------
@@ -256,6 +271,7 @@ export class LessonsTracker {
     );
     const removed = before - this.items.length;
     if (removed > 0) {
+      this._cachedBlock = null;
       this.save();
     }
     return removed;

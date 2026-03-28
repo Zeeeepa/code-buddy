@@ -56,6 +56,10 @@ export function getTodoTracker(workDir: string = process.cwd()): TodoTracker {
   const key = path.resolve(workDir);
   if (!registry.has(key)) {
     registry.set(key, new TodoTracker(key));
+    if (registry.size > 20) {
+      const firstKey = registry.keys().next().value;
+      if (firstKey) registry.delete(firstKey);
+    }
   }
   return registry.get(key)!;
 }
@@ -68,6 +72,8 @@ export class TodoTracker {
   private todoPath: string;
   private items: TodoItem[] = [];
   private loaded = false;
+  private _cachedBlock: string | null = null;
+  private _cacheTime = 0;
 
   constructor(private workDir: string) {
     this.todoPath = path.join(workDir, 'todo.md');
@@ -110,6 +116,7 @@ export class TodoTracker {
       updatedAt: Date.now(),
     };
     this.items.push(item);
+    this._cachedBlock = null;
     this.save();
     return item;
   }
@@ -120,6 +127,7 @@ export class TodoTracker {
     if (!item) return false;
     item.status = 'done';
     item.updatedAt = Date.now();
+    this._cachedBlock = null;
     this.save();
     return true;
   }
@@ -132,6 +140,7 @@ export class TodoTracker {
     if (updates.status !== undefined) item.status = updates.status;
     if (updates.priority !== undefined) item.priority = updates.priority;
     item.updatedAt = Date.now();
+    this._cachedBlock = null;
     this.save();
     return true;
   }
@@ -141,6 +150,7 @@ export class TodoTracker {
     const idx = this.items.findIndex(i => i.id === id);
     if (idx === -1) return false;
     this.items.splice(idx, 1);
+    this._cachedBlock = null;
     this.save();
     return true;
   }
@@ -149,6 +159,7 @@ export class TodoTracker {
     this.load();
     const before = this.items.length;
     this.items = this.items.filter(i => i.status !== 'done');
+    this._cachedBlock = null;
     this.save();
     return before - this.items.length;
   }
@@ -172,6 +183,9 @@ export class TodoTracker {
    * Returns null when there are no pending items (avoids noisy injections).
    */
   buildContextSuffix(): string | null {
+    if (this._cachedBlock !== null && Date.now() - this._cacheTime < 5000) {
+      return this._cachedBlock;
+    }
     this.load();
     const pending = this.getPending();
     if (pending.length === 0) return null;
@@ -204,7 +218,10 @@ export class TodoTracker {
     }
 
     lines.push('</todo_context>');
-    return lines.join('\n');
+    const result = lines.join('\n');
+    this._cachedBlock = result;
+    this._cacheTime = Date.now();
+    return result;
   }
 
   // --------------------------------------------------------------------------

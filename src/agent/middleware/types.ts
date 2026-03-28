@@ -57,6 +57,14 @@ export interface MiddlewareContext {
   changedFiles?: string[];
   /** Recent tool execution results (for auto-repair) */
   lastToolResults?: Array<{ toolName: string; success: boolean; output: string }>;
+  /** Available tools (for tool-filter middleware) */
+  tools?: Array<{ function: { name: string; description?: string }; [key: string]: unknown }>;
+  /** State bag for cross-middleware communication */
+  state?: Record<string, unknown>;
+  /** State setter for middleware that needs to persist state */
+  setState?: (key: string, value: unknown) => void;
+  /** State getter for middleware that needs to read persisted state */
+  getState?: <T = unknown>(key: string) => T | undefined;
 }
 
 /**

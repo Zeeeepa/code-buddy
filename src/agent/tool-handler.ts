@@ -439,6 +439,9 @@ export class ToolHandler {
           write: 'Use the "create_file" or "str_replace_editor" tool',
           edit: 'Use the "str_replace_editor" tool to edit files',
           read: 'Use the "view_file" tool to read files',
+          generate_diagram: 'Use the "diagram" tool to generate diagrams',
+          create_diagram: 'Use the "diagram" tool to generate diagrams',
+          make_diagram: 'Use the "diagram" tool to generate diagrams',
         };
         const suggestion = suggestions[toolName.toLowerCase()];
         result = {

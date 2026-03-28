@@ -13,9 +13,15 @@ import { Router } from 'express';
 import { asyncHandler, requireScope } from '../middleware/index.js';
 import {
   A2AAgentClient,
+  A2AAgentServer,
   createAgentCard,
   getTaskResult,
 } from '../../protocols/a2a/index.js';
+
+function getAgentServer(client: A2AAgentClient, name: string): A2AAgentServer | undefined {
+  return (client as unknown as { agents: Map<string, A2AAgentServer> }).agents?.get(name);
+}
+interface A2ARouter extends Router { a2aClient?: A2AAgentClient; }
 
 export function createA2AProtocolRoutes(): Router {
   const router = Router();
@@ -72,9 +78,9 @@ export function createA2AProtocolRoutes(): Router {
   router.get('/tasks/:id', requireScope('admin'), (req, res) => {
     // Search across all registered agents for the task
     for (const agentName of client.listAgents()) {
-      const server = (client as any).agents?.get(agentName);
+      const server = getAgentServer(client, agentName);
       if (server && typeof server.getTask === 'function') {
-        const task = server.getTask(req.params.id);
+        const task = server.getTask(String(req.params.id));
         if (task) {
           res.json({
             id: task.id,
@@ -93,9 +99,9 @@ export function createA2AProtocolRoutes(): Router {
   // Cancel a task
   router.post('/tasks/:id/cancel', requireScope('admin'), (req, res) => {
     for (const agentName of client.listAgents()) {
-      const server = (client as any).agents?.get(agentName);
+      const server = getAgentServer(client, agentName);
       if (server && typeof server.cancelTask === 'function') {
-        const cancelled = server.cancelTask(req.params.id);
+        const cancelled = server.cancelTask(String(req.params.id));
         if (cancelled) {
           res.json({ cancelled: true, id: req.params.id });
           return;
@@ -113,7 +119,7 @@ export function createA2AProtocolRoutes(): Router {
   });
 
   // Expose the client for external registration
-  (router as any).a2aClient = client;
+  (router as A2ARouter).a2aClient = client;
 
   return router;
 }

@@ -290,6 +290,10 @@ export class SessionRegistry extends EventEmitter {
 
     const messages = this.messages.get(sessionId) || [];
     messages.push(fullMessage);
+    const MAX_MESSAGES_PER_SESSION = 5000;
+    if (messages.length > MAX_MESSAGES_PER_SESSION) {
+      messages.splice(0, messages.length - MAX_MESSAGES_PER_SESSION);
+    }
     this.messages.set(sessionId, messages);
 
     session.messageCount++;

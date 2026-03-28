@@ -135,6 +135,10 @@ export class ContextManagerV2 {
   private compressionCount: number = 0;
   /** Total tokens saved by compression */
   private totalTokensSaved: number = 0;
+  /** Cached token count for getStats() */
+  private _cachedStatsTokenCount = 0;
+  /** Message count at time of last cache */
+  private _cachedStatsMessageCount = -1;
   /** Last compression timestamp */
   private lastCompressionTime: Date | null = null;
 
@@ -236,7 +240,14 @@ export class ContextManagerV2 {
    * Get context statistics
    */
   getStats(messages: CodeBuddyMessage[]): ContextStats {
-    const totalTokens = this.countTokens(messages);
+    let totalTokens: number;
+    if (messages.length === this._cachedStatsMessageCount) {
+      totalTokens = this._cachedStatsTokenCount;
+    } else {
+      totalTokens = this.countTokens(messages);
+      this._cachedStatsTokenCount = totalTokens;
+      this._cachedStatsMessageCount = messages.length;
+    }
     const maxTokens = this.effectiveLimit;
     const usagePercent = (totalTokens / maxTokens) * 100;
 

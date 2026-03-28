@@ -179,7 +179,7 @@ router.post(
 );
 
 /**
- * Handle streaming chat response
+ * Handle streaming chat response (legacy Code Buddy format)
  */
 async function handleStreamingChat(
   req: Request,
@@ -278,6 +278,132 @@ async function handleStreamingChat(
 }
 
 /**
+ * Handle streaming chat response (OpenAI-compatible format)
+ *
+ * Sends SSE chunks in the standard OpenAI chat.completion.chunk format
+ * so third-party clients (e.g. Cursor, Continue, litellm) work out of the box.
+ */
+async function handleOpenAIStreamingChat(
+  req: Request,
+  res: Response,
+  body: ChatRequest,
+  _startTime: number
+): Promise<void> {
+  const requestId = `chatcmpl-${randomBytes(12).toString('hex')}`;
+  const created = Math.floor(Date.now() / 1000);
+  const modelName = body.model || (await getAgent()).getModel();
+
+  // Set SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Request-ID', requestId);
+
+  // Handle client disconnect
+  let isConnected = true;
+  req.on('close', () => {
+    isConnected = false;
+  });
+
+  try {
+    const agent = await getAgent();
+    const messages = body.messages as ChatCompletionMessageParam[];
+
+    // Add system prompt if provided
+    if (body.systemPrompt && messages[0]?.role !== 'system') {
+      messages.unshift({
+        role: 'system',
+        content: body.systemPrompt,
+      });
+    }
+
+    // Estimate prompt tokens from input messages
+    const promptText = messages.map(m => (typeof m.content === 'string' ? m.content : '')).join('');
+    const promptTokens = Math.ceil(promptText.length / 4);
+    let completionTokens = 0;
+
+    const stream = await agent.streamResponse(
+      messages[messages.length - 1].content as string,
+      {
+        model: body.model,
+        temperature: body.temperature,
+        maxTokens: body.maxTokens,
+      }
+    );
+
+    for await (const chunk of stream) {
+      if (!isConnected) break;
+
+      const delta = chunk.choices?.[0]?.delta?.content || '';
+      completionTokens += Math.ceil(delta.length / 4);
+
+      const openaiChunk = {
+        id: requestId,
+        object: 'chat.completion.chunk',
+        created,
+        model: modelName,
+        choices: [
+          {
+            index: 0,
+            delta: { content: delta },
+            finish_reason: null,
+          },
+        ],
+      };
+
+      res.write(`data: ${JSON.stringify(openaiChunk)}\n\n`);
+    }
+
+    // Send final chunk with finish_reason and usage
+    if (isConnected) {
+      const finalChunk = {
+        id: requestId,
+        object: 'chat.completion.chunk',
+        created,
+        model: modelName,
+        choices: [
+          {
+            index: 0,
+            delta: {},
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {
+          prompt_tokens: promptTokens,
+          completion_tokens: completionTokens,
+          total_tokens: promptTokens + completionTokens,
+        },
+      };
+
+      res.write(`data: ${JSON.stringify(finalChunk)}\n\n`);
+      res.write('data: [DONE]\n\n');
+    }
+
+    res.end();
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown stream error';
+    const errorChunk = {
+      id: requestId,
+      object: 'chat.completion.chunk',
+      created,
+      model: modelName,
+      choices: [
+        {
+          index: 0,
+          delta: {},
+          finish_reason: 'stop',
+        },
+      ],
+    };
+
+    // Send error as a final chunk then an error event
+    res.write(`data: ${JSON.stringify(errorChunk)}\n\n`);
+    res.write(`data: ${JSON.stringify({ error: { message, type: 'server_error', code: null } })}\n\n`);
+    res.end();
+  }
+}
+
+/**
  * POST /api/chat/completions
  * OpenAI-compatible chat completions endpoint
  */
@@ -289,7 +415,22 @@ router.post(
     const body = req.body;
 
     // Validate required fields (OpenAI format)
-    validateRequired(body, ['messages']);
+    try {
+      validateRequired(body, ['messages']);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Invalid request';
+      res.status(400).json({
+        error: { message: msg, type: 'invalid_request_error', code: null },
+      });
+      return;
+    }
+
+    if (!Array.isArray(body.messages) || body.messages.length === 0) {
+      res.status(400).json({
+        error: { message: 'Messages must be a non-empty array', type: 'invalid_request_error', code: null },
+      });
+      return;
+    }
 
     // Convert to our format
     const chatRequest: ChatRequest = {
@@ -301,48 +442,62 @@ router.post(
     };
 
     if (body.stream) {
-      return handleStreamingChat(req, res, chatRequest, startTime);
+      // Use OpenAI-compatible streaming format for /completions
+      return handleOpenAIStreamingChat(req, res, chatRequest, startTime);
     }
 
-    const agent = await getAgent();
-    const requestId = `chatcmpl-${randomBytes(12).toString('hex')}`;
+    try {
+      const agent = await getAgent();
+      const requestId = `chatcmpl-${randomBytes(12).toString('hex')}`;
 
-    const messages = body.messages as ChatCompletionMessageParam[];
-    const lastMessage = messages[messages.length - 1];
+      const messages = body.messages as ChatCompletionMessageParam[];
+      const lastMessage = messages[messages.length - 1];
 
-    const result = await agent.processUserInput(
-      lastMessage.content as string,
-      {
-        model: body.model,
-        temperature: body.temperature,
-        maxTokens: body.max_tokens,
-      }
-    );
-
-    // Return OpenAI-compatible response
-    const response = {
-      id: requestId,
-      object: 'chat.completion',
-      created: Math.floor(Date.now() / 1000),
-      model: body.model || agent.getModel(),
-      choices: [
+      const result = await agent.processUserInput(
+        lastMessage.content as string,
         {
-          index: 0,
-          message: {
-            role: 'assistant',
-            content: result.content || '',
-          },
-          finish_reason: result.finishReason || 'stop',
-        },
-      ],
-      usage: {
-        prompt_tokens: result.usage?.prompt_tokens || 0,
-        completion_tokens: result.usage?.completion_tokens || 0,
-        total_tokens: result.usage?.total_tokens || 0,
-      },
-    };
+          model: body.model,
+          temperature: body.temperature,
+          maxTokens: body.max_tokens,
+        }
+      );
 
-    res.json(response);
+      // Estimate token counts when the provider doesn't return them
+      const promptText = messages.map(m => (typeof m.content === 'string' ? m.content : '')).join('');
+      const estimatedPromptTokens = Math.ceil(promptText.length / 4);
+      const completionText = result.content || '';
+      const estimatedCompletionTokens = Math.ceil(completionText.length / 4);
+
+      // Return OpenAI-compatible response
+      const response = {
+        id: requestId,
+        object: 'chat.completion',
+        created: Math.floor(Date.now() / 1000),
+        model: body.model || agent.getModel(),
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: completionText,
+            },
+            finish_reason: result.finishReason || 'stop',
+          },
+        ],
+        usage: {
+          prompt_tokens: result.usage?.prompt_tokens || estimatedPromptTokens,
+          completion_tokens: result.usage?.completion_tokens || estimatedCompletionTokens,
+          total_tokens: result.usage?.total_tokens || (estimatedPromptTokens + estimatedCompletionTokens),
+        },
+      };
+
+      res.json(response);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({
+        error: { message, type: 'server_error', code: null },
+      });
+    }
   })
 );
 

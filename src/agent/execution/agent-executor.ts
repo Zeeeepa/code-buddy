@@ -32,6 +32,18 @@ import type { ICMBridge } from "../../memory/icm-bridge.js";
 import { repairToolCallPairs } from "../../context/transcript-repair.js";
 import { shouldCompactBeforeToolExec, estimateToolResultTokens } from "../../context/proactive-compaction.js";
 import { formatTokenUsage, estimateCost } from "../../utils/token-display.js";
+import { classifyQuery } from "./query-classifier.js";
+
+/**
+ * Race a promise against a timeout, returning the fallback value if the
+ * promise doesn't settle within `ms` milliseconds.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>(resolve => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
 
 // Lazy-loaded workspace context to avoid blocking tests.
 // Includes a 3s hard timeout so git commands never stall the agent loop.
@@ -481,36 +493,46 @@ export class AgentExecutor {
         this.deps.contextManager.prepareMessages(messages)
       );
 
+      // --- Query-aware context injection (saves ~15-20K tokens for trivial messages) ---
+      const { injection: ctxLevel, complexity: queryComplexity } = classifyQuery(message);
+      logger.debug(`Query classified as '${queryComplexity}' — context injection level: ${JSON.stringify(ctxLevel)}`);
+
       // --- Workspace context: git state + directory tree (Codex CLI pattern) ---
-      try {
-        const wsCtx = await lazyGetWorkspaceContext(process.cwd());
-        if (wsCtx) {
-          preparedMessages.push({ role: 'system', content: wsCtx });
-        }
-      } catch { /* workspace context optional */ }
+      if (ctxLevel.workspace) {
+        try {
+          const wsCtx = await lazyGetWorkspaceContext(process.cwd());
+          if (wsCtx) {
+            preparedMessages.push({ role: 'system', content: wsCtx });
+          }
+        } catch { /* workspace context optional */ }
+      }
 
       // --- Lessons context: inject BEFORE todo suffix (stable rules, higher priority) ---
-      const lessonsBlock = getLessonsTracker(process.cwd()).buildContextBlock();
-      if (lessonsBlock) {
-        preparedMessages.push({ role: 'system', content: `<context type="lessons">\n${lessonsBlock}\n</context>` });
+      if (ctxLevel.lessons) {
+        const lessonsBlock = getLessonsTracker(process.cwd()).buildContextBlock();
+        if (lessonsBlock) {
+          preparedMessages.push({ role: 'system', content: `<context type="lessons">\n${lessonsBlock}\n</context>` });
+        }
       }
 
       // --- Knowledge graph context: user preferences, habits, temporal patterns ---
       // Uses memU intent routing: skips injection for trivial messages (saves ~200 tokens)
-      try {
-        const { getKnowledgeGraph } = await import('../../memory/knowledge-graph.js');
-        const kg = getKnowledgeGraph();
-        await kg.load();
-        const kgBlock = kg.formatContextBlockSmart(message, 600);
-        if (kgBlock) {
-          preparedMessages.push({ role: 'system', content: kgBlock });
-        }
-      } catch { /* knowledge graph is optional */ }
+      if (ctxLevel.knowledgeGraph) {
+        try {
+          const { getKnowledgeGraph } = await import('../../memory/knowledge-graph.js');
+          const kg = getKnowledgeGraph();
+          await kg.load();
+          const kgBlock = kg.formatContextBlockSmart(message, 600);
+          if (kgBlock) {
+            preparedMessages.push({ role: 'system', content: kgBlock });
+          }
+        } catch { /* knowledge graph is optional */ }
+      }
 
       // --- Decision memory context: inject relevant past decisions ---
-      if (this.getDecisionContextProvider()) {
+      if (ctxLevel.decisionMemory && this.getDecisionContextProvider()) {
         try {
-          const decisionsBlock = await this.getDecisionContextProvider()!(message);
+          const decisionsBlock = await withTimeout(this.getDecisionContextProvider()!(message), 3000, null);
           if (decisionsBlock) {
             preparedMessages.push({ role: 'system', content: `<context type="decision">\n${decisionsBlock}\n</context>` });
           }
@@ -518,11 +540,11 @@ export class AgentExecutor {
       }
 
       // --- ICM cross-session memory: search for relevant past episodes ---
-      if (this.getICMBridgeProvider()) {
+      if (ctxLevel.icmMemory && this.getICMBridgeProvider()) {
         try {
           const icm = this.getICMBridgeProvider()!();
           if (icm?.isAvailable()) {
-            const memories = await icm.searchMemory(message, { limit: 3 });
+            const memories = await withTimeout(icm.searchMemory(message, { limit: 3 }), 3000, []);
             if (memories.length > 0) {
               const memoryLines = memories.map(m => `- ${m.content}`).join('\n');
               preparedMessages.push({ role: 'system', content: `<context type="memory">\nRelevant cross-session memories:\n${memoryLines}\n</context>` });
@@ -532,7 +554,7 @@ export class AgentExecutor {
       }
 
       // --- Code graph context: ego-graph of entities mentioned in message ---
-      if (this.getCodeGraphContextProvider()) {
+      if (ctxLevel.codeGraph && this.getCodeGraphContextProvider()) {
         try {
           const graphCtx = this.getCodeGraphContextProvider()!(message);
           if (graphCtx) {
@@ -542,7 +564,7 @@ export class AgentExecutor {
       }
 
       // --- Documentation context: relevant doc pages for the user's query ---
-      if (this.getDocsContextProvider()) {
+      if (ctxLevel.docs && this.getDocsContextProvider()) {
         try {
           const docsCtx = this.getDocsContextProvider()!(message);
           if (docsCtx) {
@@ -552,9 +574,11 @@ export class AgentExecutor {
       }
 
       // --- Manus AI attention bias: append todo.md context at END of messages ---
-      const todoSuffix = getTodoTracker(process.cwd()).buildContextSuffix();
-      if (todoSuffix) {
-        preparedMessages.push({ role: 'system', content: `<context type="todo">\n${todoSuffix}\n</context>` });
+      if (ctxLevel.todo) {
+        const todoSuffix = getTodoTracker(process.cwd()).buildContextSuffix();
+        if (todoSuffix) {
+          preparedMessages.push({ role: 'system', content: `<context type="todo">\n${todoSuffix}\n</context>` });
+        }
       }
 
       // Check for context warnings
@@ -907,20 +931,22 @@ export class AgentExecutor {
           );
 
           // Re-inject lessons and todo context for each tool round (mirroring streaming path)
-          const lessonsBlockNext = getLessonsTracker(process.cwd()).buildContextBlock();
-          if (lessonsBlockNext) {
-            nextPreparedMessages.push({ role: 'system', content: `<context type="lessons">\n${lessonsBlockNext}\n</context>` });
-          }
-
-          // Re-inject knowledge graph context for each tool round
-          try {
-            const { getKnowledgeGraph } = await import('../../memory/knowledge-graph.js');
-            const kgNext = getKnowledgeGraph();
-            const kgBlockNext = kgNext.formatContextBlock(message, 600);
-            if (kgBlockNext) {
-              nextPreparedMessages.push({ role: 'system', content: kgBlockNext });
+          if (queryComplexity === 'complex') {
+            const lessonsBlockNext = getLessonsTracker(process.cwd()).buildContextBlock();
+            if (lessonsBlockNext) {
+              nextPreparedMessages.push({ role: 'system', content: `<context type="lessons">\n${lessonsBlockNext}\n</context>` });
             }
-          } catch { /* knowledge graph is optional */ }
+
+            // Re-inject knowledge graph context for each tool round
+            try {
+              const { getKnowledgeGraph } = await import('../../memory/knowledge-graph.js');
+              const kgNext = getKnowledgeGraph();
+              const kgBlockNext = kgNext.formatContextBlock(message, 600);
+              if (kgBlockNext) {
+                nextPreparedMessages.push({ role: 'system', content: kgBlockNext });
+              }
+            } catch { /* knowledge graph is optional */ }
+          }
 
           const todoSuffixNext = getTodoTracker(process.cwd()).buildContextSuffix();
           if (todoSuffixNext) {
@@ -954,7 +980,7 @@ export class AgentExecutor {
             const { getAutoCaptureManager } = await import('../../memory/auto-capture.js');
             const acm = getAutoCaptureManager();
             if (acm) {
-              acm.processMessage('assistant', assistantMessage.content || '').catch(() => {});
+              acm.processMessage('assistant', assistantMessage.content || '').catch(err => logger.debug('Auto-capture failed', { error: String(err) }));
             }
           } catch { /* auto-capture optional */ }
 
@@ -968,7 +994,7 @@ export class AgentExecutor {
                   source: 'agent-executor',
                   sessionId: process.env.CODEBUDDY_SESSION_ID,
                   turnNumber: toolRounds,
-                }).catch(() => {});
+                }).catch(err => logger.debug('ICM episode store failed', { error: String(err) }));
               }
             } catch { /* ICM store optional */ }
           }
@@ -1152,36 +1178,46 @@ export class AgentExecutor {
           this.deps.contextManager.prepareMessages(messages)
         );
 
+        // --- Query-aware context injection (saves ~15-20K tokens for trivial messages) ---
+        const { injection: ctxLevel, complexity: queryComplexity } = classifyQuery(message);
+        logger.debug(`Query classified as '${queryComplexity}' — context injection level: ${JSON.stringify(ctxLevel)}`);
+
         // --- Workspace context: git state + directory tree (streaming path) ---
-        try {
-          const wsCtxStream = await lazyGetWorkspaceContext(process.cwd());
-          if (wsCtxStream) {
-            preparedMessages.push({ role: 'system', content: wsCtxStream });
-          }
-        } catch { /* workspace context optional */ }
+        if (ctxLevel.workspace) {
+          try {
+            const wsCtxStream = await lazyGetWorkspaceContext(process.cwd());
+            if (wsCtxStream) {
+              preparedMessages.push({ role: 'system', content: wsCtxStream });
+            }
+          } catch { /* workspace context optional */ }
+        }
 
         // --- Lessons context: inject BEFORE todo suffix (stable rules, higher priority) ---
-        const lessonsBlockStream = getLessonsTracker(process.cwd()).buildContextBlock();
-        if (lessonsBlockStream) {
-          preparedMessages.push({ role: 'system', content: `<context type="lessons">\n${lessonsBlockStream}\n</context>` });
+        if (ctxLevel.lessons) {
+          const lessonsBlockStream = getLessonsTracker(process.cwd()).buildContextBlock();
+          if (lessonsBlockStream) {
+            preparedMessages.push({ role: 'system', content: `<context type="lessons">\n${lessonsBlockStream}\n</context>` });
+          }
         }
 
         // --- Knowledge graph context: user preferences, habits, temporal patterns (streaming path) ---
         // Uses memU intent routing: skips injection for trivial messages
-        try {
-          const { getKnowledgeGraph } = await import('../../memory/knowledge-graph.js');
-          const kgStream = getKnowledgeGraph();
-          await kgStream.load();
-          const kgBlockStream = kgStream.formatContextBlockSmart(message, 600);
-          if (kgBlockStream) {
-            preparedMessages.push({ role: 'system', content: kgBlockStream });
-          }
-        } catch { /* knowledge graph is optional */ }
+        if (ctxLevel.knowledgeGraph) {
+          try {
+            const { getKnowledgeGraph } = await import('../../memory/knowledge-graph.js');
+            const kgStream = getKnowledgeGraph();
+            await kgStream.load();
+            const kgBlockStream = kgStream.formatContextBlockSmart(message, 600);
+            if (kgBlockStream) {
+              preparedMessages.push({ role: 'system', content: kgBlockStream });
+            }
+          } catch { /* knowledge graph is optional */ }
+        }
 
         // --- Decision memory context: inject relevant past decisions (streaming path) ---
-        if (this.getDecisionContextProvider()) {
+        if (ctxLevel.decisionMemory && this.getDecisionContextProvider()) {
           try {
-            const decisionsBlockStream = await this.getDecisionContextProvider()!(message);
+            const decisionsBlockStream = await withTimeout(this.getDecisionContextProvider()!(message), 3000, null);
             if (decisionsBlockStream) {
               preparedMessages.push({ role: 'system', content: `<context type="decision">\n${decisionsBlockStream}\n</context>` });
             }
@@ -1189,11 +1225,11 @@ export class AgentExecutor {
         }
 
         // --- ICM cross-session memory: search for relevant past episodes (streaming path) ---
-        if (this.getICMBridgeProvider()) {
+        if (ctxLevel.icmMemory && this.getICMBridgeProvider()) {
           try {
             const icm = this.getICMBridgeProvider()!();
             if (icm?.isAvailable()) {
-              const memories = await icm.searchMemory(message, { limit: 3 });
+              const memories = await withTimeout(icm.searchMemory(message, { limit: 3 }), 3000, []);
               if (memories.length > 0) {
                 const memoryLines = memories.map(m => `- ${m.content}`).join('\n');
                 preparedMessages.push({ role: 'system', content: `<context type="memory">\nRelevant cross-session memories:\n${memoryLines}\n</context>` });
@@ -1203,7 +1239,7 @@ export class AgentExecutor {
         }
 
         // --- Code graph context: ego-graph of entities mentioned in message (streaming path) ---
-        if (this.getCodeGraphContextProvider()) {
+        if (ctxLevel.codeGraph && this.getCodeGraphContextProvider()) {
           try {
             const graphCtxStream = this.getCodeGraphContextProvider()!(message);
             if (graphCtxStream) {
@@ -1213,7 +1249,7 @@ export class AgentExecutor {
         }
 
         // --- Documentation context: relevant doc pages (streaming path) ---
-        if (this.getDocsContextProvider()) {
+        if (ctxLevel.docs && this.getDocsContextProvider()) {
           try {
             const docsCtxStream = this.getDocsContextProvider()!(message);
             if (docsCtxStream) {
@@ -1223,9 +1259,11 @@ export class AgentExecutor {
         }
 
         // --- Manus AI attention bias: append todo.md context at END of messages ---
-        const todoSuffixStream = getTodoTracker(process.cwd()).buildContextSuffix();
-        if (todoSuffixStream) {
-          preparedMessages.push({ role: 'system', content: `<context type="todo">\n${todoSuffixStream}\n</context>` });
+        if (ctxLevel.todo) {
+          const todoSuffixStream = getTodoTracker(process.cwd()).buildContextSuffix();
+          if (todoSuffixStream) {
+            preparedMessages.push({ role: 'system', content: `<context type="todo">\n${todoSuffixStream}\n</context>` });
+          }
         }
 
         // Context warning — always check regardless of pipeline state
@@ -1627,7 +1665,7 @@ export class AgentExecutor {
             const { getAutoCaptureManager } = await import('../../memory/auto-capture.js');
             const acm = getAutoCaptureManager();
             if (acm) {
-              acm.processMessage('assistant', content || '').catch(() => {});
+              acm.processMessage('assistant', content || '').catch(err => logger.debug('Auto-capture failed', { error: String(err) }));
             }
           } catch { /* auto-capture optional */ }
 
@@ -1641,7 +1679,7 @@ export class AgentExecutor {
                   source: 'agent-executor-stream',
                   sessionId: process.env.CODEBUDDY_SESSION_ID,
                   turnNumber: toolRounds,
-                }).catch(() => {});
+                }).catch(err => logger.debug('ICM episode store failed', { error: String(err) }));
               }
             } catch { /* ICM store optional */ }
           }

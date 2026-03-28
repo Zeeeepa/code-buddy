@@ -125,12 +125,31 @@ export async function clearRecoveryFiles(): Promise<void> {
   if (!existsSync(recoveryDir)) return;
 
   try {
-    // Only remove latest.json — let CrashHandler.cleanupOldCrashes() manage the crash files
+    // Remove latest.json
     const latestFile = join(recoveryDir, 'latest.json');
     if (existsSync(latestFile)) {
-      const { unlink } = await import('fs/promises');
-      await unlink(latestFile);
+      await rm(latestFile);
     }
+
+    // Clean up crash_*.json files older than 1 hour
+    const files = await readdir(recoveryDir);
+    const oneHourAgo = Date.now() - 3600000;
+    for (const file of files) {
+      if (file.startsWith('crash_') && file.endsWith('.json')) {
+        const filePath = join(recoveryDir, file);
+        try {
+          const { stat } = await import('fs/promises');
+          const fileStat = await stat(filePath);
+          if (fileStat.mtimeMs < oneHourAgo) {
+            await rm(filePath);
+            logger.debug(`Removed old crash file: ${file}`);
+          }
+        } catch {
+          // Skip files that can't be stat'd or removed
+        }
+      }
+    }
+
     logger.debug('Recovery files cleared');
   } catch (err) {
     logger.debug(`Failed to clear recovery files: ${err instanceof Error ? err.message : String(err)}`);

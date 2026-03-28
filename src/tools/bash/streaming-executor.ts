@@ -137,6 +137,12 @@ export async function* executeStreaming(
   } finally {
     clearTimeout(timer);
     runningProcesses.delete(proc);
+    if (!proc.killed && proc.exitCode === null) {
+      proc.kill('SIGTERM');
+      setTimeout(() => {
+        try { if (!proc.killed) proc.kill('SIGKILL'); } catch { /* already dead */ }
+      }, 5000);
+    }
   }
 
   if (timedOut) {

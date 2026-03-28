@@ -70,6 +70,7 @@ export class CostTracker extends EventEmitter {
   private history: TokenUsage[] = [];
   private sessionStart: Date;
   private dbRepository: AnalyticsRepository | null = null;
+  private _lastBudgetAlertTime = 0;
 
   constructor(config: Partial<CostConfig> = {}) {
     super();
@@ -149,9 +150,10 @@ export class CostTracker extends EventEmitter {
   /**
    * Calculate cost for token usage
    */
-  calculateCost(inputTokens: number, outputTokens: number, model: string): number {
+  calculateCost(inputTokens: number, outputTokens: number, model: string, cachedTokens: number = 0): number {
     const pricing = MODEL_PRICING[model] || MODEL_PRICING["default"];
-    return (inputTokens / 1000) * pricing.inputPer1k +
+    const effectiveInput = inputTokens - cachedTokens + (cachedTokens * 0.5);
+    return (effectiveInput / 1000) * pricing.inputPer1k +
            (outputTokens / 1000) * pricing.outputPer1k;
   }
 
@@ -169,6 +171,17 @@ export class CostTracker extends EventEmitter {
     };
 
     this.sessionUsage.push(usage);
+    const MAX_SESSION_USAGE = 1000;
+    if (this.sessionUsage.length > MAX_SESSION_USAGE) {
+      const pruned = this.sessionUsage.splice(0, this.sessionUsage.length - MAX_SESSION_USAGE);
+      const prunedCost = pruned.reduce((sum, u) => sum + u.cost, 0);
+      const prunedIn = pruned.reduce((sum, u) => sum + u.inputTokens, 0);
+      const prunedOut = pruned.reduce((sum, u) => sum + u.outputTokens, 0);
+      this.sessionUsage.unshift({
+        inputTokens: prunedIn, outputTokens: prunedOut,
+        model: 'aggregated', timestamp: pruned[0].timestamp, cost: prunedCost,
+      });
+    }
     this.history.push(usage);
 
     // Store in SQLite if enabled
@@ -206,6 +219,11 @@ export class CostTracker extends EventEmitter {
    * Check and emit budget alerts
    */
   private checkBudgetAlerts(): void {
+    const now = Date.now();
+    if (now - this._lastBudgetAlertTime < 30_000) {
+      return; // Rate limit: at most one alert per 30 seconds
+    }
+
     const report = this.getReport();
 
     if (this.config.budgetLimit) {
@@ -216,12 +234,14 @@ export class CostTracker extends EventEmitter {
           limit: this.config.budgetLimit,
           current: report.monthlyCost,
         });
+        this._lastBudgetAlertTime = now;
       } else if (this.config.alertThreshold && percentage >= this.config.alertThreshold) {
         this.emit("budget:warning", {
           limit: this.config.budgetLimit,
           current: report.monthlyCost,
           percentage: percentage * 100,
         });
+        this._lastBudgetAlertTime = now;
       }
     }
 
@@ -230,6 +250,7 @@ export class CostTracker extends EventEmitter {
         limit: this.config.dailyLimit,
         current: report.dailyCost,
       });
+      this._lastBudgetAlertTime = now;
     }
   }
 

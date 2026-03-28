@@ -186,7 +186,7 @@ export class SkillManager extends EventEmitter {
     super();
     if (!_skillManagerDeprecationWarned) {
       _skillManagerDeprecationWarned = true;
-      logger.warn('[DEPRECATED] SkillManager is deprecated. Use SKILL.md system (SkillRegistry) instead. See src/skills/MIGRATION.md');
+      logger.debug('[DEPRECATED] SkillManager is deprecated. Use SKILL.md system (SkillRegistry) instead. See src/skills/MIGRATION.md');
     }
     this.skillsDir = path.join(projectRoot, ".codebuddy", "skills");
 

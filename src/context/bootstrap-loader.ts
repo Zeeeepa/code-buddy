@@ -49,7 +49,7 @@ const DEFAULT_BOOTSTRAP_FILES = [
   'BOOTSTRAP.md',
   'AGENTS.md',
   'SOUL.md',
-  'TOOLS.md',
+  // TOOLS.md excluded: tool descriptions are already sent as function definitions
   'IDENTITY.md',
   'USER.md',
   'HEARTBEAT.md',

@@ -3,6 +3,8 @@ import { Text, Box } from 'ink';
 import { marked, type Renderer } from 'marked';
 import TerminalRenderer from 'marked-terminal';
 import { highlight } from 'cli-highlight';
+import hljs from 'highlight.js';
+const { getLanguage } = hljs;
 import { InkTable } from '../components/InkTable.js';
 import { logger } from '../../utils/logger.js';
 
@@ -95,6 +97,7 @@ marked.setOptions({
     // Syntax highlighting for code blocks
     code: (code: string, lang?: string) => {
       try {
+        if (lang && !getLanguage(lang)) { return code; }
         return lang
           ? highlight(code, { language: lang, ignoreIllegals: true })
           : highlight(code, { ignoreIllegals: true });

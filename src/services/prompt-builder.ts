@@ -220,15 +220,17 @@ export class PromptBuilder {
         }
       } catch { /* skills module optional */ }
 
-      // Inject identity (SOUL.md, USER.md, AGENTS.md)
+      // Inject identity (SOUL.md, USER.md, AGENTS.md) — skip if already present to avoid duplication
       try {
-        const { getIdentityManager } = await import('../identity/identity-manager.js');
-        const identityMgr = getIdentityManager();
-        await identityMgr.load(process.cwd());
-        const identityBlock = identityMgr.getPromptInjection();
-        if (identityBlock) {
-          systemPrompt += `\n\n<identity>\n${identityBlock}\n</identity>`;
-          logger.debug('Injected identity into system prompt');
+        if (!systemPrompt.includes('## SOUL.md') && !systemPrompt.includes('## AGENTS.md')) {
+          const { getIdentityManager } = await import('../identity/identity-manager.js');
+          const identityMgr = getIdentityManager();
+          await identityMgr.load(process.cwd());
+          const identityBlock = identityMgr.getPromptInjection();
+          if (identityBlock) {
+            systemPrompt += `\n\n<identity>\n${identityBlock}\n</identity>`;
+            logger.debug('Injected identity into system prompt');
+          }
         }
       } catch { /* identity module optional */ }
 
@@ -281,10 +283,10 @@ export class PromptBuilder {
       const toolConfig = getModelToolConfig(modelName);
       const contextWindow = toolConfig.contextWindow ?? 8192;
       const maxOutputTokens = toolConfig.maxOutputTokens ?? 2048;
-      const budgetTokens = Math.floor((contextWindow - maxOutputTokens) * 0.5);
+      const budgetTokens = Math.min(Math.floor((contextWindow - maxOutputTokens) * 0.5), 32_000); // 32K hard cap
       const budgetChars = budgetTokens * 4; // ~4 chars per token
       if (systemPrompt.length > budgetChars) {
-        logger.warn(`System prompt truncated for ${modelName}: ${systemPrompt.length} chars → ${budgetChars} (budget: ${budgetTokens} tokens)`);
+        logger.warn(`System prompt truncated for ${modelName}: ${systemPrompt.length} chars → ${budgetChars} (budget: ${budgetTokens} tokens, 32K hard cap)`);
         systemPrompt = systemPrompt.slice(0, budgetChars - 3) + '...';
       }
 

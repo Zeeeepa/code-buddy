@@ -60,10 +60,11 @@ export class RunScriptTool extends BaseTool {
       ...((input.env as Record<string, string>) || {}),
     };
 
-    // Validate dependency names to prevent command injection
+    // Validate dependency names via allowlist to prevent command injection
+    const SAFE_DEP_PATTERN = /^(@[a-zA-Z0-9._-]+\/)?[a-zA-Z0-9._-]+([><=~^][a-zA-Z0-9._-]*)?$/;
     for (const dep of dependencies) {
-      if (dep.includes('..') || dep.includes(';') || dep.includes('|') || dep.includes('&') || dep.includes('`') || dep.includes('$') || dep.includes('\n')) {
-        return this.error(`Invalid dependency name: "${dep}" — dependency names cannot contain shell metacharacters`);
+      if (!SAFE_DEP_PATTERN.test(dep)) {
+        return this.error(`Invalid dependency name: "${dep}" — only alphanumeric package names with optional version specifiers are allowed`);
       }
     }
 

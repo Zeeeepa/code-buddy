@@ -2,11 +2,13 @@
  * Tests for legacy skill system deprecation warnings
  */
 
-// Mock logger to capture deprecation warnings (they now use logger.warn, not console.warn)
+// Mock logger to capture deprecation warnings
+// SkillManager uses logger.debug, SkillLoader uses logger.warn
 const mockLoggerWarn = jest.fn();
+const mockLoggerDebug = jest.fn();
 jest.mock('../../src/utils/logger.js', () => ({
   logger: {
-    debug: jest.fn(),
+    debug: (...args: unknown[]) => mockLoggerDebug(...args),
     info: jest.fn(),
     warn: (...args: unknown[]) => mockLoggerWarn(...args),
     error: jest.fn(),
@@ -19,6 +21,7 @@ import { SkillLoader } from '../../src/skills/skill-loader.js';
 describe('Legacy Skill System Deprecation', () => {
   beforeEach(() => {
     mockLoggerWarn.mockClear();
+    mockLoggerDebug.mockClear();
   });
 
   describe('SkillManager deprecation', () => {
@@ -26,8 +29,8 @@ describe('Legacy Skill System Deprecation', () => {
       // Reset the one-time flag by creating a fresh module scope
       // Note: the warning is only emitted once per process due to the flag
       new SkillManager('/tmp/test');
-      // The deprecation warning uses logger.warn with [DEPRECATED] prefix
-      expect(mockLoggerWarn).toHaveBeenCalledWith(
+      // SkillManager deprecation uses logger.debug (not logger.warn) with [DEPRECATED] prefix
+      expect(mockLoggerDebug).toHaveBeenCalledWith(
         expect.stringContaining('DEPRECATED')
       );
     });

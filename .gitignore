@@ -109,6 +109,7 @@ temp/
 
 # Project-local settings (personal overrides, not shared with team)
 .codebuddy/settings.local.json
+.codebuddy/plugins/
 
 # Test artifacts and temp files
 .benchmarks/

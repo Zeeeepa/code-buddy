@@ -1,5 +1,5 @@
 {
-  "model": "gpt-4o",
+  "model": "gemini-2.5-flash",
   "mcpServers": {
     "new-server": {
       "name": "new-server",

@@ -58,6 +58,15 @@ export function setCodeExecSession(sessionId: string): void {
   _activeSessionId = sessionId;
 }
 
+export function clearCodeExecSession(sessionId: string): void {
+  sessionStates.delete(sessionId);
+}
+
+export function clearAllCodeExecSessions(): void {
+  sessionStates.clear();
+  _activeSessionId = 'default';
+}
+
 // Legacy alias (kept for backward compat in tests)
 const _legacyState: CodeExecState = { store: new Map(), output: [], yielded: false };
 void _legacyState;

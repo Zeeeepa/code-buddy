@@ -11,9 +11,13 @@
  */
 
 import { logger } from '../utils/logger.js';
-import { getConfigManager } from './toml-config.js';
 import type { CodeBuddyConfig } from './toml-config.js';
 import { resolveSecretRef } from './secret-ref.js';
+
+async function lazyGetConfigManager() {
+  const { getConfigManager } = await import('./toml-config.js');
+  return getConfigManager();
+}
 
 // ============================================================================
 // Types
@@ -202,7 +206,7 @@ export async function setConfigValue(
   opts?: ConfigSetOptions,
 ): Promise<ConfigSetResult> {
   const dryRun = opts?.dryRun ?? false;
-  const configManager = getConfigManager();
+  const configManager = await lazyGetConfigManager();
   const config = configManager.getConfig() as CodeBuddyConfig;
 
   // Navigate to the target

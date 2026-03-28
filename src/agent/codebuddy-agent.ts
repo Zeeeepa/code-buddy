@@ -68,6 +68,7 @@ export class CodeBuddyAgent extends BaseAgent {
   private costPredictor!: CostPredictor;
   /** Budget alert monitoring */
   private budgetAlertManager: BudgetAlertManager = new BudgetAlertManager();
+  private _budgetAlertListener?: (alert: { type: string; message: string }) => void;
 
   /**
    * Create a new CodeBuddyAgent instance
@@ -157,10 +158,11 @@ export class CodeBuddyAgent extends BaseAgent {
     // Initialize cost prediction and budget alerts
     this.costPredictor = new CostPredictor(this.costTracker);
     this.budgetAlertManager = new BudgetAlertManager();
-    this.budgetAlertManager.on('alert', (alert) => {
+    this._budgetAlertListener = (alert: { type: string; message: string }) => {
       logger.warn(`Budget alert [${alert.type}]: ${alert.message}`);
       this.emit('budget:alert', alert);
-    });
+    };
+    this.budgetAlertManager.on('alert', this._budgetAlertListener);
 
     // Initialize tool selection
     this.useRAGToolSelection = useRAGToolSelection;
@@ -367,19 +369,7 @@ export class CodeBuddyAgent extends BaseAgent {
         // Non-fatal — repo profiling is best-effort
       }
 
-      // Inject knowledge base context if any Knowledge.md files are loaded
-      try {
-        const { getKnowledgeManager } = await import('../knowledge/knowledge-manager.js');
-        const km = getKnowledgeManager();
-        await km.load();
-        const knowledgeBlock = km.buildContextBlock();
-        if (knowledgeBlock) {
-          systemPrompt = `${systemPrompt}\n\n${knowledgeBlock}`;
-          logger.debug('KnowledgeManager: injected knowledge context into system prompt');
-        }
-      } catch {
-        // Non-fatal — knowledge injection is best-effort
-      }
+      // Knowledge base is already injected by PromptBuilder.buildSystemPrompt() — skip duplicate injection here.
 
       this.messages.push({
         role: "system",
@@ -424,7 +414,7 @@ export class CodeBuddyAgent extends BaseAgent {
       const bridge = new ICMBridge();
       // Initialize once MCP client is available
       if (this.mcpClient) {
-        bridge.initialize(this.mcpClient as unknown as import('../memory/icm-bridge.js').MCPToolCaller).catch(() => {});
+        bridge.initialize(this.mcpClient as unknown as import('../memory/icm-bridge.js').MCPToolCaller).catch(err => logger.debug('Optional init failed', { error: String(err) }));
       }
       setICMBridgeProvider(() => bridge);
     }).catch((e) => { logger.debug('ICM bridge module load failed (optional)', { error: String(e) }); });
@@ -439,14 +429,14 @@ export class CodeBuddyAgent extends BaseAgent {
         // Wire graph into workflow guard and reasoning middleware
         import('./middleware/workflow-guard.js').then(({ setWorkflowGuardGraphProvider }) => {
           setWorkflowGuardGraphProvider(() => graph);
-        }).catch(() => {});
+        }).catch(err => logger.debug('Optional init failed', { error: String(err) }));
         import('./middleware/reasoning-middleware.js').then(({ setReasoningGraphProvider }) => {
           setReasoningGraphProvider(() => graph);
-        }).catch(() => {});
+        }).catch(err => logger.debug('Optional init failed', { error: String(err) }));
         // Wire graph into plan tool and fault localizer
         import('../tools/registry/plan-tools.js').then(({ wirePlanToolGraph }) => {
           wirePlanToolGraph(graph);
-        }).catch(() => {});
+        }).catch(err => logger.debug('Optional init failed', { error: String(err) }));
         if (this.repairCoordinator) {
           try {
             this.repairCoordinator.setFaultLocalizerGraph?.(graph);
@@ -465,13 +455,13 @@ export class CodeBuddyAgent extends BaseAgent {
         // Also wire into reasoning middleware + workflow guard
         import('./middleware/reasoning-middleware.js').then(({ setReasoningDocsProvider }) => {
           setReasoningDocsProvider(provider);
-        }).catch(() => {});
+        }).catch(err => logger.debug('Optional init failed', { error: String(err) }));
         import('./middleware/workflow-guard.js').then(({ setWorkflowGuardDocsProvider }) => {
           setWorkflowGuardDocsProvider(provider);
-        }).catch(() => {});
+        }).catch(err => logger.debug('Optional init failed', { error: String(err) }));
         logger.debug('Docs context provider wired into executor + reasoning');
       }
-    }).catch(() => { /* docs context optional */ });
+    }).catch(err => logger.debug('Optional init failed', { error: String(err) }));
   }
 
   private applySkillMatching(message: string): void {
@@ -1251,6 +1241,10 @@ export class CodeBuddyAgent extends BaseAgent {
       this.repairCoordinator.off('repair:success', this.repairListeners.success);
       this.repairCoordinator.off('repair:failed', this.repairListeners.failed);
       this.repairCoordinator.off('repair:error', this.repairListeners.error);
+    }
+    if (this._budgetAlertListener) {
+      this.budgetAlertManager.off('alert', this._budgetAlertListener);
+      this._budgetAlertListener = undefined;
     }
     this.peerRoutingConfig = null;
     super.dispose();
