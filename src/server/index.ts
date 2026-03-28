@@ -30,7 +30,7 @@ import {
   errorHandler,
   notFoundHandler,
 } from './middleware/index.js';
-import { chatRoutes, toolsRoutes, sessionsRoutes, memoryRoutes, healthRoutes, metricsRoutes, createWorkflowApiRouter, createA2AProtocolRoutes, createACPRoutes, createK8sHealthAliases, createDashboardRouter } from './routes/index.js';
+import { chatRoutes, toolsRoutes, sessionsRoutes, memoryRoutes, healthRoutes, metricsRoutes, createWorkflowApiRouter, createA2AProtocolRoutes, createACPRoutes, createK8sHealthAliases, createDashboardRouter, createCloudTaskRoutes, createWebhookRoutes } from './routes/index.js';
 import { setupWebSocket, closeAllConnections, getConnectionStats } from './websocket/index.js';
 import { logger } from '../utils/logger.js';
 import { initMetrics, getMetrics as _getMetrics } from '../metrics/index.js';
@@ -184,6 +184,8 @@ function createApp(config: ServerConfig): Application {
   app.use('/api/workflows', createWorkflowApiRouter());
   app.use('/api/a2a', createA2AProtocolRoutes());
   app.use('/api/acp', createACPRoutes());
+  app.use('/api/cloud/tasks', createCloudTaskRoutes());
+  app.use('/api/webhooks', createWebhookRoutes());
 
   // OpenAI-compatible alias
   app.use('/v1/chat', chatRoutes);
@@ -627,6 +629,7 @@ function createApp(config: ServerConfig): Application {
       docs: '/api/docs',
       health: '/api/health',
       metrics: '/api/metrics',
+      cloud: '/api/cloud/tasks',
       dashboard: '/__codebuddy__/dashboard/',
       metricsDashboard: '/api/metrics/dashboard',
     });
@@ -732,6 +735,23 @@ function createApp(config: ServerConfig): Application {
         '/api/acp/sessions/{name}': {
           get: { summary: 'Get session with tasks', tags: ['ACP'] },
           delete: { summary: 'Delete a session', tags: ['ACP'] },
+        },
+        '/api/cloud/tasks': {
+          get: { summary: 'List cloud background tasks', tags: ['Cloud'] },
+          post: { summary: 'Submit a new cloud background task', tags: ['Cloud'] },
+        },
+        '/api/cloud/tasks/{id}': {
+          get: { summary: 'Get cloud task status and result', tags: ['Cloud'] },
+          delete: { summary: 'Delete a cloud task record', tags: ['Cloud'] },
+        },
+        '/api/cloud/tasks/{id}/stream': {
+          get: { summary: 'SSE stream of cloud task progress', tags: ['Cloud'] },
+        },
+        '/api/cloud/tasks/{id}/cancel': {
+          post: { summary: 'Cancel a running cloud task', tags: ['Cloud'] },
+        },
+        '/api/cloud/tasks/{id}/logs': {
+          get: { summary: 'Get cloud task execution logs', tags: ['Cloud'] },
         },
       },
     });

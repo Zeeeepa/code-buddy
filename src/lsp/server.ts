@@ -37,6 +37,9 @@ import { CodeBuddyClient, CodeBuddyMessage } from '../codebuddy/client.js';
 import { logger } from '../utils/logger.js';
 import { CompletionCache } from './completion-cache.js';
 import { gatherCompletionContext } from './context-gatherer.js';
+import { AICompletionProvider } from './ai-completion-provider.js';
+import type { AICompletionConfig } from './ai-completion-provider.js';
+import { registerInlineCompletionHandler } from './inline-completion-handler.js';
 
 // Create connection
 const connection = createConnection(ProposedFeatures.all);
@@ -54,6 +57,8 @@ interface CodeBuddyLSPSettings {
   enableDiagnostics: boolean;
   enableCompletions: boolean;
   maxTokens: number;
+  /** AI inline completion settings */
+  aiCompletion?: Partial<AICompletionConfig>;
 }
 
 const defaultSettings: CodeBuddyLSPSettings = {
@@ -62,12 +67,25 @@ const defaultSettings: CodeBuddyLSPSettings = {
   enableDiagnostics: true,
   enableCompletions: true,
   maxTokens: 2048,
+  aiCompletion: {
+    enabled: true,
+    debounceMs: 300,
+    maxSuggestions: 3,
+    maxTokens: 200,
+  },
 };
 
 let globalSettings: CodeBuddyLSPSettings = defaultSettings;
 
 // LRU cache for completions (100 entries, 5s TTL)
 const completionCacheLRU = new CompletionCache({ maxEntries: 100, ttlMs: 5000 });
+
+// AI completion provider (initialized after client is ready)
+const aiCompletionProvider = new AICompletionProvider(
+  null,
+  completionCacheLRU,
+  defaultSettings.aiCompletion,
+);
 
 connection.onInitialize((_params: InitializeParams): InitializeResult => {
   logger.info('Code Buddy LSP server initializing...');
@@ -105,10 +123,19 @@ connection.onInitialized(() => {
   const apiKey = process.env.GROK_API_KEY || globalSettings.apiKey;
   if (apiKey) {
     codebuddyClient = new CodeBuddyClient(apiKey, globalSettings.model);
+    aiCompletionProvider.setClient(codebuddyClient);
     logger.info('Code Buddy client initialized');
   } else {
     logger.warn('No API key configured');
   }
+
+  // Update AI completion config from settings
+  if (globalSettings.aiCompletion) {
+    aiCompletionProvider.updateConfig(globalSettings.aiCompletion);
+  }
+
+  // Register inline completion handler (textDocument/inlineCompletion)
+  registerInlineCompletionHandler(connection, documents, aiCompletionProvider);
 });
 
 // Configuration change
@@ -122,6 +149,12 @@ connection.onDidChangeConfiguration((change) => {
   const apiKey = process.env.GROK_API_KEY || globalSettings.apiKey;
   if (apiKey) {
     codebuddyClient = new CodeBuddyClient(apiKey, globalSettings.model);
+    aiCompletionProvider.setClient(codebuddyClient);
+  }
+
+  // Update AI completion config
+  if (globalSettings.aiCompletion) {
+    aiCompletionProvider.updateConfig(globalSettings.aiCompletion);
   }
 
   // Revalidate all documents
@@ -284,6 +317,27 @@ Return JSON: [{"label": "<completion>", "detail": "<description>", "kind": "func
 
       // Cache results in LRU cache (auto-expires via TTL)
       completionCacheLRU.set(cacheKey, completions);
+
+      // Add AI-powered completions alongside static completions
+      if (aiCompletionProvider.getConfig().enabled) {
+        try {
+          const aiItems = await aiCompletionProvider.provideCompletions(
+            filePath,
+            { line, character },
+            {
+              prefix: ctx.prefix,
+              suffix: ctx.suffix,
+              language: ctx.language,
+              filePath: ctx.filePath,
+              linesBefore: ctx.linesBefore,
+              linesAfter: ctx.linesAfter,
+            },
+          );
+          completions.push(...aiItems);
+        } catch (aiError) {
+          logger.error(`AI completion error: ${aiError}`);
+        }
+      }
 
       return completions;
     } catch (error) {

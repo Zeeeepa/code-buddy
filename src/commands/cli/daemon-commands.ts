@@ -233,4 +233,106 @@ export function registerTriggerCommands(program: Command): void {
         process.exit(1);
       }
     });
+
+  // Webhook trigger subcommands
+  triggerCommand
+    .command("add-webhook")
+    .description("Add a webhook trigger (GitHub, GitLab, Slack, Linear, PagerDuty, generic)")
+    .requiredOption("--source <source>", "Webhook source (github, gitlab, slack, linear, pagerduty, generic)")
+    .requiredOption("--events <events>", "Comma-separated event list (e.g. pull_request.opened,issues.created)")
+    .requiredOption("--action <action>", "Prompt template with {{event}} variables")
+    .option("--secret <secret>", "Webhook secret for signature verification")
+    .option("--name <name>", "Trigger name")
+    .option("--filter <filter>", "Comma-separated key=value filters (e.g. label=bug,repo=my-repo)")
+    .action(async (opts: { source: string; events: string; action: string; secret?: string; name?: string; filter?: string }) => {
+      const { getWebhookTriggerManager } = await import("../../triggers/webhook-trigger.js");
+      const manager = getWebhookTriggerManager();
+      await manager.load();
+
+      const events = opts.events.split(",").map(e => e.trim()).filter(Boolean);
+      const filters: Record<string, string> = {};
+      if (opts.filter) {
+        for (const part of opts.filter.split(",")) {
+          const [k, v] = part.split("=");
+          if (k && v) filters[k.trim()] = v.trim();
+        }
+      }
+
+      const config = {
+        id: "",
+        name: opts.name || `${opts.source} webhook (${events.join(", ")})`,
+        source: opts.source as 'github' | 'gitlab' | 'slack' | 'linear' | 'pagerduty' | 'generic',
+        events,
+        action: opts.action,
+        secret: opts.secret,
+        enabled: true,
+        filters: Object.keys(filters).length > 0 ? filters : undefined,
+        createdAt: "",
+        fireCount: 0,
+      };
+
+      manager.addTrigger(config);
+      await manager.save();
+
+      console.log(`Webhook trigger created: ${config.id.slice(0, 8)}`);
+      console.log(`  Source: ${config.source}`);
+      console.log(`  Events: ${config.events.join(", ")}`);
+      console.log(`  Action: ${config.action}`);
+      console.log(`  Webhook URL: POST /api/webhooks/${config.source}`);
+    });
+
+  triggerCommand
+    .command("list-webhooks")
+    .description("List webhook triggers")
+    .action(async () => {
+      const { getWebhookTriggerManager } = await import("../../triggers/webhook-trigger.js");
+      const manager = getWebhookTriggerManager();
+      await manager.load();
+
+      const triggers = manager.listTriggers();
+      if (triggers.length === 0) {
+        console.log("No webhook triggers configured.");
+        console.log("Use 'codebuddy trigger add-webhook' to create one.");
+      } else {
+        console.log(`Webhook Triggers (${triggers.length}):\n`);
+        for (const t of triggers) {
+          const status = t.enabled ? "+" : "-";
+          const lastFired = t.lastFiredAt
+            ? `last: ${new Date(t.lastFiredAt).toLocaleString()}`
+            : "never fired";
+          console.log(`  ${status} [${t.id.slice(0, 8)}] ${t.name}`);
+          console.log(`    Source: ${t.source} | Events: ${t.events.join(", ")}`);
+          console.log(`    Fired: ${t.fireCount}x (${lastFired})`);
+          console.log(`    Action: ${t.action.slice(0, 80)}${t.action.length > 80 ? "..." : ""}`);
+        }
+      }
+    });
+
+  triggerCommand
+    .command("test <id>")
+    .description("Test a webhook trigger with sample data")
+    .option("--sample-event <json>", "Sample event JSON")
+    .action(async (id: string, opts: { sampleEvent?: string }) => {
+      const { getWebhookTriggerManager } = await import("../../triggers/webhook-trigger.js");
+      const manager = getWebhookTriggerManager();
+      await manager.load();
+
+      const triggers = manager.listTriggers();
+      const match = triggers.find(t => t.id === id || t.id.startsWith(id));
+      if (!match) {
+        console.error(`Webhook trigger not found: ${id}`);
+        process.exit(1);
+      }
+
+      // Use the slash command handler's sample event builder
+      const { handleTrigger } = await import("../handlers/trigger-handlers.js");
+      const testArgs = ['test', match.id];
+      if (opts.sampleEvent) {
+        testArgs.push('--sample-event', opts.sampleEvent);
+      }
+      const result = await handleTrigger(testArgs);
+      if (result.entry) {
+        console.log(result.entry.content);
+      }
+    });
 }

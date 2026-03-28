@@ -170,6 +170,30 @@ export interface AgentDefaultsConfig {
 }
 
 /**
+ * LSP AI completion configuration
+ */
+export interface LSPAICompletionConfig {
+  /** Whether AI-powered inline completions are enabled */
+  enabled?: boolean;
+  /** Debounce delay in milliseconds before sending completion request */
+  debounceMs?: number;
+  /** Maximum number of AI suggestions to return */
+  maxSuggestions?: number;
+  /** Maximum tokens per completion response */
+  maxTokens?: number;
+  /** Optional model override for completions (uses default model if not set) */
+  model?: string;
+}
+
+/**
+ * LSP server configuration
+ */
+export interface LSPConfig {
+  /** AI-powered inline completion settings */
+  aiCompletion?: LSPAICompletionConfig;
+}
+
+/**
  * Named configuration profile — a subset of config keys applied on top of the base config.
  * Activate with: `buddy --profile <name>`
  *
@@ -207,6 +231,8 @@ export interface CodeBuddyConfig {
   model_pairs?: ModelPairsConfig;
   /** Agent defaults (model preferences) — OpenClaw v2026.3.14 */
   agent_defaults?: AgentDefaultsConfig;
+  /** LSP server settings (AI completions, etc.) */
+  lsp?: LSPConfig;
   /** Named configuration profiles (activated via --profile <name>) */
   profiles?: Record<string, ProfileConfig>;
 }

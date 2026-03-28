@@ -146,6 +146,10 @@ import {
   handleDev,
   // Replace handler (codebase-wide find & replace)
   handleReplace,
+  // Cloud handlers (background agent tasks)
+  handleCloud,
+  // Trigger handlers (event-driven webhook triggers)
+  handleTrigger,
 } from "./handlers/index.js";
 
 import { handleLessonsCommand } from "./handlers/lessons-handler.js";
@@ -477,6 +481,12 @@ export class EnhancedCommandHandler {
 
     // Codebase-wide find & replace
     ['__REPLACE__', (args) => handleReplace(args)],
+
+    // Cloud background agent tasks
+    ['__CLOUD__', (args) => handleCloud(args)],
+
+    // Event-driven webhook triggers
+    ['__TRIGGER__', (args) => handleTrigger(args)],
   ]);
 
   /**

@@ -316,5 +316,15 @@ export {
   handleReplace,
 } from './replace-handler.js';
 
+// Cloud handlers (background agent tasks)
+export {
+  handleCloud,
+} from './cloud-handlers.js';
+
+// Trigger handlers (event-driven webhook triggers)
+export {
+  handleTrigger,
+} from './trigger-handlers.js';
+
 // Re-export CommandHandlerResult type
 export type { CommandHandlerResult } from './branch-handlers.js';

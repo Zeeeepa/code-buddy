@@ -1168,6 +1168,26 @@ const goldenPathCommands: SlashCommand[] = [
       { name: 'replacement', description: 'Replacement string', required: true }
     ]
   },
+  {
+    name: 'cloud',
+    description: 'Manage cloud background agent tasks (submit, status, list, cancel, logs)',
+    prompt: '__CLOUD__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'action', description: 'submit "<goal>", status <taskId>, list, cancel <taskId>, logs <taskId>, delete <taskId>', required: false }
+    ]
+  },
+  {
+    name: 'trigger',
+    description: 'Manage event-driven webhook triggers (GitHub, GitLab, Slack, Linear, PagerDuty)',
+    prompt: '__TRIGGER__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'action', description: 'add --source <s> --events <e> --action <a>, list, remove <id>, test <id>', required: false }
+    ]
+  },
 ];
 
 // ============================================================================

@@ -2198,6 +2198,17 @@ program
     if (result.response) console.log(result.response);
   });
 
+// Cloud — background agent tasks (Cursor/Codex parity)
+program
+  .command('cloud [subcommand] [args...]')
+  .description('Manage cloud background agent tasks (submit, status, list, cancel, logs)')
+  .action(async (subcommand: string | undefined, args: string[]) => {
+    const { handleCloud } = await import('./commands/handlers/cloud-handlers.js');
+    const fullArgs = [subcommand || 'list', ...(args || [])];
+    const result = await handleCloud(fullArgs);
+    if (result.entry?.content) console.log(result.entry.content);
+  });
+
 // Completions — generate or install shell completion scripts
 addLazyCommand(
   program,
