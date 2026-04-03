@@ -159,3 +159,9 @@ test.ts
 test.txt
 test1.ts
 C?Userspatri*
+
+# Code Buddy Cowork (Electron desktop app)
+cowork/node_modules/
+cowork/dist/
+cowork/dist-electron/
+cowork/release/
