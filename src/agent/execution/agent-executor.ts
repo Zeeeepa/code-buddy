@@ -33,6 +33,7 @@ import { repairToolCallPairs } from "../../context/transcript-repair.js";
 import { shouldCompactBeforeToolExec, estimateToolResultTokens } from "../../context/proactive-compaction.js";
 import { formatTokenUsage, estimateCost } from "../../utils/token-display.js";
 import { classifyQuery } from "./query-classifier.js";
+import { getUserHooksManager } from "../../hooks/user-hooks.js";
 
 /**
  * Race a promise against a timeout, returning the fallback value if the
@@ -746,8 +747,41 @@ export class AgentExecutor {
             const newIdx = newEntries.length;
             newEntries.push(toolCallEntry);
 
+            // --- User hooks: PreToolUse ---
+            try {
+              const toolArgs = JSON.parse(toolCall.function.arguments || '{}');
+              const preHookResult = await getUserHooksManager(process.cwd()).executeHooks('PreToolUse', {
+                toolName: toolCall.function.name,
+                toolInput: toolArgs,
+              });
+              if (!preHookResult.allowed) {
+                const blockedEntry: ChatEntry = {
+                  ...toolCallEntry,
+                  type: 'tool_result',
+                  content: preHookResult.feedback ?? 'Action blocked by PreToolUse hook',
+                  toolResult: { success: false, error: preHookResult.feedback ?? 'Blocked by hook' },
+                };
+                history[histIdx] = blockedEntry;
+                newEntries[newIdx] = blockedEntry;
+                messages.push({
+                  role: 'tool',
+                  tool_call_id: toolCall.id,
+                  content: preHookResult.feedback ?? 'Action blocked by PreToolUse hook',
+                } as CodeBuddyMessage);
+                continue;
+              }
+            } catch { /* user hooks are non-critical */ }
+
             const _toolStartMs = Date.now();
             const result = await this.executeToolViaLane(toolCall);
+            // --- User hooks: PostToolUse / PostToolUseFailure ---
+            try {
+              const hookEvent = result.success ? 'PostToolUse' : 'PostToolUseFailure';
+              await getUserHooksManager(process.cwd()).executeHooks(hookEvent, {
+                toolName: toolCall.function.name,
+                toolResult: { success: result.success, output: result.output },
+              });
+            } catch { /* user hooks are non-critical */ }
             // --- Per-tool metrics (DeepWiki gap #3) ---
             try {
               const { getToolMetricsTracker } = await import('../../observability/tool-metrics.js');
@@ -1436,6 +1470,25 @@ export class AgentExecutor {
               }
             } catch { /* proactive compaction is non-critical */ }
 
+            // --- User hooks: PreToolUse (streaming path) ---
+            try {
+              const streamToolArgs = JSON.parse(toolCall.function.arguments || '{}');
+              const streamPreHook = await getUserHooksManager(process.cwd()).executeHooks('PreToolUse', {
+                toolName: toolCall.function.name,
+                toolInput: streamToolArgs,
+              });
+              if (!streamPreHook.allowed) {
+                const blockedContent = streamPreHook.feedback ?? 'Action blocked by PreToolUse hook';
+                yield { type: "content", content: `\n[Hook blocked: ${blockedContent}]\n` };
+                messages.push({
+                  role: 'tool',
+                  tool_call_id: toolCall.id,
+                  content: blockedContent,
+                } as CodeBuddyMessage);
+                continue;
+              }
+            } catch { /* user hooks are non-critical */ }
+
             // Use streaming execution for tools that support it (bash, reason, + adapter-based)
             let result;
             const _streamToolStartMs = Date.now();
@@ -1494,6 +1547,14 @@ export class AgentExecutor {
               }
             }
 
+            // --- User hooks: PostToolUse / PostToolUseFailure (streaming path) ---
+            try {
+              const streamHookEvent = result.success ? 'PostToolUse' : 'PostToolUseFailure';
+              await getUserHooksManager(process.cwd()).executeHooks(streamHookEvent, {
+                toolName: toolCall.function.name,
+                toolResult: { success: result.success, output: result.output },
+              });
+            } catch { /* user hooks are non-critical */ }
             // --- Per-tool metrics (streaming path, DeepWiki gap #3) ---
             try {
               const { getToolMetricsTracker } = await import('../../observability/tool-metrics.js');

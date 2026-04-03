@@ -11,6 +11,8 @@
  */
 
 import { EventEmitter } from 'events';
+import { execSync } from 'child_process';
+import path from 'path';
 import { logger } from '../../utils/logger.js';
 import { readAgentMemory, appendAgentMemory, type AgentMemoryScope } from './agent-memory-integration.js';
 import type { ContextEngine } from '../../context/context-engine.js';
@@ -32,6 +34,10 @@ export interface AgentThread {
   result?: string;
   /** CC14: Persistent memory scope */
   memoryScope?: 'user' | 'project' | 'local';
+  /** Worktree isolation: filesystem path to the git worktree */
+  worktreePath?: string;
+  /** Worktree isolation: branch name created for this agent */
+  worktreeBranch?: string;
 }
 
 export interface SpawnOptions {
@@ -43,6 +49,8 @@ export interface SpawnOptions {
   memory?: 'user' | 'project' | 'local';
   /** OpenClaw v2026.3.14: Parent yields turn until sub-agent completes */
   yield?: boolean;
+  /** Worktree isolation: each sub-agent gets its own git worktree */
+  isolation?: 'worktree';
 }
 
 /** Sentinel value returned by spawn_agent when yield=true, detected by agent-executor */
@@ -168,6 +176,20 @@ export function spawnAgent(options: SpawnOptions): AgentThread | (AgentThread & 
   }
 
   messageQueues.set(id, [initialPrompt]);
+
+  // Worktree isolation: create a dedicated git worktree for this agent
+  if (options.isolation === 'worktree') {
+    const worktreePath = path.join(process.cwd(), '.codebuddy', 'worktrees', id);
+    const branchName = `codebuddy/agent/${id}`;
+    try {
+      execSync(`git worktree add "${worktreePath}" -b "${branchName}"`, { cwd: process.cwd(), stdio: 'pipe' });
+      thread.worktreePath = worktreePath;
+      thread.worktreeBranch = branchName;
+      logger.info(`Agent ${thread.nickname}: isolated worktree at ${worktreePath}`);
+    } catch (err) {
+      logger.warn(`Agent ${thread.nickname}: worktree creation failed, running in shared directory`, { error: String(err) });
+    }
+  }
 
   // Context engine prepareSubagentSpawn hook (OpenClaw v2026.3.7)
   if (contextEngineProvider) {
@@ -374,6 +396,32 @@ export function closeAgent(agentId: string): boolean {
       const engine = contextEngineProvider();
       engine?.onSubagentEnded?.(agentId, [], thread.result);
     } catch { /* context engine hook optional */ }
+  }
+
+  // Worktree isolation: commit changes and remove the worktree
+  if (thread.worktreePath && thread.worktreeBranch) {
+    try {
+      const status = execSync('git status --porcelain', {
+        cwd: thread.worktreePath,
+        encoding: 'utf-8',
+      }).trim();
+      if (status) {
+        execSync(`git add -A && git commit -m "Agent work: ${thread.nickname}"`, {
+          cwd: thread.worktreePath,
+          stdio: 'pipe',
+        });
+      }
+      execSync(`git worktree remove "${thread.worktreePath}" --force`, {
+        cwd: process.cwd(),
+        stdio: 'pipe',
+      });
+      execSync(`git branch -D "${thread.worktreeBranch}"`, {
+        cwd: process.cwd(),
+        stdio: 'pipe',
+      });
+    } catch (err) {
+      logger.debug('Worktree cleanup failed', { error: String(err) });
+    }
   }
 
   agentEvents.emit('close', thread);

@@ -26,6 +26,7 @@ import { MessageQueue, type MessageQueueMode } from "./message-queue.js";
 import { CostPredictor } from "../analytics/cost-predictor.js";
 import { BudgetAlertManager } from "../analytics/budget-alerts.js";
 import { initializeMemory, getMemoryManager } from "../memory/persistent-memory.js";
+import { getUserHooksManager } from "../hooks/user-hooks.js";
 
 // Re-export types for backwards compatibility
 export type { ChatEntry, StreamingChunk } from "./types.js";
@@ -346,6 +347,11 @@ export class CodeBuddyAgent extends BaseAgent {
 
     // Initialize system prompt (async operation) — track readiness
     this.systemPromptReady = this.initializeAgentSystemPrompt(systemPromptId, modelToUse, customInstructions);
+
+    // Fire SessionStart user hook (non-blocking)
+    getUserHooksManager(process.cwd()).executeHooks('SessionStart', {}).catch(
+      (err) => logger.debug(`[user-hooks] SessionStart error: ${err}`)
+    );
   }
 
   /** Resolves when the system prompt has been loaded (or failed gracefully). */
@@ -1245,6 +1251,10 @@ export class CodeBuddyAgent extends BaseAgent {
    * Should be called when the agent is no longer needed
    */
   dispose(): void {
+    // Fire SessionEnd user hook (non-blocking)
+    getUserHooksManager(process.cwd()).executeHooks('SessionEnd', {}).catch(
+      (err) => logger.debug(`[user-hooks] SessionEnd error: ${err}`)
+    );
     // Remove only the forwarding listeners we attached (not other listeners)
     if (this.repairListeners.start) {
       this.repairCoordinator.off('repair:start', this.repairListeners.start);
