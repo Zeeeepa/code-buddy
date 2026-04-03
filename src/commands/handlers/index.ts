@@ -327,5 +327,10 @@ export {
   handleTrigger,
 } from './trigger-handlers.js';
 
+// Infra handlers (TurboQuant health dashboard)
+export {
+  handleInfra,
+} from './infra-handlers.js';
+
 // Re-export CommandHandlerResult type
 export type { CommandHandlerResult } from './branch-handlers.js';

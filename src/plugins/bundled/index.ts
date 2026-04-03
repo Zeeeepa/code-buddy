@@ -17,6 +17,7 @@ import { createAzureProvider } from './azure-provider.js';
 import { createGroqProvider } from './groq-provider.js';
 import { createTogetherProvider } from './together-provider.js';
 import { createFireworksProvider } from './fireworks-provider.js';
+import { loadTurboQuantPlugin } from './turboquant-plugin.js';
 import type { PluginProvider } from '../types.js';
 
 /**
@@ -52,6 +53,9 @@ export function getBundledProviders(): PluginProvider[] {
 
   const fireworks = createFireworksProvider();
   if (fireworks) providers.push(fireworks);
+
+  const turboquant = loadTurboQuantPlugin();
+  if (turboquant) providers.push(turboquant);
 
   return providers;
 }

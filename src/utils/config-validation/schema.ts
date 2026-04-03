@@ -157,6 +157,33 @@ export const SettingsSchema = z.object({
   thinkingLevel: z.enum(['off', 'minimal', 'low', 'medium', 'high'])
     .optional()
     .describe('Gemini 3.x thinking/reasoning depth level'),
+
+  turboquant: z.object({
+    vllmEndpoint: z.string().url().optional()
+      .describe('vLLM endpoint URL, e.g. http://192.168.1.50:8000'),
+    ollamaEndpoint: z.string().url().optional()
+      .describe('Ollama endpoint URL, e.g. http://localhost:11434'),
+    turboquant: z.object({
+      enabled: z.boolean().default(true),
+      nbits: z.union([z.literal(2), z.literal(4)]).default(4)
+        .describe('KV cache quantization bits: 2 = higher compression, 4 = balanced'),
+      residualLength: z.number().int().min(0).default(128)
+        .describe('Tokens kept at full precision'),
+      mode: z.enum(['mse', 'prod']).default('mse'),
+      rotation: z.enum(['dense_gaussian', 'walsh_hadamard']).default('walsh_hadamard'),
+      skipLayers: z.union([z.array(z.number().int()), z.literal('auto')]).default('auto'),
+    }).optional(),
+    modelRouting: z.object({
+      lightweight: z.string().default('llama3.2')
+        .describe('Ollama model for short/simple requests'),
+      heavy: z.string().default('qwen2.5-72b-instruct')
+        .describe('vLLM model for long/complex requests'),
+      complexityThreshold: z.union([z.literal('auto'), z.number().int().positive()])
+        .default('auto')
+        .describe('Token count above which requests go to vLLM'),
+    }).optional(),
+  }).optional()
+    .describe('TurboQuant local inference routing (Ollama + vLLM with KV cache quantization)'),
 }).strict();
 
 export type Settings = z.infer<typeof SettingsSchema>;

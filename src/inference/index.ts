@@ -8,3 +8,5 @@
 
 export * from './kv-cache-config.js';
 export * from './speculative-decoding.js';
+export * from './inference-optimizer.js';
+export * from './health-monitor.js';

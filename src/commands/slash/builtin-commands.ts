@@ -1331,6 +1331,16 @@ const newFeatureCommands: SlashCommand[] = [
       { name: 'file', description: 'File or directory to transform', required: false }
     ]
   },
+  {
+    name: 'infra',
+    description: 'Show infrastructure health dashboard (Ollama, vLLM, TurboQuant routing stats)',
+    prompt: '__INFRA__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'subcommand', description: 'status (default), stats, health', required: false }
+    ]
+  },
 ];
 
 // ============================================================================

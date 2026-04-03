@@ -151,6 +151,8 @@ import {
   handleCloud,
   // Trigger handlers (event-driven webhook triggers)
   handleTrigger,
+  // Infra handlers (TurboQuant health dashboard)
+  handleInfra,
 } from "./handlers/index.js";
 
 import { handleLessonsCommand } from "./handlers/lessons-handler.js";
@@ -511,6 +513,9 @@ export class EnhancedCommandHandler {
 
     // Event-driven webhook triggers
     ['__TRIGGER__', (args) => handleTrigger(args)],
+
+    // Infra health dashboard (TurboQuant)
+    ['__INFRA__', (args) => handleInfra(args)],
   ]);
 
   /**
