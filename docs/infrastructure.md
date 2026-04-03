@@ -171,3 +171,35 @@ Worker thread isolation via `isolated-plugin-runner.ts` with conflict detection.
 - **Telemetry toggle**: `/telemetry on|off|errors-only`
 - **Per-message display**: `[tokens: X in / Y out | cost: $Z]` after each response
 - **Prompt cache stats**: tracks OpenAI/xAI cached_tokens and hit ratio
+
+## Desktop App (Open Cowork Integration)
+
+Code Buddy can be used as the backend for [Open Cowork](https://github.com/phuetz/open-cowork), an Electron desktop app providing:
+
+- **GUI interface** — React + Tailwind chat UI replacing the terminal TUI
+- **Sandbox VM** — WSL2 (Windows) / Lima (macOS) isolation
+- **GUI automation** — control desktop apps via screenshots + clicks
+- **Document generation** — PPTX, DOCX, XLSX via Skills system
+- **MCP connectors** — browser, Notion, and custom app integration
+
+### Setup
+
+1. Install Open Cowork from [releases](https://github.com/phuetz/open-cowork/releases)
+2. Start Code Buddy server: `buddy --server`
+3. In Open Cowork settings, enable Code Buddy backend:
+   - Endpoint: `http://localhost:3000`
+   - The desktop app routes all LLM calls through Code Buddy's 110+ tools
+
+### Architecture
+
+```
+Open Cowork (Electron GUI)
+    │
+    ├─ HTTP POST /api/chat/completions ──→ Code Buddy Server
+    │                                       ├─ 15 LLM providers
+    │                                       ├─ 110+ tools + RAG selection
+    │                                       ├─ MCTSr reasoning
+    │                                       └─ TurboQuant local inference
+    │
+    └─ MCP servers (shared) ──→ Browser, Notion, etc.
+```
