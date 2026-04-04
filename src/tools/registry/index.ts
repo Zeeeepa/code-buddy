@@ -270,6 +270,13 @@ export {
   resetCodebaseReplaceInstances,
 } from './codebase-replace-tools.js';
 
+// Tool Adapters - GUI Control (gui_control)
+export {
+  GuiControlTool,
+  createGuiTools,
+  resetGuiToolInstance,
+} from './gui-tools.js';
+
 // Tool Prefix Naming Convention — Codex-inspired canonical aliases
 export {
   createAliasTools,
