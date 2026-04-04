@@ -10,6 +10,7 @@ import {
   AlertCircle,
   Globe,
   ChevronRight,
+  Zap,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useWindowSize } from '../hooks/useWindowSize';
@@ -22,6 +23,7 @@ import { SettingsSkills } from './settings/SettingsSkills';
 import { SettingsSchedule } from './settings/SettingsSchedule';
 import { SettingsGeneral } from './settings/SettingsGeneral';
 import { SettingsLogs } from './settings/SettingsLogs';
+import { SettingsCodeBuddy } from './settings/SettingsCodeBuddy';
 
 interface SettingsPanelProps {
   onClose: () => void;
@@ -33,11 +35,13 @@ interface SettingsPanelProps {
     | 'schedule'
     | 'remote'
     | 'logs'
+    | 'codebuddy'
     | 'general';
 }
 
 type TabId =
   | 'api'
+  | 'codebuddy'
   | 'sandbox'
   | 'connectors'
   | 'skills'
@@ -48,6 +52,7 @@ type TabId =
 
 const VALID_TABS = new Set<TabId>([
   'api',
+  'codebuddy',
   'sandbox',
   'connectors',
   'skills',
@@ -103,6 +108,12 @@ export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProp
       label: t('settings.apiSettings'),
       icon: Settings,
       description: t('settings.apiSettingsDesc'),
+    },
+    {
+      id: 'codebuddy' as TabId,
+      label: 'Code Buddy',
+      icon: Zap,
+      description: 'Local agentic backend with 110+ tools',
     },
     {
       id: 'sandbox' as TabId,
@@ -161,7 +172,7 @@ export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProp
               {t('settings.title')}
             </p>
             <h2 className="mt-1 text-[1.24rem] font-semibold tracking-[-0.03em] text-text-primary">
-              Open Cowork
+              Code Buddy Cowork
             </h2>
             <p className="mt-1 text-[11px] leading-4 text-text-muted">{t('settings.panelDesc')}</p>
           </div>
@@ -241,6 +252,9 @@ export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProp
                     <SettingsAPI />
                   </>
                 )}
+              </div>
+              <div className={activeTab === 'codebuddy' ? '' : 'hidden'}>
+                {viewedTabs.has('codebuddy') && <SettingsCodeBuddy />}
               </div>
               <div className={activeTab === 'sandbox' ? '' : 'hidden'}>
                 {viewedTabs.has('sandbox') && <SettingsSandbox />}
