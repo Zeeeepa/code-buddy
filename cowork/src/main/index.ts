@@ -18,7 +18,7 @@ import * as fs from 'fs';
 import { execFileSync } from 'child_process';
 import { config } from 'dotenv';
 import { initDatabase, closeDatabase } from './db/database';
-import { SessionManager } from './session/session-manager';
+import { SessionManager, type EngineAdapterLike } from './session/session-manager';
 import { SkillsManager } from './skills/skills-manager';
 import { PluginCatalogService } from './skills/plugin-catalog-service';
 import { PluginRuntimeService } from './skills/plugin-runtime-service';
@@ -813,9 +813,53 @@ app
 
     pluginRuntimeService = new PluginRuntimeService(new PluginCatalogService());
 
+    // Initialize Code Buddy engine adapter if running in embedded mode
+    let engineAdapter: EngineAdapterLike | undefined;
+    if (process.env.CODEBUDDY_EMBEDDED === '1') {
+      try {
+        const enginePath = process.env.CODEBUDDY_ENGINE_PATH || resolve(app.getAppPath(), '..', 'dist');
+        const { CodeBuddyEngineAdapter } = await import(
+          /* webpackIgnore: true */ resolve(enginePath, 'desktop', 'codebuddy-engine-adapter.js')
+        );
+        const apiConfig = configStore.getAll();
+        engineAdapter = new CodeBuddyEngineAdapter({
+          apiKey: apiConfig.apiKey || process.env.GROK_API_KEY || '',
+          baseURL: apiConfig.baseUrl || process.env.GROK_BASE_URL,
+          model: apiConfig.model,
+          workingDirectory: currentWorkingDir || process.cwd(),
+          embedded: true,
+        }) as EngineAdapterLike;
+        // Wire permission bridge for engine tool approvals
+        try {
+          const { DesktopPermissionBridge } = await import(
+            /* webpackIgnore: true */ resolve(enginePath, 'desktop', 'permission-bridge.js')
+          );
+          const permissionBridge = new DesktopPermissionBridge(sendToRenderer);
+          if (typeof (engineAdapter as Record<string, unknown>).setPermissionCallback === 'function') {
+            (engineAdapter as { setPermissionCallback: (cb: unknown) => void }).setPermissionCallback(
+              permissionBridge.requestPermission.bind(permissionBridge)
+            );
+          }
+
+          // Handle permission responses from renderer
+          ipcMain.on('permission.bridge.response', (_event, { id, response }: { id: string; response: string }) => {
+            permissionBridge.handleResponse(id, response as 'allow' | 'deny' | 'allow_always');
+          });
+
+          log('[Main] Permission bridge wired to engine adapter');
+        } catch (permErr) {
+          logWarn('[Main] Failed to wire permission bridge:', permErr);
+        }
+
+        log('[Main] Code Buddy engine adapter initialized (embedded mode)');
+      } catch (err) {
+        logWarn('[Main] Failed to load Code Buddy engine, falling back to pi-coding-agent:', err);
+      }
+    }
+
     // Initialize session manager before creating an interactive window.
     // This avoids session.start racing the startup path and hitting a null manager.
-    sessionManager = new SessionManager(db, sendToRenderer, pluginRuntimeService);
+    sessionManager = new SessionManager(db, sendToRenderer, pluginRuntimeService, engineAdapter);
     skillsManager = new SkillsManager(db, {
       getConfiguredGlobalSkillsPath: () => configStore.get('globalSkillsPath') || '',
       setConfiguredGlobalSkillsPath: (nextPath: string) => {
@@ -1147,6 +1191,100 @@ ipcMain.handle('get-version', () => {
     logError('[IPC] Error getting version:', error);
     return 'unknown';
   }
+});
+
+// ── Checkpoint IPC handlers ────────────────────────────────────────────
+ipcMain.handle('checkpoint.list', async () => {
+  try {
+    const enginePath = process.env.CODEBUDDY_ENGINE_PATH;
+    if (!enginePath) return null;
+    const { getGhostSnapshotManager } = await import(
+      /* webpackIgnore: true */ resolve(enginePath, 'checkpoints', 'ghost-snapshot.js')
+    );
+    const gsm = getGhostSnapshotManager();
+    return gsm.getTimeline();
+  } catch { return null; }
+});
+
+ipcMain.handle('checkpoint.undo', async () => {
+  try {
+    const enginePath = process.env.CODEBUDDY_ENGINE_PATH;
+    if (!enginePath) return null;
+    const { getGhostSnapshotManager } = await import(
+      /* webpackIgnore: true */ resolve(enginePath, 'checkpoints', 'ghost-snapshot.js')
+    );
+    const gsm = getGhostSnapshotManager();
+    return await gsm.undoLastTurn();
+  } catch { return null; }
+});
+
+ipcMain.handle('checkpoint.redo', async () => {
+  try {
+    const enginePath = process.env.CODEBUDDY_ENGINE_PATH;
+    if (!enginePath) return null;
+    const { getGhostSnapshotManager } = await import(
+      /* webpackIgnore: true */ resolve(enginePath, 'checkpoints', 'ghost-snapshot.js')
+    );
+    const gsm = getGhostSnapshotManager();
+    return await gsm.redoLastTurn();
+  } catch { return null; }
+});
+
+ipcMain.handle('checkpoint.restore', async (_event, snapshotId: string) => {
+  try {
+    const enginePath = process.env.CODEBUDDY_ENGINE_PATH;
+    if (!enginePath) return null;
+    const { getGhostSnapshotManager } = await import(
+      /* webpackIgnore: true */ resolve(enginePath, 'checkpoints', 'ghost-snapshot.js')
+    );
+    const gsm = getGhostSnapshotManager();
+    return await gsm.restoreSnapshot(snapshotId);
+  } catch { return null; }
+});
+
+// ── Workspace IPC handlers ────────────────────────────────────────────
+ipcMain.handle('workspace.readDir', async (_event, dirPath: string) => {
+  try {
+    const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
+    return entries
+      .filter(e => !e.name.startsWith('.'))
+      .map(e => ({
+        name: e.name,
+        isDirectory: e.isDirectory(),
+        path: resolve(dirPath, e.name),
+      }));
+  } catch { return []; }
+});
+
+// ── Permission mode IPC handler ───────────────────────────────────────
+ipcMain.handle('permission.setMode', async (_event, mode: string) => {
+  try {
+    const enginePath = process.env.CODEBUDDY_ENGINE_PATH;
+    if (!enginePath) return;
+    const { getPermissionModeManager } = await import(
+      /* webpackIgnore: true */ resolve(enginePath, 'security', 'permission-modes.js')
+    );
+    getPermissionModeManager().setMode(mode);
+    log('[IPC] Permission mode set to:', mode);
+  } catch { /* ignore */ }
+});
+
+// ── Model switch IPC handler ──────────────────────────────────────────
+ipcMain.handle('config.switchModel', async (_event, model: string) => {
+  try {
+    configStore.update({ model });
+    log('[IPC] Model switched to:', model);
+    return true;
+  } catch { return false; }
+});
+
+// ── Session export IPC handler ────────────────────────────────────────
+ipcMain.handle('session.export', async (_event, sessionId: string, format: 'md' | 'json') => {
+  try {
+    if (!sessionManager) return null;
+    const messages = (sessionManager as unknown as { getMessages?: (id: string) => unknown[] }).getMessages?.(sessionId);
+    return { messages, format };
+  } catch { return null; }
 });
 
 ipcMain.handle('system.getTheme', () => {

@@ -13,6 +13,11 @@ npm start            # Run built CLI
 npm run typecheck    # TypeScript type checking only
 npm run lint         # ESLint only
 npm run validate     # Run lint + typecheck + test (use before committing)
+npm run build:gui    # Build Cowork desktop GUI
+npm run dev:gui      # Dev mode for Cowork GUI (hot reload)
+npm run build:all    # Build engine + GUI
+buddy gui            # Launch desktop GUI (requires buddy install-gui first)
+buddy install-gui    # Install Electron + build GUI
 ```
 
 ## Testing
@@ -241,6 +246,7 @@ Tool aliases (Codex-style): `shell_exec`, `file_read`, `browser_search`, etc. �
 | Secrets Vault | `src/commands/cli/secrets-command.ts` | AES-256-GCM encrypted vault with scrypt KDF, key rotation, env import, audit trail |
 | Deploy | `src/deploy/` | Cloud config generators (Fly.io, Railway, Render, Hetzner, Northflank, GCP), Nix flake support |
 | Canvas | `src/server/routes/canvas.ts` | HTTP serving at `/__codebuddy__/canvas/` and `/__codebuddy__/a2ui/`, push/get/list content |
+| Desktop GUI | `src/desktop/`, `cowork/` | Electron desktop app (Cowork); `buddy gui` launches; `EngineAdapter` bridges CodeBuddyAgent in-process; `buddy install-gui` installs Electron |
 | Providers (extra) | `src/providers/additional-providers.ts` | Mistral, Deepgram, MiniMax, Moonshot, Venice AI, Z.AI via OpenAI-compatible routing |
 | Automation | `src/automation/` | `PollManager` (URL/file/command polling with change detection), `AuthMonitor` (credential state tracking across providers/channels) |
 | Docs V2 | `src/docs/` | DeepWiki-style 4-phase pipeline: discover→plan→generate→link. `DocsContextProvider` injects into agent executor + system prompt. `/docs-generate` command. `docs_search` tool. JIT auto-discovery. Knowledge manager integration. Mermaid diagrams in raw mode. Incremental regeneration via manifest. Combined single-file export |

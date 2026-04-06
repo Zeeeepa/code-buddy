@@ -5,6 +5,9 @@ import { resolveArtifactPath } from '../utils/artifact-path';
 import { extractFilePathFromToolInput, extractFilePathFromToolOutput } from '../utils/tool-output-path';
 import { getArtifactLabel, getArtifactIconComponent, getArtifactSteps } from '../utils/artifact-steps';
 import { useIPC } from '../hooks/useIPC';
+import { useCheckpointTimeline } from '../store/selectors';
+import { CheckpointPanel } from './CheckpointPanel';
+import { FileTree } from './FileTree';
 import {
   ChevronDown,
   ChevronUp,
@@ -33,6 +36,51 @@ import {
 import type { TraceStep, MCPServerInfo } from '../types';
 
 const EMPTY_STEPS: TraceStep[] = [];
+
+function CheckpointSection() {
+  const timeline = useCheckpointTimeline();
+  const setCheckpointTimeline = useAppStore((s) => s.setCheckpointTimeline);
+
+  const handleUndo = async () => {
+    const result = await window.electronAPI?.checkpoint?.undo();
+    if (result) {
+      const tl = await window.electronAPI?.checkpoint?.list();
+      if (tl) setCheckpointTimeline(tl as import('../types').CheckpointTimeline);
+    }
+  };
+
+  const handleRedo = async () => {
+    const result = await window.electronAPI?.checkpoint?.redo();
+    if (result) {
+      const tl = await window.electronAPI?.checkpoint?.list();
+      if (tl) setCheckpointTimeline(tl as import('../types').CheckpointTimeline);
+    }
+  };
+
+  const handleRestore = async (snapshotId: string) => {
+    await window.electronAPI?.checkpoint?.restore(snapshotId);
+    const tl = await window.electronAPI?.checkpoint?.list();
+    if (tl) setCheckpointTimeline(tl as import('../types').CheckpointTimeline);
+  };
+
+  if (!timeline || timeline.snapshots.length === 0) return null;
+
+  return (
+    <div className="border-b border-border-muted">
+      <div className="px-4 py-2.5">
+        <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-1">
+          Checkpoints
+        </p>
+      </div>
+      <CheckpointPanel
+        timeline={timeline}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        onRestore={handleRestore}
+      />
+    </div>
+  );
+}
 
 export function ContextPanel() {
   const { t } = useTranslation();
@@ -456,6 +504,21 @@ export function ContextPanel() {
           </div>
         </div>
       </div>
+
+      {/* Checkpoints */}
+      <CheckpointSection />
+
+      {/* Files */}
+      {currentWorkingDir && (
+        <div className="border-b border-border-muted">
+          <div className="px-4 py-2.5">
+            <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-1">
+              Files
+            </p>
+          </div>
+          <FileTree rootPath={currentWorkingDir} />
+        </div>
+      )}
 
       {/* MCP Connectors */}
       <div className="flex-1 overflow-y-auto">

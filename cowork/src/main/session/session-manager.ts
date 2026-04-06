@@ -55,11 +55,27 @@ import {
 } from './session-title-utils';
 import { generateTitleWithClaudeSdk } from '../claude/claude-sdk-one-shot';
 import { buildScheduledTaskTitle } from '../../shared/schedule/task-title';
+import { CodeBuddyEngineRunner } from '../engine/codebuddy-engine-runner';
 
 interface AgentRunner {
   run(session: Session, prompt: string, existingMessages: Message[]): Promise<void>;
   cancel(sessionId: string): void;
   clearSdkSession?(sessionId: string): void;
+}
+
+/**
+ * Minimal EngineAdapter interface — structurally matches Code Buddy's EngineAdapter.
+ * Uses wide types (Record) so the Cowork side doesn't need to import Code Buddy types.
+ */
+export interface EngineAdapterLike {
+  runSession(
+    sessionId: string,
+    messages: Array<{ role: string; content: string }>,
+    onEvent: (event: { type: string; [key: string]: unknown }) => void,
+    options?: Record<string, unknown>,
+  ): Promise<{ content: string; tokenCount?: number; toolCallCount?: number }>;
+  cancel(sessionId: string): void;
+  clearSession(sessionId: string): void;
 }
 
 const WORKSPACE_MOUNT_VIRTUAL_PATH = '/mnt/workspace';
@@ -87,12 +103,17 @@ export class SessionManager {
   private messageCache: Map<string, Message[]> = new Map();
   private static readonly MAX_CACHE_SIZE = 100;
 
+  /** Optional Code Buddy engine adapter for in-process execution */
+  private engineAdapter?: EngineAdapterLike;
+
   constructor(
     db: DatabaseInstance,
     sendToRenderer: (event: ServerEvent) => void,
-    pluginRuntimeService?: PluginRuntimeService
+    pluginRuntimeService?: PluginRuntimeService,
+    engineAdapter?: EngineAdapterLike,
   ) {
     this.db = db;
+    this.engineAdapter = engineAdapter;
     this.sendToRenderer = (event) => {
       if (event.type === 'trace.step') {
         this.saveTraceStep(event.payload.sessionId, event.payload.step);
@@ -121,8 +142,19 @@ export class SessionManager {
    * Can be called to recreate runner when config changes
    */
   private createAgentRunner(): void {
-    this.agentRunner = this.createClaudeAgentRunner();
-    log('[SessionManager] Using pi-coding-agent runner');
+    if (this.engineAdapter) {
+      this.agentRunner = new CodeBuddyEngineRunner(
+        this.engineAdapter,
+        {
+          sendToRenderer: this.sendToRenderer,
+          saveMessage: (message: Message) => this.saveMessage(message),
+        },
+      );
+      log('[SessionManager] Using Code Buddy engine runner (embedded)');
+    } else {
+      this.agentRunner = this.createClaudeAgentRunner();
+      log('[SessionManager] Using pi-coding-agent runner');
+    }
   }
 
   private createClaudeAgentRunner(): ClaudeAgentRunner {

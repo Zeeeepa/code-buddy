@@ -10,6 +10,11 @@ import type {
   SandboxSetupProgress,
   SandboxSyncStatus,
   SkillsStorageChangeEvent,
+  DiffPreview,
+  CheckpointTimeline,
+  CheckpointSnapshot,
+  PermissionMode,
+  UpdateInfo,
 } from '../types';
 import { applySessionUpdate } from '../utils/session-update';
 
@@ -118,6 +123,26 @@ interface AppState {
   // System theme (from OS native theme)
   systemDarkMode: boolean;
 
+  // Diff previews per session
+  diffPreviews: Record<string, DiffPreview[]>;
+
+  // Checkpoint timeline
+  checkpointTimeline: CheckpointTimeline | null;
+
+  // Permission mode
+  permissionMode: PermissionMode;
+
+  // Command palette and shortcuts
+  showCommandPalette: boolean;
+  showShortcutsDialog: boolean;
+
+  // Auto-update
+  updateInfo: UpdateInfo | null;
+
+  // Session message search
+  searchQuery: string;
+  searchActive: boolean;
+
   // Actions
   setSessions: (sessions: Session[]) => void;
   addSession: (session: Session) => void;
@@ -187,6 +212,28 @@ interface AppState {
 
   // System theme actions
   setSystemDarkMode: (dark: boolean) => void;
+
+  // Diff preview actions
+  addDiffPreview: (sessionId: string, preview: DiffPreview) => void;
+  clearDiffPreviews: (sessionId: string) => void;
+
+  // Checkpoint actions
+  setCheckpointTimeline: (timeline: CheckpointTimeline | null) => void;
+  addCheckpoint: (snapshot: CheckpointSnapshot) => void;
+
+  // Permission mode actions
+  setPermissionMode: (mode: PermissionMode) => void;
+
+  // Command palette actions
+  setShowCommandPalette: (show: boolean) => void;
+  setShowShortcutsDialog: (show: boolean) => void;
+
+  // Update actions
+  setUpdateInfo: (info: UpdateInfo | null) => void;
+
+  // Search actions
+  setSearchQuery: (query: string) => void;
+  setSearchActive: (active: boolean) => void;
 }
 
 const defaultSettings: Settings = {
@@ -242,6 +289,14 @@ export const useAppStore = create<AppState>((set) => ({
   skillsStorageChangedAt: 0,
   skillsStorageChangeEvent: null,
   systemDarkMode: false,
+  diffPreviews: {},
+  checkpointTimeline: null,
+  permissionMode: 'default' as PermissionMode,
+  showCommandPalette: false,
+  showShortcutsDialog: false,
+  updateInfo: null,
+  searchQuery: '',
+  searchActive: false,
 
   // Session actions
   setSessions: (sessions) => set({ sessions }),
@@ -594,6 +649,50 @@ export const useAppStore = create<AppState>((set) => ({
 
   // System theme actions
   setSystemDarkMode: (dark) => set({ systemDarkMode: dark }),
+
+  // Diff preview actions
+  addDiffPreview: (sessionId, preview) =>
+    set((state) => ({
+      diffPreviews: {
+        ...state.diffPreviews,
+        [sessionId]: [...(state.diffPreviews[sessionId] || []), preview],
+      },
+    })),
+  clearDiffPreviews: (sessionId) =>
+    set((state) => {
+      const { [sessionId]: _, ...rest } = state.diffPreviews;
+      return { diffPreviews: rest };
+    }),
+
+  // Checkpoint actions
+  setCheckpointTimeline: (timeline) => set({ checkpointTimeline: timeline }),
+  addCheckpoint: (snapshot) =>
+    set((state) => {
+      const current = state.checkpointTimeline || { snapshots: [], currentIndex: -1, canUndo: false, canRedo: false };
+      const snapshots = [...current.snapshots, snapshot];
+      return {
+        checkpointTimeline: {
+          snapshots,
+          currentIndex: snapshots.length - 1,
+          canUndo: snapshots.length > 0,
+          canRedo: false,
+        },
+      };
+    }),
+
+  // Permission mode actions
+  setPermissionMode: (mode) => set({ permissionMode: mode }),
+
+  // Command palette actions
+  setShowCommandPalette: (show) => set({ showCommandPalette: show }),
+  setShowShortcutsDialog: (show) => set({ showShortcutsDialog: show }),
+
+  // Update actions
+  setUpdateInfo: (info) => set({ updateInfo: info }),
+
+  // Search actions
+  setSearchQuery: (query) => set({ searchQuery: query }),
+  setSearchActive: (active) => set({ searchActive: active, searchQuery: active ? '' : '' }),
 }));
 
 // Expose helpers for nav-server (CLI-driven UI navigation via executeJavaScript)

@@ -1,6 +1,11 @@
 /**
  * @module main/codebuddy/codebuddy-adapter
  *
+ * @deprecated Use CodeBuddyEngineAdapter (in-process) instead.
+ * This HTTP adapter is kept for backward compatibility with standalone
+ * Code Buddy server deployments. For embedded mode (buddy gui), the
+ * engine runs in-process via CodeBuddyEngineRunner.
+ *
  * Backend adapter for Code Buddy's HTTP API (~300 lines).
  *
  * Responsibilities:

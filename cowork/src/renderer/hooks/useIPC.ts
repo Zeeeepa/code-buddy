@@ -304,6 +304,47 @@ export function useIPC() {
             }
             break;
 
+          // ── New events for Claude Code parity ──────────────────────────
+          case 'diff.preview':
+            store.addDiffPreview(
+              event.payload.sessionId,
+              event.payload.diffPreview
+            );
+            break;
+
+          case 'checkpoint.created':
+            store.addCheckpoint(event.payload.snapshot);
+            break;
+
+          case 'checkpoint.timeline':
+            store.setCheckpointTimeline(event.payload);
+            break;
+
+          case 'permission.modeChanged':
+            store.setPermissionMode(event.payload.mode);
+            break;
+
+          case 'stream.done':
+            // Stream completed — no additional action needed
+            // (session.status 'idle' already handles UI cleanup)
+            break;
+
+          case 'update.available':
+            store.setUpdateInfo(event.payload);
+            break;
+
+          case 'update.progress':
+            store.setUpdateInfo({
+              available: true,
+              downloaded: false,
+              downloadProgress: event.payload.percent,
+            });
+            break;
+
+          case 'update.downloaded':
+            store.setUpdateInfo(event.payload);
+            break;
+
           default:
             console.log('[useIPC] Unknown server event:', event);
         }

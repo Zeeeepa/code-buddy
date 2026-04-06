@@ -78,6 +78,7 @@ export default defineConfig({
       '@': resolve(__dirname, 'src'),
       '@main': resolve(__dirname, 'src/main'),
       '@renderer': resolve(__dirname, 'src/renderer'),
+      '@codebuddy': resolve(__dirname, '..', 'src'),
     },
   },
   server: {

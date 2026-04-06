@@ -1,0 +1,100 @@
+/**
+ * Engine Adapter Interface
+ *
+ * Defines the contract between the Cowork Electron app and the
+ * Code Buddy engine. Implementations wrap CodeBuddyAgent for
+ * direct in-process usage (no HTTP).
+ *
+ * @module desktop/engine-adapter
+ */
+
+import type {
+  EngineStreamEvent,
+  EngineMessage,
+  EngineSessionConfig,
+  EngineSessionResult,
+  EngineModelInfo,
+  EnginePermissionRequest,
+  EnginePermissionResponse,
+} from '../shared/engine-types.js';
+
+// Re-export shared types for convenience
+export type {
+  EngineStreamEvent,
+  EngineStreamEventType,
+  EngineMessage,
+  EngineSessionConfig,
+  EngineSessionResult,
+  EngineModelInfo,
+  EnginePermissionRequest,
+  EnginePermissionResponse,
+} from '../shared/engine-types.js';
+
+/**
+ * Callback for streaming events from the engine.
+ */
+export type EngineStreamCallback = (event: EngineStreamEvent) => void;
+
+/**
+ * Callback for permission requests from the engine.
+ * Returns the user's decision (allow/deny/allow_always).
+ */
+export type EnginePermissionCallback = (
+  request: EnginePermissionRequest
+) => Promise<EnginePermissionResponse>;
+
+/**
+ * Abstract interface for the Code Buddy engine.
+ *
+ * The Cowork Electron main process instantiates a concrete implementation
+ * (CodeBuddyEngineAdapter) and passes it to SessionManager. This decouples
+ * the GUI from the agent internals.
+ */
+export interface EngineAdapter {
+  /**
+   * Run a streaming session with the engine.
+   *
+   * @param sessionId - Unique identifier for this session
+   * @param messages - Conversation history
+   * @param onEvent - Callback invoked for each streaming event
+   * @param options - Optional session-level overrides
+   * @returns Final session result once the stream completes
+   */
+  runSession(
+    sessionId: string,
+    messages: EngineMessage[],
+    onEvent: EngineStreamCallback,
+    options?: Partial<EngineSessionConfig>,
+  ): Promise<EngineSessionResult>;
+
+  /**
+   * Cancel a running session.
+   */
+  cancel(sessionId: string): void;
+
+  /**
+   * Clear internal state for a session (free memory, close resources).
+   */
+  clearSession(sessionId: string): void;
+
+  /**
+   * List available models from the engine.
+   */
+  getModels(): Promise<EngineModelInfo[]>;
+
+  /**
+   * Check if the engine is initialized and ready to accept sessions.
+   */
+  isReady(): boolean;
+
+  /**
+   * Set the permission callback. The engine calls this when it needs
+   * user approval for destructive operations.
+   */
+  setPermissionCallback(callback: EnginePermissionCallback): void;
+
+  /**
+   * Release all resources. Called when the app is shutting down.
+   */
+  dispose(): void;
+}

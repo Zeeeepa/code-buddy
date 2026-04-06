@@ -253,6 +253,25 @@ export function WelcomeView() {
     setIsDragging(false);
 
     const files = Array.from(e.dataTransfer.files);
+
+    // Detect folder drops — switch working directory
+    const folderFiles = files.filter((file) => {
+      const filePath = 'path' in file && typeof (file as File & { path?: string }).path === 'string'
+        ? (file as File & { path?: string }).path
+        : '';
+      return !file.type && filePath && !file.name.includes('.');
+    });
+    if (folderFiles.length > 0) {
+      const folderPath = (folderFiles[0] as File & { path?: string }).path;
+      if (folderPath && window.electronAPI) {
+        window.electronAPI.send({
+          type: 'workdir.set',
+          payload: { path: folderPath },
+        });
+      }
+      return;
+    }
+
     const imageFiles = files.filter((file) => file.type.startsWith('image/'));
     const otherFiles = files.filter((file) => !file.type.startsWith('image/'));
 

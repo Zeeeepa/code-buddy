@@ -11,7 +11,7 @@ import { logger } from '../utils/logger.js';
 
 export interface DesktopAppConfig {
   platform: 'darwin' | 'win32' | 'linux';
-  framework: 'electron' | 'tauri';
+  framework: 'electron';
   autoUpdate: boolean;
   multiWindow: boolean;
   cloudIntegration: boolean;
@@ -43,7 +43,7 @@ export class DesktopAppManager {
   constructor(config?: Partial<DesktopAppConfig>) {
     this.config = {
       platform: (process.platform as DesktopAppConfig['platform']) || 'linux',
-      framework: 'electron',
+      framework: 'electron' as const,
       autoUpdate: true,
       multiWindow: true,
       cloudIntegration: false,
@@ -132,31 +132,16 @@ export class DesktopAppManager {
       autoUpdate: this.config.autoUpdate,
     };
 
-    if (this.config.framework === 'electron') {
-      return {
-        ...base,
-        electronVersion: '28.0.0',
-        build: {
-          appId: base.appId,
-          productName: base.productName,
-          directories: { output: 'dist-desktop' },
-          mac: { category: 'public.app-category.developer-tools' },
-          win: { target: ['nsis', 'portable'] },
-          linux: { target: ['AppImage', 'deb'] },
-        },
-      };
-    }
-
     return {
       ...base,
-      tauriVersion: '2.0.0',
+      electronVersion: '35.7.5',
       build: {
-        distDir: '../dist',
-        devPath: 'http://localhost:3000',
-        bundle: {
-          identifier: base.appId,
-          targets: 'all',
-        },
+        appId: base.appId,
+        productName: base.productName,
+        directories: { output: 'release' },
+        mac: { category: 'public.app-category.developer-tools' },
+        win: { target: ['nsis'] },
+        linux: { target: ['AppImage'] },
       },
     };
   }
@@ -166,8 +151,7 @@ export class DesktopAppManager {
   }
 
   isDesktopAvailable(): boolean {
-    // In a real implementation, check if desktop framework is installed
-    return this.config.framework === 'electron' || this.config.framework === 'tauri';
+    return this.config.framework === 'electron';
   }
 
   getWindowCount(): number {

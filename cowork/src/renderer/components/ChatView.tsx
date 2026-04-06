@@ -13,7 +13,11 @@ import {
 import { useAppStore } from '../store';
 import { useIPC } from '../hooks/useIPC';
 import { MessageCard } from './MessageCard';
-import type { Message, ContentBlock } from '../types';
+import { ModelSwitcher } from './ModelSwitcher';
+import { PermissionModeSelector } from './PermissionModeSelector';
+import { SessionSearch } from './SessionSearch';
+import { usePermissionMode, useSearchState } from '../store/selectors';
+import type { Message, ContentBlock, PermissionMode } from '../types';
 import { Send, Square, Plus, Loader2, Plug, X, Clock } from 'lucide-react';
 
 type AttachedFile = {
@@ -35,6 +39,8 @@ export function ChatView() {
   const pendingTurns = usePendingTurns();
   const executionClock = useActiveExecutionClock();
   const appConfig = useAppConfig();
+  const permissionMode = usePermissionMode();
+  const { searchQuery, searchActive } = useSearchState();
   const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
   const { continueSession, stopSession, isElectron } = useIPC();
   const [prompt, setPrompt] = useState('');
@@ -445,6 +451,26 @@ export function ChatView() {
     setIsDragging(false);
 
     const files = Array.from(e.dataTransfer.files);
+
+    // Detect folder drops — switch working directory
+    const folderFiles = files.filter((file) => {
+      const filePath = 'path' in file && typeof (file as File & { path?: string }).path === 'string'
+        ? (file as File & { path?: string }).path
+        : '';
+      // Folders have empty type and a path
+      return !file.type && filePath && !file.name.includes('.');
+    });
+    if (folderFiles.length > 0) {
+      const folderPath = (folderFiles[0] as File & { path?: string }).path;
+      if (folderPath && window.electronAPI) {
+        window.electronAPI.send({
+          type: 'workdir.set',
+          payload: { path: folderPath },
+        });
+      }
+      return;
+    }
+
     const imageFiles = files.filter((file) => file.type.startsWith('image/'));
     const otherFiles = files.filter((file) => !file.type.startsWith('image/'));
 
@@ -667,7 +693,40 @@ export function ChatView() {
             </div>
           </>
         )}
+
+        {/* Model switcher and permission mode */}
+        <div className="flex items-center gap-1.5 justify-self-end">
+          {appConfig?.model && (
+            <ModelSwitcher
+              currentModel={appConfig.model}
+              onModelChange={(model) => {
+                window.electronAPI?.model?.switch(model);
+                useAppStore.getState().setAppConfig({ ...appConfig, model });
+              }}
+            />
+          )}
+          <PermissionModeSelector
+            currentMode={permissionMode}
+            onModeChange={(mode) => {
+              window.electronAPI?.permission?.setMode(mode);
+              useAppStore.getState().setPermissionMode(mode);
+            }}
+          />
+        </div>
       </div>
+
+      {/* Session search */}
+      {searchActive && (
+        <SessionSearch
+          query={searchQuery}
+          onQueryChange={(q) => useAppStore.getState().setSearchQuery(q)}
+          onClose={() => useAppStore.getState().setSearchActive(false)}
+          matchCount={0}
+          currentMatch={0}
+          onNext={() => {}}
+          onPrev={() => {}}
+        />
+      )}
 
       {/* Messages */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">

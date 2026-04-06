@@ -7,6 +7,11 @@ import type { ToolUseContent, ToolResultContent, ContentBlock, Message } from '.
 import { AskUserQuestionBlock } from './AskUserQuestionBlock';
 import { TodoWriteBlock } from './TodoWriteBlock';
 import { getToolIcon, getToolLabel } from './toolHelpers';
+import { TerminalOutput } from './TerminalOutput';
+import { DiffViewer } from '../DiffViewer';
+
+const EDIT_TOOLS = new Set(['write', 'edit', 'str_replace_editor', 'create_file', 'write_file', 'edit_file', 'apply_patch']);
+const BASH_TOOLS = new Set(['bash', 'execute_command', 'shell_exec', 'run_command']);
 
 // Only allow safe image MIME types for data: URI rendering
 const ALLOWED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
@@ -176,13 +181,39 @@ export const ToolUseBlock = memo(function ToolUseBlock({
               <div className="text-[10px] uppercase tracking-wider text-text-muted font-medium mb-1">
                 Output
               </div>
-              <pre
-                className={`text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 border border-border-subtle max-h-[300px] overflow-y-auto ${
-                  isError ? 'text-error bg-error/5' : 'text-text-secondary bg-surface-muted'
-                }`}
-              >
-                {toolResult.content}
-              </pre>
+
+              {/* Terminal-style output for bash tools */}
+              {BASH_TOOLS.has(block.name) ? (
+                <TerminalOutput
+                  command={typeof block.input?.command === 'string' ? block.input.command : undefined}
+                  output={toolResult.content}
+                  isError={isError}
+                />
+              ) : (
+                <pre
+                  className={`text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 border border-border-subtle max-h-[300px] overflow-y-auto ${
+                    isError ? 'text-error bg-error/5' : 'text-text-secondary bg-surface-muted'
+                  }`}
+                >
+                  {toolResult.content}
+                </pre>
+              )}
+
+              {/* Inline diff for edit tools */}
+              {EDIT_TOOLS.has(block.name) && toolResult.content && !isError && (
+                <DiffViewer
+                  diff={{
+                    path: typeof block.input?.file_path === 'string' ? block.input.file_path
+                      : typeof block.input?.path === 'string' ? block.input.path
+                      : typeof block.input?.filename === 'string' ? block.input.filename
+                      : 'file',
+                    action: block.name === 'create_file' || block.name === 'write_file' ? 'create' : 'modify',
+                    linesAdded: (toolResult.content.match(/^\+/gm) || []).length,
+                    linesRemoved: (toolResult.content.match(/^-/gm) || []).length,
+                    excerpt: toolResult.content,
+                  }}
+                />
+              )}
 
               {/* Images */}
               {Array.isArray(toolResult.images) &&

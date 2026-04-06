@@ -1933,6 +1933,43 @@ program
     }
   });
 
+// Desktop GUI commands
+program
+  .command("gui")
+  .description("Launch the Code Buddy desktop GUI (Electron)")
+  .option("--dev", "start with Vite dev server (hot reload)")
+  .option("--detach", "run in background")
+  .action(async (options) => {
+    const { launchDesktop } = await import("./desktop/launcher.js");
+    const code = await launchDesktop({
+      dev: options.dev,
+      detach: options.detach,
+    });
+    process.exit(code);
+  });
+
+program
+  .command("desktop")
+  .description("Alias for 'buddy gui'")
+  .option("--dev", "start with Vite dev server")
+  .option("--detach", "run in background")
+  .action(async (options) => {
+    const { launchDesktop } = await import("./desktop/launcher.js");
+    const code = await launchDesktop({
+      dev: options.dev,
+      detach: options.detach,
+    });
+    process.exit(code);
+  });
+
+program
+  .command("install-gui")
+  .description("Install Electron and build the desktop GUI")
+  .action(async () => {
+    const { installGUI } = await import("./desktop/installer.js");
+    await installGUI();
+  });
+
 // MCP Server command - run Code Buddy as an MCP tool provider over stdio
 program
   .command("mcp-server")

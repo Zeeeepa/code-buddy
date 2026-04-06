@@ -41,6 +41,14 @@
     "./plugin-sdk/testing": {
       "import": "./dist/plugin-sdk/testing.js",
       "types": "./dist/plugin-sdk/testing.d.ts"
+    },
+    "./desktop": {
+      "import": "./dist/desktop/index.js",
+      "types": "./dist/desktop/index.d.ts"
+    },
+    "./engine-types": {
+      "import": "./dist/shared/engine-types.js",
+      "types": "./dist/shared/engine-types.d.ts"
     }
   },
   "bin": {
@@ -74,7 +82,12 @@
     "bench:startup": "npx tsx benchmarks/startup.bench.ts",
     "bench:tools": "npx tsx benchmarks/tools.bench.ts",
     "perf": "PERF_TIMING=true npm start -- --help",
-    "perf:verbose": "PERF_TIMING=true VERBOSE=true npm start -- --help"
+    "perf:verbose": "PERF_TIMING=true VERBOSE=true npm start -- --help",
+    "build:gui": "cd cowork && npm run build",
+    "dev:gui": "cd cowork && npm run dev",
+    "build:all": "node scripts/build-all.js",
+    "build:all:pack": "node scripts/build-all.js --pack",
+    "install:gui": "node dist/index.js install-gui"
   },
   "keywords": [
     "cli",

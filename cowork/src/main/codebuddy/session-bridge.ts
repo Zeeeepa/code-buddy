@@ -1,6 +1,10 @@
 /**
  * @module main/codebuddy/session-bridge
  *
+ * @deprecated Use CodeBuddyEngineRunner (in-process) instead.
+ * This SSE bridge is kept for backward compatibility. For embedded mode,
+ * the engine events are translated directly by CodeBuddyEngineRunner.
+ *
  * Bridges Code Buddy SSE events → Open Cowork renderer IPC events (~200 lines).
  *
  * Responsibilities:

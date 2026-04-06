@@ -43,6 +43,9 @@ export const ThinkingBlock = memo(function ThinkingBlock({ block }: ThinkingBloc
   const text = block.thinking || '';
   if (!text) return null;
 
+  // Word count for stats display
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+
   // Preview: first ~80 chars, clean up broken ** markers from truncation
   let preview = text.length > 80 ? text.substring(0, 77) + '...' : text;
   // Strip a trailing unclosed ** that truncation may have created
@@ -67,6 +70,10 @@ export const ThinkingBlock = memo(function ThinkingBlock({ block }: ThinkingBloc
             {previewNodes}
           </span>
         )}
+        {/* Word count badge */}
+        <span className="text-[10px] text-text-muted/40 flex-shrink-0 tabular-nums">
+          {wordCount} words
+        </span>
         {expanded ? (
           <ChevronDown className="w-3.5 h-3.5 text-text-muted flex-shrink-0 ml-auto" />
         ) : (
@@ -74,8 +81,11 @@ export const ThinkingBlock = memo(function ThinkingBlock({ block }: ThinkingBloc
         )}
       </button>
 
-      {expanded && (
-        <div className="border-t border-border/50 px-4 py-3 animate-fade-in">
+      <div
+        className="overflow-hidden transition-all duration-200 ease-in-out"
+        style={{ maxHeight: expanded ? '2000px' : '0px', opacity: expanded ? 1 : 0 }}
+      >
+        <div className="border-t border-border/50 px-4 py-3">
           <div className="text-sm text-text-secondary leading-relaxed prose-chat max-w-none">
             <PanelErrorBoundary
               name="ThinkingMarkdown"
@@ -87,7 +97,7 @@ export const ThinkingBlock = memo(function ThinkingBlock({ block }: ThinkingBloc
             </PanelErrorBoundary>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 });

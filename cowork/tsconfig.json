@@ -22,7 +22,8 @@
     "paths": {
       "@/*": ["src/*"],
       "@main/*": ["src/main/*"],
-      "@renderer/*": ["src/renderer/*"]
+      "@renderer/*": ["src/renderer/*"],
+      "@codebuddy/*": ["../src/*"]
     }
   },
   "include": ["src"],

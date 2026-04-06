@@ -11,6 +11,9 @@ import {
   useSandboxSetupState,
   useSandboxSyncStatus,
   usePendingDialogs,
+  useShowCommandPalette,
+  useShowShortcutsDialog,
+  useUpdateInfo,
 } from './store/selectors';
 import { useIPC } from './hooks/useIPC';
 import { useWindowSize } from './hooks/useWindowSize';
@@ -23,6 +26,9 @@ import { SandboxSetupDialog } from './components/SandboxSetupDialog';
 import { SandboxSyncToast } from './components/SandboxSyncToast';
 import { GlobalNoticeToast } from './components/GlobalNoticeToast';
 import { PanelErrorBoundary } from './components/PanelErrorBoundary';
+import { CommandPalette } from './components/CommandPalette';
+import { KeyboardShortcutsDialog } from './components/KeyboardShortcutsDialog';
+import { UpdateNotification } from './components/UpdateNotification';
 import type { AppConfig } from './types';
 import type { GlobalNoticeAction } from './store';
 
@@ -69,6 +75,9 @@ function App() {
     useSandboxSetupState();
   const sandboxSyncStatus = useSandboxSyncStatus();
   const { pendingPermission, pendingSudoPassword } = usePendingDialogs();
+  const showCommandPalette = useShowCommandPalette();
+  const showShortcutsDialog = useShowShortcutsDialog();
+  const updateInfo = useUpdateInfo();
 
   // Actions are still pulled directly from the store
   const setShowConfigModal = useAppStore((s) => s.setShowConfigModal);
@@ -78,6 +87,10 @@ function App() {
   const setSandboxSetupComplete = useAppStore((s) => s.setSandboxSetupComplete);
   const setShowSettings = useAppStore((s) => s.setShowSettings);
   const setSidebarCollapsed = useAppStore((s) => s.setSidebarCollapsed);
+  const setShowCommandPalette = useAppStore((s) => s.setShowCommandPalette);
+  const setShowShortcutsDialog = useAppStore((s) => s.setShowShortcutsDialog);
+  const setUpdateInfo = useAppStore((s) => s.setUpdateInfo);
+  const setSearchActive = useAppStore((s) => s.setSearchActive);
   const setContextPanelCollapsed = useAppStore((s) => s.setContextPanelCollapsed);
 
   const { listSessions, isElectron } = useIPC();
@@ -162,9 +175,37 @@ function App() {
     [clearGlobalNotice, setShowConfigModal]
   );
 
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.key === 'k') {
+        e.preventDefault();
+        setShowCommandPalette(!showCommandPalette);
+      } else if (mod && e.key === '/') {
+        e.preventDefault();
+        setShowShortcutsDialog(!showShortcutsDialog);
+      } else if (mod && e.key === ',') {
+        e.preventDefault();
+        setShowSettings(true);
+      } else if (mod && e.key === 'f' && activeSessionId) {
+        e.preventDefault();
+        setSearchActive(true);
+      } else if (mod && e.key === 'b') {
+        e.preventDefault();
+        setSidebarCollapsed(!sidebarCollapsed);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showCommandPalette, showShortcutsDialog, sidebarCollapsed, activeSessionId, setShowCommandPalette, setShowShortcutsDialog, setShowSettings, setSearchActive, setSidebarCollapsed]);
+
   // Determine if we should show the sandbox setup dialog
   // Show if there's progress and setup is not complete
   const showSandboxSetup = sandboxSetupProgress && !isSandboxSetupComplete;
+
+  // Theme helper
+  const isDark = settings.theme === 'system' ? systemDarkMode : settings.theme === 'dark';
 
   return (
     <div className="h-full w-full min-h-0 flex flex-col overflow-hidden bg-background">
@@ -254,6 +295,39 @@ function App() {
         onDismiss={clearGlobalNotice}
         onAction={handleGlobalNoticeAction}
       />
+
+      {/* Update notification banner */}
+      {updateInfo && updateInfo.available && (
+        <UpdateNotification
+          updateInfo={updateInfo}
+          onDownload={() => window.electronAPI?.update?.download()}
+          onInstall={() => window.electronAPI?.update?.install()}
+          onDismiss={() => setUpdateInfo(null)}
+        />
+      )}
+
+      {/* Command Palette (Cmd+K) */}
+      {showCommandPalette && (
+        <CommandPalette
+          onClose={() => setShowCommandPalette(false)}
+          onNewSession={() => {
+            setShowSettings(false);
+            useAppStore.getState().setActiveSession(null);
+          }}
+          onOpenSettings={() => setShowSettings(true)}
+          onToggleTheme={() => {
+            const newTheme = isDark ? 'light' : 'dark';
+            useAppStore.getState().updateSettings({ theme: newTheme });
+          }}
+          onShowShortcuts={() => setShowShortcutsDialog(true)}
+          isDark={isDark}
+        />
+      )}
+
+      {/* Keyboard Shortcuts Dialog (Cmd+/) */}
+      {showShortcutsDialog && (
+        <KeyboardShortcutsDialog onClose={() => setShowShortcutsDialog(false)} />
+      )}
     </div>
   );
 }

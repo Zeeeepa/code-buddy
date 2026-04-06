@@ -1064,7 +1064,7 @@ export function createDashboardRouter(): Router {
   });
 
   // SPA fallback — serve the same HTML for any sub-path
-  router.get('/*', (_req: Request, res: Response) => {
+  router.get('/{*path}', (_req: Request, res: Response) => {
     try {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader('Cache-Control', 'no-cache');

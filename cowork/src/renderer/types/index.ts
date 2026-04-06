@@ -313,6 +313,52 @@ export interface PermissionRule {
   action: 'allow' | 'deny' | 'ask';
 }
 
+// Diff types (Code Buddy Cowork parity)
+export interface DiffEntry {
+  path: string;
+  action: 'create' | 'modify' | 'delete' | 'rename';
+  linesAdded: number;
+  linesRemoved: number;
+  excerpt: string;
+}
+
+export interface DiffPreview {
+  turnId: number;
+  sessionId: string;
+  diffs: DiffEntry[];
+  plan?: string;
+  timestamp: number;
+  status: 'pending' | 'accepted' | 'rejected';
+}
+
+// Checkpoint types
+export interface CheckpointSnapshot {
+  id: string;
+  commitHash: string;
+  description: string;
+  timestamp: number;
+  turn: number;
+}
+
+export interface CheckpointTimeline {
+  snapshots: CheckpointSnapshot[];
+  currentIndex: number;
+  canUndo: boolean;
+  canRedo: boolean;
+}
+
+// Permission mode types
+export type PermissionMode = 'default' | 'plan' | 'acceptEdits' | 'dontAsk' | 'bypassPermissions';
+
+// Update info types
+export interface UpdateInfo {
+  available: boolean;
+  version?: string;
+  releaseNotes?: string;
+  downloadProgress?: number;
+  downloaded: boolean;
+}
+
 // IPC Event types
 export type ClientEvent =
   | { type: 'session.start'; payload: { title: string; prompt: string; cwd?: string; allowedTools?: string[]; content?: ContentBlock[] } }
@@ -396,7 +442,15 @@ export type ServerEvent =
   | { type: 'new-session' }
   | { type: 'navigate'; payload: string }
   | { type: 'scheduled-task.error'; payload: { taskId: string; error: string } }
-  | { type: 'error'; payload: { message: string; code?: 'CONFIG_REQUIRED_ACTIVE_SET'; action?: 'open_api_settings' } };
+  | { type: 'error'; payload: { message: string; code?: 'CONFIG_REQUIRED_ACTIVE_SET'; action?: 'open_api_settings' } }
+  | { type: 'diff.preview'; payload: { sessionId: string; diffPreview: DiffPreview } }
+  | { type: 'checkpoint.created'; payload: { sessionId: string; snapshot: CheckpointSnapshot } }
+  | { type: 'checkpoint.timeline'; payload: CheckpointTimeline }
+  | { type: 'permission.modeChanged'; payload: { mode: PermissionMode } }
+  | { type: 'stream.done'; payload: { sessionId: string } }
+  | { type: 'update.available'; payload: UpdateInfo }
+  | { type: 'update.progress'; payload: { percent: number } }
+  | { type: 'update.downloaded'; payload: UpdateInfo };
 
 // Settings types
 export interface Settings {

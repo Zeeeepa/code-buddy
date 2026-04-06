@@ -397,6 +397,42 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('schedule.toggle', id, enabled),
     runNow: (id: string): Promise<ScheduleTask | null> => ipcRenderer.invoke('schedule.runNow', id),
   },
+
+  // Checkpoint operations
+  checkpoint: {
+    list: () => ipcRenderer.invoke('checkpoint.list'),
+    undo: () => ipcRenderer.invoke('checkpoint.undo'),
+    redo: () => ipcRenderer.invoke('checkpoint.redo'),
+    restore: (snapshotId: string) => ipcRenderer.invoke('checkpoint.restore', snapshotId),
+  },
+
+  // Workspace operations
+  workspace: {
+    readDir: (dirPath: string) => ipcRenderer.invoke('workspace.readDir', dirPath),
+  },
+
+  // Permission mode
+  permission: {
+    setMode: (mode: string) => ipcRenderer.invoke('permission.setMode', mode),
+    respondBridge: (id: string, response: string) => ipcRenderer.send('permission.bridge.response', { id, response }),
+  },
+
+  // Model switching
+  model: {
+    switch: (model: string) => ipcRenderer.invoke('config.switchModel', model),
+  },
+
+  // Session export
+  session: {
+    export: (sessionId: string, format: 'md' | 'json') => ipcRenderer.invoke('session.export', sessionId, format),
+  },
+
+  // Auto-update
+  update: {
+    check: () => ipcRenderer.invoke('update.check'),
+    download: () => ipcRenderer.invoke('update.download'),
+    install: () => ipcRenderer.invoke('update.install'),
+  },
 });
 
 // Type declaration for the renderer process
@@ -606,6 +642,30 @@ declare global {
         delete: (id: string) => Promise<{ success: boolean }>;
         toggle: (id: string, enabled: boolean) => Promise<ScheduleTask | null>;
         runNow: (id: string) => Promise<ScheduleTask | null>;
+      };
+      checkpoint: {
+        list: () => Promise<unknown>;
+        undo: () => Promise<unknown>;
+        redo: () => Promise<unknown>;
+        restore: (snapshotId: string) => Promise<unknown>;
+      };
+      workspace: {
+        readDir: (dirPath: string) => Promise<Array<{ name: string; isDirectory: boolean; path: string }>>;
+      };
+      permission: {
+        setMode: (mode: string) => Promise<void>;
+        respondBridge: (id: string, response: string) => void;
+      };
+      model: {
+        switch: (model: string) => Promise<boolean>;
+      };
+      session: {
+        export: (sessionId: string, format: 'md' | 'json') => Promise<unknown>;
+      };
+      update: {
+        check: () => Promise<unknown>;
+        download: () => Promise<void>;
+        install: () => void;
       };
     };
   }

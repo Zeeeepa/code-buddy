@@ -1,0 +1,138 @@
+/**
+ * Permission Bridge
+ *
+ * Bridges Code Buddy's ConfirmationService to the Electron IPC
+ * permission dialog. When the engine requests user approval for
+ * a destructive operation, this bridge sends an IPC event to the
+ * renderer and waits for the user's response.
+ *
+ * @module desktop/permission-bridge
+ */
+
+import { logger } from '../utils/logger.js';
+import type {
+  EnginePermissionRequest,
+  EnginePermissionResponse,
+} from '../shared/engine-types.js';
+
+/** Pending permission request with resolve callback */
+interface PendingRequest {
+  request: EnginePermissionRequest;
+  resolve: (response: EnginePermissionResponse) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+/**
+ * Callback type for sending IPC events to the Electron renderer.
+ * Injected at construction time to avoid importing Electron directly.
+ */
+export type SendToRendererFn = (event: {
+  type: string;
+  payload: unknown;
+}) => void;
+
+/**
+ * Bridges engine permission requests to Electron IPC.
+ *
+ * Usage:
+ * ```ts
+ * const bridge = new DesktopPermissionBridge(sendToRenderer);
+ * engineAdapter.setPermissionCallback(bridge.requestPermission.bind(bridge));
+ *
+ * // In IPC handler:
+ * ipcMain.on('permission.response', (_, { id, response }) => {
+ *   bridge.handleResponse(id, response);
+ * });
+ * ```
+ */
+export class DesktopPermissionBridge {
+  private pending: Map<string, PendingRequest> = new Map();
+  private sendToRenderer: SendToRendererFn;
+  private timeoutMs: number;
+
+  /** Tools that never require permission */
+  private static readonly SAFE_TOOLS = new Set([
+    'read_file', 'view_file', 'grep', 'glob', 'list_files',
+    'search', 'plan', 'reason', 'think', 'tree',
+  ]);
+
+  constructor(sendToRenderer: SendToRendererFn, timeoutMs = 90_000) {
+    this.sendToRenderer = sendToRenderer;
+    this.timeoutMs = timeoutMs;
+  }
+
+  /**
+   * Request permission from the user via IPC.
+   * Returns a promise that resolves when the user responds.
+   */
+  async requestPermission(
+    request: EnginePermissionRequest
+  ): Promise<EnginePermissionResponse> {
+    // Auto-allow safe tools
+    if (DesktopPermissionBridge.SAFE_TOOLS.has(request.operation)) {
+      return 'allow';
+    }
+
+    return new Promise<EnginePermissionResponse>((resolve) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(request.id);
+        logger.warn('[PermissionBridge] timed out', { id: request.id });
+        resolve('deny');
+      }, this.timeoutMs);
+
+      this.pending.set(request.id, { request, resolve, timer });
+
+      // Send to renderer
+      this.sendToRenderer({
+        type: 'permission.request',
+        payload: {
+          id: request.id,
+          operation: request.operation,
+          filename: request.filename,
+          content: request.content,
+          diffPreview: request.diffPreview,
+        },
+      });
+
+      logger.debug('[PermissionBridge] sent request', {
+        id: request.id,
+        operation: request.operation,
+      });
+    });
+  }
+
+  /**
+   * Handle user's response from the renderer via IPC.
+   */
+  handleResponse(id: string, response: EnginePermissionResponse): void {
+    const pending = this.pending.get(id);
+    if (!pending) {
+      logger.warn('[PermissionBridge] unknown request id', { id });
+      return;
+    }
+
+    clearTimeout(pending.timer);
+    this.pending.delete(id);
+    pending.resolve(response);
+    logger.debug('[PermissionBridge] resolved', { id, response });
+  }
+
+  /**
+   * Cancel all pending requests (e.g., on session stop).
+   */
+  cancelAll(): void {
+    for (const [id, pending] of this.pending) {
+      clearTimeout(pending.timer);
+      pending.resolve('deny');
+      logger.debug('[PermissionBridge] cancelled', { id });
+    }
+    this.pending.clear();
+  }
+
+  /**
+   * Number of pending permission requests.
+   */
+  get pendingCount(): number {
+    return this.pending.size;
+  }
+}

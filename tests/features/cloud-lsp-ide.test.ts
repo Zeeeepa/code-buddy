@@ -497,7 +497,7 @@ describe('DesktopAppManager', () => {
   it('should accept custom config', () => {
     const custom = new DesktopAppManager({
       platform: 'darwin',
-      framework: 'tauri',
+      framework: 'electron',
       autoUpdate: false,
     });
     expect(custom.getPlatform()).toBe('darwin');
@@ -591,12 +591,12 @@ describe('DesktopAppManager', () => {
     expect((config.build as any).mac).toBeDefined();
   });
 
-  it('should generate tauri installer config', () => {
-    const tauriManager = new DesktopAppManager({ framework: 'tauri' });
-    const config = tauriManager.getInstallerConfig();
-    expect(config.framework).toBe('tauri');
-    expect(config.tauriVersion).toBeDefined();
-    expect((config.build as any).bundle).toBeDefined();
+  it('should generate electron installer config with correct version', () => {
+    const electronManager = new DesktopAppManager({ framework: 'electron' });
+    const config = electronManager.getInstallerConfig();
+    expect(config.framework).toBe('electron');
+    expect(config.electronVersion).toBe('35.7.5');
+    expect((config.build as Record<string, unknown>).win).toBeDefined();
   });
 
   it('should throw when multi-window disabled and creating second window', () => {

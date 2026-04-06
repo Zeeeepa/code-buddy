@@ -1247,6 +1247,28 @@ export class CodeBuddyAgent extends BaseAgent {
   }
 
   /**
+   * Add a message to the agent's conversation history.
+   * Used by the desktop engine adapter to restore session context
+   * when creating a new agent for an existing session.
+   */
+  addToHistory(message: { role: 'user' | 'assistant' | 'system'; content: string }): void {
+    this.messages.push({ role: message.role, content: message.content });
+    if (message.role === 'user') {
+      this.chatHistory.push({
+        type: 'user',
+        content: message.content,
+        timestamp: new Date(),
+      });
+    } else if (message.role === 'assistant') {
+      this.chatHistory.push({
+        type: 'assistant',
+        content: message.content,
+        timestamp: new Date(),
+      });
+    }
+  }
+
+  /**
    * Clean up all resources
    * Should be called when the agent is no longer needed
    */

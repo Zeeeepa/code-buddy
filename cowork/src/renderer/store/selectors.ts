@@ -295,3 +295,49 @@ export function usePendingDialogs() {
     }))
   );
 }
+
+// ---------------------------------------------------------------------------
+// Code Buddy Cowork parity selectors
+// ---------------------------------------------------------------------------
+
+import type { DiffPreview, CheckpointTimeline, PermissionMode, UpdateInfo } from '../types';
+
+/** Returns diff previews for a specific session. */
+export function useDiffPreviews(sessionId: string | null): DiffPreview[] {
+  return useAppStore((s) => (sessionId ? s.diffPreviews[sessionId] ?? [] : []));
+}
+
+/** Returns the checkpoint timeline (or null). */
+export function useCheckpointTimeline(): CheckpointTimeline | null {
+  return useAppStore((s) => s.checkpointTimeline);
+}
+
+/** Returns the current permission mode. */
+export function usePermissionMode(): PermissionMode {
+  return useAppStore((s) => s.permissionMode);
+}
+
+/** Returns update info (or null). */
+export function useUpdateInfo(): UpdateInfo | null {
+  return useAppStore((s) => s.updateInfo);
+}
+
+/** Returns search state. */
+export function useSearchState() {
+  return useAppStore(
+    useShallow((s) => ({
+      searchQuery: s.searchQuery,
+      searchActive: s.searchActive,
+    }))
+  );
+}
+
+/** Returns command palette visibility. */
+export function useShowCommandPalette(): boolean {
+  return useAppStore((s) => s.showCommandPalette);
+}
+
+/** Returns shortcuts dialog visibility. */
+export function useShowShortcutsDialog(): boolean {
+  return useAppStore((s) => s.showShortcutsDialog);
+}
