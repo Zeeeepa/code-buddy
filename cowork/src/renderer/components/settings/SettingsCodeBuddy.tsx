@@ -30,8 +30,8 @@ export function SettingsCodeBuddy() {
 
   // Load config on mount
   useEffect(() => {
-    window.electronAPI?.invoke('config.get').then((appConfig: Record<string, unknown>) => {
-      const cb = appConfig?.codebuddy as CodeBuddyConfig | undefined;
+    window.electronAPI?.config.get().then((appConfig) => {
+      const cb = (appConfig as unknown as { codebuddy?: CodeBuddyConfig })?.codebuddy;
       if (cb) {
         setConfig({
           enabled: cb.enabled ?? false,
@@ -97,16 +97,17 @@ export function SettingsCodeBuddy() {
     setIsSaving(true);
     setSavedMsg('');
     try {
-      const currentConfig = await window.electronAPI?.invoke('config.get');
-      await window.electronAPI?.invoke('config.save', {
-        ...currentConfig,
+      const currentConfig = await window.electronAPI?.config.get();
+      const base = (currentConfig ?? {}) as unknown as Record<string, unknown>;
+      await window.electronAPI?.config.save({
+        ...base,
         codebuddy: {
           enabled: config.enabled,
           endpoint: config.endpoint,
           apiKey: config.apiKey || undefined,
           model: config.model || undefined,
         },
-      });
+      } as Parameters<NonNullable<typeof window.electronAPI>['config']['save']>[0]);
       setSavedMsg('Configuration saved!');
       setTimeout(() => setSavedMsg(''), 3000);
     } catch (err) {

@@ -1,7 +1,7 @@
 /**
  * Session Export Utility — Format messages as Markdown or JSON
  */
-import type { Message, ContentBlock, TextContent, ToolUseContent, ToolResultContent, ThinkingContent } from '../types';
+import type { Message, TextContent, ToolUseContent, ToolResultContent, ThinkingContent } from '../types';
 
 export function exportAsMarkdown(messages: Message[], sessionTitle: string): string {
   const lines: string[] = [];

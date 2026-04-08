@@ -18,6 +18,9 @@ import type {
   ScheduleUpdateInput,
   ProviderModelInfo,
   LocalOllamaDiscoveryResult,
+  Project,
+  ProjectCreateInput,
+  ProjectUpdateInput,
 } from '../renderer/types';
 import type { DiagnosticInput, DiagnosticResult } from '../renderer/types';
 import type {
@@ -200,6 +203,43 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getTools: (): Promise<McpTool[]> => ipcRenderer.invoke('mcp.getTools'),
     getServerStatus: (): Promise<McpServerStatus[]> => ipcRenderer.invoke('mcp.getServerStatus'),
     getPresets: (): Promise<McpPresetsMap> => ipcRenderer.invoke('mcp.getPresets'),
+    // Marketplace (Claude Cowork parity Phase 2)
+    registry: (): Promise<Array<Record<string, unknown>>> => ipcRenderer.invoke('mcp.registry'),
+    registrySearch: (query: string): Promise<Array<Record<string, unknown>>> =>
+      ipcRenderer.invoke('mcp.registrySearch', query),
+    registryGet: (id: string): Promise<Record<string, unknown> | null> =>
+      ipcRenderer.invoke('mcp.registryGet', id),
+    registryInstall: (
+      id: string,
+      envOverrides?: Record<string, string>
+    ): Promise<{ success: boolean; serverId?: string; error?: string }> =>
+      ipcRenderer.invoke('mcp.registryInstall', id, envOverrides),
+    registryUninstall: (id: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('mcp.registryUninstall', id),
+    registrySetEnabled: (
+      id: string,
+      enabled: boolean
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('mcp.registrySetEnabled', id, enabled),
+    registryTools: (id: string): Promise<Array<{ name: string; description?: string; serverId: string; serverName: string }>> =>
+      ipcRenderer.invoke('mcp.registryTools', id),
+    // Phase 3 step 7: MCP playground
+    listAllTools: (): Promise<Array<{
+      name: string;
+      description?: string;
+      serverId: string;
+      serverName: string;
+      inputSchema?: unknown;
+    }>> => ipcRenderer.invoke('mcp.listAllTools'),
+    invokeTool: (
+      toolName: string,
+      args: Record<string, unknown>
+    ): Promise<{
+      success: boolean;
+      durationMs: number;
+      result?: unknown;
+      error?: string;
+    }> => ipcRenderer.invoke('mcp.invokeTool', toolName, args),
   },
 
   // Skills methods
@@ -420,11 +460,84 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Model switching
   model: {
     switch: (model: string) => ipcRenderer.invoke('config.switchModel', model),
+    // Phase 3 step 3: capability lookup (vision, reasoning, context window)
+    capabilities: (
+      model: string
+    ): Promise<{
+      model: string;
+      supportsVision: boolean;
+      supportsReasoning: boolean;
+      supportsToolCalls: boolean;
+      contextWindow: number;
+      maxOutputTokens: number;
+    }> => ipcRenderer.invoke('model.capabilities', model),
   },
 
-  // Session export
+  // Session export, background sessions, settings update
   session: {
     export: (sessionId: string, format: 'md' | 'json') => ipcRenderer.invoke('session.export', sessionId, format),
+    // Phase 2 step 16: enhanced export
+    exportFull: (
+      sessionId: string,
+      options: {
+        format: 'markdown' | 'json' | 'html';
+        redactSecrets?: boolean;
+        includeCheckpoints?: boolean;
+      }
+    ): Promise<{ success: boolean; content: string; filename: string; error?: string }> =>
+      ipcRenderer.invoke('session.exportFull', sessionId, options),
+    exportToFile: (
+      sessionId: string,
+      options: {
+        format: 'markdown' | 'json' | 'html';
+        redactSecrets?: boolean;
+        includeCheckpoints?: boolean;
+      }
+    ): Promise<{ success: boolean; error?: string; path?: string }> =>
+      ipcRenderer.invoke('session.exportToFile', sessionId, options),
+    startBackground: (payload: { title: string; prompt: string; cwd?: string; projectId?: string }) =>
+      ipcRenderer.invoke('session.startBackground', payload),
+    updateSettings: (sessionId: string, updates: { projectId?: string | null; executionMode?: 'chat' | 'task'; isBackground?: boolean; title?: string }) =>
+      ipcRenderer.invoke('session.updateSettings', sessionId, updates),
+    // Branching (Claude Cowork parity Phase 2)
+    branches: (sessionId: string): Promise<Array<{
+      id: string;
+      name: string;
+      parentId?: string;
+      parentMessageIndex?: number;
+      createdAt: number;
+      updatedAt: number;
+      messageCount: number;
+      isCurrent: boolean;
+    }>> => ipcRenderer.invoke('session.branches', sessionId),
+    fork: (
+      sessionId: string,
+      name: string,
+      fromMessageIndex?: number
+    ): Promise<{ success: boolean; branch?: Record<string, unknown>; error?: string }> =>
+      ipcRenderer.invoke('session.fork', sessionId, name, fromMessageIndex),
+    checkout: (
+      sessionId: string,
+      branchId: string
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('session.checkout', sessionId, branchId),
+    mergeBranch: (
+      sessionId: string,
+      sourceBranchId: string,
+      strategy?: 'append' | 'replace'
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('session.mergeBranch', sessionId, sourceBranchId, strategy),
+    deleteBranch: (
+      sessionId: string,
+      branchId: string
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('session.deleteBranch', sessionId, branchId),
+    renameBranch: (
+      sessionId: string,
+      branchId: string,
+      newName: string
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('session.renameBranch', sessionId, branchId, newName),
   },
 
   // Auto-update
@@ -432,6 +545,729 @@ contextBridge.exposeInMainWorld('electronAPI', {
     check: () => ipcRenderer.invoke('update.check'),
     download: () => ipcRenderer.invoke('update.download'),
     install: () => ipcRenderer.invoke('update.install'),
+  },
+
+  // Projects (Claude Cowork parity)
+  project: {
+    list: (): Promise<{ projects: Project[] }> => ipcRenderer.invoke('project.list'),
+    get: (id: string): Promise<Project | null> => ipcRenderer.invoke('project.get', id),
+    create: (input: ProjectCreateInput): Promise<Project> =>
+      ipcRenderer.invoke('project.create', input),
+    update: (id: string, updates: ProjectUpdateInput): Promise<Project | null> =>
+      ipcRenderer.invoke('project.update', id, updates),
+    delete: (id: string): Promise<boolean> => ipcRenderer.invoke('project.delete', id),
+    setActive: (id: string | null): Promise<Project | null> =>
+      ipcRenderer.invoke('project.setActive', id),
+    getActive: (): Promise<Project | null> => ipcRenderer.invoke('project.getActive'),
+  },
+
+  // Sub-agents (Claude Cowork parity)
+  subAgent: {
+    list: (): Promise<Array<Record<string, unknown>>> => ipcRenderer.invoke('subagent.list'),
+    spawn: (options: { sessionId: string; prompt: string; role?: string; forkContext?: boolean; parentId?: string }): Promise<Record<string, unknown>> =>
+      ipcRenderer.invoke('subagent.spawn', options),
+    sendInput: (agentId: string, message: string, interrupt?: boolean): Promise<boolean> =>
+      ipcRenderer.invoke('subagent.sendInput', agentId, message, interrupt),
+    close: (agentId: string): Promise<boolean> =>
+      ipcRenderer.invoke('subagent.close', agentId),
+    resume: (agentId: string, prompt?: string): Promise<boolean> =>
+      ipcRenderer.invoke('subagent.resume', agentId, prompt),
+    wait: (agentIds: string[], timeoutMs?: number): Promise<Array<Record<string, unknown>>> =>
+      ipcRenderer.invoke('subagent.wait', agentIds, timeoutMs),
+  },
+
+  // Orchestrator
+  orchestrator: {
+    run: (sessionId: string, goal: string, options?: Record<string, unknown>): Promise<Record<string, unknown>> =>
+      ipcRenderer.invoke('orchestrator.run', sessionId, goal, options),
+    isComplex: (goal: string): Promise<boolean> =>
+      ipcRenderer.invoke('orchestrator.isComplex', goal),
+  },
+
+  // @mention processing
+  mention: {
+    process: (text: string, cwd?: string): Promise<{ cleanedText: string; contextBlocks: Array<{ type: string; content: string; source: string }> }> =>
+      ipcRenderer.invoke('mention.process', text, cwd),
+    autocomplete: (prefix: string, cwd?: string, limit?: number): Promise<Array<{ label: string; value: string; description?: string; category: string }>> =>
+      ipcRenderer.invoke('mention.autocomplete', prefix, cwd, limit),
+  },
+
+  // Permission rules editor (Claude Cowork parity Phase 2)
+  rules: {
+    list: (projectId?: string): Promise<{ allow: string[]; deny: string[] }> =>
+      ipcRenderer.invoke('rules.list', projectId),
+    add: (
+      bucket: 'allow' | 'deny',
+      rule: string,
+      projectId?: string
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('rules.add', bucket, rule, projectId),
+    remove: (
+      bucket: 'allow' | 'deny',
+      rule: string,
+      projectId?: string
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('rules.remove', bucket, rule, projectId),
+    update: (
+      bucket: 'allow' | 'deny',
+      oldRule: string,
+      newRule: string,
+      projectId?: string
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('rules.update', bucket, oldRule, newRule, projectId),
+    test: (
+      toolName: string,
+      toolArgs: Record<string, unknown>,
+      projectId?: string
+    ): Promise<{ decision: 'allow' | 'ask' | 'deny'; matchedRule?: string }> =>
+      ipcRenderer.invoke('rules.test', toolName, toolArgs, projectId),
+  },
+
+  // Cost dashboard (Claude Cowork parity Phase 2)
+  cost: {
+    summary: (): Promise<{
+      sessionCost: number;
+      dailyCost: number;
+      weeklyCost: number;
+      monthlyCost: number;
+      totalCost: number;
+      sessionTokens: { input: number; output: number };
+      modelBreakdown: Record<string, { cost: number; calls: number }>;
+      budgetLimit?: number;
+      dailyLimit?: number;
+    }> => ipcRenderer.invoke('cost.summary'),
+    history: (days?: number): Promise<Array<{
+      date: string;
+      cost: number;
+      inputTokens: number;
+      outputTokens: number;
+      calls: number;
+    }>> => ipcRenderer.invoke('cost.history', days),
+    modelBreakdown: (days?: number): Promise<Array<{
+      model: string;
+      cost: number;
+      calls: number;
+      inputTokens: number;
+      outputTokens: number;
+    }>> => ipcRenderer.invoke('cost.modelBreakdown', days),
+    setBudget: (monthlyLimit: number): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('cost.setBudget', monthlyLimit),
+    setDailyLimit: (limit: number): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('cost.setDailyLimit', limit),
+    record: (
+      inputTokens: number,
+      outputTokens: number,
+      model: string,
+      cost?: number
+    ): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('cost.record', inputTokens, outputTokens, model, cost),
+  },
+
+  // SKILL.md skills (Claude Cowork parity Phase 2)
+  skillMd: {
+    list: (): Promise<Array<{
+      name: string;
+      description: string;
+      tier: string;
+      filePath?: string;
+      tags?: string[];
+      requires?: string[];
+    }>> => ipcRenderer.invoke('skillMd.list'),
+    search: (query: string, limit?: number): Promise<Array<{
+      skill: { name: string; description: string; tier: string; filePath?: string; tags?: string[] };
+      score: number;
+    }>> => ipcRenderer.invoke('skillMd.search', query, limit),
+    findBest: (request: string): Promise<{
+      skill: { name: string; description: string; tier: string; filePath?: string; tags?: string[] };
+      confidence: number;
+      matchedTriggers?: string[];
+    } | null> => ipcRenderer.invoke('skillMd.findBest', request),
+    execute: (
+      skillName: string,
+      context: { userInput?: string; workspaceRoot?: string; sessionId?: string }
+    ): Promise<{ success: boolean; output?: string; error?: string; duration?: number }> =>
+      ipcRenderer.invoke('skillMd.execute', skillName, context),
+  },
+
+  // Global search Cmd+K palette (Claude Cowork parity Phase 2 step 8)
+  search: {
+    global: (
+      query: string,
+      limit?: number
+    ): Promise<{
+      hits: Array<{
+        source: 'session' | 'message' | 'memory' | 'knowledge' | 'file';
+        id: string;
+        title: string;
+        snippet: string;
+        score: number;
+        context: {
+          sessionId?: string;
+          projectId?: string;
+          messageIndex?: number;
+          path?: string;
+        };
+      }>;
+      totalByCategory: Record<
+        'session' | 'message' | 'memory' | 'knowledge' | 'file',
+        number
+      >;
+    }> => ipcRenderer.invoke('search.global', query, limit),
+  },
+
+  // Config export/import (Claude Cowork parity Phase 2 step 19)
+  configSync: {
+    exportBundle: (): Promise<{ success: boolean; bundle?: Record<string, unknown>; error?: string }> =>
+      ipcRenderer.invoke('config.export'),
+    exportToFile: (): Promise<{ success: boolean; error?: string; bundle?: Record<string, unknown> }> =>
+      ipcRenderer.invoke('config.exportToFile'),
+    importFromFile: (): Promise<{
+      success: boolean;
+      error?: string;
+      preview?: {
+        bundle: Record<string, unknown>;
+        conflicts: Array<{ type: string; identifier: string; current?: unknown; incoming: unknown }>;
+        newProjects: number;
+        newMcpServers: number;
+      };
+    }> => ipcRenderer.invoke('config.importFromFile'),
+    applyImport: (
+      bundle: Record<string, unknown>,
+      strategy: 'skip' | 'overwrite'
+    ): Promise<{
+      success: boolean;
+      imported: { projects: number; mcpServers: number; apiUpdated: boolean };
+      errors: string[];
+    }> => ipcRenderer.invoke('config.applyImport', bundle, strategy),
+  },
+
+  // Activity feed (Claude Cowork parity Phase 2 step 18)
+  activity: {
+    recent: (
+      limit?: number,
+      projectId?: string
+    ): Promise<Array<{
+      id: number;
+      type: string;
+      title: string;
+      description?: string;
+      sessionId?: string;
+      projectId?: string;
+      metadata?: Record<string, unknown>;
+      timestamp: number;
+    }>> => ipcRenderer.invoke('activity.recent', limit, projectId),
+    clear: (): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('activity.clear'),
+  },
+
+  // Workflow visual editor (Claude Cowork parity Phase 2 step 15)
+  workflow: {
+    list: (): Promise<Array<{
+      id: string;
+      name: string;
+      description?: string;
+      nodes: Array<{
+        id: string;
+        type: 'tool' | 'condition' | 'parallel' | 'approval' | 'start' | 'end';
+        name: string;
+        position: { x: number; y: number };
+        config?: Record<string, unknown>;
+      }>;
+      edges: Array<{ id: string; source: string; target: string; label?: string }>;
+      createdAt: number;
+      updatedAt: number;
+    }>> => ipcRenderer.invoke('workflow.list'),
+    get: (id: string): Promise<unknown> => ipcRenderer.invoke('workflow.get', id),
+    create: (input: {
+      name: string;
+      description?: string;
+      nodes: Array<unknown>;
+      edges: Array<unknown>;
+    }): Promise<unknown> => ipcRenderer.invoke('workflow.create', input),
+    update: (id: string, patch: Record<string, unknown>): Promise<unknown> =>
+      ipcRenderer.invoke('workflow.update', id, patch),
+    delete: (id: string): Promise<boolean> =>
+      ipcRenderer.invoke('workflow.delete', id),
+    run: (
+      id: string,
+      initialContext?: Record<string, unknown>
+    ): Promise<{
+      success: boolean;
+      status: string;
+      duration: number;
+      completedSteps: number;
+      totalSteps: number;
+      error?: string;
+    }> => ipcRenderer.invoke('workflow.run', id, initialContext),
+  },
+
+  // Project templates (Claude Cowork parity Phase 2 step 12)
+  template: {
+    list: (): Promise<Array<{
+      name: string;
+      description: string;
+      tier: string;
+      tags: string[];
+      language?: string;
+      filePath?: string;
+    }>> => ipcRenderer.invoke('template.list'),
+    preview: (
+      name: string
+    ): Promise<{ content: string; filePath?: string } | null> =>
+      ipcRenderer.invoke('template.preview', name),
+    create: (
+      name: string,
+      workspaceRoot: string
+    ): Promise<{ success: boolean; output?: string; error?: string }> =>
+      ipcRenderer.invoke('template.create', name, workspaceRoot),
+  },
+
+  // File preview pane (Claude Cowork parity Phase 2 step 9)
+  preview: {
+    get: (
+      filePath: string
+    ): Promise<{
+      kind: 'text' | 'image' | 'pdf' | 'binary' | 'error';
+      path: string;
+      name: string;
+      size: number;
+      mime: string;
+      text?: string;
+      lineCount?: number;
+      language?: string;
+      dataUri?: string;
+      dimensions?: { width: number; height: number };
+      pdfText?: string;
+      pdfPages?: number;
+      error?: string;
+    }> => ipcRenderer.invoke('preview.get', filePath),
+  },
+
+  // Workspace presets (Claude Cowork parity Phase 3 step 9)
+  workspacePresets: {
+    list: (): Promise<Array<{
+      id: string;
+      name: string;
+      description?: string;
+      workspacePath?: string;
+      model?: string;
+      permissionMode?: string;
+      memoryScope?: 'project' | 'global' | 'none';
+      createdAt: number;
+      updatedAt: number;
+    }>> => ipcRenderer.invoke('workspacePresets.list'),
+    save: (preset: {
+      id?: string;
+      name: string;
+      description?: string;
+      workspacePath?: string;
+      model?: string;
+      permissionMode?: string;
+      memoryScope?: 'project' | 'global' | 'none';
+    }): Promise<{
+      success: boolean;
+      preset?: {
+        id: string;
+        name: string;
+        description?: string;
+        workspacePath?: string;
+        model?: string;
+        permissionMode?: string;
+        memoryScope?: 'project' | 'global' | 'none';
+        createdAt: number;
+        updatedAt: number;
+      };
+      error?: string;
+    }> => ipcRenderer.invoke('workspacePresets.save', preset),
+    delete: (id: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('workspacePresets.delete', id),
+  },
+
+  // A2A remote agent registry (Claude Cowork parity Phase 3 step 19)
+  a2a: {
+    list: (): Promise<Array<{
+      id: string;
+      url: string;
+      addedAt: number;
+      lastPingAt?: number;
+      lastStatus?: 'ok' | 'error' | 'unknown';
+      lastError?: string;
+      card: {
+        name: string;
+        description: string;
+        url: string;
+        version: string;
+        skills: Array<{ id: string; name: string; description?: string }>;
+      };
+    }>> => ipcRenderer.invoke('a2a.list'),
+    discover: (url: string): Promise<{
+      success: boolean;
+      card?: unknown;
+      error?: string;
+    }> => ipcRenderer.invoke('a2a.discover', url),
+    add: (url: string): Promise<{
+      success: boolean;
+      agent?: unknown;
+      error?: string;
+    }> => ipcRenderer.invoke('a2a.add', url),
+    remove: (id: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('a2a.remove', id),
+    ping: (id: string): Promise<{
+      success: boolean;
+      status?: string;
+      error?: string;
+    }> => ipcRenderer.invoke('a2a.ping', id),
+    invoke: (id: string, message: string): Promise<{
+      success: boolean;
+      taskId?: string;
+      result?: string;
+      error?: string;
+    }> => ipcRenderer.invoke('a2a.invoke', { id, message }),
+  },
+
+  // Reasoning trace viewer (Claude Cowork parity Phase 3 step 17)
+  reasoning: {
+    listTraces: (): Promise<Array<{
+      toolUseId: string;
+      sessionId: string;
+      problem: string;
+      mode: string;
+      startedAt: number;
+      endedAt?: number;
+      iterations?: number;
+    }>> => ipcRenderer.invoke('reasoning.listTraces'),
+    getTrace: (toolUseId: string): Promise<unknown | null> =>
+      ipcRenderer.invoke('reasoning.getTrace', toolUseId),
+    clear: (): Promise<{ success: boolean }> => ipcRenderer.invoke('reasoning.clear'),
+  },
+
+  // Hooks editor (Claude Cowork parity Phase 3 step 13)
+  hooks: {
+    list: (): Promise<Array<{
+      id: string;
+      event: string;
+      index: number;
+      handler: {
+        type: string;
+        command?: string;
+        url?: string;
+        prompt?: string;
+        if?: string;
+        timeout?: number;
+      };
+    }>> => ipcRenderer.invoke('hooks.list'),
+    upsert: (params: {
+      event: string;
+      handler: Record<string, unknown>;
+      index?: number;
+    }): Promise<{ success: boolean; entry?: unknown; error?: string }> =>
+      ipcRenderer.invoke('hooks.upsert', params),
+    remove: (params: {
+      event: string;
+      index: number;
+    }): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('hooks.remove', params),
+    test: (handler: Record<string, unknown>): Promise<{
+      success: boolean;
+      exitCode: number | null;
+      stdout: string;
+      stderr: string;
+      durationMs: number;
+      error?: string;
+    }> => ipcRenderer.invoke('hooks.test', handler),
+  },
+
+  // Test runner (Claude Cowork parity Phase 3 step 12)
+  test: {
+    detect: (): Promise<string | null> => ipcRenderer.invoke('test.detect'),
+    run: (files?: string[]): Promise<unknown> => ipcRenderer.invoke('test.run', files),
+    runFailing: (): Promise<unknown> => ipcRenderer.invoke('test.runFailing'),
+    cancel: (): Promise<{ success: boolean }> => ipcRenderer.invoke('test.cancel'),
+    getState: (): Promise<{
+      framework: string | null;
+      lastResult: unknown | null;
+      isRunning: boolean;
+    } | null> => ipcRenderer.invoke('test.getState'),
+  },
+
+  // Persona switcher (Claude Cowork parity Phase 3 step 11)
+  identity: {
+    list: (): Promise<Array<{
+      id: string;
+      name: string;
+      description?: string;
+      filePath: string;
+      source: 'workspace' | 'global';
+      kind: 'identity' | 'persona';
+      mtime: number;
+      size: number;
+      active: boolean;
+    }>> => ipcRenderer.invoke('identity.list'),
+    getDetail: (id: string): Promise<{
+      id: string;
+      name: string;
+      description?: string;
+      filePath: string;
+      source: 'workspace' | 'global';
+      kind: 'identity' | 'persona';
+      mtime: number;
+      size: number;
+      active: boolean;
+      content: string;
+    } | null> => ipcRenderer.invoke('identity.getDetail', id),
+    activate: (id: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('identity.activate', id),
+    deactivate: (): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('identity.deactivate'),
+    getActive: (): Promise<unknown | null> => ipcRenderer.invoke('identity.getActive'),
+  },
+
+  // Audit log (Claude Cowork parity Phase 3 step 10)
+  audit: {
+    listRuns: (filter?: {
+      limit?: number;
+      status?: 'running' | 'completed' | 'failed' | 'cancelled';
+      sessionId?: string;
+      sinceTs?: number;
+      untilTs?: number;
+    }): Promise<Array<{
+      runId: string;
+      objective: string;
+      status: 'running' | 'completed' | 'failed' | 'cancelled';
+      startedAt: number;
+      endedAt?: number;
+      durationMs?: number;
+      eventCount: number;
+      artifactCount: number;
+      channel?: string;
+      sessionId?: string;
+      userId?: string;
+      tags?: string[];
+      totalCost?: number;
+      totalTokens?: number;
+      toolCallCount?: number;
+    }>> => ipcRenderer.invoke('audit.listRuns', filter),
+    getRunDetail: (runId: string): Promise<unknown | null> =>
+      ipcRenderer.invoke('audit.getRunDetail', runId),
+    exportCsv: (filter?: Record<string, unknown>): Promise<string> =>
+      ipcRenderer.invoke('audit.exportCsv', filter),
+  },
+
+  // Custom slash commands editor (Claude Cowork parity Phase 3 step 6)
+  customCommands: {
+    list: (): Promise<Array<{
+      name: string;
+      description: string;
+      prompt: string;
+      category?: string;
+      isBuiltin: boolean;
+    }>> => ipcRenderer.invoke('customCommands.list'),
+    save: (cmd: {
+      name: string;
+      description: string;
+      body: string;
+    }): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('customCommands.save', cmd),
+    delete: (name: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('customCommands.delete', name),
+  },
+
+  // Snippets / prompt library (Claude Cowork parity Phase 3 step 5)
+  snippets: {
+    list: (): Promise<Array<{
+      id: string;
+      name: string;
+      description?: string;
+      tags: string[];
+      body: string;
+      updatedAt: number;
+    }>> => ipcRenderer.invoke('snippets.list'),
+    get: (
+      id: string
+    ): Promise<{
+      id: string;
+      name: string;
+      description?: string;
+      tags: string[];
+      body: string;
+      updatedAt: number;
+    } | null> => ipcRenderer.invoke('snippets.get', id),
+    save: (snippet: {
+      id?: string;
+      name: string;
+      description?: string;
+      tags?: string[];
+      body: string;
+    }): Promise<{ success: boolean; id?: string; error?: string }> =>
+      ipcRenderer.invoke('snippets.save', snippet),
+    delete: (id: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('snippets.delete', id),
+  },
+
+  // Starred/bookmarked messages (Claude Cowork parity Phase 3 step 4)
+  bookmarks: {
+    toggle: (entry: {
+      sessionId: string;
+      projectId?: string | null;
+      messageId: string;
+      preview: string;
+      role?: string;
+    }): Promise<{ bookmarked: boolean }> => ipcRenderer.invoke('bookmarks.toggle', entry),
+    list: (
+      projectId?: string | null,
+      limit?: number
+    ): Promise<Array<{
+      id: number;
+      sessionId: string;
+      projectId?: string | null;
+      messageId: string;
+      preview: string;
+      note?: string | null;
+      role?: string | null;
+      createdAt: number;
+    }>> => ipcRenderer.invoke('bookmarks.list', projectId, limit),
+    forSession: (sessionId: string): Promise<string[]> =>
+      ipcRenderer.invoke('bookmarks.forSession', sessionId),
+    updateNote: (id: number, note: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('bookmarks.updateNote', id, note),
+    remove: (id: number): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('bookmarks.remove', id),
+  },
+
+  // Git panel + commit composer (Claude Cowork parity Phase 3 step 2)
+  git: {
+    status: (
+      cwd: string
+    ): Promise<{
+      isRepo: boolean;
+      branch: string | null;
+      upstream: string | null;
+      ahead: number;
+      behind: number;
+      files: Array<{
+        path: string;
+        oldPath?: string;
+        indexStatus: string;
+        workingStatus: string;
+        staged: boolean;
+      }>;
+      error?: string;
+    }> => ipcRenderer.invoke('git.status', cwd),
+    stage: (cwd: string, files: string[]): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('git.stage', cwd, files),
+    unstage: (cwd: string, files: string[]): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('git.unstage', cwd, files),
+    diff: (cwd: string, file: string, staged: boolean): Promise<string> =>
+      ipcRenderer.invoke('git.diff', cwd, file, staged),
+    commit: (
+      cwd: string,
+      message: string,
+      amend?: boolean
+    ): Promise<{ success: boolean; error?: string; hash?: string }> =>
+      ipcRenderer.invoke('git.commit', cwd, message, amend),
+    suggestMessage: (cwd: string): Promise<{ message: string }> =>
+      ipcRenderer.invoke('git.suggestMessage', cwd),
+    branches: (cwd: string): Promise<string[]> => ipcRenderer.invoke('git.branches', cwd),
+  },
+
+  // Hunk-level diff accept/reject (Claude Cowork parity Phase 3 step 1)
+  diff: {
+    parseHunks: (
+      excerpt: string
+    ): Promise<{
+      hunks: Array<{
+        index: number;
+        header: string;
+        oldStart: number;
+        oldCount: number;
+        newStart: number;
+        newCount: number;
+        lines: string[];
+        body: string;
+      }>;
+      preamble: string;
+    }> => ipcRenderer.invoke('diff.parseHunks', excerpt),
+    revertHunks: (
+      filePath: string,
+      hunks: Array<{
+        index: number;
+        header: string;
+        oldStart: number;
+        oldCount: number;
+        newStart: number;
+        newCount: number;
+        lines: string[];
+        body: string;
+      }>
+    ): Promise<{ success: boolean; method: 'git' | 'manual' | 'none'; error?: string }> =>
+      ipcRenderer.invoke('diff.revertHunks', filePath, hunks),
+  },
+
+  // Slash commands (Claude Cowork parity Phase 2)
+  command: {
+    list: (): Promise<Array<{
+      name: string;
+      description: string;
+      prompt: string;
+      category?: string;
+      isBuiltin: boolean;
+      arguments?: Array<{ name: string; description: string; required: boolean; default?: string }>;
+    }>> => ipcRenderer.invoke('command.list'),
+    autocomplete: (prefix: string, limit?: number): Promise<Array<{
+      name: string;
+      description: string;
+      prompt: string;
+      category?: string;
+      isBuiltin: boolean;
+    }>> => ipcRenderer.invoke('command.autocomplete', prefix, limit),
+    execute: (name: string, args: string[], sessionId?: string): Promise<{
+      success: boolean;
+      prompt?: string;
+      message?: string;
+      error?: string;
+      handled?: boolean;
+    }> => ipcRenderer.invoke('command.execute', name, args, sessionId),
+  },
+
+  // Project memory entries (Claude Cowork parity)
+  memory: {
+    list: (projectId?: string): Promise<Array<{ category: string; content: string; sourceSessionId?: string; timestamp: number }>> =>
+      ipcRenderer.invoke('memory.list', projectId),
+    // Phase 2 step 17: inline memory editor
+    add: (
+      category: 'preference' | 'pattern' | 'context' | 'decision',
+      content: string,
+      projectId?: string
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('memory.add', category, content, projectId),
+    update: (
+      entryIndex: number,
+      newContent: string,
+      newCategory?: 'preference' | 'pattern' | 'context' | 'decision',
+      projectId?: string
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('memory.update', entryIndex, newContent, newCategory, projectId),
+    delete: (
+      entryIndex: number,
+      projectId?: string
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('memory.delete', entryIndex, projectId),
+  },
+
+  // Knowledge base (Claude Cowork parity)
+  knowledge: {
+    list: (projectId?: string): Promise<Array<Record<string, unknown>>> =>
+      ipcRenderer.invoke('knowledge.list', projectId),
+    get: (id: string, projectId?: string): Promise<Record<string, unknown> | null> =>
+      ipcRenderer.invoke('knowledge.get', id, projectId),
+    create: (input: { title: string; content: string; tags?: string[]; scope?: string[]; priority?: number }, projectId?: string): Promise<Record<string, unknown>> =>
+      ipcRenderer.invoke('knowledge.create', input, projectId),
+    update: (id: string, updates: Record<string, unknown>, projectId?: string): Promise<Record<string, unknown> | null> =>
+      ipcRenderer.invoke('knowledge.update', id, updates, projectId),
+    delete: (id: string, projectId?: string): Promise<boolean> =>
+      ipcRenderer.invoke('knowledge.delete', id, projectId),
+    search: (query: string, projectId?: string, limit?: number): Promise<Array<Record<string, unknown>>> =>
+      ipcRenderer.invoke('knowledge.search', query, projectId, limit),
   },
 });
 
@@ -489,6 +1325,35 @@ declare global {
         getTools: () => Promise<McpTool[]>;
         getServerStatus: () => Promise<McpServerStatus[]>;
         getPresets: () => Promise<McpPresetsMap>;
+        registry: () => Promise<Array<Record<string, unknown>>>;
+        registrySearch: (query: string) => Promise<Array<Record<string, unknown>>>;
+        registryGet: (id: string) => Promise<Record<string, unknown> | null>;
+        registryInstall: (
+          id: string,
+          envOverrides?: Record<string, string>
+        ) => Promise<{ success: boolean; serverId?: string; error?: string }>;
+        registryUninstall: (id: string) => Promise<{ success: boolean; error?: string }>;
+        registrySetEnabled: (
+          id: string,
+          enabled: boolean
+        ) => Promise<{ success: boolean; error?: string }>;
+        registryTools: (id: string) => Promise<Array<{ name: string; description?: string; serverId: string; serverName: string }>>;
+        listAllTools: () => Promise<Array<{
+          name: string;
+          description?: string;
+          serverId: string;
+          serverName: string;
+          inputSchema?: unknown;
+        }>>;
+        invokeTool: (
+          toolName: string,
+          args: Record<string, unknown>
+        ) => Promise<{
+          success: boolean;
+          durationMs: number;
+          result?: unknown;
+          error?: string;
+        }>;
       };
       skills: {
         getAll: () => Promise<Skill[]>;
@@ -658,14 +1523,676 @@ declare global {
       };
       model: {
         switch: (model: string) => Promise<boolean>;
+        capabilities: (model: string) => Promise<{
+          model: string;
+          supportsVision: boolean;
+          supportsReasoning: boolean;
+          supportsToolCalls: boolean;
+          contextWindow: number;
+          maxOutputTokens: number;
+        }>;
       };
       session: {
         export: (sessionId: string, format: 'md' | 'json') => Promise<unknown>;
+        exportFull: (
+          sessionId: string,
+          options: {
+            format: 'markdown' | 'json' | 'html';
+            redactSecrets?: boolean;
+            includeCheckpoints?: boolean;
+          }
+        ) => Promise<{ success: boolean; content: string; filename: string; error?: string }>;
+        exportToFile: (
+          sessionId: string,
+          options: {
+            format: 'markdown' | 'json' | 'html';
+            redactSecrets?: boolean;
+            includeCheckpoints?: boolean;
+          }
+        ) => Promise<{ success: boolean; error?: string; path?: string }>;
+        startBackground: (payload: { title: string; prompt: string; cwd?: string; projectId?: string }) => Promise<unknown>;
+        updateSettings: (sessionId: string, updates: { projectId?: string | null; executionMode?: 'chat' | 'task'; isBackground?: boolean; title?: string }) => Promise<boolean>;
+        branches: (sessionId: string) => Promise<Array<{
+          id: string;
+          name: string;
+          parentId?: string;
+          parentMessageIndex?: number;
+          createdAt: number;
+          updatedAt: number;
+          messageCount: number;
+          isCurrent: boolean;
+        }>>;
+        fork: (
+          sessionId: string,
+          name: string,
+          fromMessageIndex?: number
+        ) => Promise<{ success: boolean; branch?: Record<string, unknown>; error?: string }>;
+        checkout: (
+          sessionId: string,
+          branchId: string
+        ) => Promise<{ success: boolean; error?: string }>;
+        mergeBranch: (
+          sessionId: string,
+          sourceBranchId: string,
+          strategy?: 'append' | 'replace'
+        ) => Promise<{ success: boolean; error?: string }>;
+        deleteBranch: (
+          sessionId: string,
+          branchId: string
+        ) => Promise<{ success: boolean; error?: string }>;
+        renameBranch: (
+          sessionId: string,
+          branchId: string,
+          newName: string
+        ) => Promise<{ success: boolean; error?: string }>;
       };
       update: {
         check: () => Promise<unknown>;
         download: () => Promise<void>;
         install: () => void;
+      };
+      project: {
+        list: () => Promise<{ projects: Project[] }>;
+        get: (id: string) => Promise<Project | null>;
+        create: (input: ProjectCreateInput) => Promise<Project>;
+        update: (id: string, updates: ProjectUpdateInput) => Promise<Project | null>;
+        delete: (id: string) => Promise<boolean>;
+        setActive: (id: string | null) => Promise<Project | null>;
+        getActive: () => Promise<Project | null>;
+      };
+      subAgent: {
+        list: () => Promise<Array<Record<string, unknown>>>;
+        spawn: (options: { sessionId: string; prompt: string; role?: string; forkContext?: boolean; parentId?: string }) => Promise<Record<string, unknown>>;
+        sendInput: (agentId: string, message: string, interrupt?: boolean) => Promise<boolean>;
+        close: (agentId: string) => Promise<boolean>;
+        resume: (agentId: string, prompt?: string) => Promise<boolean>;
+        wait: (agentIds: string[], timeoutMs?: number) => Promise<Array<Record<string, unknown>>>;
+      };
+      orchestrator: {
+        run: (sessionId: string, goal: string, options?: Record<string, unknown>) => Promise<Record<string, unknown>>;
+        isComplex: (goal: string) => Promise<boolean>;
+      };
+      mention: {
+        process: (text: string, cwd?: string) => Promise<{ cleanedText: string; contextBlocks: Array<{ type: string; content: string; source: string }> }>;
+        autocomplete: (prefix: string, cwd?: string, limit?: number) => Promise<Array<{ label: string; value: string; description?: string; category: string }>>;
+      };
+      rules: {
+        list: (projectId?: string) => Promise<{ allow: string[]; deny: string[] }>;
+        add: (
+          bucket: 'allow' | 'deny',
+          rule: string,
+          projectId?: string
+        ) => Promise<{ success: boolean; error?: string }>;
+        remove: (
+          bucket: 'allow' | 'deny',
+          rule: string,
+          projectId?: string
+        ) => Promise<{ success: boolean; error?: string }>;
+        update: (
+          bucket: 'allow' | 'deny',
+          oldRule: string,
+          newRule: string,
+          projectId?: string
+        ) => Promise<{ success: boolean; error?: string }>;
+        test: (
+          toolName: string,
+          toolArgs: Record<string, unknown>,
+          projectId?: string
+        ) => Promise<{ decision: 'allow' | 'ask' | 'deny'; matchedRule?: string }>;
+      };
+      cost: {
+        summary: () => Promise<{
+          sessionCost: number;
+          dailyCost: number;
+          weeklyCost: number;
+          monthlyCost: number;
+          totalCost: number;
+          sessionTokens: { input: number; output: number };
+          modelBreakdown: Record<string, { cost: number; calls: number }>;
+          budgetLimit?: number;
+          dailyLimit?: number;
+        }>;
+        history: (days?: number) => Promise<Array<{
+          date: string;
+          cost: number;
+          inputTokens: number;
+          outputTokens: number;
+          calls: number;
+        }>>;
+        modelBreakdown: (days?: number) => Promise<Array<{
+          model: string;
+          cost: number;
+          calls: number;
+          inputTokens: number;
+          outputTokens: number;
+        }>>;
+        setBudget: (monthlyLimit: number) => Promise<{ success: boolean }>;
+        setDailyLimit: (limit: number) => Promise<{ success: boolean }>;
+        record: (
+          inputTokens: number,
+          outputTokens: number,
+          model: string,
+          cost?: number
+        ) => Promise<{ success: boolean }>;
+      };
+      skillMd: {
+        list: () => Promise<Array<{
+          name: string;
+          description: string;
+          tier: string;
+          filePath?: string;
+          tags?: string[];
+          requires?: string[];
+        }>>;
+        search: (query: string, limit?: number) => Promise<Array<{
+          skill: { name: string; description: string; tier: string; filePath?: string; tags?: string[] };
+          score: number;
+        }>>;
+        findBest: (request: string) => Promise<{
+          skill: { name: string; description: string; tier: string; filePath?: string; tags?: string[] };
+          confidence: number;
+          matchedTriggers?: string[];
+        } | null>;
+        execute: (
+          skillName: string,
+          context: { userInput?: string; workspaceRoot?: string; sessionId?: string }
+        ) => Promise<{ success: boolean; output?: string; error?: string; duration?: number }>;
+      };
+      search: {
+        global: (
+          query: string,
+          limit?: number
+        ) => Promise<{
+          hits: Array<{
+            source: 'session' | 'message' | 'memory' | 'knowledge' | 'file';
+            id: string;
+            title: string;
+            snippet: string;
+            score: number;
+            context: {
+              sessionId?: string;
+              projectId?: string;
+              messageIndex?: number;
+              path?: string;
+            };
+          }>;
+          totalByCategory: Record<
+            'session' | 'message' | 'memory' | 'knowledge' | 'file',
+            number
+          >;
+        }>;
+      };
+      configSync: {
+        exportBundle: () => Promise<{ success: boolean; bundle?: Record<string, unknown>; error?: string }>;
+        exportToFile: () => Promise<{ success: boolean; error?: string; bundle?: Record<string, unknown> }>;
+        importFromFile: () => Promise<{
+          success: boolean;
+          error?: string;
+          preview?: {
+            bundle: Record<string, unknown>;
+            conflicts: Array<{ type: string; identifier: string; current?: unknown; incoming: unknown }>;
+            newProjects: number;
+            newMcpServers: number;
+          };
+        }>;
+        applyImport: (
+          bundle: Record<string, unknown>,
+          strategy: 'skip' | 'overwrite'
+        ) => Promise<{
+          success: boolean;
+          imported: { projects: number; mcpServers: number; apiUpdated: boolean };
+          errors: string[];
+        }>;
+      };
+      activity: {
+        recent: (
+          limit?: number,
+          projectId?: string
+        ) => Promise<Array<{
+          id: number;
+          type: string;
+          title: string;
+          description?: string;
+          sessionId?: string;
+          projectId?: string;
+          metadata?: Record<string, unknown>;
+          timestamp: number;
+        }>>;
+        clear: () => Promise<{ success: boolean }>;
+      };
+      workflow: {
+        list: () => Promise<Array<{
+          id: string;
+          name: string;
+          description?: string;
+          nodes: Array<{
+            id: string;
+            type: 'tool' | 'condition' | 'parallel' | 'approval' | 'start' | 'end';
+            name: string;
+            position: { x: number; y: number };
+            config?: Record<string, unknown>;
+          }>;
+          edges: Array<{ id: string; source: string; target: string; label?: string }>;
+          createdAt: number;
+          updatedAt: number;
+        }>>;
+        get: (id: string) => Promise<unknown>;
+        create: (input: {
+          name: string;
+          description?: string;
+          nodes: Array<unknown>;
+          edges: Array<unknown>;
+        }) => Promise<unknown>;
+        update: (id: string, patch: Record<string, unknown>) => Promise<unknown>;
+        delete: (id: string) => Promise<boolean>;
+        run: (
+          id: string,
+          initialContext?: Record<string, unknown>
+        ) => Promise<{
+          success: boolean;
+          status: string;
+          duration: number;
+          completedSteps: number;
+          totalSteps: number;
+          error?: string;
+        }>;
+      };
+      template: {
+        list: () => Promise<Array<{
+          name: string;
+          description: string;
+          tier: string;
+          tags: string[];
+          language?: string;
+          filePath?: string;
+        }>>;
+        preview: (
+          name: string
+        ) => Promise<{ content: string; filePath?: string } | null>;
+        create: (
+          name: string,
+          workspaceRoot: string
+        ) => Promise<{ success: boolean; output?: string; error?: string }>;
+      };
+      preview: {
+        get: (
+          filePath: string
+        ) => Promise<{
+          kind: 'text' | 'image' | 'pdf' | 'binary' | 'error';
+          path: string;
+          name: string;
+          size: number;
+          mime: string;
+          text?: string;
+          lineCount?: number;
+          language?: string;
+          dataUri?: string;
+          dimensions?: { width: number; height: number };
+          pdfText?: string;
+          pdfPages?: number;
+          error?: string;
+        }>;
+      };
+      workspacePresets: {
+        list: () => Promise<Array<{
+          id: string;
+          name: string;
+          description?: string;
+          workspacePath?: string;
+          model?: string;
+          permissionMode?: string;
+          memoryScope?: 'project' | 'global' | 'none';
+          createdAt: number;
+          updatedAt: number;
+        }>>;
+        save: (preset: {
+          id?: string;
+          name: string;
+          description?: string;
+          workspacePath?: string;
+          model?: string;
+          permissionMode?: string;
+          memoryScope?: 'project' | 'global' | 'none';
+        }) => Promise<{
+          success: boolean;
+          preset?: {
+            id: string;
+            name: string;
+            description?: string;
+            workspacePath?: string;
+            model?: string;
+            permissionMode?: string;
+            memoryScope?: 'project' | 'global' | 'none';
+            createdAt: number;
+            updatedAt: number;
+          };
+          error?: string;
+        }>;
+        delete: (id: string) => Promise<{ success: boolean }>;
+      };
+      a2a: {
+        list: () => Promise<Array<{
+          id: string;
+          url: string;
+          addedAt: number;
+          lastPingAt?: number;
+          lastStatus?: 'ok' | 'error' | 'unknown';
+          lastError?: string;
+          card: {
+            name: string;
+            description: string;
+            url: string;
+            version: string;
+            skills: Array<{ id: string; name: string; description?: string }>;
+          };
+        }>>;
+        discover: (url: string) => Promise<{
+          success: boolean;
+          card?: unknown;
+          error?: string;
+        }>;
+        add: (url: string) => Promise<{
+          success: boolean;
+          agent?: unknown;
+          error?: string;
+        }>;
+        remove: (id: string) => Promise<{ success: boolean }>;
+        ping: (id: string) => Promise<{
+          success: boolean;
+          status?: string;
+          error?: string;
+        }>;
+        invoke: (
+          id: string,
+          message: string
+        ) => Promise<{
+          success: boolean;
+          taskId?: string;
+          result?: string;
+          error?: string;
+        }>;
+      };
+      reasoning: {
+        listTraces: () => Promise<Array<{
+          toolUseId: string;
+          sessionId: string;
+          problem: string;
+          mode: string;
+          startedAt: number;
+          endedAt?: number;
+          iterations?: number;
+        }>>;
+        getTrace: (toolUseId: string) => Promise<unknown | null>;
+        clear: () => Promise<{ success: boolean }>;
+      };
+      hooks: {
+        list: () => Promise<Array<{
+          id: string;
+          event: string;
+          index: number;
+          handler: {
+            type: string;
+            command?: string;
+            url?: string;
+            prompt?: string;
+            if?: string;
+            timeout?: number;
+          };
+        }>>;
+        upsert: (params: {
+          event: string;
+          handler: Record<string, unknown>;
+          index?: number;
+        }) => Promise<{ success: boolean; entry?: unknown; error?: string }>;
+        remove: (params: {
+          event: string;
+          index: number;
+        }) => Promise<{ success: boolean; error?: string }>;
+        test: (handler: Record<string, unknown>) => Promise<{
+          success: boolean;
+          exitCode: number | null;
+          stdout: string;
+          stderr: string;
+          durationMs: number;
+          error?: string;
+        }>;
+      };
+      test: {
+        detect: () => Promise<string | null>;
+        run: (files?: string[]) => Promise<unknown>;
+        runFailing: () => Promise<unknown>;
+        cancel: () => Promise<{ success: boolean }>;
+        getState: () => Promise<{
+          framework: string | null;
+          lastResult: unknown | null;
+          isRunning: boolean;
+        } | null>;
+      };
+      identity: {
+        list: () => Promise<Array<{
+          id: string;
+          name: string;
+          description?: string;
+          filePath: string;
+          source: 'workspace' | 'global';
+          kind: 'identity' | 'persona';
+          mtime: number;
+          size: number;
+          active: boolean;
+        }>>;
+        getDetail: (id: string) => Promise<{
+          id: string;
+          name: string;
+          description?: string;
+          filePath: string;
+          source: 'workspace' | 'global';
+          kind: 'identity' | 'persona';
+          mtime: number;
+          size: number;
+          active: boolean;
+          content: string;
+        } | null>;
+        activate: (id: string) => Promise<{ success: boolean; error?: string }>;
+        deactivate: () => Promise<{ success: boolean }>;
+        getActive: () => Promise<unknown | null>;
+      };
+      audit: {
+        listRuns: (filter?: {
+          limit?: number;
+          status?: 'running' | 'completed' | 'failed' | 'cancelled';
+          sessionId?: string;
+          sinceTs?: number;
+          untilTs?: number;
+        }) => Promise<Array<{
+          runId: string;
+          objective: string;
+          status: 'running' | 'completed' | 'failed' | 'cancelled';
+          startedAt: number;
+          endedAt?: number;
+          durationMs?: number;
+          eventCount: number;
+          artifactCount: number;
+          channel?: string;
+          sessionId?: string;
+          userId?: string;
+          tags?: string[];
+          totalCost?: number;
+          totalTokens?: number;
+          toolCallCount?: number;
+        }>>;
+        getRunDetail: (runId: string) => Promise<unknown | null>;
+        exportCsv: (filter?: Record<string, unknown>) => Promise<string>;
+      };
+      customCommands: {
+        list: () => Promise<Array<{
+          name: string;
+          description: string;
+          prompt: string;
+          category?: string;
+          isBuiltin: boolean;
+        }>>;
+        save: (cmd: {
+          name: string;
+          description: string;
+          body: string;
+        }) => Promise<{ success: boolean; error?: string }>;
+        delete: (name: string) => Promise<{ success: boolean; error?: string }>;
+      };
+      snippets: {
+        list: () => Promise<Array<{
+          id: string;
+          name: string;
+          description?: string;
+          tags: string[];
+          body: string;
+          updatedAt: number;
+        }>>;
+        get: (id: string) => Promise<{
+          id: string;
+          name: string;
+          description?: string;
+          tags: string[];
+          body: string;
+          updatedAt: number;
+        } | null>;
+        save: (snippet: {
+          id?: string;
+          name: string;
+          description?: string;
+          tags?: string[];
+          body: string;
+        }) => Promise<{ success: boolean; id?: string; error?: string }>;
+        delete: (id: string) => Promise<{ success: boolean; error?: string }>;
+      };
+      bookmarks: {
+        toggle: (entry: {
+          sessionId: string;
+          projectId?: string | null;
+          messageId: string;
+          preview: string;
+          role?: string;
+        }) => Promise<{ bookmarked: boolean }>;
+        list: (
+          projectId?: string | null,
+          limit?: number
+        ) => Promise<Array<{
+          id: number;
+          sessionId: string;
+          projectId?: string | null;
+          messageId: string;
+          preview: string;
+          note?: string | null;
+          role?: string | null;
+          createdAt: number;
+        }>>;
+        forSession: (sessionId: string) => Promise<string[]>;
+        updateNote: (id: number, note: string) => Promise<{ success: boolean }>;
+        remove: (id: number) => Promise<{ success: boolean }>;
+      };
+      git: {
+        status: (cwd: string) => Promise<{
+          isRepo: boolean;
+          branch: string | null;
+          upstream: string | null;
+          ahead: number;
+          behind: number;
+          files: Array<{
+            path: string;
+            oldPath?: string;
+            indexStatus: string;
+            workingStatus: string;
+            staged: boolean;
+          }>;
+          error?: string;
+        }>;
+        stage: (cwd: string, files: string[]) => Promise<{ success: boolean; error?: string }>;
+        unstage: (cwd: string, files: string[]) => Promise<{ success: boolean; error?: string }>;
+        diff: (cwd: string, file: string, staged: boolean) => Promise<string>;
+        commit: (
+          cwd: string,
+          message: string,
+          amend?: boolean
+        ) => Promise<{ success: boolean; error?: string; hash?: string }>;
+        suggestMessage: (cwd: string) => Promise<{ message: string }>;
+        branches: (cwd: string) => Promise<string[]>;
+      };
+      diff: {
+        parseHunks: (excerpt: string) => Promise<{
+          hunks: Array<{
+            index: number;
+            header: string;
+            oldStart: number;
+            oldCount: number;
+            newStart: number;
+            newCount: number;
+            lines: string[];
+            body: string;
+          }>;
+          preamble: string;
+        }>;
+        revertHunks: (
+          filePath: string,
+          hunks: Array<{
+            index: number;
+            header: string;
+            oldStart: number;
+            oldCount: number;
+            newStart: number;
+            newCount: number;
+            lines: string[];
+            body: string;
+          }>
+        ) => Promise<{ success: boolean; method: 'git' | 'manual' | 'none'; error?: string }>;
+      };
+      command: {
+        list: () => Promise<Array<{
+          name: string;
+          description: string;
+          prompt: string;
+          category?: string;
+          isBuiltin: boolean;
+          arguments?: Array<{ name: string; description: string; required: boolean; default?: string }>;
+        }>>;
+        autocomplete: (prefix: string, limit?: number) => Promise<Array<{
+          name: string;
+          description: string;
+          prompt: string;
+          category?: string;
+          isBuiltin: boolean;
+        }>>;
+        execute: (name: string, args: string[], sessionId?: string) => Promise<{
+          success: boolean;
+          prompt?: string;
+          message?: string;
+          error?: string;
+          handled?: boolean;
+        }>;
+      };
+      memory: {
+        list: (projectId?: string) => Promise<Array<{ category: string; content: string; sourceSessionId?: string; timestamp: number }>>;
+        add: (
+          category: 'preference' | 'pattern' | 'context' | 'decision',
+          content: string,
+          projectId?: string
+        ) => Promise<{ success: boolean; error?: string }>;
+        update: (
+          entryIndex: number,
+          newContent: string,
+          newCategory?: 'preference' | 'pattern' | 'context' | 'decision',
+          projectId?: string
+        ) => Promise<{ success: boolean; error?: string }>;
+        delete: (
+          entryIndex: number,
+          projectId?: string
+        ) => Promise<{ success: boolean; error?: string }>;
+      };
+      knowledge: {
+        list: (projectId?: string) => Promise<Array<Record<string, unknown>>>;
+        get: (id: string, projectId?: string) => Promise<Record<string, unknown> | null>;
+        create: (input: { title: string; content: string; tags?: string[]; scope?: string[]; priority?: number }, projectId?: string) => Promise<Record<string, unknown>>;
+        update: (id: string, updates: Record<string, unknown>, projectId?: string) => Promise<Record<string, unknown> | null>;
+        delete: (id: string, projectId?: string) => Promise<boolean>;
+        search: (query: string, projectId?: string, limit?: number) => Promise<Array<Record<string, unknown>>>;
       };
     };
   }

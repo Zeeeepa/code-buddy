@@ -16,9 +16,20 @@ import { MessageCard } from './MessageCard';
 import { ModelSwitcher } from './ModelSwitcher';
 import { PermissionModeSelector } from './PermissionModeSelector';
 import { SessionSearch } from './SessionSearch';
+import { SubAgentPanel } from './SubAgentPanel';
+import { MentionAutocomplete, type MentionItem } from './MentionAutocomplete';
+import { SlashCommandPalette, type SlashCommandItem } from './SlashCommandPalette';
+import { BranchSwitcher } from './BranchSwitcher';
+import { TaskModeToggle } from './TaskModeToggle';
+import { VoiceButton } from './VoiceButton';
+import { VoiceOutputToggle, speakText } from './VoiceOutputToggle';
+import { MemoryEditCard } from './MemoryEditCard';
+import { FileAttachmentChip } from './FileAttachmentChip';
+import { ContextWindowGauge } from './ContextWindowGauge';
+import type { ExecutionMode } from '../types';
 import { usePermissionMode, useSearchState } from '../store/selectors';
-import type { Message, ContentBlock, PermissionMode } from '../types';
-import { Send, Square, Plus, Loader2, Plug, X, Clock } from 'lucide-react';
+import type { Message, ContentBlock } from '../types';
+import { Send, Square, Plus, Loader2, Plug, X, Clock, Eye } from 'lucide-react';
 
 type AttachedFile = {
   name: string;
@@ -42,6 +53,8 @@ export function ChatView() {
   const permissionMode = usePermissionMode();
   const { searchQuery, searchActive } = useSearchState();
   const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
+  const showMemoryEditor = useAppStore((s) => s.showMemoryEditor);
+  const setShowMemoryEditor = useAppStore((s) => s.setShowMemoryEditor);
   const { continueSession, stopSession, isElectron } = useIPC();
   const [prompt, setPrompt] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,7 +69,19 @@ export function ChatView() {
     Array<{ url: string; base64: string; mediaType: string }>
   >([]);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  // Phase 3 step 3: vision capability of the current model (for warning banner).
+  const [modelSupportsVision, setModelSupportsVision] = useState<boolean | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [mentionState, setMentionState] = useState<{
+    prefix: string;
+    startPos: number;
+    anchor: { top: number; left: number } | null;
+  } | null>(null);
+  const [slashState, setSlashState] = useState<{
+    prefix: string;
+    startPos: number;
+    anchor: { top: number; left: number } | null;
+  } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -219,6 +244,24 @@ export function ChatView() {
     prevPartialLengthRef.current = partialLength;
   }, [messages.length, partialMessage.length, partialThinking.length]);
 
+  // Phase 2 step 11: speak the latest assistant message when TTS is enabled.
+  const lastSpokenIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (messages.length === 0) return;
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== 'assistant') return;
+    const messageId = (last as { id?: string }).id ?? `idx-${messages.length - 1}`;
+    if (lastSpokenIdRef.current === messageId) return;
+    lastSpokenIdRef.current = messageId;
+    const text = Array.isArray(last.content)
+      ? (last.content as Array<{ type?: string; text?: string }>)
+          .filter((b) => b.type === 'text' && typeof b.text === 'string')
+          .map((b) => b.text ?? '')
+          .join(' ')
+      : String(last.content ?? '');
+    if (text) speakText(text);
+  }, [messages]);
+
   // Additional scroll trigger for content height changes (e.g., TodoWrite expand/collapse)
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -255,6 +298,46 @@ export function ChatView() {
   useEffect(() => {
     textareaRef.current?.focus();
   }, [activeSessionId]);
+
+  // Phase 3 step 3: fetch vision capability when model changes
+  useEffect(() => {
+    const model = activeSession?.model || appConfig?.model;
+    if (!model || !window.electronAPI?.model?.capabilities) {
+      setModelSupportsVision(null);
+      return;
+    }
+    let cancelled = false;
+    window.electronAPI.model.capabilities(model).then((caps) => {
+      if (!cancelled) setModelSupportsVision(caps.supportsVision);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSession?.model, appConfig?.model]);
+
+  // Phase 3 step 5: listen for snippet insertion from SnippetsLibrary
+  useEffect(() => {
+    const handler = (ev: Event) => {
+      const custom = ev as CustomEvent<{ body: string }>;
+      const body = custom.detail?.body;
+      if (!body || !textareaRef.current) return;
+      const textarea = textareaRef.current;
+      const start = textarea.selectionStart ?? textarea.value.length;
+      const end = textarea.selectionEnd ?? textarea.value.length;
+      const before = textarea.value.slice(0, start);
+      const after = textarea.value.slice(end);
+      const next = `${before}${body}${after}`;
+      setPrompt(next);
+      textarea.value = next;
+      requestAnimationFrame(() => {
+        textarea.focus();
+        const pos = before.length + body.length;
+        textarea.setSelectionRange(pos, pos);
+      });
+    };
+    window.addEventListener('snippets:insert', handler as EventListener);
+    return () => window.removeEventListener('snippets:insert', handler as EventListener);
+  }, []);
 
   // Handle paste event for images
   const handlePaste = async (e: React.ClipboardEvent) => {
@@ -696,6 +779,7 @@ export function ChatView() {
 
         {/* Model switcher and permission mode */}
         <div className="flex items-center gap-1.5 justify-self-end">
+          <ContextWindowGauge />
           {appConfig?.model && (
             <ModelSwitcher
               currentModel={appConfig.model}
@@ -712,6 +796,26 @@ export function ChatView() {
               useAppStore.getState().setPermissionMode(mode);
             }}
           />
+          {activeSession && (
+            <TaskModeToggle
+              mode={(activeSession.executionMode as ExecutionMode) ?? 'chat'}
+              onChange={(newMode) => {
+                // Optimistic local update
+                useAppStore.getState().updateSession(activeSession.id, { executionMode: newMode });
+                // Persist to DB
+                void window.electronAPI?.session?.updateSettings?.(activeSession.id, {
+                  executionMode: newMode,
+                });
+                // If switching to task mode, auto-enable dontAsk permission mode
+                if (newMode === 'task') {
+                  window.electronAPI?.permission?.setMode('dontAsk');
+                  useAppStore.getState().setPermissionMode('dontAsk');
+                }
+              }}
+            />
+          )}
+          {activeSessionId && <BranchSwitcher sessionId={activeSessionId} />}
+          <VoiceOutputToggle />
         </div>
       </div>
 
@@ -728,12 +832,39 @@ export function ChatView() {
         />
       )}
 
+      {/* Plan mode banner (Claude Cowork parity Phase 2) */}
+      {permissionMode === 'plan' && (
+        <div className="px-4 lg:px-8 py-2 bg-accent/10 border-b border-accent/30 flex items-center gap-2">
+          <Eye size={14} className="text-accent shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-semibold text-accent">
+              {t('planMode.activeTitle')}
+            </div>
+            <div className="text-[11px] text-text-muted truncate">
+              {t('planMode.activeDescription')}
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              window.electronAPI?.permission?.setMode('default');
+              useAppStore.getState().setPermissionMode('default');
+            }}
+            className="text-[11px] text-accent hover:text-accent-hover underline"
+          >
+            {t('planMode.exit')}
+          </button>
+        </div>
+      )}
+
       {/* Messages */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
         <div
           ref={messagesContainerRef}
           className="w-full max-w-[920px] mx-auto py-8 px-5 lg:px-8 space-y-5"
         >
+          {/* Sub-agent panel (Claude Cowork parity) */}
+          <SubAgentPanel compact />
+
           {displayedMessages.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-28 text-text-muted space-y-3 text-center">
               <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted/80">
@@ -789,6 +920,23 @@ export function ChatView() {
             onDrop={handleDrop}
             className="relative w-full"
           >
+            {/* Phase 3 step 15: full overlay while dragging */}
+            {isDragging && (
+              <div className="absolute inset-0 z-10 rounded-[2rem] border-2 border-dashed border-accent bg-accent/10 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+                <span className="text-sm font-medium text-accent">
+                  {t('chat.dropToAttach', 'Drop files to attach')}
+                </span>
+              </div>
+            )}
+
+            {/* Phase 3 step 3: vision model warning */}
+            {pastedImages.length > 0 && modelSupportsVision === false && (
+              <div className="mb-3 px-3 py-2 rounded-lg bg-warning/10 border border-warning/30 text-xs text-warning flex items-start gap-2">
+                <span className="font-medium">{t('chat.visionWarningTitle')}</span>
+                <span className="text-warning/80">{t('chat.visionWarningBody')}</span>
+              </div>
+            )}
+
             {/* Image previews */}
             {pastedImages.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 mb-3">
@@ -811,26 +959,30 @@ export function ChatView() {
               </div>
             )}
 
-            {/* File attachments */}
+            {/* File attachments (Phase 3 step 15: chips with preview) */}
             {attachedFiles.length > 0 && (
-              <div className="space-y-2 mb-3">
+              <div className="flex flex-wrap gap-1.5 mb-3">
                 {attachedFiles.map((file, index) => (
-                  <div
+                  <FileAttachmentChip
                     key={file.path || `attached-file-${index}`}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-muted border border-border group"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-text-primary truncate">{file.name}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeFile(index)}
-                      className="w-6 h-6 rounded-full bg-error/10 hover:bg-error/20 text-error flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                    file={file}
+                    onRemove={() => removeFile(index)}
+                    onPreview={(f) => {
+                      if (f.path) {
+                        useAppStore.getState().setPreviewFilePath(f.path);
+                      }
+                    }}
+                  />
                 ))}
+              </div>
+            )}
+
+            {/* Phase 2 step 17: inline memory editor */}
+            {showMemoryEditor && (
+              <div className="mb-3">
+                <MemoryEditCard
+                  onClose={() => setShowMemoryEditor(false)}
+                />
               </div>
             )}
 
@@ -851,7 +1003,49 @@ export function ChatView() {
               <textarea
                 ref={textareaRef}
                 value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
+                onChange={(e) => {
+                  const newValue = e.target.value;
+                  setPrompt(newValue);
+
+                  // Detect @ mention trigger
+                  const caretPos = e.target.selectionStart ?? newValue.length;
+                  const textBeforeCaret = newValue.slice(0, caretPos);
+                  const atMatch = textBeforeCaret.match(/(?:^|\s)@([^\s]*)$/);
+                  if (atMatch) {
+                    const startPos = caretPos - atMatch[1].length - 1;
+                    const rect = e.target.getBoundingClientRect();
+                    setMentionState({
+                      prefix: atMatch[1],
+                      startPos,
+                      anchor: {
+                        top: rect.top - 300,
+                        left: rect.left + 20,
+                      },
+                    });
+                  } else {
+                    setMentionState(null);
+                  }
+
+                  // Detect slash command trigger — only at line start or
+                  // after whitespace, and only when the slash is the first
+                  // non-whitespace run ending at the caret.
+                  const slashMatch = textBeforeCaret.match(/^\s*\/([\w-]*)$/);
+                  if (slashMatch) {
+                    const prefix = slashMatch[1];
+                    const startPos = textBeforeCaret.lastIndexOf('/');
+                    const rect = e.target.getBoundingClientRect();
+                    setSlashState({
+                      prefix,
+                      startPos,
+                      anchor: {
+                        top: rect.top - 340,
+                        left: rect.left + 20,
+                      },
+                    });
+                  } else {
+                    setSlashState(null);
+                  }
+                }}
                 onCompositionStart={() => {
                   isComposingRef.current = true;
                 }}
@@ -876,6 +1070,14 @@ export function ChatView() {
               />
 
               <div className="flex items-center gap-2">
+                {/* Voice input (Phase 2 step 11) */}
+                <VoiceButton
+                  onTranscript={(text) => {
+                    setPrompt(text);
+                    if (textareaRef.current) textareaRef.current.value = text;
+                  }}
+                />
+
                 {/* Model display */}
                 <span className="hidden sm:inline-flex px-2.5 py-1 rounded-full border border-border-subtle bg-background/60 text-xs text-text-muted">
                   {appConfig?.model || t('chat.noModel')}
@@ -914,6 +1116,94 @@ export function ChatView() {
           </form>
         </div>
       </div>
+
+      {/* @mention autocomplete dropdown (Claude Cowork parity) */}
+      {mentionState && (
+        <MentionAutocomplete
+          prefix={mentionState.prefix}
+          cwd={activeSession?.cwd}
+          anchorPosition={mentionState.anchor}
+          onSelect={(item: MentionItem) => {
+            if (!mentionState || !textareaRef.current) return;
+            const before = prompt.slice(0, mentionState.startPos);
+            const afterCaret = prompt.slice(
+              mentionState.startPos + mentionState.prefix.length + 1
+            );
+            const newValue = `${before}${item.value}${afterCaret}`;
+            setPrompt(newValue);
+            setMentionState(null);
+            setTimeout(() => {
+              const newCaret = before.length + item.value.length;
+              textareaRef.current?.focus();
+              textareaRef.current?.setSelectionRange(newCaret, newCaret);
+            }, 0);
+          }}
+          onClose={() => setMentionState(null)}
+        />
+      )}
+
+      {/* Slash command palette (Claude Cowork parity Phase 2) */}
+      {slashState && (
+        <SlashCommandPalette
+          prefix={slashState.prefix}
+          anchorPosition={slashState.anchor}
+          onSelect={async (item: SlashCommandItem) => {
+            if (!textareaRef.current) return;
+            const api = window.electronAPI;
+            if (!api?.command) {
+              setSlashState(null);
+              return;
+            }
+
+            // Execute command via bridge. If it resolves to a prompt, we
+            // swap the slash text for the resolved prompt in the textarea.
+            // If it's handled client-side (__TOKEN__), we fire the built-in
+            // effect and clear the textarea.
+            try {
+              // Phase 2 step 17: intercept /memory to open the inline editor
+              if (item.name === 'memory' || item.name.startsWith('memory')) {
+                useAppStore.getState().setShowMemoryEditor(true);
+                setPrompt('');
+                setSlashState(null);
+                return;
+              }
+
+              const result = await api.command.execute(item.name, [], activeSessionId ?? undefined);
+
+              if (result.handled && result.message) {
+                // Built-in tokens (__CLEAR_CHAT__, __HELP__, etc.) require
+                // additional wiring in subsequent Phase 2 steps. For now,
+                // surface them as informational notices.
+                useAppStore.getState().setGlobalNotice?.({
+                  id: `slash-info-${Date.now()}`,
+                  type: 'info',
+                  message: `/${item.name}: ${item.description}`,
+                });
+                setPrompt('');
+              } else if (result.success && result.prompt) {
+                // Replace the slash text with the resolved prompt
+                setPrompt(result.prompt);
+                setTimeout(() => {
+                  textareaRef.current?.focus();
+                  const end = result.prompt?.length ?? 0;
+                  textareaRef.current?.setSelectionRange(end, end);
+                }, 0);
+              } else if (result.error) {
+                useAppStore.getState().setGlobalNotice?.({
+                  id: `slash-error-${Date.now()}`,
+                  type: 'error',
+                  message: result.error,
+                });
+              }
+            } catch (err) {
+              console.error('[ChatView] Slash command execute failed:', err);
+            } finally {
+              setSlashState(null);
+            }
+          }}
+          onClose={() => setSlashState(null)}
+        />
+      )}
     </div>
   );
 }

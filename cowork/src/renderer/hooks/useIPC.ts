@@ -345,6 +345,63 @@ export function useIPC() {
             store.setUpdateInfo(event.payload);
             break;
 
+          case 'project.list':
+            store.setProjects(event.payload.projects);
+            break;
+
+          case 'project.created':
+            store.addProject(event.payload.project);
+            break;
+
+          case 'project.updated':
+            store.updateProject(event.payload.project.id, event.payload.project);
+            break;
+
+          case 'project.deleted':
+            store.removeProject(event.payload.projectId);
+            break;
+
+          case 'project.activeChanged':
+            store.setActiveProjectId(event.payload.projectId);
+            break;
+
+          case 'subagent.spawned':
+            store.addSubAgent(event.payload.sessionId, event.payload.subAgent);
+            break;
+
+          case 'subagent.status':
+            store.updateSubAgentStatus(
+              event.payload.sessionId,
+              event.payload.agentId,
+              event.payload.status
+            );
+            break;
+
+          case 'subagent.completed':
+            store.completeSubAgent(
+              event.payload.sessionId,
+              event.payload.agentId,
+              event.payload.result
+            );
+            break;
+
+          case 'subagent.output':
+            store.appendSubAgentOutput(
+              event.payload.sessionId,
+              event.payload.agentId,
+              event.payload.delta
+            );
+            break;
+
+          case 'notification.message':
+            store.addNotification(event.payload.notification);
+            break;
+
+          case 'gui.action':
+            // Phase 2 step 13: Computer Use overlay
+            store.appendGuiAction(event.payload);
+            break;
+
           default:
             console.log('[useIPC] Unknown server event:', event);
         }

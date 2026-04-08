@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../../store';
+import { SettingsImportExport } from './SettingsImportExport';
 
 export function SettingsGeneral() {
   const { i18n, t } = useTranslation();
@@ -69,6 +70,11 @@ export function SettingsGeneral() {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Settings sync (Phase 2 step 19) */}
+      <div className="pt-4 border-t border-border">
+        <SettingsImportExport />
       </div>
 
       {/* About */}

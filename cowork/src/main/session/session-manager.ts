@@ -78,6 +78,65 @@ export interface EngineAdapterLike {
   clearSession(sessionId: string): void;
 }
 
+/** Minimal interface for the project memory service */
+export interface ProjectMemoryServiceLike {
+  loadProjectContext(projectId: string): Promise<string | null>;
+  consolidateSessionMemory(
+    projectId: string,
+    sessionId: string,
+    messages: Array<{ role: string; content: string }>
+  ): Promise<{ added: number; duplicatesSkipped: number; memoryDir: string } | null>;
+}
+
+/** Minimal interface for the project manager */
+export interface ProjectManagerLike {
+  get(id: string): { id: string; name: string; workspacePath?: string } | null;
+  getActiveId(): string | null;
+}
+
+/** Minimal interface for the mention processor */
+export interface MentionProcessorLike {
+  process(
+    text: string,
+    cwd?: string
+  ): Promise<{
+    cleanedText: string;
+    contextBlocks: Array<{ type: string; content: string; source: string }>;
+  }>;
+  buildEnhancedPrompt(result: {
+    cleanedText: string;
+    contextBlocks: Array<{ type: string; content: string; source: string }>;
+  }): string;
+}
+
+/** Minimal interface for the notification bridge */
+export interface NotificationBridgeLike {
+  notifyTaskComplete(sessionId: string, summary: string, success: boolean): void;
+  notifyTaskProgress(sessionId: string, message: string): void;
+}
+
+/** Minimal interface for the ICM cross-session memory */
+export interface ICMIntegrationLike {
+  isAvailable(): boolean;
+  searchRelevantMemories(
+    query: string,
+    projectId?: string,
+    limit?: number
+  ): Promise<Array<{ id: string; content: string; score?: number }>>;
+  storeEpisode(
+    content: string,
+    metadata: {
+      sessionId: string;
+      projectId?: string;
+      tags?: string[];
+      source?: string;
+    }
+  ): Promise<void>;
+  formatContextBlock(
+    memories: Array<{ id: string; content: string; score?: number }>
+  ): string | null;
+}
+
 const WORKSPACE_MOUNT_VIRTUAL_PATH = '/mnt/workspace';
 const TITLE_GENERATION_TIMEOUT_MS = 20000;
 
@@ -105,6 +164,21 @@ export class SessionManager {
 
   /** Optional Code Buddy engine adapter for in-process execution */
   private engineAdapter?: EngineAdapterLike;
+
+  /** Optional project memory service (Claude Cowork parity) */
+  private projectMemory?: ProjectMemoryServiceLike;
+
+  /** Optional reference to the project manager for resolving session.projectId */
+  private projectManager?: ProjectManagerLike;
+
+  /** Optional mention processor (Claude Cowork parity) */
+  private mentionProcessor?: MentionProcessorLike;
+
+  /** Optional notification bridge (Claude Cowork parity) */
+  private notificationBridge?: NotificationBridgeLike;
+
+  /** Optional ICM cross-session memory integration (Claude Cowork parity) */
+  private icmIntegration?: ICMIntegrationLike;
 
   constructor(
     db: DatabaseInstance,
@@ -135,6 +209,30 @@ export class SessionManager {
     this.createAgentRunner();
 
     log('[SessionManager] Initialized with persistent database and MCP support');
+  }
+
+  /** Inject project manager + memory service (wired from main/index.ts) */
+  setProjectServices(
+    projectManager: ProjectManagerLike,
+    projectMemory: ProjectMemoryServiceLike,
+  ): void {
+    this.projectManager = projectManager;
+    this.projectMemory = projectMemory;
+  }
+
+  /** Inject mention processor (wired from main/index.ts) */
+  setMentionProcessor(processor: MentionProcessorLike): void {
+    this.mentionProcessor = processor;
+  }
+
+  /** Inject notification bridge (wired from main/index.ts) */
+  setNotificationBridge(bridge: NotificationBridgeLike): void {
+    this.notificationBridge = bridge;
+  }
+
+  /** Inject ICM integration (wired from main/index.ts) */
+  setICMIntegration(icm: ICMIntegrationLike): void {
+    this.icmIntegration = icm;
   }
 
   /**
@@ -272,12 +370,83 @@ export class SessionManager {
   ): Promise<Session> {
     log('[SessionManager] Starting new session:', title);
 
-    const session = this.createSession(title, cwd, allowedTools);
+    // If no explicit cwd, fall back to active project's workspacePath
+    let effectiveCwd = cwd;
+    let resolvedProjectId: string | null = null;
+    if (this.projectManager) {
+      resolvedProjectId = this.projectManager.getActiveId();
+      if (resolvedProjectId) {
+        const activeProject = this.projectManager.get(resolvedProjectId);
+        if (activeProject?.workspacePath && !effectiveCwd) {
+          effectiveCwd = activeProject.workspacePath;
+          log(
+            '[SessionManager] Using active project workspace as cwd:',
+            effectiveCwd
+          );
+        }
+      }
+    }
+
+    const session = this.createSession(title, effectiveCwd, allowedTools);
+
+    // Attach active project if any (Claude Cowork parity)
+    if (resolvedProjectId) {
+      session.projectId = resolvedProjectId;
+    }
 
     // Save to database
     this.saveSession(session);
 
     // Start processing the prompt with content blocks
+    this.enqueuePrompt(session, prompt, content);
+
+    return session;
+  }
+
+  /**
+   * Start a background session (Claude Cowork parity).
+   * Runs without requiring the UI to be focused; notifies on completion.
+   */
+  async startBackgroundSession(
+    title: string,
+    prompt: string,
+    cwd?: string,
+    projectId?: string,
+    content?: ContentBlock[]
+  ): Promise<Session> {
+    log('[SessionManager] Starting background session:', title);
+
+    // Resolve project + cwd
+    let resolvedProjectId: string | null = projectId ?? null;
+    if (!resolvedProjectId && this.projectManager) {
+      resolvedProjectId = this.projectManager.getActiveId();
+    }
+    let effectiveCwd = cwd;
+    if (!effectiveCwd && resolvedProjectId && this.projectManager) {
+      const project = this.projectManager.get(resolvedProjectId);
+      if (project?.workspacePath) {
+        effectiveCwd = project.workspacePath;
+      }
+    }
+
+    const session = this.createSession(title, effectiveCwd);
+    session.isBackground = true;
+    if (resolvedProjectId) {
+      session.projectId = resolvedProjectId;
+    }
+
+    this.saveSession(session);
+
+    // Notify renderer that a background session was created
+    this.sendToRenderer({
+      type: 'session.update',
+      payload: {
+        sessionId: session.id,
+        updates: { isBackground: true, projectId: session.projectId },
+      },
+    });
+
+    // Enqueue prompt — executes without blocking UI
     this.enqueuePrompt(session, prompt, content);
 
     return session;
@@ -335,6 +504,9 @@ export class SessionManager {
       allowed_tools: JSON.stringify(session.allowedTools),
       memory_enabled: session.memoryEnabled ? 1 : 0,
       model: session.model || null,
+      project_id: session.projectId ?? null,
+      is_background: session.isBackground ? 1 : 0,
+      execution_mode: session.executionMode ?? null,
       created_at: session.createdAt,
       updated_at: session.updatedAt,
     });
@@ -372,6 +544,9 @@ export class SessionManager {
       allowedTools,
       memoryEnabled: row.memory_enabled === 1,
       model: row.model || undefined,
+      projectId: row.project_id ?? null,
+      isBackground: row.is_background === 1,
+      executionMode: (row.execution_mode as 'chat' | 'task' | null) ?? undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -675,6 +850,55 @@ export class SessionManager {
           logCtx('[SessionManager] Enhanced prompt with file info:', enhancedPrompt);
         }
 
+        // Process @mentions in the prompt (Claude Cowork parity)
+        if (this.mentionProcessor && enhancedPrompt.includes('@')) {
+          try {
+            const mentionResult = await this.mentionProcessor.process(enhancedPrompt, session.cwd);
+            if (mentionResult.contextBlocks.length > 0) {
+              enhancedPrompt = this.mentionProcessor.buildEnhancedPrompt(mentionResult);
+              logCtx(
+                '[SessionManager] Processed',
+                mentionResult.contextBlocks.length,
+                '@mentions'
+              );
+            }
+          } catch (err) {
+            logCtxError('[SessionManager] Mention processing failed:', err);
+          }
+        }
+
+        // Inject project memory context (Claude Cowork parity)
+        const projectId = session.projectId ?? this.projectManager?.getActiveId() ?? null;
+        if (projectId && this.projectMemory) {
+          try {
+            const projectContext = await this.projectMemory.loadProjectContext(projectId);
+            if (projectContext) {
+              enhancedPrompt = `${projectContext}\n\n${enhancedPrompt}`;
+              logCtx('[SessionManager] Injected project memory for', projectId);
+            }
+          } catch (err) {
+            logCtxError('[SessionManager] Failed to inject project memory:', err);
+          }
+        }
+
+        // Query ICM cross-session memory (Claude Cowork parity)
+        if (this.icmIntegration?.isAvailable()) {
+          try {
+            const memories = await this.icmIntegration.searchRelevantMemories(
+              prompt,
+              projectId ?? undefined,
+              5
+            );
+            const icmBlock = this.icmIntegration.formatContextBlock(memories);
+            if (icmBlock) {
+              enhancedPrompt = `${icmBlock}\n\n${enhancedPrompt}`;
+              logCtx('[SessionManager] Injected', memories.length, 'ICM memories');
+            }
+          } catch (err) {
+            logCtxError('[SessionManager] ICM search failed:', err);
+          }
+        }
+
         // Save user message to database for persistence
         const existingMessages = this.getMessages(session.id);
         const userMessage: Message = {
@@ -707,6 +931,58 @@ export class SessionManager {
 
         // Run the agent
         await this.agentRunner.run(session, enhancedPrompt, messagesForContext);
+
+        // Store ICM episode for cross-session recall (Claude Cowork parity)
+        if (this.icmIntegration?.isAvailable()) {
+          void this.icmIntegration
+            .storeEpisode(
+              `User asked: ${prompt.slice(0, 500)}`,
+              {
+                sessionId: session.id,
+                projectId: projectId ?? undefined,
+                tags: ['cowork', 'user-query'],
+                source: 'cowork-session',
+              }
+            )
+            .catch((err: unknown) => logCtxError('[SessionManager] ICM store failed:', err));
+        }
+
+        // Notify task completion for background sessions or long tasks (Claude Cowork parity)
+        if (this.notificationBridge && session.isBackground) {
+          try {
+            this.notificationBridge.notifyTaskComplete(
+              session.id,
+              `Background task "${session.title ?? session.id}" completed`,
+              true
+            );
+          } catch (err) {
+            logCtxError('[SessionManager] Notification dispatch failed:', err);
+          }
+        }
+
+        // Consolidate project memory asynchronously (Claude Cowork parity)
+        if (projectId && this.projectMemory) {
+          void this.projectMemory
+            .consolidateSessionMemory(
+              projectId,
+              session.id,
+              messagesForContext.map((m) => ({
+                role: m.role,
+                content: typeof m.content === 'string'
+                  ? m.content
+                  : m.content
+                      .filter((c) => c.type === 'text')
+                      .map((c) => (c as { text: string }).text)
+                      .join('\n'),
+              }))
+            )
+            .then((result) => {
+              if (result && result.added > 0) {
+                log(`[SessionManager] Consolidated ${result.added} memories for project ${projectId}`);
+              }
+            })
+            .catch((err) => logCtxError('[SessionManager] Memory consolidation failed:', err));
+        }
 
         // 标题生成不再与首轮对话并发，避免与主请求竞争同一上游配额/通道导致体感变慢。
         this.runSessionTitleGeneration(session, prompt, existingMessages).catch((err) =>
@@ -1004,6 +1280,47 @@ export class SessionManager {
       type: 'session.status',
       payload: { sessionId, status },
     });
+  }
+
+  /** Update project assignment / execution mode / background flag (Claude Cowork parity) */
+  updateSessionSettings(
+    sessionId: string,
+    updates: {
+      projectId?: string | null;
+      executionMode?: 'chat' | 'task';
+      isBackground?: boolean;
+      title?: string;
+    }
+  ): boolean {
+    const existing = this.db.sessions.get(sessionId);
+    if (!existing) {
+      logWarn('[SessionManager] updateSessionSettings: unknown session', sessionId);
+      return false;
+    }
+
+    const dbUpdates: Record<string, unknown> = {};
+    if (updates.projectId !== undefined) dbUpdates.project_id = updates.projectId;
+    if (updates.executionMode !== undefined) dbUpdates.execution_mode = updates.executionMode;
+    if (updates.isBackground !== undefined) dbUpdates.is_background = updates.isBackground ? 1 : 0;
+    if (updates.title !== undefined) dbUpdates.title = updates.title;
+
+    if (Object.keys(dbUpdates).length === 0) return true;
+
+    this.db.sessions.update(sessionId, dbUpdates);
+
+    // Echo to renderer
+    const rendererUpdates: Record<string, unknown> = {};
+    if (updates.projectId !== undefined) rendererUpdates.projectId = updates.projectId;
+    if (updates.executionMode !== undefined) rendererUpdates.executionMode = updates.executionMode;
+    if (updates.isBackground !== undefined) rendererUpdates.isBackground = updates.isBackground;
+    if (updates.title !== undefined) rendererUpdates.title = updates.title;
+
+    this.sendToRenderer({
+      type: 'session.update',
+      payload: { sessionId, updates: rendererUpdates as Partial<Session> },
+    });
+
+    return true;
   }
 
   private updateSessionTitle(sessionId: string, title: string): boolean {

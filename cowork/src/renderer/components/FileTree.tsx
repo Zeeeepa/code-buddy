@@ -3,6 +3,7 @@
  */
 import React, { useState, useCallback, useEffect } from 'react';
 import { ChevronRight, ChevronDown, File, Folder, FolderOpen, Search } from 'lucide-react';
+import { useAppStore } from '../store';
 
 interface FileEntry {
   name: string;
@@ -110,6 +111,7 @@ export const FileTree: React.FC<FileTreeProps> = ({ rootPath }) => {
   const [rootEntries, setRootEntries] = useState<FileEntry[]>([]);
   const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(false);
+  const setPreviewFilePath = useAppStore((s) => s.setPreviewFilePath);
 
   const loadChildren = useCallback(async (dirPath: string): Promise<FileEntry[]> => {
     try {
@@ -133,13 +135,19 @@ export const FileTree: React.FC<FileTreeProps> = ({ rootPath }) => {
     });
   }, [rootPath, loadChildren]);
 
-  const handleFileClick = useCallback((path: string) => {
-    const api = (window as { electronAPI?: { showItemInFolder?: (p: string) => void } }).electronAPI;
-    api?.showItemInFolder?.(path);
-  }, []);
+  const handleFileClick = useCallback(
+    (filePath: string) => {
+      // Phase 2 step 9: open the file preview pane on single-click.
+      setPreviewFilePath(filePath);
+    },
+    [setPreviewFilePath]
+  );
 
-  const handleFileDoubleClick = useCallback((_path: string) => {
-    // TODO: Add file content to chat context
+  const handleFileDoubleClick = useCallback((filePath: string) => {
+    // Reveal in OS file explorer on double-click.
+    const api = (window as { electronAPI?: { showItemInFolder?: (p: string) => void } })
+      .electronAPI;
+    api?.showItemInFolder?.(filePath);
   }, []);
 
   const filtered = filter

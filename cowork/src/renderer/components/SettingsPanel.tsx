@@ -11,6 +11,14 @@ import {
   Globe,
   ChevronRight,
   Zap,
+  Workflow,
+  DollarSign,
+  Lock,
+  FileText,
+  SlashSquare,
+  Layers,
+  Webhook,
+  Network,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useWindowSize } from '../hooks/useWindowSize';
@@ -24,6 +32,15 @@ import { SettingsSchedule } from './settings/SettingsSchedule';
 import { SettingsGeneral } from './settings/SettingsGeneral';
 import { SettingsLogs } from './settings/SettingsLogs';
 import { SettingsCodeBuddy } from './settings/SettingsCodeBuddy';
+import { SettingsWorkflows } from './settings/SettingsWorkflows';
+import { SettingsCostDashboard } from './settings/SettingsCostDashboard';
+import { SettingsPermissionRules } from './settings/SettingsPermissionRules';
+import { SettingsMCPMarketplace } from './settings/SettingsMCPMarketplace';
+import { SettingsSnippets } from './settings/SettingsSnippets';
+import { SettingsCustomCommands } from './settings/SettingsCustomCommands';
+import { SettingsWorkspacePresets } from './settings/SettingsWorkspacePresets';
+import { SettingsHooks } from './settings/SettingsHooks';
+import { SettingsA2AAgents } from './settings/SettingsA2AAgents';
 
 interface SettingsPanelProps {
   onClose: () => void;
@@ -36,6 +53,15 @@ interface SettingsPanelProps {
     | 'remote'
     | 'logs'
     | 'codebuddy'
+    | 'workflows'
+    | 'cost'
+    | 'rules'
+    | 'mcpMarketplace'
+    | 'snippets'
+    | 'customCommands'
+    | 'workspacePresets'
+    | 'hooks'
+    | 'a2a'
     | 'general';
 }
 
@@ -48,6 +74,15 @@ type TabId =
   | 'schedule'
   | 'remote'
   | 'logs'
+  | 'workflows'
+  | 'cost'
+  | 'rules'
+  | 'mcpMarketplace'
+  | 'snippets'
+  | 'customCommands'
+  | 'workspacePresets'
+  | 'hooks'
+  | 'a2a'
   | 'general';
 
 const VALID_TABS = new Set<TabId>([
@@ -59,6 +94,15 @@ const VALID_TABS = new Set<TabId>([
   'schedule',
   'remote',
   'logs',
+  'workflows',
+  'cost',
+  'rules',
+  'mcpMarketplace',
+  'snippets',
+  'customCommands',
+  'workspacePresets',
+  'hooks',
+  'a2a',
   'general',
 ]);
 
@@ -150,6 +194,60 @@ export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProp
       label: t('settings.logs'),
       icon: AlertCircle,
       description: t('settings.logsDesc'),
+    },
+    {
+      id: 'workflows' as TabId,
+      label: t('settings.workflows', 'Workflows'),
+      icon: Workflow,
+      description: t('settings.workflowsDesc', 'Visual DAG editor for repeatable workflows'),
+    },
+    {
+      id: 'cost' as TabId,
+      label: t('settings.cost', 'Cost'),
+      icon: DollarSign,
+      description: t('settings.costDesc', 'Token usage, cost tracking, and budget limits'),
+    },
+    {
+      id: 'rules' as TabId,
+      label: t('settings.rules', 'Permission rules'),
+      icon: Lock,
+      description: t('settings.rulesDesc', 'Allow/deny rules for tools and file paths'),
+    },
+    {
+      id: 'mcpMarketplace' as TabId,
+      label: t('settings.mcpMarketplace', 'MCP marketplace'),
+      icon: Plug,
+      description: t('settings.mcpMarketplaceDesc', 'Install MCP servers from the registry'),
+    },
+    {
+      id: 'snippets' as TabId,
+      label: t('snippets.title', 'Snippets'),
+      icon: FileText,
+      description: t('snippets.settingsHint', 'Reusable prompt templates'),
+    },
+    {
+      id: 'customCommands' as TabId,
+      label: t('customCommands.title', 'Custom commands'),
+      icon: SlashSquare,
+      description: t('customCommands.hint', 'User-defined slash commands'),
+    },
+    {
+      id: 'workspacePresets' as TabId,
+      label: t('workspacePresets.title', 'Workspace presets'),
+      icon: Layers,
+      description: t('workspacePresets.hint', 'Save and apply workspace configurations'),
+    },
+    {
+      id: 'hooks' as TabId,
+      label: t('hooks.title', 'Hooks & triggers'),
+      icon: Webhook,
+      description: t('hooks.hint', 'Run shell or HTTP hooks on agent events'),
+    },
+    {
+      id: 'a2a' as TabId,
+      label: t('a2a.title', 'Remote agents (A2A)'),
+      icon: Network,
+      description: t('a2a.hint', 'Register and invoke remote A2A agents'),
     },
     {
       id: 'general' as TabId,
@@ -279,6 +377,33 @@ export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProp
               </div>
               <div className={activeTab === 'logs' ? '' : 'hidden'}>
                 {viewedTabs.has('logs') && <SettingsLogs isActive={activeTab === 'logs'} />}
+              </div>
+              <div className={activeTab === 'workflows' ? '' : 'hidden'}>
+                {viewedTabs.has('workflows') && <SettingsWorkflows />}
+              </div>
+              <div className={activeTab === 'cost' ? '' : 'hidden'}>
+                {viewedTabs.has('cost') && <SettingsCostDashboard />}
+              </div>
+              <div className={activeTab === 'rules' ? '' : 'hidden'}>
+                {viewedTabs.has('rules') && <SettingsPermissionRules />}
+              </div>
+              <div className={activeTab === 'mcpMarketplace' ? '' : 'hidden'}>
+                {viewedTabs.has('mcpMarketplace') && <SettingsMCPMarketplace />}
+              </div>
+              <div className={activeTab === 'snippets' ? '' : 'hidden'}>
+                {viewedTabs.has('snippets') && <SettingsSnippets />}
+              </div>
+              <div className={activeTab === 'customCommands' ? '' : 'hidden'}>
+                {viewedTabs.has('customCommands') && <SettingsCustomCommands />}
+              </div>
+              <div className={activeTab === 'workspacePresets' ? '' : 'hidden'}>
+                {viewedTabs.has('workspacePresets') && <SettingsWorkspacePresets />}
+              </div>
+              <div className={activeTab === 'hooks' ? '' : 'hidden'}>
+                {viewedTabs.has('hooks') && <SettingsHooks />}
+              </div>
+              <div className={activeTab === 'a2a' ? '' : 'hidden'}>
+                {viewedTabs.has('a2a') && <SettingsA2AAgents />}
               </div>
               <div className={activeTab === 'general' ? '' : 'hidden'}>
                 {viewedTabs.has('general') && <SettingsGeneral />}

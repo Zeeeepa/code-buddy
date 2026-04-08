@@ -11,11 +11,13 @@ import {
 } from 'lucide-react';
 import { formatAppDateTime } from '../../utils/i18n-format';
 import { SettingsContentSection } from './shared';
+import { AuditLogViewer } from '../AuditLogViewer';
 
 const isElectron = typeof window !== 'undefined' && window.electronAPI !== undefined;
 
 export function SettingsLogs({ isActive }: { isActive: boolean }) {
   const { t } = useTranslation();
+  const [subTab, setSubTab] = useState<'files' | 'audit'>('files');
   const [logFiles, setLogFiles] = useState<
     Array<{ name: string; path: string; size: number; mtime: Date }>
   >([]);
@@ -152,6 +154,34 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
 
   return (
     <div className="space-y-4">
+      {/* SubTab switcher */}
+      <div className="flex items-center gap-1 border-b border-border-muted">
+        <button
+          onClick={() => setSubTab('files')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            subTab === 'files'
+              ? 'border-accent text-text-primary'
+              : 'border-transparent text-text-muted hover:text-text-primary'
+          }`}
+        >
+          {t('logs.tabFiles', 'Log files')}
+        </button>
+        <button
+          onClick={() => setSubTab('audit')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            subTab === 'audit'
+              ? 'border-accent text-text-primary'
+              : 'border-transparent text-text-muted hover:text-text-primary'
+          }`}
+        >
+          {t('logs.tabAudit', 'Audit log')}
+        </button>
+      </div>
+
+      {subTab === 'audit' && <AuditLogViewer />}
+
+      {subTab === 'files' && (
+        <>
       {/* Error/Success Messages */}
       {error && (
         <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-error/10 text-error text-sm">
@@ -304,6 +334,8 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
         <p>{t('logs.helpText1')}</p>
         <p>{t('logs.helpText2')}</p>
       </div>
+        </>
+      )}
     </div>
   );
 }

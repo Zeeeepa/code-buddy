@@ -10,7 +10,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { log, logError } from '../utils/logger';
-import type { Session, Message, ServerEvent, ContentBlock, TextContent, ToolUseContent, ToolResultContent, ThinkingContent } from '../../renderer/types';
+import type { Session, Message, ServerEvent, ContentBlock, TextContent, ToolUseContent, ToolResultContent } from '../../renderer/types';
 
 /** Minimal EngineAdapter interface (avoids direct import from Code Buddy src) */
 interface EngineAdapter {
@@ -89,10 +89,23 @@ export class CodeBuddyEngineRunner {
     // Create checkpoint before this turn (ghost snapshot)
     try {
       if (session.cwd) {
-        const { getGhostSnapshotManager } = await import(
-          /* webpackIgnore: true */ '../../../src/checkpoints/ghost-snapshot.js'
-        );
-        const gsm = getGhostSnapshotManager(session.cwd);
+        const { loadCoreModule } = await import('../utils/core-loader');
+        type GhostSnapshotMod = {
+          getGhostSnapshotManager: (cwd: string) => {
+            createSnapshot: (desc: string) => Promise<{
+              id: string;
+              commitHash: string;
+              description: string;
+              timestamp: number;
+              turn: number;
+            } | null>;
+          };
+        };
+        const mod = await loadCoreModule<GhostSnapshotMod>('checkpoints/ghost-snapshot.js');
+        if (!mod) {
+          throw new Error('ghost-snapshot module unavailable');
+        }
+        const gsm = mod.getGhostSnapshotManager(session.cwd);
         const snapshot = await gsm.createSnapshot(`Turn: ${prompt.slice(0, 60)}`);
         if (snapshot) {
           sendToRenderer({
@@ -131,17 +144,17 @@ export class CodeBuddyEngineRunner {
                 fullContent += event.content;
                 sendToRenderer({
                   type: 'stream.partial',
-                  payload: { sessionId: session.id, content: event.content },
-                } as ServerEvent);
+                  payload: { sessionId: session.id, delta: event.content },
+                });
               }
               break;
 
             case 'thinking':
               if (event.thinking) {
                 sendToRenderer({
-                  type: 'stream.partial',
-                  payload: { sessionId: session.id, thinking: event.thinking },
-                } as ServerEvent);
+                  type: 'stream.thinking',
+                  payload: { sessionId: session.id, delta: event.thinking },
+                });
               }
               break;
 
@@ -176,6 +189,7 @@ export class CodeBuddyEngineRunner {
                 sendToRenderer({
                   type: 'trace.update',
                   payload: {
+                    sessionId: session.id,
                     stepId: event.tool.id,
                     updates: {
                       status: event.tool.isError ? 'error' : 'completed',
@@ -184,7 +198,7 @@ export class CodeBuddyEngineRunner {
                       duration: 0,
                     },
                   },
-                } as ServerEvent);
+                });
 
                 // Add tool_result content block
                 contentBlocks.push({
@@ -193,6 +207,18 @@ export class CodeBuddyEngineRunner {
                   content: event.tool.output || '',
                   isError: event.tool.isError,
                 } as ToolResultContent);
+
+                // Phase 2 step 13: emit gui.action events for Computer Use overlay.
+                if (isGuiOperateTool(event.tool.name)) {
+                  emitGuiActionEvent(
+                    sendToRenderer,
+                    session.id,
+                    event.tool.id,
+                    event.tool.name,
+                    event.tool.input,
+                    event.tool.output
+                  );
+                }
               }
               break;
 
@@ -201,10 +227,11 @@ export class CodeBuddyEngineRunner {
                 sendToRenderer({
                   type: 'trace.update',
                   payload: {
+                    sessionId: session.id,
                     stepId: event.tool.id,
                     updates: { toolOutput: event.tool.delta },
                   },
-                } as ServerEvent);
+                });
               }
               break;
 
@@ -212,8 +239,8 @@ export class CodeBuddyEngineRunner {
               if (event.tokenCount !== undefined) {
                 sendToRenderer({
                   type: 'session.contextInfo',
-                  payload: { sessionId: session.id, tokenCount: event.tokenCount },
-                } as ServerEvent);
+                  payload: { sessionId: session.id, contextWindow: event.tokenCount },
+                });
               }
               break;
 
@@ -337,11 +364,18 @@ export class CodeBuddyEngineRunner {
 
     for (const msg of messages) {
       const parts: string[] = [];
+      let imageCount = 0;
 
       for (const block of msg.content) {
         switch (block.type) {
           case 'text':
             parts.push((block as TextContent).text);
+            break;
+          case 'image':
+            // Phase 3 step 3: surface pasted images as markers so the agent
+            // can reason about their presence even when the underlying
+            // adapter can't pass multi-modal content through yet.
+            imageCount++;
             break;
           case 'tool_use': {
             const tu = block as ToolUseContent;
@@ -361,6 +395,10 @@ export class CodeBuddyEngineRunner {
             // Thinking blocks are internal — skip
             break;
         }
+      }
+
+      if (imageCount > 0) {
+        parts.unshift(`[User attached ${imageCount} image(s)]`);
       }
 
       const content = parts.join('\n');
@@ -385,4 +423,91 @@ function tryParseJSON(str: string): Record<string, unknown> {
   } catch {
     return { raw: str };
   }
+}
+
+/**
+ * Detect Computer Use / GUI automation tool names so we can render their
+ * screenshots in the ComputerUseOverlay (Phase 2 step 13).
+ */
+function isGuiOperateTool(name: string): boolean {
+  if (!name) return false;
+  const lower = name.toLowerCase();
+  return (
+    lower === 'gui_operate' ||
+    lower === 'computer' ||
+    lower.includes('screenshot') ||
+    lower.includes('gui_') ||
+    lower.startsWith('computer_') ||
+    lower.endsWith('_screenshot')
+  );
+}
+
+/**
+ * Extract a screenshot data URI / file path from a tool output blob.
+ * Supports: base64 data URIs, JSON with `screenshot`/`image` fields,
+ * absolute file paths ending in image extensions.
+ */
+function extractScreenshotFromOutput(output: string | undefined): string | undefined {
+  if (!output) return undefined;
+  // Inline data URI
+  const dataUriMatch = output.match(/data:image\/[a-zA-Z]+;base64,[A-Za-z0-9+/=]+/);
+  if (dataUriMatch) return dataUriMatch[0];
+  // JSON output
+  try {
+    const parsed = JSON.parse(output);
+    if (parsed && typeof parsed === 'object') {
+      const obj = parsed as Record<string, unknown>;
+      const candidate =
+        obj.screenshot ?? obj.image ?? obj.imagePath ?? obj.screenshotPath;
+      if (typeof candidate === 'string' && candidate.length > 0) {
+        return candidate;
+      }
+    }
+  } catch {
+    /* not JSON */
+  }
+  // Absolute file path ending with image extension
+  const pathMatch = output.match(/[A-Za-z]:[\\/][^\s"']+\.(?:png|jpg|jpeg|webp)/i);
+  if (pathMatch) return pathMatch[0];
+  const unixPathMatch = output.match(/\/[^\s"']+\.(?:png|jpg|jpeg|webp)/i);
+  if (unixPathMatch) return unixPathMatch[0];
+  return undefined;
+}
+
+function emitGuiActionEvent(
+  sendToRenderer: (event: ServerEvent) => void,
+  sessionId: string,
+  toolUseId: string,
+  toolName: string,
+  rawInput: string | undefined,
+  rawOutput: string | undefined
+): void {
+  let input: Record<string, unknown> = {};
+  if (rawInput) {
+    input = tryParseJSON(rawInput);
+  }
+  const action =
+    typeof input.action === 'string'
+      ? input.action
+      : typeof input.command === 'string'
+        ? input.command
+        : 'screenshot';
+  const click =
+    typeof input.x === 'number' && typeof input.y === 'number'
+      ? { x: input.x as number, y: input.y as number }
+      : undefined;
+
+  sendToRenderer({
+    type: 'gui.action',
+    payload: {
+      sessionId,
+      toolUseId,
+      action,
+      toolName,
+      screenshot: extractScreenshotFromOutput(rawOutput),
+      click,
+      details: input,
+      timestamp: Date.now(),
+    },
+  });
 }

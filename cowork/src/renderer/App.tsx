@@ -28,7 +28,20 @@ import { GlobalNoticeToast } from './components/GlobalNoticeToast';
 import { PanelErrorBoundary } from './components/PanelErrorBoundary';
 import { CommandPalette } from './components/CommandPalette';
 import { KeyboardShortcutsDialog } from './components/KeyboardShortcutsDialog';
+import { GlobalSearchDialog } from './components/GlobalSearchDialog';
+import { FilePreviewPane } from './components/FilePreviewPane';
+import { ArtifactPanel } from './components/ArtifactPanel';
+import { ComputerUseOverlay } from './components/ComputerUseOverlay';
+import { ActivityFeed } from './components/ActivityFeed';
+import { BookmarksPanel } from './components/BookmarksPanel';
+import { SnippetsLibrary } from './components/SnippetsLibrary';
+import { PersonaSwitcherDialog } from './components/PersonaSwitcherDialog';
+import { TestRunnerPanel } from './components/TestRunnerPanel';
+import { ReasoningTraceViewer } from './components/ReasoningTraceViewer';
+import { SplitPaneLayout } from './components/SplitPaneLayout';
 import { UpdateNotification } from './components/UpdateNotification';
+import { NotificationToastContainer } from './components/NotificationToast';
+import { NotificationCenter } from './components/NotificationCenter';
 import type { AppConfig } from './types';
 import type { GlobalNoticeAction } from './store';
 
@@ -77,6 +90,18 @@ function App() {
   const { pendingPermission, pendingSudoPassword } = usePendingDialogs();
   const showCommandPalette = useShowCommandPalette();
   const showShortcutsDialog = useShowShortcutsDialog();
+  const showGlobalSearch = useAppStore((s) => s.showGlobalSearch);
+  const showActivityFeed = useAppStore((s) => s.showActivityFeed);
+  const setBookmarkedMessageIds = useAppStore((s) => s.setBookmarkedMessageIds);
+  const setShowSnippetsLibrary = useAppStore((s) => s.setShowSnippetsLibrary);
+  const showPersonaSwitcher = useAppStore((s) => s.showPersonaSwitcher);
+  const setShowPersonaSwitcher = useAppStore((s) => s.setShowPersonaSwitcher);
+  const showTestRunner = useAppStore((s) => s.showTestRunner);
+  const setShowTestRunner = useAppStore((s) => s.setShowTestRunner);
+  const showReasoningViewer = useAppStore((s) => s.showReasoningViewer);
+  const setShowReasoningViewer = useAppStore((s) => s.setShowReasoningViewer);
+  const splitPaneEnabled = useAppStore((s) => s.splitPaneEnabled);
+  const toggleSplitPane = useAppStore((s) => s.toggleSplitPane);
   const updateInfo = useUpdateInfo();
 
   // Actions are still pulled directly from the store
@@ -89,6 +114,8 @@ function App() {
   const setSidebarCollapsed = useAppStore((s) => s.setSidebarCollapsed);
   const setShowCommandPalette = useAppStore((s) => s.setShowCommandPalette);
   const setShowShortcutsDialog = useAppStore((s) => s.setShowShortcutsDialog);
+  const setShowGlobalSearch = useAppStore((s) => s.setShowGlobalSearch);
+  const setShowActivityFeed = useAppStore((s) => s.setShowActivityFeed);
   const setUpdateInfo = useAppStore((s) => s.setUpdateInfo);
   const setSearchActive = useAppStore((s) => s.setSearchActive);
   const setContextPanelCollapsed = useAppStore((s) => s.setContextPanelCollapsed);
@@ -119,6 +146,21 @@ function App() {
       document.documentElement.classList.remove('light');
     }
   }, [settings.theme, systemDarkMode]);
+
+  // Phase 3 step 4: sync bookmarked messages when active session changes.
+  useEffect(() => {
+    if (!activeSessionId || !window.electronAPI?.bookmarks?.forSession) {
+      setBookmarkedMessageIds([]);
+      return;
+    }
+    let cancelled = false;
+    window.electronAPI.bookmarks.forSession(activeSessionId).then((ids) => {
+      if (!cancelled) setBookmarkedMessageIds(ids);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSessionId, setBookmarkedMessageIds]);
 
   // Auto-collapse panels based on window width
   useEffect(() => {
@@ -179,7 +221,34 @@ function App() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
-      if (mod && e.key === 'k') {
+      // Cmd+Shift+K or Cmd+P opens global search (Cmd+K is the action launcher).
+      if (mod && e.shiftKey && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setShowGlobalSearch(!showGlobalSearch);
+      } else if (mod && e.shiftKey && (e.key === 's' || e.key === 'S')) {
+        // Phase 3 step 5: snippets library
+        e.preventDefault();
+        setShowSnippetsLibrary(true);
+      } else if (mod && e.shiftKey && (e.key === 'p' || e.key === 'P')) {
+        // Phase 3 step 11: persona switcher
+        e.preventDefault();
+        setShowPersonaSwitcher(true);
+      } else if (mod && e.shiftKey && (e.key === 't' || e.key === 'T')) {
+        // Phase 3 step 12: test runner panel
+        e.preventDefault();
+        setShowTestRunner(true);
+      } else if (mod && e.shiftKey && (e.key === 'r' || e.key === 'R')) {
+        // Phase 3 step 17: reasoning trace viewer
+        e.preventDefault();
+        setShowReasoningViewer(true);
+      } else if (mod && e.key === '\\') {
+        // Phase 3 step 8: toggle split-pane layout
+        e.preventDefault();
+        toggleSplitPane();
+      } else if (mod && (e.key === 'p' || e.key === 'P') && !e.shiftKey) {
+        e.preventDefault();
+        setShowGlobalSearch(!showGlobalSearch);
+      } else if (mod && e.key === 'k') {
         e.preventDefault();
         setShowCommandPalette(!showCommandPalette);
       } else if (mod && e.key === '/') {
@@ -198,7 +267,7 @@ function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showCommandPalette, showShortcutsDialog, sidebarCollapsed, activeSessionId, setShowCommandPalette, setShowShortcutsDialog, setShowSettings, setSearchActive, setSidebarCollapsed]);
+  }, [showCommandPalette, showShortcutsDialog, showGlobalSearch, sidebarCollapsed, activeSessionId, setShowCommandPalette, setShowShortcutsDialog, setShowGlobalSearch, setShowSettings, setSearchActive, setSidebarCollapsed, setShowSnippetsLibrary, setShowPersonaSwitcher, setShowTestRunner, setShowReasoningViewer, toggleSplitPane]);
 
   // Determine if we should show the sandbox setup dialog
   // Show if there's progress and setup is not complete
@@ -238,7 +307,14 @@ function App() {
               fallback={<MainPanelFallback />}
             >
               <Suspense fallback={<MainPanelFallback />}>
-                <ChatView />
+                {splitPaneEnabled ? (
+                  <SplitPaneLayout
+                    left={<ChatView />}
+                    right={<FilePreviewPane inline />}
+                  />
+                ) : (
+                  <ChatView />
+                )}
               </Suspense>
             </PanelErrorBoundary>
           ) : (
@@ -328,6 +404,49 @@ function App() {
       {showShortcutsDialog && (
         <KeyboardShortcutsDialog onClose={() => setShowShortcutsDialog(false)} />
       )}
+
+      {/* Global Search Dialog (Cmd+P / Cmd+Shift+K) — Phase 2 step 8 */}
+      <GlobalSearchDialog
+        open={showGlobalSearch}
+        onClose={() => setShowGlobalSearch(false)}
+      />
+
+      {/* File Preview Pane — Phase 2 step 9 (skipped when split-pane owns it) */}
+      {!splitPaneEnabled && <FilePreviewPane />}
+
+      {/* Artifact Panel — Phase 2 step 10 */}
+      <ArtifactPanel />
+
+      {/* Computer Use Overlay — Phase 2 step 13 */}
+      <ComputerUseOverlay />
+
+      {/* Activity Feed — Phase 2 step 18 */}
+      <ActivityFeed
+        open={showActivityFeed}
+        onClose={() => setShowActivityFeed(false)}
+      />
+
+      {/* Bookmarks Panel — Phase 3 step 4 */}
+      <BookmarksPanel />
+
+      {/* Snippets Library — Phase 3 step 5 */}
+      <SnippetsLibrary />
+      <PersonaSwitcherDialog
+        isOpen={showPersonaSwitcher}
+        onClose={() => setShowPersonaSwitcher(false)}
+      />
+      <TestRunnerPanel
+        isOpen={showTestRunner}
+        onClose={() => setShowTestRunner(false)}
+      />
+      <ReasoningTraceViewer
+        isOpen={showReasoningViewer}
+        onClose={() => setShowReasoningViewer(false)}
+      />
+
+      {/* Notification toasts + center (Claude Cowork parity) */}
+      <NotificationToastContainer />
+      <NotificationCenter />
     </div>
   );
 }

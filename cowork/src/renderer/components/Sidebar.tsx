@@ -2,6 +2,8 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../store';
 import { useIPC } from '../hooks/useIPC';
+import { useActiveProjectId, usePermissionMode } from '../store/selectors';
+import { ProjectSelector } from './ProjectSelector';
 import {
   ChevronLeft,
   ChevronRight,
@@ -14,8 +16,12 @@ import {
   Plus,
   ListChecks,
   Check,
+  Bot,
+  Eye,
+  Download,
 } from 'lucide-react';
 import type { Session } from '../types';
+import { ExportDialog } from './ExportDialog';
 
 import sidebarLogoSrc from '../assets/logo.png';
 
@@ -28,7 +34,9 @@ type SessionGroup = {
 export function Sidebar() {
   const { t } = useTranslation();
   const sessions = useAppStore((s) => s.sessions);
+  const activeProjectId = useActiveProjectId();
   const activeSessionId = useAppStore((s) => s.activeSessionId);
+  const permissionMode = usePermissionMode();
   const settings = useAppStore((s) => s.settings);
   const sessionStates = useAppStore((s) => s.sessionStates);
   const setActiveSession = useAppStore((s) => s.setActiveSession);
@@ -51,13 +59,19 @@ export function Sidebar() {
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  // Phase 2 step 16: session export dialog
+  const [exportSessionId, setExportSessionId] = useState<string | null>(null);
+  const [exportSessionTitle, setExportSessionTitle] = useState<string | undefined>(undefined);
 
   const normalizedQuery = useMemo(() => searchQuery.trim().toLowerCase(), [searchQuery]);
   const filteredSessions = useMemo(() => {
-    return normalizedQuery
-      ? sessions.filter((session) => session.title.toLowerCase().includes(normalizedQuery))
+    const projectScoped = activeProjectId
+      ? sessions.filter((session) => session.projectId === activeProjectId)
       : sessions;
-  }, [sessions, normalizedQuery]);
+    return normalizedQuery
+      ? projectScoped.filter((session) => session.title.toLowerCase().includes(normalizedQuery))
+      : projectScoped;
+  }, [sessions, normalizedQuery, activeProjectId]);
 
   const groupedSessions = useMemo(
     () => groupSessionsByDate(filteredSessions, t),
@@ -301,6 +315,11 @@ export function Sidebar() {
           <span className="text-[13px] font-medium">{t('sidebar.newTask')}</span>
         </button>
 
+        {/* Project selector (Claude Cowork parity) */}
+        <div className="mt-2">
+          <ProjectSelector />
+        </div>
+
         {sessions.length > 0 && (
           <div className="mt-2 flex items-center gap-2">
             <div className="relative flex-1 min-w-0">
@@ -384,20 +403,45 @@ export function Sidebar() {
                             </div>
                           )}
                           <div className="min-w-0 flex-1">
-                            <div className="text-[13px] font-medium leading-5 text-text-primary truncate">
-                              {session.title}
+                            <div className="text-[13px] font-medium leading-5 text-text-primary truncate flex items-center gap-1.5">
+                              {session.isBackground && (
+                                <Bot
+                                  className="w-3 h-3 text-indigo-400 shrink-0"
+                                  aria-label="Background session"
+                                />
+                              )}
+                              {isActive && permissionMode === 'plan' && (
+                                <Eye
+                                  className="w-3 h-3 text-accent shrink-0"
+                                  aria-label="Plan mode active"
+                                />
+                              )}
+                              <span className="truncate">{session.title}</span>
                             </div>
                           </div>
                         </div>
 
                         {!isSelectMode && hoveredSession === session.id && (
-                          <button
-                            onClick={(e) => handleDeleteSession(e, session.id)}
-                            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-lg flex items-center justify-center text-text-muted hover:text-error hover:bg-surface-active transition-colors"
-                            title={t('common.delete')}
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
+                          <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExportSessionId(session.id);
+                                setExportSessionTitle(session.title);
+                              }}
+                              className="w-6 h-6 rounded-lg flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-active transition-colors"
+                              title={t('exportDialog.title')}
+                            >
+                              <Download className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={(e) => handleDeleteSession(e, session.id)}
+                              className="w-6 h-6 rounded-lg flex items-center justify-center text-text-muted hover:text-error hover:bg-surface-active transition-colors"
+                              title={t('common.delete')}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
                         )}
                       </div>
                     );
@@ -490,6 +534,18 @@ export function Sidebar() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Session export dialog (Phase 2 step 16) */}
+      {exportSessionId && (
+        <ExportDialog
+          sessionId={exportSessionId}
+          sessionTitle={exportSessionTitle}
+          onClose={() => {
+            setExportSessionId(null);
+            setExportSessionTitle(undefined);
+          }}
+        />
       )}
     </aside>
   );

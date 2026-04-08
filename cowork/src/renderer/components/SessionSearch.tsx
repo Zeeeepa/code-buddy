@@ -1,7 +1,7 @@
 /**
  * SessionSearch — In-message search with highlighting (Cmd+F)
  */
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { X, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface SessionSearchProps {

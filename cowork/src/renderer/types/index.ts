@@ -10,11 +10,80 @@ export interface Session {
   allowedTools: string[];
   memoryEnabled: boolean;
   model?: string;
+  projectId?: string | null;
+  isBackground?: boolean;
+  executionMode?: ExecutionMode;
   createdAt: number;
   updatedAt: number;
 }
 
 export type SessionStatus = 'idle' | 'running' | 'completed' | 'error';
+
+export type ExecutionMode = 'chat' | 'task';
+
+// Project types (Claude Cowork parity)
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  workspacePath?: string;
+  memoryConfig?: ProjectMemoryConfig;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ProjectMemoryConfig {
+  autoConsolidate?: boolean;
+  maxMemoryEntries?: number;
+  includeICM?: boolean;
+}
+
+export interface ProjectCreateInput {
+  name: string;
+  description?: string;
+  workspacePath?: string;
+  memoryConfig?: ProjectMemoryConfig;
+}
+
+export interface ProjectUpdateInput {
+  name?: string;
+  description?: string;
+  workspacePath?: string;
+  memoryConfig?: ProjectMemoryConfig;
+}
+
+// Sub-agent types (Claude Cowork parity)
+export type SubAgentStatus = 'running' | 'waiting' | 'completed' | 'error' | 'closed';
+export type SubAgentRole = 'default' | 'explorer' | 'worker' | 'coder' | 'reviewer' | 'tester' | 'researcher' | 'debugger' | 'architect' | 'documenter' | string;
+
+export interface SubAgent {
+  id: string;
+  nickname: string;
+  role: SubAgentRole;
+  status: SubAgentStatus;
+  depth: number;
+  parentId: string | null;
+  createdAt: number;
+  result?: string;
+  sessionId?: string;
+  progress?: number;
+  currentStep?: string;
+}
+
+// Notification types (Claude Cowork parity)
+export type NotificationPriority = 'low' | 'normal' | 'high' | 'urgent';
+
+export interface NotificationEntry {
+  id: string;
+  title: string;
+  body: string;
+  priority: NotificationPriority;
+  timestamp: number;
+  read: boolean;
+  sessionId?: string;
+  projectId?: string;
+  actionLabel?: string;
+}
 
 export interface MountedPath {
   virtual: string;
@@ -450,7 +519,40 @@ export type ServerEvent =
   | { type: 'stream.done'; payload: { sessionId: string } }
   | { type: 'update.available'; payload: UpdateInfo }
   | { type: 'update.progress'; payload: { percent: number } }
-  | { type: 'update.downloaded'; payload: UpdateInfo };
+  | { type: 'update.downloaded'; payload: UpdateInfo }
+  | { type: 'project.list'; payload: { projects: Project[] } }
+  | { type: 'project.created'; payload: { project: Project } }
+  | { type: 'project.updated'; payload: { project: Project } }
+  | { type: 'project.deleted'; payload: { projectId: string } }
+  | { type: 'project.activeChanged'; payload: { projectId: string | null } }
+  | { type: 'subagent.spawned'; payload: { sessionId: string; subAgent: SubAgent } }
+  | { type: 'subagent.status'; payload: { sessionId: string; agentId: string; status: SubAgentStatus; nickname: string } }
+  | { type: 'subagent.completed'; payload: { sessionId: string; agentId: string; nickname: string; result: string } }
+  | { type: 'subagent.output'; payload: { sessionId: string; agentId: string; delta: string } }
+  | { type: 'notification.message'; payload: { notification: NotificationEntry } }
+  | { type: 'identity.updated'; payload: unknown[] }
+  | { type: 'identity.activated'; payload: unknown | null }
+  | { type: 'test.framework'; payload: { framework: string } }
+  | { type: 'test.start'; payload: { files: string[]; framework?: string } }
+  | { type: 'test.output'; payload: { stream: 'stdout' | 'stderr'; text: string } }
+  | { type: 'test.complete'; payload: unknown }
+  | { type: 'test.cancelled'; payload: null }
+  | { type: 'gui.action'; payload: GuiActionEvent };
+
+// Computer Use overlay events (Claude Cowork parity Phase 2 step 13)
+export interface GuiActionEvent {
+  sessionId: string;
+  toolUseId: string;
+  action: string;
+  toolName: string;
+  /** Base64 data URI or absolute file path of the screenshot if available */
+  screenshot?: string;
+  /** Optional click coordinates relative to the screenshot */
+  click?: { x: number; y: number };
+  /** Other input parameters that produced this action */
+  details?: Record<string, unknown>;
+  timestamp: number;
+}
 
 // Settings types
 export interface Settings {

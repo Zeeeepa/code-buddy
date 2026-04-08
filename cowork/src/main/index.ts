@@ -19,6 +19,38 @@ import { execFileSync } from 'child_process';
 import { config } from 'dotenv';
 import { initDatabase, closeDatabase } from './db/database';
 import { SessionManager, type EngineAdapterLike } from './session/session-manager';
+import { ProjectManager, type ProjectCreateInput, type ProjectUpdateInput } from './project/project-manager';
+import { ProjectMemoryService } from './project/project-memory';
+import { SubAgentBridge } from './agent/sub-agent-bridge';
+import { OrchestratorBridge, type OrchestratorOptions } from './agent/orchestrator-bridge';
+import { MentionProcessor } from './input/mention-processor';
+import { SlashCommandBridge } from './commands/slash-command-bridge';
+import { SkillMdBridge } from './skills/skill-md-bridge';
+import { MCPMarketplaceBridge } from './mcp/mcp-marketplace-bridge';
+import { CostBridge } from './cost/cost-bridge';
+import { RulesBridge } from './security/rules-bridge';
+import { SessionBranchingBridge } from './session/session-branching';
+import { GlobalSearchService } from './search/global-search-service';
+import { PreviewService } from './preview/preview-service';
+import { parseUnifiedDiff, revertHunks, type ParsedHunk } from './diff/hunk-diff-service';
+import { getGitBridge } from './git/git-bridge';
+import { getModelCapabilities } from './config/model-capability-bridge';
+import { TemplateService } from './project/template-service';
+import { WorkflowBridge } from './workflows/workflow-bridge';
+import { SessionExportService } from './session/session-export-service';
+import { ActivityFeed } from './activity/activity-feed';
+import { BookmarksService } from './bookmarks/bookmarks-service';
+import { getSnippetsService } from './snippets/snippets-service';
+import { getCustomCommandsService } from './commands/custom-commands-service';
+import {
+  getWorkspacePresetsService,
+  type WorkspacePreset,
+} from './workspace/workspace-presets-service';
+import { ConfigExportService } from './config/config-export-service';
+import { KnowledgeService, type KnowledgeCreateInput } from './knowledge/knowledge-service';
+import { NotificationBridge } from './notification/notification-bridge';
+import { ICMIntegration } from './memory/icm-integration';
+import { TaskDispatch, type DispatchRequest } from './remote/task-dispatch';
 import { SkillsManager } from './skills/skills-manager';
 import { PluginCatalogService } from './skills/plugin-catalog-service';
 import { PluginRuntimeService } from './skills/plugin-runtime-service';
@@ -110,6 +142,29 @@ let sessionManager: SessionManager | null = null;
 let skillsManager: SkillsManager | null = null;
 let pluginRuntimeService: PluginRuntimeService | null = null;
 let scheduledTaskManager: ScheduledTaskManager | null = null;
+let projectManager: ProjectManager | null = null;
+let subAgentBridge: SubAgentBridge | null = null;
+let orchestratorBridge: OrchestratorBridge | null = null;
+let mentionProcessor: MentionProcessor | null = null;
+let slashCommandBridge: SlashCommandBridge | null = null;
+let skillMdBridge: SkillMdBridge | null = null;
+let mcpMarketplaceBridge: MCPMarketplaceBridge | null = null;
+let costBridge: CostBridge | null = null;
+let rulesBridge: RulesBridge | null = null;
+let sessionBranchingBridge: SessionBranchingBridge | null = null;
+let globalSearchService: GlobalSearchService | null = null;
+let previewService: PreviewService | null = null;
+let templateService: TemplateService | null = null;
+let workflowBridge: WorkflowBridge | null = null;
+let sessionExportService: SessionExportService | null = null;
+let activityFeed: ActivityFeed | null = null;
+let bookmarksService: BookmarksService | null = null;
+let configExportService: ConfigExportService | null = null;
+let knowledgeService: KnowledgeService | null = null;
+let projectMemoryServiceRef: ProjectMemoryService | null = null;
+let notificationBridge: NotificationBridge | null = null;
+let icmIntegration: ICMIntegration | null = null;
+let taskDispatch: TaskDispatch | null = null;
 
 function sanitizeDiagnosticBaseUrl(value: string | undefined): string | null {
   if (!value) {
@@ -624,6 +679,49 @@ async function setWorkingDir(
     payload: { path: newDir },
   });
 
+  // Sync persona bridge workspace so identity lookups follow the active cwd
+  try {
+    const { getIdentityBridge } = await import('./identity/identity-bridge');
+    const bridge = getIdentityBridge();
+    if (!(bridge as unknown as { _coworkListenerBound?: boolean })._coworkListenerBound) {
+      bridge.on('personas:updated', (entries) => {
+        sendToRenderer({ type: 'identity.updated', payload: entries });
+      });
+      bridge.on('personas:activated', (entry) => {
+        sendToRenderer({ type: 'identity.activated', payload: entry });
+      });
+      (bridge as unknown as { _coworkListenerBound?: boolean })._coworkListenerBound = true;
+    }
+    bridge.setWorkspace(newDir);
+  } catch (err) {
+    logWarn('[App] identity bridge workspace sync failed:', err);
+  }
+
+  // Sync hooks bridge workspace
+  try {
+    const { getHooksBridge } = await import('./hooks/hooks-bridge');
+    getHooksBridge().setWorkspace(newDir);
+  } catch (err) {
+    logWarn('[App] hooks bridge workspace sync failed:', err);
+  }
+
+  // Sync test runner workspace + event forwarding
+  try {
+    const { getTestRunnerBridge } = await import('./testing/test-runner-bridge');
+    const bridge = getTestRunnerBridge();
+    if (!(bridge as unknown as { _coworkListenerBound?: boolean })._coworkListenerBound) {
+      bridge.on('test.framework', (p) => sendToRenderer({ type: 'test.framework', payload: p }));
+      bridge.on('test.start', (p) => sendToRenderer({ type: 'test.start', payload: p }));
+      bridge.on('test.output', (p) => sendToRenderer({ type: 'test.output', payload: p }));
+      bridge.on('test.complete', (p) => sendToRenderer({ type: 'test.complete', payload: p }));
+      bridge.on('test.cancelled', () => sendToRenderer({ type: 'test.cancelled', payload: null }));
+      (bridge as unknown as { _coworkListenerBound?: boolean })._coworkListenerBound = true;
+    }
+    bridge.setWorkspace(newDir);
+  } catch (err) {
+    logWarn('[App] test runner workspace sync failed:', err);
+  }
+
   log(
     '[App] Working directory for UI updated:',
     newDir,
@@ -835,8 +933,11 @@ app
             /* webpackIgnore: true */ resolve(enginePath, 'desktop', 'permission-bridge.js')
           );
           const permissionBridge = new DesktopPermissionBridge(sendToRenderer);
-          if (typeof (engineAdapter as Record<string, unknown>).setPermissionCallback === 'function') {
-            (engineAdapter as { setPermissionCallback: (cb: unknown) => void }).setPermissionCallback(
+          const adapterWithPerm = engineAdapter as unknown as {
+            setPermissionCallback?: (cb: unknown) => void;
+          };
+          if (typeof adapterWithPerm.setPermissionCallback === 'function') {
+            adapterWithPerm.setPermissionCallback(
               permissionBridge.requestPermission.bind(permissionBridge)
             );
           }
@@ -860,6 +961,190 @@ app
     // Initialize session manager before creating an interactive window.
     // This avoids session.start racing the startup path and hitting a null manager.
     sessionManager = new SessionManager(db, sendToRenderer, pluginRuntimeService, engineAdapter);
+
+    // Initialize ProjectManager for Claude Cowork parity
+    projectManager = new ProjectManager(db);
+    projectManager.setProjectChangeListener((project) => {
+      sendToRenderer({
+        type: 'project.activeChanged',
+        payload: { projectId: project?.id ?? null },
+      });
+    });
+
+    // Wire project memory service into session manager
+    const projectMemoryService = new ProjectMemoryService(projectManager);
+    projectMemoryServiceRef = projectMemoryService;
+    sessionManager.setProjectServices(projectManager, projectMemoryService);
+
+    // Initialize sub-agent bridge (Claude Cowork parity)
+    subAgentBridge = new SubAgentBridge(sendToRenderer);
+    void subAgentBridge.init();
+
+    // Initialize orchestrator bridge for multi-agent workflows
+    orchestratorBridge = new OrchestratorBridge(
+      sendToRenderer,
+      () => configStore.get('apiKey') || process.env.GROK_API_KEY || '',
+      () => configStore.get('baseUrl') || process.env.GROK_BASE_URL
+    );
+
+    // Initialize mention processor (Claude Cowork parity)
+    mentionProcessor = new MentionProcessor();
+    sessionManager.setMentionProcessor(mentionProcessor);
+
+    slashCommandBridge = new SlashCommandBridge();
+    skillMdBridge = new SkillMdBridge();
+    costBridge = new CostBridge(db);
+    rulesBridge = new RulesBridge();
+    sessionBranchingBridge = new SessionBranchingBridge();
+
+    // MCP marketplace bridge — wired to the live config store + running manager.
+    mcpMarketplaceBridge = new MCPMarketplaceBridge();
+    mcpMarketplaceBridge.configure({
+      listInstalledServers: () => mcpConfigStore.getServers(),
+      saveServer: async (config) => {
+        mcpConfigStore.saveServer(config as MCPServerConfig);
+        const mgr = sessionManager?.getMCPManager();
+        if (mgr) {
+          try {
+            await mgr.updateServer(config as MCPServerConfig);
+            sessionManager?.invalidateMcpServersCache();
+          } catch (err) {
+            logError('[MCP Marketplace] updateServer failed:', err);
+            mcpConfigStore.saveServer({
+              ...(config as MCPServerConfig),
+              enabled: false,
+            });
+            throw err;
+          }
+        }
+      },
+      deleteServer: async (serverId) => {
+        mcpConfigStore.deleteServer(serverId);
+        const mgr = sessionManager?.getMCPManager();
+        if (mgr) {
+          try {
+            await mgr.removeServer(serverId);
+            sessionManager?.invalidateMcpServersCache();
+          } catch (err) {
+            logError('[MCP Marketplace] removeServer failed:', err);
+          }
+        }
+      },
+      updateServer: async (config) => {
+        mcpConfigStore.saveServer(config as MCPServerConfig);
+        const mgr = sessionManager?.getMCPManager();
+        if (mgr) {
+          try {
+            await mgr.updateServer(config as MCPServerConfig);
+            sessionManager?.invalidateMcpServersCache();
+          } catch (err) {
+            logError('[MCP Marketplace] updateServer (toggle) failed:', err);
+            throw err;
+          }
+        }
+      },
+      listTools: () => {
+        const mgr = sessionManager?.getMCPManager();
+        if (!mgr) return [];
+        const tools = mgr.getTools();
+        return tools.map(
+          (t: {
+            name: string;
+            description?: string;
+            serverId?: string;
+            serverName?: string;
+            inputSchema?: unknown;
+          }) => ({
+            name: t.name,
+            description: t.description,
+            serverId: t.serverId ?? '',
+            serverName: t.serverName,
+            inputSchema: t.inputSchema,
+          })
+        );
+      },
+      expandArgs: (args) => {
+        // Expand {WORKSPACE} placeholder to the currently active project
+        const activeProject = projectManager?.getActive();
+        const workspace = activeProject?.workspacePath ?? process.cwd();
+        return args.map((arg) => arg.replace(/\{WORKSPACE\}/g, workspace));
+      },
+      // Phase 3 step 7: MCP tool playground
+      callTool: async (toolName: string, toolArgs: Record<string, unknown>) => {
+        const mgr = sessionManager?.getMCPManager();
+        if (!mgr) throw new Error('MCP manager not available');
+        return mgr.callTool(toolName, toolArgs);
+      },
+    });
+
+    // Initialize knowledge service (Claude Cowork parity)
+    knowledgeService = new KnowledgeService();
+
+    // Global search wires existing project services for cross-source queries.
+    globalSearchService = new GlobalSearchService({
+      db,
+      projectManager,
+      knowledgeService,
+      projectMemoryService: projectMemoryServiceRef,
+    });
+
+    // File preview service — wraps core PDFTool, detects mime, returns text/image/binary.
+    previewService = new PreviewService();
+
+    // Project templates — wraps SKILL.md starter packs from the core registry.
+    if (skillMdBridge) {
+      templateService = new TemplateService(skillMdBridge);
+    }
+
+    // Workflow bridge — visual editor + execution
+    workflowBridge = new WorkflowBridge();
+
+    // Session export — enhanced formats (markdown/json/html) with redaction
+    sessionExportService = new SessionExportService(sessionManager);
+
+    // Activity feed — cross-project event log persisted in SQLite
+    activityFeed = new ActivityFeed(db);
+
+    // Phase 3 step 4: bookmarks service (starred messages)
+    bookmarksService = new BookmarksService(db);
+
+    // Config export/import — settings sync bundle
+    configExportService = new ConfigExportService(projectManager);
+
+    // Initialize notification bridge (Claude Cowork parity)
+    notificationBridge = new NotificationBridge(sendToRenderer);
+    void notificationBridge.init();
+    sessionManager.setNotificationBridge(notificationBridge);
+
+    // Initialize task dispatch for remote triggers (Claude Cowork parity)
+    taskDispatch = new TaskDispatch(sessionManager, notificationBridge);
+
+    // Initialize ICM cross-session memory integration (Claude Cowork parity)
+    icmIntegration = new ICMIntegration();
+    const icmIntegrationRef = icmIntegration;
+    const sessionManagerRef = sessionManager;
+    void (async () => {
+      try {
+        // Defer until MCP manager has had a chance to connect to servers
+        const mcpMgr = (sessionManagerRef as unknown as { mcpManager?: {
+          callTool?: (server: string, tool: string, args: Record<string, unknown>) => Promise<unknown>;
+          getConnectedServers?: () => string[];
+        } }).mcpManager;
+        if (mcpMgr?.callTool && mcpMgr?.getConnectedServers) {
+          const caller = {
+            callTool: mcpMgr.callTool.bind(mcpMgr),
+            getConnectedServers: mcpMgr.getConnectedServers.bind(mcpMgr),
+          };
+          const available = await icmIntegrationRef.initialize(caller);
+          if (available) {
+            sessionManagerRef.setICMIntegration(icmIntegrationRef);
+            log('[Main] ICM cross-session memory wired');
+          }
+        }
+      } catch (err) {
+        logWarn('[Main] ICM integration setup failed:', err);
+      }
+    })();
     skillsManager = new SkillsManager(db, {
       getConfiguredGlobalSkillsPath: () => configStore.get('globalSkillsPath') || '',
       setConfiguredGlobalSkillsPath: (nextPath: string) => {
@@ -1278,6 +1563,323 @@ ipcMain.handle('config.switchModel', async (_event, model: string) => {
   } catch { return false; }
 });
 
+// ── Project IPC handlers (Claude Cowork parity) ──────────────────────
+ipcMain.handle('project.list', async () => {
+  if (!projectManager) return { projects: [] };
+  return { projects: projectManager.list() };
+});
+
+ipcMain.handle('project.get', async (_event, id: string) => {
+  if (!projectManager) return null;
+  return projectManager.get(id);
+});
+
+ipcMain.handle('project.create', async (_event, input: ProjectCreateInput) => {
+  if (!projectManager) throw new Error('ProjectManager not initialized');
+  const project = projectManager.create(input);
+  sendToRenderer({ type: 'project.created', payload: { project } });
+  activityFeed?.record({
+    type: 'project.created',
+    title: `Project created: ${project.name}`,
+    description: project.description,
+    projectId: project.id,
+  });
+  return project;
+});
+
+ipcMain.handle('project.update', async (_event, id: string, updates: ProjectUpdateInput) => {
+  if (!projectManager) return null;
+  const project = projectManager.update(id, updates);
+  if (project) {
+    sendToRenderer({ type: 'project.updated', payload: { project } });
+  }
+  return project;
+});
+
+ipcMain.handle('project.delete', async (_event, id: string) => {
+  if (!projectManager) return false;
+  const ok = projectManager.delete(id);
+  if (ok) {
+    sendToRenderer({ type: 'project.deleted', payload: { projectId: id } });
+    activityFeed?.record({
+      type: 'project.deleted',
+      title: `Project deleted`,
+      projectId: id,
+    });
+  }
+  return ok;
+});
+
+ipcMain.handle('project.setActive', async (_event, id: string | null) => {
+  if (!projectManager) return null;
+  return projectManager.setActive(id);
+});
+
+ipcMain.handle('project.getActive', async () => {
+  if (!projectManager) return null;
+  return projectManager.getActive();
+});
+
+// ── Sub-agent IPC handlers (Claude Cowork parity) ────────────────────
+ipcMain.handle('subagent.list', async () => {
+  if (!subAgentBridge) return [];
+  return subAgentBridge.list();
+});
+
+ipcMain.handle('subagent.spawn', async (_event, options: {
+  sessionId: string;
+  prompt: string;
+  role?: string;
+  forkContext?: boolean;
+  parentId?: string;
+}) => {
+  if (!subAgentBridge) return { error: 'SubAgentBridge not initialized' };
+  return subAgentBridge.spawn(options);
+});
+
+ipcMain.handle('subagent.sendInput', async (_event, agentId: string, message: string, interrupt?: boolean) => {
+  if (!subAgentBridge) return false;
+  return subAgentBridge.sendInput(agentId, message, interrupt);
+});
+
+ipcMain.handle('subagent.close', async (_event, agentId: string) => {
+  if (!subAgentBridge) return false;
+  return subAgentBridge.close(agentId);
+});
+
+ipcMain.handle('subagent.resume', async (_event, agentId: string, prompt?: string) => {
+  if (!subAgentBridge) return false;
+  return subAgentBridge.resume(agentId, prompt);
+});
+
+ipcMain.handle('subagent.wait', async (_event, agentIds: string[], timeoutMs?: number) => {
+  if (!subAgentBridge) return [];
+  return subAgentBridge.wait(agentIds, timeoutMs);
+});
+
+// ── Orchestrator IPC handlers ────────────────────────────────────────
+ipcMain.handle('orchestrator.run', async (_event, sessionId: string, goal: string, options?: OrchestratorOptions) => {
+  if (!orchestratorBridge) return { success: false, summary: 'Orchestrator not initialized', artifacts: {}, agentResults: [], duration: 0, errors: ['not initialized'] };
+  return orchestratorBridge.run(sessionId, goal, options);
+});
+
+ipcMain.handle('orchestrator.isComplex', async (_event, goal: string) => {
+  if (!orchestratorBridge) return false;
+  return orchestratorBridge.isComplexGoal(goal);
+});
+
+// ── Mention IPC handlers (Claude Cowork parity) ──────────────────────
+ipcMain.handle('mention.process', async (_event, text: string, cwd?: string) => {
+  if (!mentionProcessor) return { cleanedText: text, contextBlocks: [] };
+  return mentionProcessor.process(text, cwd);
+});
+
+ipcMain.handle('mention.autocomplete', async (_event, prefix: string, cwd?: string, limit?: number) => {
+  if (!mentionProcessor) return [];
+  return mentionProcessor.autocomplete(prefix, cwd, limit);
+});
+
+// ── Slash command IPC handlers (Claude Cowork parity Phase 2) ────────
+ipcMain.handle('command.list', async () => {
+  if (!slashCommandBridge) return [];
+  return slashCommandBridge.listCommands();
+});
+
+ipcMain.handle('command.autocomplete', async (_event, prefix: string, limit?: number) => {
+  if (!slashCommandBridge) return [];
+  return slashCommandBridge.autocomplete(prefix, limit);
+});
+
+ipcMain.handle(
+  'command.execute',
+  async (_event, name: string, args: string[], sessionId?: string) => {
+    if (!slashCommandBridge) {
+      return { success: false, error: 'Slash command bridge unavailable' };
+    }
+    return slashCommandBridge.execute(name, args, sessionId);
+  }
+);
+
+// ── SKILL.md bridge IPC handlers (Claude Cowork parity Phase 2) ─────
+ipcMain.handle('skillMd.list', async () => {
+  if (!skillMdBridge) return [];
+  return skillMdBridge.list();
+});
+
+ipcMain.handle('skillMd.search', async (_event, query: string, limit?: number) => {
+  if (!skillMdBridge) return [];
+  return skillMdBridge.search(query, limit);
+});
+
+ipcMain.handle('skillMd.findBest', async (_event, request: string) => {
+  if (!skillMdBridge) return null;
+  return skillMdBridge.findBest(request);
+});
+
+ipcMain.handle(
+  'skillMd.execute',
+  async (
+    _event,
+    skillName: string,
+    context: { userInput?: string; workspaceRoot?: string; sessionId?: string }
+  ) => {
+    if (!skillMdBridge) {
+      return { success: false, error: 'Skill bridge unavailable' };
+    }
+    return skillMdBridge.execute(skillName, context);
+  }
+);
+
+// ── Knowledge IPC handlers (Claude Cowork parity) ────────────────────
+function resolveKnowledgeWorkspace(projectId?: string): string | null {
+  if (!projectManager) return null;
+  const project = projectId
+    ? projectManager.get(projectId)
+    : projectManager.getActive();
+  return project?.workspacePath ?? null;
+}
+
+ipcMain.handle('knowledge.list', async (_event, projectId?: string) => {
+  if (!knowledgeService) return [];
+  const workspace = resolveKnowledgeWorkspace(projectId);
+  if (!workspace) return [];
+  return knowledgeService.list(workspace);
+});
+
+ipcMain.handle('knowledge.get', async (_event, id: string, projectId?: string) => {
+  if (!knowledgeService) return null;
+  const workspace = resolveKnowledgeWorkspace(projectId);
+  if (!workspace) return null;
+  return knowledgeService.get(workspace, id);
+});
+
+ipcMain.handle('knowledge.create', async (_event, input: KnowledgeCreateInput, projectId?: string) => {
+  if (!knowledgeService) throw new Error('KnowledgeService not initialized');
+  const workspace = resolveKnowledgeWorkspace(projectId);
+  if (!workspace) throw new Error('No active project workspace');
+  return knowledgeService.create(workspace, input);
+});
+
+ipcMain.handle('knowledge.update', async (_event, id: string, updates: Partial<KnowledgeCreateInput>, projectId?: string) => {
+  if (!knowledgeService) return null;
+  const workspace = resolveKnowledgeWorkspace(projectId);
+  if (!workspace) return null;
+  return knowledgeService.update(workspace, id, updates);
+});
+
+ipcMain.handle('knowledge.delete', async (_event, id: string, projectId?: string) => {
+  if (!knowledgeService) return false;
+  const workspace = resolveKnowledgeWorkspace(projectId);
+  if (!workspace) return false;
+  return knowledgeService.delete(workspace, id);
+});
+
+ipcMain.handle('knowledge.search', async (_event, query: string, projectId?: string, limit?: number) => {
+  if (!knowledgeService) return [];
+  const workspace = resolveKnowledgeWorkspace(projectId);
+  if (!workspace) return [];
+  return knowledgeService.search(workspace, query, limit);
+});
+
+// ── Task dispatch IPC (mobile/remote → background session) ───────────
+ipcMain.handle('dispatch.task', async (_event, request: DispatchRequest) => {
+  if (!taskDispatch) return { success: false, error: 'TaskDispatch not initialized' };
+  const validation = taskDispatch.validate(request);
+  if (!validation.valid) {
+    return { success: false, error: validation.reason };
+  }
+  return taskDispatch.dispatch(request);
+});
+
+// ── Session settings update IPC (Claude Cowork parity) ──────────────
+ipcMain.handle('session.updateSettings', async (_event, sessionId: string, updates: {
+  projectId?: string | null;
+  executionMode?: 'chat' | 'task';
+  isBackground?: boolean;
+  title?: string;
+}) => {
+  if (!sessionManager) return false;
+  return sessionManager.updateSessionSettings(sessionId, updates);
+});
+
+// ── Background session IPC (Claude Cowork parity) ────────────────────
+ipcMain.handle('session.startBackground', async (_event, payload: {
+  title: string;
+  prompt: string;
+  cwd?: string;
+  projectId?: string;
+}) => {
+  if (!sessionManager) throw new Error('SessionManager not initialized');
+  const session = await sessionManager.startBackgroundSession(
+    payload.title,
+    payload.prompt,
+    payload.cwd,
+    payload.projectId
+  );
+  return session;
+});
+
+// ── Memory listing for MemoryBrowser (Claude Cowork parity) ──────────
+ipcMain.handle('memory.list', async (_event, projectId?: string) => {
+  if (!projectManager || !projectMemoryServiceRef) return [];
+  const id = projectId ?? projectManager.getActiveId();
+  if (!id) return [];
+  return projectMemoryServiceRef.listMemoryEntries(id);
+});
+
+// Phase 2 step 17: memory CRUD for inline editor
+ipcMain.handle(
+  'memory.add',
+  async (
+    _event,
+    category: 'preference' | 'pattern' | 'context' | 'decision',
+    content: string,
+    projectId?: string
+  ) => {
+    if (!projectManager || !projectMemoryServiceRef) {
+      return { success: false, error: 'Memory service unavailable' };
+    }
+    const id = projectId ?? projectManager.getActiveId();
+    if (!id) return { success: false, error: 'No active project' };
+    return projectMemoryServiceRef.addMemoryEntry(id, category, content);
+  }
+);
+
+ipcMain.handle(
+  'memory.update',
+  async (
+    _event,
+    entryIndex: number,
+    newContent: string,
+    newCategory?: 'preference' | 'pattern' | 'context' | 'decision',
+    projectId?: string
+  ) => {
+    if (!projectManager || !projectMemoryServiceRef) {
+      return { success: false, error: 'Memory service unavailable' };
+    }
+    const id = projectId ?? projectManager.getActiveId();
+    if (!id) return { success: false, error: 'No active project' };
+    return projectMemoryServiceRef.updateMemoryEntry(
+      id,
+      entryIndex,
+      newContent,
+      newCategory
+    );
+  }
+);
+
+ipcMain.handle(
+  'memory.delete',
+  async (_event, entryIndex: number, projectId?: string) => {
+    if (!projectManager || !projectMemoryServiceRef) {
+      return { success: false, error: 'Memory service unavailable' };
+    }
+    const id = projectId ?? projectManager.getActiveId();
+    if (!id) return { success: false, error: 'No active project' };
+    return projectMemoryServiceRef.deleteMemoryEntry(id, entryIndex);
+  }
+);
+
 // ── Session export IPC handler ────────────────────────────────────────
 ipcMain.handle('session.export', async (_event, sessionId: string, format: 'md' | 'json') => {
   try {
@@ -1286,6 +1888,60 @@ ipcMain.handle('session.export', async (_event, sessionId: string, format: 'md' 
     return { messages, format };
   } catch { return null; }
 });
+
+// Phase 2 step 16: enhanced session export with format/redaction options
+ipcMain.handle(
+  'session.exportFull',
+  async (
+    _event,
+    sessionId: string,
+    options: {
+      format: 'markdown' | 'json' | 'html';
+      redactSecrets?: boolean;
+      includeCheckpoints?: boolean;
+    }
+  ) => {
+    if (!sessionExportService) {
+      return { success: false, content: '', filename: '', error: 'Export service unavailable' };
+    }
+    return sessionExportService.exportSession(sessionId, options);
+  }
+);
+
+ipcMain.handle(
+  'session.exportToFile',
+  async (
+    _event,
+    sessionId: string,
+    options: {
+      format: 'markdown' | 'json' | 'html';
+      redactSecrets?: boolean;
+      includeCheckpoints?: boolean;
+    }
+  ) => {
+    if (!sessionExportService) {
+      return { success: false, error: 'Export service unavailable' };
+    }
+    const result = sessionExportService.exportSession(sessionId, options);
+    if (!result.success) return { success: false, error: result.error };
+    const dialogResult = await dialog.showSaveDialog({
+      title: 'Export session',
+      defaultPath: result.filename,
+      filters: [
+        options.format === 'markdown'
+          ? { name: 'Markdown', extensions: ['md'] }
+          : options.format === 'html'
+            ? { name: 'HTML', extensions: ['html'] }
+            : { name: 'JSON', extensions: ['json'] },
+      ],
+    });
+    if (dialogResult.canceled || !dialogResult.filePath) {
+      return { success: false, error: 'Cancelled' };
+    }
+    const writeResult = sessionExportService.saveToFile(dialogResult.filePath, result.content);
+    return { success: writeResult.success, error: writeResult.error, path: dialogResult.filePath };
+  }
+);
 
 ipcMain.handle('system.getTheme', () => {
   try {
@@ -1763,6 +2419,1093 @@ ipcMain.handle('mcp.getPresets', () => {
     return {};
   }
 });
+
+// ── MCP marketplace IPC handlers (Claude Cowork parity Phase 2) ─────
+ipcMain.handle('mcp.registry', () => {
+  if (!mcpMarketplaceBridge) return [];
+  return mcpMarketplaceBridge.list();
+});
+
+ipcMain.handle('mcp.registrySearch', (_event, query: string) => {
+  if (!mcpMarketplaceBridge) return [];
+  return mcpMarketplaceBridge.search(query);
+});
+
+ipcMain.handle('mcp.registryGet', (_event, id: string) => {
+  if (!mcpMarketplaceBridge) return null;
+  return mcpMarketplaceBridge.get(id);
+});
+
+ipcMain.handle(
+  'mcp.registryInstall',
+  async (_event, id: string, envOverrides?: Record<string, string>) => {
+    if (!mcpMarketplaceBridge) {
+      return { success: false, error: 'Marketplace bridge unavailable' };
+    }
+    return mcpMarketplaceBridge.install(id, envOverrides);
+  }
+);
+
+ipcMain.handle('mcp.registryUninstall', async (_event, id: string) => {
+  if (!mcpMarketplaceBridge) {
+    return { success: false, error: 'Marketplace bridge unavailable' };
+  }
+  return mcpMarketplaceBridge.uninstall(id);
+});
+
+ipcMain.handle(
+  'mcp.registrySetEnabled',
+  async (_event, id: string, enabled: boolean) => {
+    if (!mcpMarketplaceBridge) {
+      return { success: false, error: 'Marketplace bridge unavailable' };
+    }
+    return mcpMarketplaceBridge.setEnabled(id, enabled);
+  }
+);
+
+ipcMain.handle('mcp.registryTools', (_event, id: string) => {
+  if (!mcpMarketplaceBridge) return [];
+  return mcpMarketplaceBridge.getTools(id);
+});
+
+// Phase 3 step 7: MCP tool playground
+ipcMain.handle('mcp.listAllTools', () => {
+  try {
+    if (!mcpMarketplaceBridge) return [];
+    return mcpMarketplaceBridge.listAllTools();
+  } catch (err) {
+    logError('[mcp.listAllTools] failed:', err);
+    return [];
+  }
+});
+
+ipcMain.handle(
+  'mcp.invokeTool',
+  async (_event, toolName: string, args: Record<string, unknown>) => {
+    try {
+      if (!mcpMarketplaceBridge) {
+        return {
+          success: false,
+          durationMs: 0,
+          error: 'MCP marketplace bridge not ready',
+        };
+      }
+      return await mcpMarketplaceBridge.invokeTool(toolName, args ?? {});
+    } catch (err) {
+      logError('[mcp.invokeTool] failed:', err);
+      return {
+        success: false,
+        durationMs: 0,
+        error: (err as Error).message,
+      };
+    }
+  }
+);
+
+// ── Cost dashboard IPC handlers (Claude Cowork parity Phase 2) ──────
+ipcMain.handle('cost.summary', async () => {
+  if (!costBridge) {
+    return {
+      sessionCost: 0,
+      dailyCost: 0,
+      weeklyCost: 0,
+      monthlyCost: 0,
+      totalCost: 0,
+      sessionTokens: { input: 0, output: 0 },
+      modelBreakdown: {},
+    };
+  }
+  return costBridge.getSummary();
+});
+
+ipcMain.handle('cost.history', (_event, days?: number) => {
+  if (!costBridge) return [];
+  return costBridge.getDailyHistory(days);
+});
+
+ipcMain.handle('cost.modelBreakdown', (_event, days?: number) => {
+  if (!costBridge) return [];
+  return costBridge.getModelBreakdown(days);
+});
+
+ipcMain.handle('cost.setBudget', async (_event, monthlyLimit: number) => {
+  if (!costBridge) return { success: false };
+  await costBridge.setBudget(monthlyLimit);
+  return { success: true };
+});
+
+ipcMain.handle('cost.setDailyLimit', async (_event, limit: number) => {
+  if (!costBridge) return { success: false };
+  await costBridge.setDailyLimit(limit);
+  return { success: true };
+});
+
+ipcMain.handle(
+  'cost.record',
+  async (
+    _event,
+    inputTokens: number,
+    outputTokens: number,
+    model: string,
+    cost?: number
+  ) => {
+    if (!costBridge) return { success: false };
+    await costBridge.record(inputTokens, outputTokens, model, cost);
+    return { success: true };
+  }
+);
+
+// ── Rules editor IPC handlers (Claude Cowork parity Phase 2) ────────
+function resolveRulesWorkspace(projectId?: string): string {
+  if (projectManager) {
+    const project = projectId
+      ? projectManager.get(projectId)
+      : projectManager.getActive();
+    if (project?.workspacePath) return project.workspacePath;
+  }
+  return process.cwd();
+}
+
+ipcMain.handle('rules.list', async (_event, projectId?: string) => {
+  if (!rulesBridge) return { allow: [], deny: [] };
+  return rulesBridge.list(resolveRulesWorkspace(projectId));
+});
+
+ipcMain.handle(
+  'rules.add',
+  async (_event, bucket: 'allow' | 'deny', rule: string, projectId?: string) => {
+    if (!rulesBridge) {
+      return { success: false, error: 'Rules bridge unavailable' };
+    }
+    return rulesBridge.add(resolveRulesWorkspace(projectId), bucket, rule);
+  }
+);
+
+ipcMain.handle(
+  'rules.remove',
+  async (_event, bucket: 'allow' | 'deny', rule: string, projectId?: string) => {
+    if (!rulesBridge) {
+      return { success: false, error: 'Rules bridge unavailable' };
+    }
+    return rulesBridge.remove(resolveRulesWorkspace(projectId), bucket, rule);
+  }
+);
+
+ipcMain.handle(
+  'rules.update',
+  async (
+    _event,
+    bucket: 'allow' | 'deny',
+    oldRule: string,
+    newRule: string,
+    projectId?: string
+  ) => {
+    if (!rulesBridge) {
+      return { success: false, error: 'Rules bridge unavailable' };
+    }
+    return rulesBridge.update(
+      resolveRulesWorkspace(projectId),
+      bucket,
+      oldRule,
+      newRule
+    );
+  }
+);
+
+ipcMain.handle(
+  'rules.test',
+  async (
+    _event,
+    toolName: string,
+    toolArgs: Record<string, unknown>,
+    projectId?: string
+  ) => {
+    if (!rulesBridge) return { decision: 'ask' as const };
+    return rulesBridge.test(resolveRulesWorkspace(projectId), toolName, toolArgs);
+  }
+);
+
+// ── Session branching IPC handlers (Claude Cowork parity Phase 2) ──
+ipcMain.handle('session.branches', async (_event, sessionId: string) => {
+  if (!sessionBranchingBridge) return [];
+  return sessionBranchingBridge.listBranches(sessionId);
+});
+
+ipcMain.handle(
+  'session.fork',
+  async (_event, sessionId: string, name: string, fromMessageIndex?: number) => {
+    if (!sessionBranchingBridge) {
+      return { success: false, error: 'Branching bridge unavailable' };
+    }
+    return sessionBranchingBridge.fork(sessionId, name, fromMessageIndex);
+  }
+);
+
+ipcMain.handle(
+  'session.checkout',
+  async (_event, sessionId: string, branchId: string) => {
+    if (!sessionBranchingBridge) {
+      return { success: false, error: 'Branching bridge unavailable' };
+    }
+    return sessionBranchingBridge.checkout(sessionId, branchId);
+  }
+);
+
+ipcMain.handle(
+  'session.mergeBranch',
+  async (
+    _event,
+    sessionId: string,
+    sourceBranchId: string,
+    strategy?: 'append' | 'replace'
+  ) => {
+    if (!sessionBranchingBridge) {
+      return { success: false, error: 'Branching bridge unavailable' };
+    }
+    return sessionBranchingBridge.mergeBranch(sessionId, sourceBranchId, strategy);
+  }
+);
+
+ipcMain.handle(
+  'session.deleteBranch',
+  async (_event, sessionId: string, branchId: string) => {
+    if (!sessionBranchingBridge) {
+      return { success: false, error: 'Branching bridge unavailable' };
+    }
+    return sessionBranchingBridge.deleteBranch(sessionId, branchId);
+  }
+);
+
+ipcMain.handle(
+  'session.renameBranch',
+  async (_event, sessionId: string, branchId: string, newName: string) => {
+    if (!sessionBranchingBridge) {
+      return { success: false, error: 'Branching bridge unavailable' };
+    }
+    return sessionBranchingBridge.renameBranch(sessionId, branchId, newName);
+  }
+);
+
+// Config export/import — Claude Cowork parity Phase 2 step 19
+ipcMain.handle('config.export', async () => {
+  if (!configExportService) {
+    return { success: false, error: 'Export service unavailable' };
+  }
+  try {
+    const bundle = configExportService.exportBundle();
+    return { success: true, bundle };
+  } catch (err) {
+    logError('[config.export] failed:', err);
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle('config.exportToFile', async () => {
+  if (!configExportService) {
+    return { success: false, error: 'Export service unavailable' };
+  }
+  const dialogResult = await dialog.showSaveDialog({
+    title: 'Export settings',
+    defaultPath: `cowork-settings-${new Date().toISOString().slice(0, 10)}.json`,
+    filters: [{ name: 'JSON', extensions: ['json'] }],
+  });
+  if (dialogResult.canceled || !dialogResult.filePath) {
+    return { success: false, error: 'Cancelled' };
+  }
+  return configExportService.saveToFile(dialogResult.filePath);
+});
+
+ipcMain.handle('config.importFromFile', async () => {
+  if (!configExportService) {
+    return { success: false, error: 'Export service unavailable' };
+  }
+  const dialogResult = await dialog.showOpenDialog({
+    title: 'Import settings',
+    filters: [{ name: 'JSON', extensions: ['json'] }],
+    properties: ['openFile'],
+  });
+  if (dialogResult.canceled || dialogResult.filePaths.length === 0) {
+    return { success: false, error: 'Cancelled' };
+  }
+  const loaded = configExportService.loadFromFile(dialogResult.filePaths[0]);
+  if (!loaded.success || !loaded.bundle) {
+    return { success: false, error: loaded.error };
+  }
+  const preview = configExportService.diffBundle(loaded.bundle);
+  return { success: true, preview };
+});
+
+ipcMain.handle(
+  'config.applyImport',
+  async (
+    _event,
+    bundle: Record<string, unknown>,
+    strategy: 'skip' | 'overwrite'
+  ) => {
+    if (!configExportService) {
+      return {
+        success: false,
+        imported: { projects: 0, mcpServers: 0, apiUpdated: false },
+        errors: ['Export service unavailable'],
+      };
+    }
+    return configExportService.importBundle(bundle as never, strategy);
+  }
+);
+
+// Activity feed — Claude Cowork parity Phase 2 step 18
+ipcMain.handle(
+  'activity.recent',
+  async (_event, limit?: number, projectId?: string) => {
+    if (!activityFeed) return [];
+    return activityFeed.recent(limit ?? 100, projectId);
+  }
+);
+
+ipcMain.handle('activity.clear', async () => {
+  if (!activityFeed) return { success: false };
+  activityFeed.clear();
+  return { success: true };
+});
+
+// Workflow editor — Claude Cowork parity Phase 2 step 15
+ipcMain.handle('workflow.list', async () => {
+  if (!workflowBridge) return [];
+  try {
+    return workflowBridge.list();
+  } catch (err) {
+    logError('[workflow.list] failed:', err);
+    return [];
+  }
+});
+
+ipcMain.handle('workflow.get', async (_event, id: string) => {
+  if (!workflowBridge) return null;
+  return workflowBridge.get(id);
+});
+
+ipcMain.handle(
+  'workflow.create',
+  async (
+    _event,
+    input: {
+      name: string;
+      description?: string;
+      nodes: Array<Record<string, unknown>>;
+      edges: Array<Record<string, unknown>>;
+    }
+  ) => {
+    if (!workflowBridge) return null;
+    try {
+      return workflowBridge.create({
+        name: input.name,
+        description: input.description,
+        nodes: input.nodes as never,
+        edges: input.edges as never,
+      });
+    } catch (err) {
+      logError('[workflow.create] failed:', err);
+      return null;
+    }
+  }
+);
+
+ipcMain.handle(
+  'workflow.update',
+  async (_event, id: string, patch: Record<string, unknown>) => {
+    if (!workflowBridge) return null;
+    return workflowBridge.update(id, patch as never);
+  }
+);
+
+ipcMain.handle('workflow.delete', async (_event, id: string) => {
+  if (!workflowBridge) return false;
+  return workflowBridge.delete(id);
+});
+
+ipcMain.handle(
+  'workflow.run',
+  async (_event, id: string, initialContext?: Record<string, unknown>) => {
+    if (!workflowBridge) {
+      return {
+        success: false,
+        status: 'failed',
+        duration: 0,
+        completedSteps: 0,
+        totalSteps: 0,
+        error: 'Workflow bridge unavailable',
+      };
+    }
+    return workflowBridge.run(id, initialContext ?? {});
+  }
+);
+
+// Project templates — Claude Cowork parity Phase 2 step 12
+ipcMain.handle('template.list', async () => {
+  if (!templateService) return [];
+  try {
+    return await templateService.list();
+  } catch (err) {
+    logError('[template.list] failed:', err);
+    return [];
+  }
+});
+
+ipcMain.handle('template.preview', async (_event, name: string) => {
+  if (!templateService) return null;
+  try {
+    return await templateService.preview(name);
+  } catch (err) {
+    logError('[template.preview] failed:', err);
+    return null;
+  }
+});
+
+ipcMain.handle(
+  'template.create',
+  async (_event, name: string, workspaceRoot: string) => {
+    if (!templateService) {
+      return { success: false, error: 'Template service unavailable' };
+    }
+    try {
+      return await templateService.apply(name, workspaceRoot);
+    } catch (err) {
+      logError('[template.create] failed:', err);
+      return {
+        success: false,
+        error: (err as Error).message ?? 'Template execution failed',
+      };
+    }
+  }
+);
+
+// File preview pane — Claude Cowork parity Phase 2 step 9
+ipcMain.handle('preview.get', async (_event, filePath: string) => {
+  if (!previewService) {
+    return {
+      kind: 'error',
+      path: filePath,
+      name: filePath,
+      size: 0,
+      mime: 'application/octet-stream',
+      error: 'Preview service not ready',
+    };
+  }
+  try {
+    return await previewService.getPreview(filePath);
+  } catch (err) {
+    logError('[preview.get] failed:', err);
+    return {
+      kind: 'error',
+      path: filePath,
+      name: filePath,
+      size: 0,
+      mime: 'application/octet-stream',
+      error: (err as Error).message ?? 'Unknown error',
+    };
+  }
+});
+
+// Workspace presets — Claude Cowork parity Phase 3 step 9
+ipcMain.handle('workspacePresets.list', async () => {
+  try {
+    return getWorkspacePresetsService().list();
+  } catch (err) {
+    logError('[workspacePresets.list] failed:', err);
+    return [];
+  }
+});
+
+ipcMain.handle(
+  'workspacePresets.save',
+  async (
+    _event,
+    preset: Omit<WorkspacePreset, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }
+  ) => {
+    try {
+      return getWorkspacePresetsService().save(preset);
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
+    }
+  }
+);
+
+ipcMain.handle('workspacePresets.delete', async (_event, id: string) => {
+  try {
+    return getWorkspacePresetsService().delete(id);
+  } catch (err) {
+    return { success: false };
+  }
+});
+
+// A2A remote agent registry — Claude Cowork parity Phase 3 step 19
+ipcMain.handle('a2a.list', async () => {
+  try {
+    const { getA2ABridge } = await import('./a2a/a2a-bridge');
+    return await getA2ABridge().list();
+  } catch (err) {
+    logError('[a2a.list] failed:', err);
+    return [];
+  }
+});
+
+ipcMain.handle('a2a.discover', async (_event, url: string) => {
+  try {
+    const { getA2ABridge } = await import('./a2a/a2a-bridge');
+    return await getA2ABridge().discover(url);
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle('a2a.add', async (_event, url: string) => {
+  try {
+    const { getA2ABridge } = await import('./a2a/a2a-bridge');
+    return await getA2ABridge().add(url);
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle('a2a.remove', async (_event, id: string) => {
+  try {
+    const { getA2ABridge } = await import('./a2a/a2a-bridge');
+    return await getA2ABridge().remove(id);
+  } catch (err) {
+    return { success: false };
+  }
+});
+
+ipcMain.handle('a2a.ping', async (_event, id: string) => {
+  try {
+    const { getA2ABridge } = await import('./a2a/a2a-bridge');
+    return await getA2ABridge().ping(id);
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle('a2a.invoke', async (_event, params: { id: string; message: string }) => {
+  try {
+    const { getA2ABridge } = await import('./a2a/a2a-bridge');
+    return await getA2ABridge().invoke(params.id, params.message);
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+// Reasoning trace viewer — Claude Cowork parity Phase 3 step 17
+ipcMain.handle('reasoning.listTraces', async () => {
+  try {
+    const { getReasoningBridge } = await import('./reasoning/reasoning-bridge');
+    return getReasoningBridge().listTraces();
+  } catch (err) {
+    logError('[reasoning.listTraces] failed:', err);
+    return [];
+  }
+});
+
+ipcMain.handle('reasoning.getTrace', async (_event, toolUseId: string) => {
+  try {
+    const { getReasoningBridge } = await import('./reasoning/reasoning-bridge');
+    return getReasoningBridge().getTrace(toolUseId);
+  } catch (err) {
+    logError('[reasoning.getTrace] failed:', err);
+    return null;
+  }
+});
+
+ipcMain.handle('reasoning.clear', async () => {
+  try {
+    const { getReasoningBridge } = await import('./reasoning/reasoning-bridge');
+    getReasoningBridge().clear();
+    return { success: true };
+  } catch (err) {
+    return { success: false };
+  }
+});
+
+// Hooks editor — Claude Cowork parity Phase 3 step 13
+ipcMain.handle('hooks.list', async () => {
+  try {
+    const { getHooksBridge } = await import('./hooks/hooks-bridge');
+    return await getHooksBridge().list();
+  } catch (err) {
+    logError('[hooks.list] failed:', err);
+    return [];
+  }
+});
+
+ipcMain.handle(
+  'hooks.upsert',
+  async (
+    _event,
+    params: { event: string; handler: Record<string, unknown>; index?: number }
+  ) => {
+    try {
+      const { getHooksBridge } = await import('./hooks/hooks-bridge');
+      return await getHooksBridge().upsert(
+        params.event as never,
+        params.handler as never,
+        params.index
+      );
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
+    }
+  }
+);
+
+ipcMain.handle('hooks.remove', async (_event, params: { event: string; index: number }) => {
+  try {
+    const { getHooksBridge } = await import('./hooks/hooks-bridge');
+    return await getHooksBridge().remove(params.event as never, params.index);
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle('hooks.test', async (_event, handler: Record<string, unknown>) => {
+  try {
+    const { getHooksBridge } = await import('./hooks/hooks-bridge');
+    return await getHooksBridge().test(handler as never);
+  } catch (err) {
+    return {
+      success: false,
+      exitCode: null,
+      stdout: '',
+      stderr: '',
+      durationMs: 0,
+      error: (err as Error).message,
+    };
+  }
+});
+
+// Test runner — Claude Cowork parity Phase 3 step 12
+ipcMain.handle('test.detect', async () => {
+  try {
+    const { getTestRunnerBridge } = await import('./testing/test-runner-bridge');
+    return await getTestRunnerBridge().detectFramework();
+  } catch (err) {
+    logError('[test.detect] failed:', err);
+    return null;
+  }
+});
+
+ipcMain.handle('test.run', async (_event, files?: string[]) => {
+  try {
+    const { getTestRunnerBridge } = await import('./testing/test-runner-bridge');
+    return await getTestRunnerBridge().run(files ?? []);
+  } catch (err) {
+    logError('[test.run] failed:', err);
+    return null;
+  }
+});
+
+ipcMain.handle('test.runFailing', async () => {
+  try {
+    const { getTestRunnerBridge } = await import('./testing/test-runner-bridge');
+    return await getTestRunnerBridge().runFailing();
+  } catch (err) {
+    logError('[test.runFailing] failed:', err);
+    return null;
+  }
+});
+
+ipcMain.handle('test.cancel', async () => {
+  try {
+    const { getTestRunnerBridge } = await import('./testing/test-runner-bridge');
+    getTestRunnerBridge().cancel();
+    return { success: true };
+  } catch (err) {
+    return { success: false };
+  }
+});
+
+ipcMain.handle('test.getState', async () => {
+  try {
+    const { getTestRunnerBridge } = await import('./testing/test-runner-bridge');
+    return getTestRunnerBridge().getState();
+  } catch (err) {
+    return null;
+  }
+});
+
+// Persona switcher — Claude Cowork parity Phase 3 step 11
+ipcMain.handle('identity.list', async () => {
+  try {
+    const { getIdentityBridge } = await import('./identity/identity-bridge');
+    return await getIdentityBridge().list();
+  } catch (err) {
+    logError('[identity.list] failed:', err);
+    return [];
+  }
+});
+
+ipcMain.handle('identity.getDetail', async (_event, id: string) => {
+  try {
+    const { getIdentityBridge } = await import('./identity/identity-bridge');
+    return await getIdentityBridge().getDetail(id);
+  } catch (err) {
+    logError('[identity.getDetail] failed:', err);
+    return null;
+  }
+});
+
+ipcMain.handle('identity.activate', async (_event, id: string) => {
+  try {
+    const { getIdentityBridge } = await import('./identity/identity-bridge');
+    const result = await getIdentityBridge().activate(id);
+    if (result.success) {
+      sendToRenderer({
+        type: 'identity.activated',
+        payload: result.active ?? null,
+      });
+    }
+    return result;
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle('identity.deactivate', async () => {
+  try {
+    const { getIdentityBridge } = await import('./identity/identity-bridge');
+    const result = await getIdentityBridge().deactivate();
+    sendToRenderer({
+      type: 'identity.activated',
+      payload: null,
+    });
+    return result;
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle('identity.getActive', async () => {
+  try {
+    const { getIdentityBridge } = await import('./identity/identity-bridge');
+    return getIdentityBridge().getActive();
+  } catch (err) {
+    return null;
+  }
+});
+
+// Audit log — Claude Cowork parity Phase 3 step 10
+ipcMain.handle('audit.listRuns', async (_event, filter?: Record<string, unknown>) => {
+  try {
+    const { listRuns } = await import('./observability/audit-bridge');
+    return await listRuns(filter as never);
+  } catch (err) {
+    logError('[audit.listRuns] failed:', err);
+    return [];
+  }
+});
+
+ipcMain.handle('audit.getRunDetail', async (_event, runId: string) => {
+  try {
+    const { getRunDetail } = await import('./observability/audit-bridge');
+    return await getRunDetail(runId);
+  } catch (err) {
+    logError('[audit.getRunDetail] failed:', err);
+    return null;
+  }
+});
+
+ipcMain.handle('audit.exportCsv', async (_event, filter?: Record<string, unknown>) => {
+  try {
+    const { exportCsv } = await import('./observability/audit-bridge');
+    return await exportCsv(filter as never);
+  } catch (err) {
+    logError('[audit.exportCsv] failed:', err);
+    return '';
+  }
+});
+
+// Custom slash commands — Claude Cowork parity Phase 3 step 6
+ipcMain.handle('customCommands.list', async () => {
+  try {
+    return getCustomCommandsService().list();
+  } catch (err) {
+    logError('[customCommands.list] failed:', err);
+    return [];
+  }
+});
+
+ipcMain.handle(
+  'customCommands.save',
+  async (_event, cmd: { name: string; description: string; body: string }) => {
+    try {
+      return getCustomCommandsService().save(cmd);
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
+    }
+  }
+);
+
+ipcMain.handle('customCommands.delete', async (_event, name: string) => {
+  try {
+    return getCustomCommandsService().delete(name);
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+// Snippets / prompt library — Claude Cowork parity Phase 3 step 5
+ipcMain.handle('snippets.list', async () => {
+  try {
+    return getSnippetsService().list();
+  } catch (err) {
+    logError('[snippets.list] failed:', err);
+    return [];
+  }
+});
+
+ipcMain.handle('snippets.get', async (_event, id: string) => {
+  try {
+    return getSnippetsService().get(id);
+  } catch (err) {
+    return null;
+  }
+});
+
+ipcMain.handle(
+  'snippets.save',
+  async (
+    _event,
+    snippet: {
+      id?: string;
+      name: string;
+      description?: string;
+      tags?: string[];
+      body: string;
+    }
+  ) => {
+    try {
+      return getSnippetsService().save(snippet);
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
+    }
+  }
+);
+
+ipcMain.handle('snippets.delete', async (_event, id: string) => {
+  try {
+    return getSnippetsService().delete(id);
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+// Starred/bookmarked messages — Claude Cowork parity Phase 3 step 4
+ipcMain.handle(
+  'bookmarks.toggle',
+  async (
+    _event,
+    entry: {
+      sessionId: string;
+      projectId?: string | null;
+      messageId: string;
+      preview: string;
+      role?: string;
+    }
+  ) => {
+    try {
+      if (!bookmarksService) return { bookmarked: false };
+      return bookmarksService.toggle(entry);
+    } catch (err) {
+      logError('[bookmarks.toggle] failed:', err);
+      return { bookmarked: false };
+    }
+  }
+);
+
+ipcMain.handle('bookmarks.list', async (_event, projectId?: string | null, limit?: number) => {
+  try {
+    if (!bookmarksService) return [];
+    return bookmarksService.list(projectId ?? null, limit ?? 100);
+  } catch (err) {
+    logError('[bookmarks.list] failed:', err);
+    return [];
+  }
+});
+
+ipcMain.handle('bookmarks.forSession', async (_event, sessionId: string) => {
+  try {
+    if (!bookmarksService) return [];
+    return bookmarksService.getBookmarkedMessageIds(sessionId);
+  } catch (err) {
+    return [];
+  }
+});
+
+ipcMain.handle('bookmarks.updateNote', async (_event, id: number, note: string) => {
+  try {
+    if (!bookmarksService) return { success: false };
+    return { success: bookmarksService.updateNote(id, note) };
+  } catch (err) {
+    return { success: false };
+  }
+});
+
+ipcMain.handle('bookmarks.remove', async (_event, id: number) => {
+  try {
+    if (!bookmarksService) return { success: false };
+    return { success: bookmarksService.remove(id) };
+  } catch (err) {
+    return { success: false };
+  }
+});
+
+// Model capabilities lookup — Claude Cowork parity Phase 3 step 3
+ipcMain.handle('model.capabilities', async (_event, model: string) => {
+  try {
+    return await getModelCapabilities(model ?? '');
+  } catch (err) {
+    logError('[model.capabilities] failed:', err);
+    return {
+      model,
+      supportsVision: false,
+      supportsReasoning: false,
+      supportsToolCalls: true,
+      contextWindow: 128000,
+      maxOutputTokens: 8192,
+    };
+  }
+});
+
+// Git status panel + commit composer — Claude Cowork parity Phase 3 step 2
+ipcMain.handle('git.status', async (_event, cwd: string) => {
+  try {
+    if (!cwd) return { isRepo: false, branch: null, upstream: null, ahead: 0, behind: 0, files: [] };
+    return getGitBridge().getStatus(cwd);
+  } catch (err) {
+    logError('[git.status] failed:', err);
+    return {
+      isRepo: false,
+      branch: null,
+      upstream: null,
+      ahead: 0,
+      behind: 0,
+      files: [],
+      error: (err as Error).message,
+    };
+  }
+});
+
+ipcMain.handle('git.stage', async (_event, cwd: string, files: string[]) => {
+  try {
+    return getGitBridge().stage(cwd, files);
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle('git.unstage', async (_event, cwd: string, files: string[]) => {
+  try {
+    return getGitBridge().unstage(cwd, files);
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle('git.diff', async (_event, cwd: string, file: string, staged: boolean) => {
+  try {
+    return getGitBridge().diff(cwd, file, staged);
+  } catch (err) {
+    logError('[git.diff] failed:', err);
+    return '';
+  }
+});
+
+ipcMain.handle(
+  'git.commit',
+  async (_event, cwd: string, message: string, amend?: boolean) => {
+    try {
+      return getGitBridge().commit(cwd, message, { amend: !!amend });
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
+    }
+  }
+);
+
+ipcMain.handle('git.suggestMessage', async (_event, cwd: string) => {
+  try {
+    return { message: getGitBridge().suggestMessage(cwd) ?? '' };
+  } catch (err) {
+    return { message: '' };
+  }
+});
+
+ipcMain.handle('git.branches', async (_event, cwd: string) => {
+  try {
+    return getGitBridge().listBranches(cwd);
+  } catch {
+    return [];
+  }
+});
+
+// Hunk diff accept/reject — Claude Cowork parity Phase 3 step 1
+ipcMain.handle('diff.parseHunks', async (_event, excerpt: string) => {
+  try {
+    return parseUnifiedDiff(excerpt ?? '');
+  } catch (err) {
+    logError('[diff.parseHunks] failed:', err);
+    return { hunks: [], preamble: '' };
+  }
+});
+
+ipcMain.handle(
+  'diff.revertHunks',
+  async (_event, filePath: string, hunks: ParsedHunk[]) => {
+    try {
+      if (!filePath || !Array.isArray(hunks)) {
+        return { success: false, method: 'none', error: 'Invalid arguments' };
+      }
+      return revertHunks(filePath, hunks);
+    } catch (err) {
+      logError('[diff.revertHunks] failed:', err);
+      return {
+        success: false,
+        method: 'none',
+        error: (err as Error).message ?? 'Unknown error',
+      };
+    }
+  }
+);
+
+// Global search (Cmd+K palette) — Claude Cowork parity Phase 2 step 8
+ipcMain.handle(
+  'search.global',
+  async (_event, query: string, limit?: number) => {
+    if (!globalSearchService) {
+      return {
+        hits: [],
+        totalByCategory: {
+          session: 0,
+          message: 0,
+          memory: 0,
+          knowledge: 0,
+          file: 0,
+        },
+      };
+    }
+    try {
+      return await globalSearchService.search(query, limit ?? 40);
+    } catch (err) {
+      logError('[search.global] failed:', err);
+      return {
+        hits: [],
+        totalByCategory: {
+          session: 0,
+          message: 0,
+          memory: 0,
+          knowledge: 0,
+          file: 0,
+        },
+      };
+    }
+  }
+);
 
 // Skills API handlers
 ipcMain.handle('skills.getAll', async () => {

@@ -8,6 +8,10 @@ import { useIPC } from '../hooks/useIPC';
 import { useCheckpointTimeline } from '../store/selectors';
 import { CheckpointPanel } from './CheckpointPanel';
 import { FileTree } from './FileTree';
+import { SubAgentPanel } from './SubAgentPanel';
+import { MemoryBrowser } from './MemoryBrowser';
+import { KnowledgeBaseBrowser } from './KnowledgeBaseBrowser';
+import { GitStatusPanel } from './GitStatusPanel';
 import {
   ChevronDown,
   ChevronUp,
@@ -94,6 +98,7 @@ export function ContextPanel() {
   const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
   const { getMCPServers, changeWorkingDir } = useIPC();
   const [artifactsOpen, setArtifactsOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState<'files' | 'git' | 'memory' | 'knowledge' | 'agents' | 'mcp'>('files');
   const [expandedConnector, setExpandedConnector] = useState<string | null>(null);
   const [mcpServers, setMcpServers] = useState<MCPServerInfo[]>([]);
   const [copiedPath, setCopiedPath] = useState(false);
@@ -508,45 +513,76 @@ export function ContextPanel() {
       {/* Checkpoints */}
       <CheckpointSection />
 
-      {/* Files */}
-      {currentWorkingDir && (
-        <div className="border-b border-border-muted">
-          <div className="px-4 py-2.5">
-            <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-1">
-              Files
-            </p>
-          </div>
-          <FileTree rootPath={currentWorkingDir} />
-        </div>
-      )}
+      {/* Tab navigation (Claude Cowork parity — unified tabs) */}
+      <div className="flex border-b border-border-muted bg-background/40">
+        {([
+          { id: 'files', label: 'Files' },
+          { id: 'git', label: 'Git' },
+          { id: 'memory', label: 'Memory' },
+          { id: 'knowledge', label: 'Knowledge' },
+          { id: 'agents', label: 'Agents' },
+          { id: 'mcp', label: 'MCP' },
+        ] as const).map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex-1 px-2 py-2 text-[11px] font-medium transition-colors ${
+              activeTab === tab.id
+                ? 'text-accent border-b-2 border-accent -mb-px'
+                : 'text-text-muted hover:text-text-primary'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-      {/* MCP Connectors */}
+      {/* Tab content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="px-4 py-2.5">
-          <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2">
-            {t('context.mcpConnectors')}
-          </p>
-          {mcpServers.length === 0 ? (
-            <div className="flex items-center gap-2 text-xs text-text-muted py-1">
-              <Plug className="w-3.5 h-3.5 shrink-0" />
-              <span>{t('mcp.noConnectors')}</span>
-            </div>
-          ) : (
-            <div className="space-y-0.5">
-              {mcpServers.map((server) => (
-                <ConnectorItem
-                  key={server.id}
-                  server={server}
-                  steps={steps}
-                  expanded={expandedConnector === server.id}
-                  onToggle={() =>
-                    setExpandedConnector(expandedConnector === server.id ? null : server.id)
-                  }
-                />
-              ))}
-            </div>
-          )}
-        </div>
+        {activeTab === 'files' && currentWorkingDir && (
+          <FileTree rootPath={currentWorkingDir} />
+        )}
+        {activeTab === 'files' && !currentWorkingDir && (
+          <div className="px-4 py-4 text-xs text-text-muted">
+            No working directory
+          </div>
+        )}
+
+        {activeTab === 'git' && <GitStatusPanel />}
+
+        {activeTab === 'memory' && <MemoryBrowser />}
+
+        {activeTab === 'knowledge' && <KnowledgeBaseBrowser />}
+
+        {activeTab === 'agents' && <SubAgentPanel />}
+
+        {activeTab === 'mcp' && (
+          <div className="px-4 py-2.5">
+            <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2">
+              {t('context.mcpConnectors')}
+            </p>
+            {mcpServers.length === 0 ? (
+              <div className="flex items-center gap-2 text-xs text-text-muted py-1">
+                <Plug className="w-3.5 h-3.5 shrink-0" />
+                <span>{t('mcp.noConnectors')}</span>
+              </div>
+            ) : (
+              <div className="space-y-0.5">
+                {mcpServers.map((server) => (
+                  <ConnectorItem
+                    key={server.id}
+                    server={server}
+                    steps={steps}
+                    expanded={expandedConnector === server.id}
+                    onToggle={() =>
+                      setExpandedConnector(expandedConnector === server.id ? null : server.id)
+                    }
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

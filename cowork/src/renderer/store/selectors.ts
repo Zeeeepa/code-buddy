@@ -300,7 +300,15 @@ export function usePendingDialogs() {
 // Code Buddy Cowork parity selectors
 // ---------------------------------------------------------------------------
 
-import type { DiffPreview, CheckpointTimeline, PermissionMode, UpdateInfo } from '../types';
+import type {
+  DiffPreview,
+  CheckpointTimeline,
+  PermissionMode,
+  UpdateInfo,
+  Project,
+  SubAgent,
+  NotificationEntry,
+} from '../types';
 
 /** Returns diff previews for a specific session. */
 export function useDiffPreviews(sessionId: string | null): DiffPreview[] {
@@ -340,4 +348,77 @@ export function useShowCommandPalette(): boolean {
 /** Returns shortcuts dialog visibility. */
 export function useShowShortcutsDialog(): boolean {
   return useAppStore((s) => s.showShortcutsDialog);
+}
+
+// ---------------------------------------------------------------------------
+// Projects domain (Claude Cowork parity)
+// ---------------------------------------------------------------------------
+
+/** Returns the full list of projects. */
+export function useProjects(): Project[] {
+  return useAppStore((s) => s.projects);
+}
+
+/** Returns the active project id (may be null). */
+export function useActiveProjectId(): string | null {
+  return useAppStore((s) => s.activeProjectId);
+}
+
+/** Returns the active project object, or null. */
+export function useActiveProject(): Project | null {
+  return useAppStore((s) => {
+    if (!s.activeProjectId) return null;
+    return s.projects.find((p) => p.id === s.activeProjectId) ?? null;
+  });
+}
+
+/** Returns sessions filtered by the active project. */
+export function useProjectFilteredSessions(): Session[] {
+  return useAppStore(
+    useShallow((s) => {
+      if (!s.activeProjectId) return s.sessions;
+      return s.sessions.filter((session) => session.projectId === s.activeProjectId);
+    })
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sub-agents domain (Claude Cowork parity)
+// ---------------------------------------------------------------------------
+
+const EMPTY_SUB_AGENT_LIST: SubAgent[] = [];
+
+/** Returns the sub-agents spawned for the active session. */
+export function useActiveSessionSubAgents(): SubAgent[] {
+  return useAppStore((s) => {
+    if (!s.activeSessionId) return EMPTY_SUB_AGENT_LIST;
+    return s.subAgents[s.activeSessionId] ?? EMPTY_SUB_AGENT_LIST;
+  });
+}
+
+/** Returns the accumulated output for a specific sub-agent in the active session. */
+export function useSubAgentOutput(agentId: string): string {
+  return useAppStore((s) => {
+    if (!s.activeSessionId) return '';
+    return s.subAgentOutputs[s.activeSessionId]?.[agentId] ?? '';
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Notifications domain (Claude Cowork parity)
+// ---------------------------------------------------------------------------
+
+/** Returns the full list of notifications. */
+export function useNotifications(): NotificationEntry[] {
+  return useAppStore((s) => s.notifications);
+}
+
+/** Returns the count of unread notifications. */
+export function useUnreadNotificationCount(): number {
+  return useAppStore((s) => s.notifications.filter((n) => !n.read).length);
+}
+
+/** Returns notification center visibility. */
+export function useShowNotificationCenter(): boolean {
+  return useAppStore((s) => s.showNotificationCenter);
 }

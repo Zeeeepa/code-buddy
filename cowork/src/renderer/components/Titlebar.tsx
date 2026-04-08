@@ -1,12 +1,18 @@
-import { Minus, Square, X, Copy } from 'lucide-react';
+import { Minus, Square, X, Copy, Bell, Activity, Star } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAppStore } from '../store';
+import { useUnreadNotificationCount } from '../store/selectors';
+import { TabBar } from './TabBar';
 
 const isMac = typeof window !== 'undefined' && window.electronAPI?.platform === 'darwin';
 
 export function Titlebar() {
   const { t } = useTranslation();
   const [isMaximized, setIsMaximized] = useState(false);
+  const unreadCount = useUnreadNotificationCount();
+  const setShowNotificationCenter = useAppStore((s) => s.setShowNotificationCenter);
+  const showNotificationCenter = useAppStore((s) => s.showNotificationCenter);
 
   const handleMinimize = () => {
     window.electronAPI?.window.minimize();
@@ -22,13 +28,52 @@ export function Titlebar() {
   };
 
   return (
-    <div 
+    <div
       className={`h-10 bg-background-secondary border-b border-border flex items-center titlebar-drag shrink-0 ${
-        isMac ? 'justify-start pl-20' : 'justify-end'
+        isMac ? 'justify-start pl-20' : 'justify-start'
       }`}
     >
       {/* macOS: Traffic lights are positioned by trafficLightPosition, we just need left padding */}
-      
+
+      {/* Tab bar (Phase 2 step 14) */}
+      <div className="flex-1 min-w-0 flex items-center pl-2">
+        <TabBar />
+      </div>
+
+      {/* Bookmarks panel (Phase 3 step 4) */}
+      <button
+        onClick={() => useAppStore.getState().setShowBookmarksPanel(true)}
+        className="w-10 h-full flex items-center justify-center titlebar-no-drag hover:bg-surface transition-colors ml-auto"
+        title="Bookmarks"
+      >
+        <Star className="w-4 h-4 text-text-secondary" />
+      </button>
+
+      {/* Activity feed (Phase 2 step 18) */}
+      <button
+        onClick={() => useAppStore.getState().setShowActivityFeed(true)}
+        className="w-10 h-full flex items-center justify-center titlebar-no-drag hover:bg-surface transition-colors"
+        title="Activity"
+      >
+        <Activity className="w-4 h-4 text-text-secondary" />
+      </button>
+
+      {/* Notification bell (Claude Cowork parity) */}
+      <button
+        onClick={() => setShowNotificationCenter(!showNotificationCenter)}
+        className={`w-10 h-full flex items-center justify-center titlebar-no-drag hover:bg-surface transition-colors relative ${
+          isMac ? 'mr-2' : ''
+        }`}
+        title="Notifications"
+      >
+        <Bell className="w-4 h-4 text-text-secondary" />
+        {unreadCount > 0 && (
+          <span className="absolute top-1.5 right-1.5 min-w-[14px] h-[14px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
+      </button>
+
       {/* Window Controls (for Windows/Linux - macOS uses native traffic lights) */}
       {!isMac && (
         <div className="flex items-center titlebar-no-drag h-full">
