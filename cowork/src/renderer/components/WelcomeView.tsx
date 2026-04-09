@@ -256,9 +256,10 @@ export function WelcomeView() {
 
     // Detect folder drops — switch working directory
     const folderFiles = files.filter((file) => {
-      const filePath = 'path' in file && typeof (file as File & { path?: string }).path === 'string'
-        ? (file as File & { path?: string }).path
-        : '';
+      const filePath =
+        'path' in file && typeof (file as File & { path?: string }).path === 'string'
+          ? (file as File & { path?: string }).path
+          : '';
       return !file.type && filePath && !file.name.includes('.');
     });
     if (folderFiles.length > 0) {
@@ -458,7 +459,10 @@ export function WelcomeView() {
   ];
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-5 py-10 md:px-8 md:py-14">
+    <div
+      className="flex-1 flex flex-col items-center justify-center px-5 py-10 md:px-8 md:py-14"
+      data-testid="welcome-view"
+    >
       <div className="max-w-[840px] w-full space-y-7 animate-fade-in">
         <div className="space-y-4 text-center">
           <div className="flex items-center justify-center gap-4">
@@ -488,6 +492,7 @@ export function WelcomeView() {
                 setSettingsTab('api');
                 setShowSettings(true);
               }}
+              data-testid="welcome-api-settings-cta"
               className="inline-flex items-center gap-1 text-accent hover:text-accent-hover transition-colors"
             >
               {t('welcome.goToSettings')}

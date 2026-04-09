@@ -9,16 +9,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Plus,
-  Trash2,
-  RefreshCw,
-  Play,
-  AlertCircle,
-  CheckCircle2,
-  Globe,
-  Cpu,
-} from 'lucide-react';
+import { Plus, Trash2, RefreshCw, Play, AlertCircle, CheckCircle2, Globe, Cpu } from 'lucide-react';
 
 interface AgentCard {
   name: string;
@@ -118,7 +109,7 @@ export function SettingsA2AAgents() {
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="settings-a2a-agents">
       <div>
         <h3 className="text-sm font-semibold text-text-primary">
           {t('a2a.title', 'Remote agents (A2A)')}
@@ -136,11 +127,13 @@ export function SettingsA2AAgents() {
           value={newUrl}
           onChange={(ev) => setNewUrl(ev.target.value)}
           placeholder="https://agent.example.com"
+          data-testid="a2a-add-url-input"
           className="flex-1 px-3 py-1.5 rounded-md bg-surface border border-border text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent font-mono"
         />
         <button
           onClick={() => void handleAdd()}
           disabled={isAdding || !newUrl.trim()}
+          data-testid="a2a-add-button"
           className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-accent text-white hover:bg-accent-hover disabled:opacity-50 transition-colors"
         >
           <Plus size={12} />
@@ -164,7 +157,7 @@ export function SettingsA2AAgents() {
 
       <div className="space-y-3">
         {agents.length === 0 && (
-          <div className="text-center py-8 text-xs text-text-muted">
+          <div className="text-center py-8 text-xs text-text-muted" data-testid="a2a-empty-state">
             {t('a2a.empty', 'No remote agents registered')}
           </div>
         )}
@@ -175,9 +168,7 @@ export function SettingsA2AAgents() {
                 <Cpu size={14} className="mt-0.5 text-accent shrink-0" />
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-text-primary">
-                      {agent.card.name}
-                    </span>
+                    <span className="text-sm font-medium text-text-primary">{agent.card.name}</span>
                     <span className="text-[10px] text-text-muted">v{agent.card.version}</span>
                     {agent.lastStatus === 'ok' && (
                       <span className="text-[10px] text-success flex items-center gap-1">

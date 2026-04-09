@@ -259,7 +259,7 @@ export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProp
   const activeTabMeta = tabs.find((tab) => tab.id === activeTab);
 
   return (
-    <div className="flex h-full w-full overflow-hidden bg-background">
+    <div className="flex h-full w-full overflow-hidden bg-background" data-testid="settings-panel">
       {/* Sidebar */}
       <div
         className={`${compactSidebar ? 'w-14' : 'w-52 lg:w-60'} bg-background-secondary/88 border-r border-border-muted flex flex-col flex-shrink-0`}
@@ -281,6 +281,7 @@ export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProp
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               title={compactSidebar ? tab.label : undefined}
+              data-testid={`settings-tab-${tab.id}`}
               className={`w-full flex items-center ${compactSidebar ? 'justify-center p-2.5' : 'gap-3 px-3.5 py-3'} rounded-lg text-left transition-colors active:scale-[0.98] ${
                 activeTab === tab.id
                   ? 'bg-accent/10 text-text-primary font-medium border-l-2 border-accent'

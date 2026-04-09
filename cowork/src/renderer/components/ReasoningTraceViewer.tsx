@@ -86,7 +86,9 @@ export function ReasoningTraceViewer({ isOpen, onClose }: ReasoningTraceViewerPr
     (async () => {
       if (!window.electronAPI?.reasoning?.getTrace) return;
       try {
-        const d = (await window.electronAPI.reasoning.getTrace(selectedId)) as ReasoningTrace | null;
+        const d = (await window.electronAPI.reasoning.getTrace(
+          selectedId
+        )) as ReasoningTrace | null;
         if (!cancelled) setDetail(d);
       } catch {
         if (!cancelled) setDetail(null);
@@ -155,7 +157,10 @@ export function ReasoningTraceViewer({ isOpen, onClose }: ReasoningTraceViewerPr
   if (!isOpen) return null;
 
   return (
-    <div className="fixed right-0 top-0 h-full w-[640px] max-w-[95vw] bg-background border-l border-border shadow-2xl z-40 flex flex-col">
+    <div
+      className="fixed right-0 top-0 h-full w-[640px] max-w-[95vw] bg-background border-l border-border shadow-2xl z-40 flex flex-col"
+      data-testid="reasoning-trace-viewer"
+    >
       <div className="flex items-center justify-between px-4 py-3 border-b border-border-muted">
         <div className="flex items-center gap-2">
           <Brain size={16} className="text-accent" />
@@ -183,6 +188,7 @@ export function ReasoningTraceViewer({ isOpen, onClose }: ReasoningTraceViewerPr
             onClick={onClose}
             className="p-1 rounded hover:bg-surface-hover text-text-muted hover:text-text-primary"
             aria-label={t('common.close', 'Close')}
+            data-testid="reasoning-trace-viewer-close"
           >
             <X size={16} />
           </button>
@@ -198,8 +204,14 @@ export function ReasoningTraceViewer({ isOpen, onClose }: ReasoningTraceViewerPr
       <div className="flex-1 grid grid-cols-[240px_1fr] overflow-hidden">
         <div className="border-r border-border-muted overflow-y-auto">
           {traces.length === 0 && !isLoading && (
-            <div className="px-4 py-8 text-center text-xs text-text-muted">
-              {t('reasoning.empty', 'No reasoning traces captured yet. Traces appear here when the agent uses the reason tool.')}
+            <div
+              className="px-4 py-8 text-center text-xs text-text-muted"
+              data-testid="reasoning-empty-state"
+            >
+              {t(
+                'reasoning.empty',
+                'No reasoning traces captured yet. Traces appear here when the agent uses the reason tool.'
+              )}
             </div>
           )}
           {traces.map((trace) => (

@@ -267,7 +267,24 @@ function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showCommandPalette, showShortcutsDialog, showGlobalSearch, sidebarCollapsed, activeSessionId, setShowCommandPalette, setShowShortcutsDialog, setShowGlobalSearch, setShowSettings, setSearchActive, setSidebarCollapsed, setShowSnippetsLibrary, setShowPersonaSwitcher, setShowTestRunner, setShowReasoningViewer, toggleSplitPane]);
+  }, [
+    showCommandPalette,
+    showShortcutsDialog,
+    showGlobalSearch,
+    sidebarCollapsed,
+    activeSessionId,
+    setShowCommandPalette,
+    setShowShortcutsDialog,
+    setShowGlobalSearch,
+    setShowSettings,
+    setSearchActive,
+    setSidebarCollapsed,
+    setShowSnippetsLibrary,
+    setShowPersonaSwitcher,
+    setShowTestRunner,
+    setShowReasoningViewer,
+    toggleSplitPane,
+  ]);
 
   // Determine if we should show the sandbox setup dialog
   // Show if there's progress and setup is not complete
@@ -277,7 +294,10 @@ function App() {
   const isDark = settings.theme === 'system' ? systemDarkMode : settings.theme === 'dark';
 
   return (
-    <div className="h-full w-full min-h-0 flex flex-col overflow-hidden bg-background">
+    <div
+      className="h-full w-full min-h-0 flex flex-col overflow-hidden bg-background"
+      data-testid="app-root"
+    >
       {/* Titlebar - draggable region */}
       <Titlebar />
 
@@ -308,10 +328,7 @@ function App() {
             >
               <Suspense fallback={<MainPanelFallback />}>
                 {splitPaneEnabled ? (
-                  <SplitPaneLayout
-                    left={<ChatView />}
-                    right={<FilePreviewPane inline />}
-                  />
+                  <SplitPaneLayout left={<ChatView />} right={<FilePreviewPane inline />} />
                 ) : (
                   <ChatView />
                 )}
@@ -406,10 +423,7 @@ function App() {
       )}
 
       {/* Global Search Dialog (Cmd+P / Cmd+Shift+K) — Phase 2 step 8 */}
-      <GlobalSearchDialog
-        open={showGlobalSearch}
-        onClose={() => setShowGlobalSearch(false)}
-      />
+      <GlobalSearchDialog open={showGlobalSearch} onClose={() => setShowGlobalSearch(false)} />
 
       {/* File Preview Pane — Phase 2 step 9 (skipped when split-pane owns it) */}
       {!splitPaneEnabled && <FilePreviewPane />}
@@ -421,10 +435,7 @@ function App() {
       <ComputerUseOverlay />
 
       {/* Activity Feed — Phase 2 step 18 */}
-      <ActivityFeed
-        open={showActivityFeed}
-        onClose={() => setShowActivityFeed(false)}
-      />
+      <ActivityFeed open={showActivityFeed} onClose={() => setShowActivityFeed(false)} />
 
       {/* Bookmarks Panel — Phase 3 step 4 */}
       <BookmarksPanel />
@@ -435,10 +446,7 @@ function App() {
         isOpen={showPersonaSwitcher}
         onClose={() => setShowPersonaSwitcher(false)}
       />
-      <TestRunnerPanel
-        isOpen={showTestRunner}
-        onClose={() => setShowTestRunner(false)}
-      />
+      <TestRunnerPanel isOpen={showTestRunner} onClose={() => setShowTestRunner(false)} />
       <ReasoningTraceViewer
         isOpen={showReasoningViewer}
         onClose={() => setShowReasoningViewer(false)}

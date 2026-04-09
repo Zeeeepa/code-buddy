@@ -19,7 +19,11 @@ import { execFileSync } from 'child_process';
 import { config } from 'dotenv';
 import { initDatabase, closeDatabase } from './db/database';
 import { SessionManager, type EngineAdapterLike } from './session/session-manager';
-import { ProjectManager, type ProjectCreateInput, type ProjectUpdateInput } from './project/project-manager';
+import {
+  ProjectManager,
+  type ProjectCreateInput,
+  type ProjectUpdateInput,
+} from './project/project-manager';
 import { ProjectMemoryService } from './project/project-memory';
 import { SubAgentBridge } from './agent/sub-agent-bridge';
 import { OrchestratorBridge, type OrchestratorOptions } from './agent/orchestrator-bridge';
@@ -226,6 +230,7 @@ async function waitForDevServer(url: string, maxAttempts = 30, intervalMs = 500)
 // Single-instance lock: skip in dev mode so vite-plugin-electron can restart freely
 // without the old process blocking the new one during async cleanup.
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
+const isE2E = process.env.COWORK_E2E === '1';
 const ELECTRON_DEVTOOLS_DEBUG_PORT = '9223';
 
 // Enable Chrome DevTools Protocol in dev mode so the renderer can be inspected
@@ -239,11 +244,11 @@ if (isDev) {
   );
 }
 
-const hasSingleInstanceLock = isDev || app.requestSingleInstanceLock();
+const hasSingleInstanceLock = isDev || isE2E || app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   logWarn('[App] Another instance is already running, quitting this instance');
   app.quit();
-} else if (!isDev) {
+} else if (!isDev && !isE2E) {
   app.on('second-instance', () => {
     const existingWindow =
       mainWindow && !mainWindow.isDestroyed()
@@ -915,7 +920,8 @@ app
     let engineAdapter: EngineAdapterLike | undefined;
     if (process.env.CODEBUDDY_EMBEDDED === '1') {
       try {
-        const enginePath = process.env.CODEBUDDY_ENGINE_PATH || resolve(app.getAppPath(), '..', 'dist');
+        const enginePath =
+          process.env.CODEBUDDY_ENGINE_PATH || resolve(app.getAppPath(), '..', 'dist');
         const { CodeBuddyEngineAdapter } = await import(
           /* webpackIgnore: true */ resolve(enginePath, 'desktop', 'codebuddy-engine-adapter.js')
         );
@@ -943,9 +949,12 @@ app
           }
 
           // Handle permission responses from renderer
-          ipcMain.on('permission.bridge.response', (_event, { id, response }: { id: string; response: string }) => {
-            permissionBridge.handleResponse(id, response as 'allow' | 'deny' | 'allow_always');
-          });
+          ipcMain.on(
+            'permission.bridge.response',
+            (_event, { id, response }: { id: string; response: string }) => {
+              permissionBridge.handleResponse(id, response as 'allow' | 'deny' | 'allow_always');
+            }
+          );
 
           log('[Main] Permission bridge wired to engine adapter');
         } catch (permErr) {
@@ -1126,10 +1135,18 @@ app
     void (async () => {
       try {
         // Defer until MCP manager has had a chance to connect to servers
-        const mcpMgr = (sessionManagerRef as unknown as { mcpManager?: {
-          callTool?: (server: string, tool: string, args: Record<string, unknown>) => Promise<unknown>;
-          getConnectedServers?: () => string[];
-        } }).mcpManager;
+        const mcpMgr = (
+          sessionManagerRef as unknown as {
+            mcpManager?: {
+              callTool?: (
+                server: string,
+                tool: string,
+                args: Record<string, unknown>
+              ) => Promise<unknown>;
+              getConnectedServers?: () => string[];
+            };
+          }
+        ).mcpManager;
         if (mcpMgr?.callTool && mcpMgr?.getConnectedServers) {
           const caller = {
             callTool: mcpMgr.callTool.bind(mcpMgr),
@@ -1162,7 +1179,9 @@ app
 
     // macOS: application menu, dock menu, tray icon
     buildMacMenu();
-    setupTray();
+    if (!isE2E) {
+      setupTray();
+    }
 
     // Show window after core managers are ready so first-load actions can be handled.
     createWindow();
@@ -1205,7 +1224,7 @@ app
     });
 
     // Auto-updater: check for updates in production
-    if (!isDev) {
+    if (!isDev && !isE2E) {
       import('electron-updater')
         .then(({ autoUpdater }) => {
           autoUpdater.checkForUpdatesAndNotify().catch((err: unknown) => {
@@ -1217,7 +1236,9 @@ app
         });
     }
 
-    startNavServer(() => mainWindow);
+    if (!isE2E) {
+      startNavServer(() => mainWindow);
+    }
 
     const scheduledTaskStore = createScheduledTaskStore(db);
     scheduledTaskManager = new ScheduledTaskManager({
@@ -1488,7 +1509,9 @@ ipcMain.handle('checkpoint.list', async () => {
     );
     const gsm = getGhostSnapshotManager();
     return gsm.getTimeline();
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 });
 
 ipcMain.handle('checkpoint.undo', async () => {
@@ -1500,7 +1523,9 @@ ipcMain.handle('checkpoint.undo', async () => {
     );
     const gsm = getGhostSnapshotManager();
     return await gsm.undoLastTurn();
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 });
 
 ipcMain.handle('checkpoint.redo', async () => {
@@ -1512,7 +1537,9 @@ ipcMain.handle('checkpoint.redo', async () => {
     );
     const gsm = getGhostSnapshotManager();
     return await gsm.redoLastTurn();
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 });
 
 ipcMain.handle('checkpoint.restore', async (_event, snapshotId: string) => {
@@ -1524,7 +1551,9 @@ ipcMain.handle('checkpoint.restore', async (_event, snapshotId: string) => {
     );
     const gsm = getGhostSnapshotManager();
     return await gsm.restoreSnapshot(snapshotId);
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 });
 
 // ── Workspace IPC handlers ────────────────────────────────────────────
@@ -1532,13 +1561,15 @@ ipcMain.handle('workspace.readDir', async (_event, dirPath: string) => {
   try {
     const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
     return entries
-      .filter(e => !e.name.startsWith('.'))
-      .map(e => ({
+      .filter((e) => !e.name.startsWith('.'))
+      .map((e) => ({
         name: e.name,
         isDirectory: e.isDirectory(),
         path: resolve(dirPath, e.name),
       }));
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 });
 
 // ── Permission mode IPC handler ───────────────────────────────────────
@@ -1551,7 +1582,9 @@ ipcMain.handle('permission.setMode', async (_event, mode: string) => {
     );
     getPermissionModeManager().setMode(mode);
     log('[IPC] Permission mode set to:', mode);
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 });
 
 // ── Model switch IPC handler ──────────────────────────────────────────
@@ -1560,7 +1593,9 @@ ipcMain.handle('config.switchModel', async (_event, model: string) => {
     configStore.update({ model });
     log('[IPC] Model switched to:', model);
     return true;
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 });
 
 // ── Project IPC handlers (Claude Cowork parity) ──────────────────────
@@ -1626,21 +1661,30 @@ ipcMain.handle('subagent.list', async () => {
   return subAgentBridge.list();
 });
 
-ipcMain.handle('subagent.spawn', async (_event, options: {
-  sessionId: string;
-  prompt: string;
-  role?: string;
-  forkContext?: boolean;
-  parentId?: string;
-}) => {
-  if (!subAgentBridge) return { error: 'SubAgentBridge not initialized' };
-  return subAgentBridge.spawn(options);
-});
+ipcMain.handle(
+  'subagent.spawn',
+  async (
+    _event,
+    options: {
+      sessionId: string;
+      prompt: string;
+      role?: string;
+      forkContext?: boolean;
+      parentId?: string;
+    }
+  ) => {
+    if (!subAgentBridge) return { error: 'SubAgentBridge not initialized' };
+    return subAgentBridge.spawn(options);
+  }
+);
 
-ipcMain.handle('subagent.sendInput', async (_event, agentId: string, message: string, interrupt?: boolean) => {
-  if (!subAgentBridge) return false;
-  return subAgentBridge.sendInput(agentId, message, interrupt);
-});
+ipcMain.handle(
+  'subagent.sendInput',
+  async (_event, agentId: string, message: string, interrupt?: boolean) => {
+    if (!subAgentBridge) return false;
+    return subAgentBridge.sendInput(agentId, message, interrupt);
+  }
+);
 
 ipcMain.handle('subagent.close', async (_event, agentId: string) => {
   if (!subAgentBridge) return false;
@@ -1658,10 +1702,21 @@ ipcMain.handle('subagent.wait', async (_event, agentIds: string[], timeoutMs?: n
 });
 
 // ── Orchestrator IPC handlers ────────────────────────────────────────
-ipcMain.handle('orchestrator.run', async (_event, sessionId: string, goal: string, options?: OrchestratorOptions) => {
-  if (!orchestratorBridge) return { success: false, summary: 'Orchestrator not initialized', artifacts: {}, agentResults: [], duration: 0, errors: ['not initialized'] };
-  return orchestratorBridge.run(sessionId, goal, options);
-});
+ipcMain.handle(
+  'orchestrator.run',
+  async (_event, sessionId: string, goal: string, options?: OrchestratorOptions) => {
+    if (!orchestratorBridge)
+      return {
+        success: false,
+        summary: 'Orchestrator not initialized',
+        artifacts: {},
+        agentResults: [],
+        duration: 0,
+        errors: ['not initialized'],
+      };
+    return orchestratorBridge.run(sessionId, goal, options);
+  }
+);
 
 ipcMain.handle('orchestrator.isComplex', async (_event, goal: string) => {
   if (!orchestratorBridge) return false;
@@ -1674,10 +1729,13 @@ ipcMain.handle('mention.process', async (_event, text: string, cwd?: string) => 
   return mentionProcessor.process(text, cwd);
 });
 
-ipcMain.handle('mention.autocomplete', async (_event, prefix: string, cwd?: string, limit?: number) => {
-  if (!mentionProcessor) return [];
-  return mentionProcessor.autocomplete(prefix, cwd, limit);
-});
+ipcMain.handle(
+  'mention.autocomplete',
+  async (_event, prefix: string, cwd?: string, limit?: number) => {
+    if (!mentionProcessor) return [];
+    return mentionProcessor.autocomplete(prefix, cwd, limit);
+  }
+);
 
 // ── Slash command IPC handlers (Claude Cowork parity Phase 2) ────────
 ipcMain.handle('command.list', async () => {
@@ -1733,9 +1791,7 @@ ipcMain.handle(
 // ── Knowledge IPC handlers (Claude Cowork parity) ────────────────────
 function resolveKnowledgeWorkspace(projectId?: string): string | null {
   if (!projectManager) return null;
-  const project = projectId
-    ? projectManager.get(projectId)
-    : projectManager.getActive();
+  const project = projectId ? projectManager.get(projectId) : projectManager.getActive();
   return project?.workspacePath ?? null;
 }
 
@@ -1753,19 +1809,25 @@ ipcMain.handle('knowledge.get', async (_event, id: string, projectId?: string) =
   return knowledgeService.get(workspace, id);
 });
 
-ipcMain.handle('knowledge.create', async (_event, input: KnowledgeCreateInput, projectId?: string) => {
-  if (!knowledgeService) throw new Error('KnowledgeService not initialized');
-  const workspace = resolveKnowledgeWorkspace(projectId);
-  if (!workspace) throw new Error('No active project workspace');
-  return knowledgeService.create(workspace, input);
-});
+ipcMain.handle(
+  'knowledge.create',
+  async (_event, input: KnowledgeCreateInput, projectId?: string) => {
+    if (!knowledgeService) throw new Error('KnowledgeService not initialized');
+    const workspace = resolveKnowledgeWorkspace(projectId);
+    if (!workspace) throw new Error('No active project workspace');
+    return knowledgeService.create(workspace, input);
+  }
+);
 
-ipcMain.handle('knowledge.update', async (_event, id: string, updates: Partial<KnowledgeCreateInput>, projectId?: string) => {
-  if (!knowledgeService) return null;
-  const workspace = resolveKnowledgeWorkspace(projectId);
-  if (!workspace) return null;
-  return knowledgeService.update(workspace, id, updates);
-});
+ipcMain.handle(
+  'knowledge.update',
+  async (_event, id: string, updates: Partial<KnowledgeCreateInput>, projectId?: string) => {
+    if (!knowledgeService) return null;
+    const workspace = resolveKnowledgeWorkspace(projectId);
+    if (!workspace) return null;
+    return knowledgeService.update(workspace, id, updates);
+  }
+);
 
 ipcMain.handle('knowledge.delete', async (_event, id: string, projectId?: string) => {
   if (!knowledgeService) return false;
@@ -1774,12 +1836,15 @@ ipcMain.handle('knowledge.delete', async (_event, id: string, projectId?: string
   return knowledgeService.delete(workspace, id);
 });
 
-ipcMain.handle('knowledge.search', async (_event, query: string, projectId?: string, limit?: number) => {
-  if (!knowledgeService) return [];
-  const workspace = resolveKnowledgeWorkspace(projectId);
-  if (!workspace) return [];
-  return knowledgeService.search(workspace, query, limit);
-});
+ipcMain.handle(
+  'knowledge.search',
+  async (_event, query: string, projectId?: string, limit?: number) => {
+    if (!knowledgeService) return [];
+    const workspace = resolveKnowledgeWorkspace(projectId);
+    if (!workspace) return [];
+    return knowledgeService.search(workspace, query, limit);
+  }
+);
 
 // ── Task dispatch IPC (mobile/remote → background session) ───────────
 ipcMain.handle('dispatch.task', async (_event, request: DispatchRequest) => {
@@ -1792,32 +1857,45 @@ ipcMain.handle('dispatch.task', async (_event, request: DispatchRequest) => {
 });
 
 // ── Session settings update IPC (Claude Cowork parity) ──────────────
-ipcMain.handle('session.updateSettings', async (_event, sessionId: string, updates: {
-  projectId?: string | null;
-  executionMode?: 'chat' | 'task';
-  isBackground?: boolean;
-  title?: string;
-}) => {
-  if (!sessionManager) return false;
-  return sessionManager.updateSessionSettings(sessionId, updates);
-});
+ipcMain.handle(
+  'session.updateSettings',
+  async (
+    _event,
+    sessionId: string,
+    updates: {
+      projectId?: string | null;
+      executionMode?: 'chat' | 'task';
+      isBackground?: boolean;
+      title?: string;
+    }
+  ) => {
+    if (!sessionManager) return false;
+    return sessionManager.updateSessionSettings(sessionId, updates);
+  }
+);
 
 // ── Background session IPC (Claude Cowork parity) ────────────────────
-ipcMain.handle('session.startBackground', async (_event, payload: {
-  title: string;
-  prompt: string;
-  cwd?: string;
-  projectId?: string;
-}) => {
-  if (!sessionManager) throw new Error('SessionManager not initialized');
-  const session = await sessionManager.startBackgroundSession(
-    payload.title,
-    payload.prompt,
-    payload.cwd,
-    payload.projectId
-  );
-  return session;
-});
+ipcMain.handle(
+  'session.startBackground',
+  async (
+    _event,
+    payload: {
+      title: string;
+      prompt: string;
+      cwd?: string;
+      projectId?: string;
+    }
+  ) => {
+    if (!sessionManager) throw new Error('SessionManager not initialized');
+    const session = await sessionManager.startBackgroundSession(
+      payload.title,
+      payload.prompt,
+      payload.cwd,
+      payload.projectId
+    );
+    return session;
+  }
+);
 
 // ── Memory listing for MemoryBrowser (Claude Cowork parity) ──────────
 ipcMain.handle('memory.list', async (_event, projectId?: string) => {
@@ -1859,34 +1937,30 @@ ipcMain.handle(
     }
     const id = projectId ?? projectManager.getActiveId();
     if (!id) return { success: false, error: 'No active project' };
-    return projectMemoryServiceRef.updateMemoryEntry(
-      id,
-      entryIndex,
-      newContent,
-      newCategory
-    );
+    return projectMemoryServiceRef.updateMemoryEntry(id, entryIndex, newContent, newCategory);
   }
 );
 
-ipcMain.handle(
-  'memory.delete',
-  async (_event, entryIndex: number, projectId?: string) => {
-    if (!projectManager || !projectMemoryServiceRef) {
-      return { success: false, error: 'Memory service unavailable' };
-    }
-    const id = projectId ?? projectManager.getActiveId();
-    if (!id) return { success: false, error: 'No active project' };
-    return projectMemoryServiceRef.deleteMemoryEntry(id, entryIndex);
+ipcMain.handle('memory.delete', async (_event, entryIndex: number, projectId?: string) => {
+  if (!projectManager || !projectMemoryServiceRef) {
+    return { success: false, error: 'Memory service unavailable' };
   }
-);
+  const id = projectId ?? projectManager.getActiveId();
+  if (!id) return { success: false, error: 'No active project' };
+  return projectMemoryServiceRef.deleteMemoryEntry(id, entryIndex);
+});
 
 // ── Session export IPC handler ────────────────────────────────────────
 ipcMain.handle('session.export', async (_event, sessionId: string, format: 'md' | 'json') => {
   try {
     if (!sessionManager) return null;
-    const messages = (sessionManager as unknown as { getMessages?: (id: string) => unknown[] }).getMessages?.(sessionId);
+    const messages = (
+      sessionManager as unknown as { getMessages?: (id: string) => unknown[] }
+    ).getMessages?.(sessionId);
     return { messages, format };
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 });
 
 // Phase 2 step 16: enhanced session export with format/redaction options
@@ -2453,15 +2527,12 @@ ipcMain.handle('mcp.registryUninstall', async (_event, id: string) => {
   return mcpMarketplaceBridge.uninstall(id);
 });
 
-ipcMain.handle(
-  'mcp.registrySetEnabled',
-  async (_event, id: string, enabled: boolean) => {
-    if (!mcpMarketplaceBridge) {
-      return { success: false, error: 'Marketplace bridge unavailable' };
-    }
-    return mcpMarketplaceBridge.setEnabled(id, enabled);
+ipcMain.handle('mcp.registrySetEnabled', async (_event, id: string, enabled: boolean) => {
+  if (!mcpMarketplaceBridge) {
+    return { success: false, error: 'Marketplace bridge unavailable' };
   }
-);
+  return mcpMarketplaceBridge.setEnabled(id, enabled);
+});
 
 ipcMain.handle('mcp.registryTools', (_event, id: string) => {
   if (!mcpMarketplaceBridge) return [];
@@ -2542,13 +2613,7 @@ ipcMain.handle('cost.setDailyLimit', async (_event, limit: number) => {
 
 ipcMain.handle(
   'cost.record',
-  async (
-    _event,
-    inputTokens: number,
-    outputTokens: number,
-    model: string,
-    cost?: number
-  ) => {
+  async (_event, inputTokens: number, outputTokens: number, model: string, cost?: number) => {
     if (!costBridge) return { success: false };
     await costBridge.record(inputTokens, outputTokens, model, cost);
     return { success: true };
@@ -2558,9 +2623,7 @@ ipcMain.handle(
 // ── Rules editor IPC handlers (Claude Cowork parity Phase 2) ────────
 function resolveRulesWorkspace(projectId?: string): string {
   if (projectManager) {
-    const project = projectId
-      ? projectManager.get(projectId)
-      : projectManager.getActive();
+    const project = projectId ? projectManager.get(projectId) : projectManager.getActive();
     if (project?.workspacePath) return project.workspacePath;
   }
   return process.cwd();
@@ -2603,23 +2666,13 @@ ipcMain.handle(
     if (!rulesBridge) {
       return { success: false, error: 'Rules bridge unavailable' };
     }
-    return rulesBridge.update(
-      resolveRulesWorkspace(projectId),
-      bucket,
-      oldRule,
-      newRule
-    );
+    return rulesBridge.update(resolveRulesWorkspace(projectId), bucket, oldRule, newRule);
   }
 );
 
 ipcMain.handle(
   'rules.test',
-  async (
-    _event,
-    toolName: string,
-    toolArgs: Record<string, unknown>,
-    projectId?: string
-  ) => {
+  async (_event, toolName: string, toolArgs: Record<string, unknown>, projectId?: string) => {
     if (!rulesBridge) return { decision: 'ask' as const };
     return rulesBridge.test(resolveRulesWorkspace(projectId), toolName, toolArgs);
   }
@@ -2641,24 +2694,16 @@ ipcMain.handle(
   }
 );
 
-ipcMain.handle(
-  'session.checkout',
-  async (_event, sessionId: string, branchId: string) => {
-    if (!sessionBranchingBridge) {
-      return { success: false, error: 'Branching bridge unavailable' };
-    }
-    return sessionBranchingBridge.checkout(sessionId, branchId);
+ipcMain.handle('session.checkout', async (_event, sessionId: string, branchId: string) => {
+  if (!sessionBranchingBridge) {
+    return { success: false, error: 'Branching bridge unavailable' };
   }
-);
+  return sessionBranchingBridge.checkout(sessionId, branchId);
+});
 
 ipcMain.handle(
   'session.mergeBranch',
-  async (
-    _event,
-    sessionId: string,
-    sourceBranchId: string,
-    strategy?: 'append' | 'replace'
-  ) => {
+  async (_event, sessionId: string, sourceBranchId: string, strategy?: 'append' | 'replace') => {
     if (!sessionBranchingBridge) {
       return { success: false, error: 'Branching bridge unavailable' };
     }
@@ -2666,15 +2711,12 @@ ipcMain.handle(
   }
 );
 
-ipcMain.handle(
-  'session.deleteBranch',
-  async (_event, sessionId: string, branchId: string) => {
-    if (!sessionBranchingBridge) {
-      return { success: false, error: 'Branching bridge unavailable' };
-    }
-    return sessionBranchingBridge.deleteBranch(sessionId, branchId);
+ipcMain.handle('session.deleteBranch', async (_event, sessionId: string, branchId: string) => {
+  if (!sessionBranchingBridge) {
+    return { success: false, error: 'Branching bridge unavailable' };
   }
-);
+  return sessionBranchingBridge.deleteBranch(sessionId, branchId);
+});
 
 ipcMain.handle(
   'session.renameBranch',
@@ -2737,11 +2779,7 @@ ipcMain.handle('config.importFromFile', async () => {
 
 ipcMain.handle(
   'config.applyImport',
-  async (
-    _event,
-    bundle: Record<string, unknown>,
-    strategy: 'skip' | 'overwrite'
-  ) => {
+  async (_event, bundle: Record<string, unknown>, strategy: 'skip' | 'overwrite') => {
     if (!configExportService) {
       return {
         success: false,
@@ -2754,13 +2792,10 @@ ipcMain.handle(
 );
 
 // Activity feed — Claude Cowork parity Phase 2 step 18
-ipcMain.handle(
-  'activity.recent',
-  async (_event, limit?: number, projectId?: string) => {
-    if (!activityFeed) return [];
-    return activityFeed.recent(limit ?? 100, projectId);
-  }
-);
+ipcMain.handle('activity.recent', async (_event, limit?: number, projectId?: string) => {
+  if (!activityFeed) return [];
+  return activityFeed.recent(limit ?? 100, projectId);
+});
 
 ipcMain.handle('activity.clear', async () => {
   if (!activityFeed) return { success: false };
@@ -2810,13 +2845,10 @@ ipcMain.handle(
   }
 );
 
-ipcMain.handle(
-  'workflow.update',
-  async (_event, id: string, patch: Record<string, unknown>) => {
-    if (!workflowBridge) return null;
-    return workflowBridge.update(id, patch as never);
-  }
-);
+ipcMain.handle('workflow.update', async (_event, id: string, patch: Record<string, unknown>) => {
+  if (!workflowBridge) return null;
+  return workflowBridge.update(id, patch as never);
+});
 
 ipcMain.handle('workflow.delete', async (_event, id: string) => {
   if (!workflowBridge) return false;
@@ -2861,23 +2893,20 @@ ipcMain.handle('template.preview', async (_event, name: string) => {
   }
 });
 
-ipcMain.handle(
-  'template.create',
-  async (_event, name: string, workspaceRoot: string) => {
-    if (!templateService) {
-      return { success: false, error: 'Template service unavailable' };
-    }
-    try {
-      return await templateService.apply(name, workspaceRoot);
-    } catch (err) {
-      logError('[template.create] failed:', err);
-      return {
-        success: false,
-        error: (err as Error).message ?? 'Template execution failed',
-      };
-    }
+ipcMain.handle('template.create', async (_event, name: string, workspaceRoot: string) => {
+  if (!templateService) {
+    return { success: false, error: 'Template service unavailable' };
   }
-);
+  try {
+    return await templateService.apply(name, workspaceRoot);
+  } catch (err) {
+    logError('[template.create] failed:', err);
+    return {
+      success: false,
+      error: (err as Error).message ?? 'Template execution failed',
+    };
+  }
+});
 
 // File preview pane — Claude Cowork parity Phase 2 step 9
 ipcMain.handle('preview.get', async (_event, filePath: string) => {
@@ -3038,10 +3067,7 @@ ipcMain.handle('hooks.list', async () => {
 
 ipcMain.handle(
   'hooks.upsert',
-  async (
-    _event,
-    params: { event: string; handler: Record<string, unknown>; index?: number }
-  ) => {
+  async (_event, params: { event: string; handler: Record<string, unknown>; index?: number }) => {
     try {
       const { getHooksBridge } = await import('./hooks/hooks-bridge');
       return await getHooksBridge().upsert(
@@ -3376,7 +3402,8 @@ ipcMain.handle('model.capabilities', async (_event, model: string) => {
 // Git status panel + commit composer — Claude Cowork parity Phase 3 step 2
 ipcMain.handle('git.status', async (_event, cwd: string) => {
   try {
-    if (!cwd) return { isRepo: false, branch: null, upstream: null, ahead: 0, behind: 0, files: [] };
+    if (!cwd)
+      return { isRepo: false, branch: null, upstream: null, ahead: 0, behind: 0, files: [] };
     return getGitBridge().getStatus(cwd);
   } catch (err) {
     logError('[git.status] failed:', err);
@@ -3417,16 +3444,13 @@ ipcMain.handle('git.diff', async (_event, cwd: string, file: string, staged: boo
   }
 });
 
-ipcMain.handle(
-  'git.commit',
-  async (_event, cwd: string, message: string, amend?: boolean) => {
-    try {
-      return getGitBridge().commit(cwd, message, { amend: !!amend });
-    } catch (err) {
-      return { success: false, error: (err as Error).message };
-    }
+ipcMain.handle('git.commit', async (_event, cwd: string, message: string, amend?: boolean) => {
+  try {
+    return getGitBridge().commit(cwd, message, { amend: !!amend });
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
   }
-);
+});
 
 ipcMain.handle('git.suggestMessage', async (_event, cwd: string) => {
   try {
@@ -3454,58 +3478,52 @@ ipcMain.handle('diff.parseHunks', async (_event, excerpt: string) => {
   }
 });
 
-ipcMain.handle(
-  'diff.revertHunks',
-  async (_event, filePath: string, hunks: ParsedHunk[]) => {
-    try {
-      if (!filePath || !Array.isArray(hunks)) {
-        return { success: false, method: 'none', error: 'Invalid arguments' };
-      }
-      return revertHunks(filePath, hunks);
-    } catch (err) {
-      logError('[diff.revertHunks] failed:', err);
-      return {
-        success: false,
-        method: 'none',
-        error: (err as Error).message ?? 'Unknown error',
-      };
+ipcMain.handle('diff.revertHunks', async (_event, filePath: string, hunks: ParsedHunk[]) => {
+  try {
+    if (!filePath || !Array.isArray(hunks)) {
+      return { success: false, method: 'none', error: 'Invalid arguments' };
     }
+    return revertHunks(filePath, hunks);
+  } catch (err) {
+    logError('[diff.revertHunks] failed:', err);
+    return {
+      success: false,
+      method: 'none',
+      error: (err as Error).message ?? 'Unknown error',
+    };
   }
-);
+});
 
 // Global search (Cmd+K palette) — Claude Cowork parity Phase 2 step 8
-ipcMain.handle(
-  'search.global',
-  async (_event, query: string, limit?: number) => {
-    if (!globalSearchService) {
-      return {
-        hits: [],
-        totalByCategory: {
-          session: 0,
-          message: 0,
-          memory: 0,
-          knowledge: 0,
-          file: 0,
-        },
-      };
-    }
-    try {
-      return await globalSearchService.search(query, limit ?? 40);
-    } catch (err) {
-      logError('[search.global] failed:', err);
-      return {
-        hits: [],
-        totalByCategory: {
-          session: 0,
-          message: 0,
-          memory: 0,
-          knowledge: 0,
-          file: 0,
-        },
-      };
-    }
+ipcMain.handle('search.global', async (_event, query: string, limit?: number) => {
+  if (!globalSearchService) {
+    return {
+      hits: [],
+      totalByCategory: {
+        session: 0,
+        message: 0,
+        memory: 0,
+        knowledge: 0,
+        file: 0,
+      },
+    };
   }
-);
+  try {
+    return await globalSearchService.search(query, limit ?? 40);
+  } catch (err) {
+    logError('[search.global] failed:', err);
+    return {
+      hits: [],
+      totalByCategory: {
+        session: 0,
+        message: 0,
+        memory: 0,
+        knowledge: 0,
+        file: 0,
+      },
+    };
+  }
+});
 
 // Skills API handlers
 ipcMain.handle('skills.getAll', async () => {

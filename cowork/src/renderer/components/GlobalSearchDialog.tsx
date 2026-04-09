@@ -8,13 +8,7 @@
  * @module renderer/components/GlobalSearchDialog
  */
 
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Search,
@@ -50,13 +44,7 @@ interface GlobalSearchResults {
   totalByCategory: Record<SearchSource, number>;
 }
 
-const SOURCE_ORDER: SearchSource[] = [
-  'session',
-  'message',
-  'memory',
-  'knowledge',
-  'file',
-];
+const SOURCE_ORDER: SearchSource[] = ['session', 'message', 'memory', 'knowledge', 'file'];
 
 const SOURCE_ICONS: Record<SearchSource, LucideIcon> = {
   session: Hash,
@@ -71,10 +59,7 @@ interface GlobalSearchDialogProps {
   onClose: () => void;
 }
 
-export const GlobalSearchDialog: React.FC<GlobalSearchDialogProps> = ({
-  open,
-  onClose,
-}) => {
+export const GlobalSearchDialog: React.FC<GlobalSearchDialogProps> = ({ open, onClose }) => {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<GlobalSearchResults | null>(null);
@@ -198,6 +183,7 @@ export const GlobalSearchDialog: React.FC<GlobalSearchDialogProps> = ({
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-black/60 backdrop-blur-sm"
+      data-testid="global-search-dialog"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -213,6 +199,7 @@ export const GlobalSearchDialog: React.FC<GlobalSearchDialogProps> = ({
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={t('globalSearch.placeholder')}
+            data-testid="global-search-input"
             className="flex-1 bg-transparent border-none outline-none text-sm text-text-primary placeholder:text-text-muted"
           />
           {loading && <Loader2 size={14} className="animate-spin text-text-muted" />}
@@ -228,12 +215,13 @@ export const GlobalSearchDialog: React.FC<GlobalSearchDialogProps> = ({
         {/* Results */}
         <div className="flex-1 overflow-y-auto">
           {!query.trim() && (
-            <div className="px-6 py-10 text-center text-xs text-text-muted">
+            <div
+              className="px-6 py-10 text-center text-xs text-text-muted"
+              data-testid="global-search-empty-state"
+            >
               <Search size={28} className="mx-auto mb-2 opacity-30" />
               <p>{t('globalSearch.empty')}</p>
-              <p className="mt-2 text-[11px] opacity-70">
-                {t('globalSearch.tip')}
-              </p>
+              <p className="mt-2 text-[11px] opacity-70">{t('globalSearch.tip')}</p>
             </div>
           )}
 
@@ -254,9 +242,7 @@ export const GlobalSearchDialog: React.FC<GlobalSearchDialogProps> = ({
                   <span className="text-[10px] uppercase tracking-wide font-semibold text-text-muted">
                     {t(`globalSearch.source.${source}`)}
                   </span>
-                  <span className="text-[10px] text-text-muted opacity-60">
-                    {hits.length}
-                  </span>
+                  <span className="text-[10px] text-text-muted opacity-60">{hits.length}</span>
                 </div>
                 {hits.map((hit) => {
                   const idx = runningIndex++;
@@ -300,23 +286,25 @@ export const GlobalSearchDialog: React.FC<GlobalSearchDialogProps> = ({
         <div className="px-4 py-2 border-t border-border-muted bg-surface/30 flex items-center justify-between text-[10px] text-text-muted">
           <div className="flex items-center gap-3">
             <span>
-              <kbd className="px-1 py-0.5 bg-surface border border-border rounded text-[9px]">↑↓</kbd>{' '}
+              <kbd className="px-1 py-0.5 bg-surface border border-border rounded text-[9px]">
+                ↑↓
+              </kbd>{' '}
               {t('globalSearch.hint.navigate')}
             </span>
             <span>
-              <kbd className="px-1 py-0.5 bg-surface border border-border rounded text-[9px]">↵</kbd>{' '}
+              <kbd className="px-1 py-0.5 bg-surface border border-border rounded text-[9px]">
+                ↵
+              </kbd>{' '}
               {t('globalSearch.hint.select')}
             </span>
             <span>
-              <kbd className="px-1 py-0.5 bg-surface border border-border rounded text-[9px]">esc</kbd>{' '}
+              <kbd className="px-1 py-0.5 bg-surface border border-border rounded text-[9px]">
+                esc
+              </kbd>{' '}
               {t('globalSearch.hint.close')}
             </span>
           </div>
-          {results && (
-            <span>
-              {t('globalSearch.totalHits', { count: flatHits.length })}
-            </span>
-          )}
+          {results && <span>{t('globalSearch.totalHits', { count: flatHits.length })}</span>}
         </div>
       </div>
     </div>
