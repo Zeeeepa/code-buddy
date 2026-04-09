@@ -2,7 +2,16 @@
  * CommandPalette — Cmd+K command palette with fuzzy search
  */
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Search, MessageSquare, Settings, Download, Keyboard, Sun, Moon } from 'lucide-react';
+import {
+  Search,
+  MessageSquare,
+  Settings,
+  Download,
+  Keyboard,
+  Sun,
+  Moon,
+  Clock3,
+} from 'lucide-react';
 
 interface CommandItem {
   id: string;
@@ -16,6 +25,7 @@ interface CommandItem {
 interface CommandPaletteProps {
   onClose: () => void;
   onNewSession: () => void;
+  onResumeSession: () => void;
   onOpenSettings: () => void;
   onToggleTheme: () => void;
   onShowShortcuts: () => void;
@@ -25,6 +35,7 @@ interface CommandPaletteProps {
 export const CommandPalette: React.FC<CommandPaletteProps> = ({
   onClose,
   onNewSession,
+  onResumeSession,
   onOpenSettings,
   onToggleTheme,
   onShowShortcuts,
@@ -34,20 +45,63 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const commands: CommandItem[] = useMemo(() => [
-    { id: 'new-session', label: 'New Session', description: 'Start a new conversation', icon: <MessageSquare size={14} />, action: onNewSession, shortcut: 'Ctrl+N' },
-    { id: 'settings', label: 'Settings', description: 'Open settings panel', icon: <Settings size={14} />, action: onOpenSettings, shortcut: 'Ctrl+,' },
-    { id: 'theme', label: isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme', icon: isDark ? <Sun size={14} /> : <Moon size={14} />, action: onToggleTheme },
-    { id: 'shortcuts', label: 'Keyboard Shortcuts', description: 'View all shortcuts', icon: <Keyboard size={14} />, action: onShowShortcuts, shortcut: 'Ctrl+/' },
-    { id: 'export', label: 'Export Session', description: 'Export as Markdown or JSON', icon: <Download size={14} />, action: () => { /* handled by sidebar */ } },
-  ], [onNewSession, onOpenSettings, onToggleTheme, onShowShortcuts, isDark]);
+  const commands: CommandItem[] = useMemo(
+    () => [
+      {
+        id: 'new-session',
+        label: 'New Session',
+        description: 'Start a new conversation',
+        icon: <MessageSquare size={14} />,
+        action: onNewSession,
+        shortcut: 'Ctrl+N',
+      },
+      {
+        id: 'resume-session',
+        label: 'Resume Session',
+        description: 'Open the session resume chooser',
+        icon: <Clock3 size={14} />,
+        action: onResumeSession,
+      },
+      {
+        id: 'settings',
+        label: 'Settings',
+        description: 'Open settings panel',
+        icon: <Settings size={14} />,
+        action: onOpenSettings,
+        shortcut: 'Ctrl+,',
+      },
+      {
+        id: 'theme',
+        label: isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme',
+        icon: isDark ? <Sun size={14} /> : <Moon size={14} />,
+        action: onToggleTheme,
+      },
+      {
+        id: 'shortcuts',
+        label: 'Keyboard Shortcuts',
+        description: 'View all shortcuts',
+        icon: <Keyboard size={14} />,
+        action: onShowShortcuts,
+        shortcut: 'Ctrl+/',
+      },
+      {
+        id: 'export',
+        label: 'Export Session',
+        description: 'Export as Markdown or JSON',
+        icon: <Download size={14} />,
+        action: () => {
+          /* handled by sidebar */
+        },
+      },
+    ],
+    [onNewSession, onResumeSession, onOpenSettings, onToggleTheme, onShowShortcuts, isDark]
+  );
 
   const filtered = useMemo(() => {
     if (!query) return commands;
     const q = query.toLowerCase();
-    return commands.filter((c) =>
-      c.label.toLowerCase().includes(q) ||
-      c.description?.toLowerCase().includes(q)
+    return commands.filter(
+      (c) => c.label.toLowerCase().includes(q) || c.description?.toLowerCase().includes(q)
     );
   }, [query, commands]);
 
@@ -102,7 +156,10 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
             filtered.map((cmd, i) => (
               <button
                 key={cmd.id}
-                onClick={() => { cmd.action(); onClose(); }}
+                onClick={() => {
+                  cmd.action();
+                  onClose();
+                }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
                   i === selectedIndex ? 'bg-zinc-800' : 'hover:bg-zinc-800/50'
                 }`}
@@ -110,7 +167,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                 <span className="text-zinc-400">{cmd.icon}</span>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm text-zinc-200">{cmd.label}</div>
-                  {cmd.description && <div className="text-xs text-zinc-500">{cmd.description}</div>}
+                  {cmd.description && (
+                    <div className="text-xs text-zinc-500">{cmd.description}</div>
+                  )}
                 </div>
                 {cmd.shortcut && (
                   <span className="text-xs text-zinc-600 font-mono">{cmd.shortcut}</span>

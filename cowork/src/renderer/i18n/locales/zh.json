@@ -1114,6 +1114,24 @@
     "duration": "运行时长",
     "noRenderableContent": "没有可渲染的文本内容"
   },
+  "sessionResume": {
+    "title": "恢复会话",
+    "subtitle": "选择一个之前的会话并从其工作区继续",
+    "searchPlaceholder": "按标题、模型、工作区或转录内容搜索…",
+    "empty": "没有可恢复的会话",
+    "selectHint": "选择一个会话以继续",
+    "unknownModel": "未知模型",
+    "messages": "消息",
+    "tools": "工具调用",
+    "tokens": "令牌",
+    "updated": "更新时间",
+    "preview": "转录预览",
+    "noPreview": "没有可用的转录预览",
+    "resume": "继续",
+    "resuming": "恢复中…",
+    "resumeCta_one": "恢复 {{count}} 个会话",
+    "resumeCta_other": "恢复 {{count}} 个会话"
+  },
   "checkpoints": {
     "empty": "暂无检查点。修改会被自动跟踪。",
     "undo": "撤销上次更改",

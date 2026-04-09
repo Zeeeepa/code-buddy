@@ -9,6 +9,7 @@ import {
   BarChart3,
   FolderOpen,
   ArrowRight,
+  History,
   Mail,
   X,
   Paperclip,
@@ -42,7 +43,9 @@ export function WelcomeView() {
   const workingDir = useAppStore((state) => state.workingDir);
   const setGlobalNotice = useAppStore((state) => state.setGlobalNotice);
   const isConfigured = useAppStore((state) => state.isConfigured);
+  const sessions = useAppStore((state) => state.sessions);
   const setShowSettings = useAppStore((state) => state.setShowSettings);
+  const setShowResumeChooser = useAppStore((state) => state.setShowResumeChooser);
   const setSettingsTab = useAppStore((state) => state.setSettingsTab);
   const canSubmit = prompt.trim().length > 0 || pastedImages.length > 0 || attachedFiles.length > 0;
 
@@ -503,6 +506,20 @@ export function WelcomeView() {
 
         {/* Quick Action Tags */}
         <div className="flex flex-wrap gap-2 justify-center px-3">
+          <button
+            type="button"
+            onClick={() => setShowResumeChooser(true)}
+            className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-background/65 px-3 py-2 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary transition-colors"
+            data-testid="welcome-resume-session"
+          >
+            <History className="w-4 h-4 text-text-muted" />
+            <span>
+              {t('sessionResume.resumeCta', {
+                count: sessions.length,
+                defaultValue: 'Resume session',
+              })}
+            </span>
+          </button>
           {quickTags.map((tag) => (
             <button
               key={tag.id}

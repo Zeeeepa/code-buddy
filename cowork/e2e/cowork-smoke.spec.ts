@@ -8,7 +8,7 @@ test('shows the welcome view on a fresh profile', async ({ appPage }) => {
 });
 
 test('opens Settings and renders the A2A registry tab', async ({ appPage }) => {
-  await appPage.keyboard.press(`${modKey}+Comma`);
+  await appPage.getByTestId('sidebar-settings-button').click();
 
   await expect(appPage.getByTestId('settings-panel')).toBeVisible();
   await appPage.getByTestId('settings-tab-a2a').click();
@@ -37,4 +37,11 @@ test('opens the session insights panel from the titlebar', async ({ appPage }) =
 
   await expect(appPage.getByTestId('session-insights-panel')).toBeVisible();
   await expect(appPage.getByTestId('session-insights-empty')).toBeVisible();
+});
+
+test('opens the session resume dialog from the welcome view', async ({ appPage }) => {
+  await appPage.getByTestId('welcome-resume-session').click();
+
+  await expect(appPage.getByTestId('session-resume-dialog')).toBeVisible();
+  await expect(appPage.getByTestId('session-resume-empty')).toBeVisible();
 });

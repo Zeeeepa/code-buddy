@@ -41,7 +41,7 @@ export const test = base.extend<CoworkFixtures>({
   appPage: async ({ electronApp }, use) => {
     const page = await electronApp.firstWindow({ timeout: 60_000 });
     await page.waitForLoadState('domcontentloaded');
-    await expect(page.getByTestId('app-root')).toBeVisible();
+    await expect(page.getByTestId('app-root')).toBeVisible({ timeout: 30_000 });
     await use(page);
   },
 });

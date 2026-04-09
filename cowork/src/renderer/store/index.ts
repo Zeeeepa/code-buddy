@@ -163,6 +163,7 @@ interface AppState {
   showMemoryEditor: boolean;
   showActivityFeed: boolean;
   showSessionInsights: boolean;
+  showResumeChooser: boolean;
 
   // Phase 3 step 4: bookmarked message IDs for the active session
   bookmarkedMessageIds: Set<string>;
@@ -317,6 +318,7 @@ interface AppState {
   setShowMemoryEditor: (show: boolean) => void;
   setShowActivityFeed: (show: boolean) => void;
   setShowSessionInsights: (show: boolean) => void;
+  setShowResumeChooser: (show: boolean) => void;
   setBookmarkedMessageIds: (ids: string[]) => void;
   toggleBookmarkedMessage: (messageId: string, bookmarked: boolean) => void;
   setShowBookmarksPanel: (show: boolean) => void;
@@ -424,6 +426,7 @@ export const useAppStore = create<AppState>((set) => ({
   showMemoryEditor: false,
   showActivityFeed: false,
   showSessionInsights: false,
+  showResumeChooser: false,
   bookmarkedMessageIds: new Set<string>(),
   showBookmarksPanel: false,
   showSnippetsLibrary: false,
@@ -942,6 +945,7 @@ export const useAppStore = create<AppState>((set) => ({
   setShowMemoryEditor: (show) => set({ showMemoryEditor: show }),
   setShowActivityFeed: (show) => set({ showActivityFeed: show }),
   setShowSessionInsights: (show) => set({ showSessionInsights: show }),
+  setShowResumeChooser: (show) => set({ showResumeChooser: show }),
   setBookmarkedMessageIds: (ids) => set({ bookmarkedMessageIds: new Set(ids) }),
   toggleBookmarkedMessage: (messageId, bookmarked) =>
     set((state) => {

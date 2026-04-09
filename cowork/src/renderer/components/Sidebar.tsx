@@ -271,6 +271,7 @@ export function Sidebar() {
             onClick={() => setShowSettings(true)}
             className="w-9 h-9 rounded-2xl flex items-center justify-center hover:bg-surface-hover transition-colors text-text-secondary relative"
             title={t('sidebar.settings')}
+            data-testid="sidebar-settings-button"
           >
             <Settings className="w-4 h-4" />
             {!isConfigured && (
@@ -513,6 +514,7 @@ export function Sidebar() {
             <button
               onClick={() => setShowSettings(true)}
               className="flex-1 min-w-0 flex items-center gap-2 text-left text-text-secondary hover:text-text-primary transition-colors"
+              data-testid="sidebar-settings-button"
             >
               <Settings className="w-4 h-4 flex-shrink-0" />
               <div className="min-w-0">

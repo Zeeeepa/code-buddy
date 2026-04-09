@@ -34,6 +34,7 @@ import { ArtifactPanel } from './components/ArtifactPanel';
 import { ComputerUseOverlay } from './components/ComputerUseOverlay';
 import { ActivityFeed } from './components/ActivityFeed';
 import { SessionInsightsPanel } from './components/SessionInsightsPanel';
+import { SessionResumeDialog } from './components/SessionResumeDialog';
 import { BookmarksPanel } from './components/BookmarksPanel';
 import { SnippetsLibrary } from './components/SnippetsLibrary';
 import { PersonaSwitcherDialog } from './components/PersonaSwitcherDialog';
@@ -94,6 +95,7 @@ function App() {
   const showGlobalSearch = useAppStore((s) => s.showGlobalSearch);
   const showActivityFeed = useAppStore((s) => s.showActivityFeed);
   const showSessionInsights = useAppStore((s) => s.showSessionInsights);
+  const showResumeChooser = useAppStore((s) => s.showResumeChooser);
   const setBookmarkedMessageIds = useAppStore((s) => s.setBookmarkedMessageIds);
   const setShowSnippetsLibrary = useAppStore((s) => s.setShowSnippetsLibrary);
   const showPersonaSwitcher = useAppStore((s) => s.showPersonaSwitcher);
@@ -119,6 +121,7 @@ function App() {
   const setShowGlobalSearch = useAppStore((s) => s.setShowGlobalSearch);
   const setShowActivityFeed = useAppStore((s) => s.setShowActivityFeed);
   const setShowSessionInsights = useAppStore((s) => s.setShowSessionInsights);
+  const setShowResumeChooser = useAppStore((s) => s.setShowResumeChooser);
   const setUpdateInfo = useAppStore((s) => s.setUpdateInfo);
   const setSearchActive = useAppStore((s) => s.setSearchActive);
   const setContextPanelCollapsed = useAppStore((s) => s.setContextPanelCollapsed);
@@ -247,6 +250,9 @@ function App() {
       } else if (mod && e.shiftKey && (e.key === 'i' || e.key === 'I')) {
         e.preventDefault();
         setShowSessionInsights(true);
+      } else if (mod && e.shiftKey && (e.key === 'o' || e.key === 'O')) {
+        e.preventDefault();
+        setShowResumeChooser(true);
       } else if (mod && e.key === '\\') {
         // Phase 3 step 8: toggle split-pane layout
         e.preventDefault();
@@ -290,6 +296,7 @@ function App() {
     setShowTestRunner,
     setShowReasoningViewer,
     setShowSessionInsights,
+    setShowResumeChooser,
     toggleSplitPane,
   ]);
 
@@ -414,6 +421,7 @@ function App() {
             setShowSettings(false);
             useAppStore.getState().setActiveSession(null);
           }}
+          onResumeSession={() => setShowResumeChooser(true)}
           onOpenSettings={() => setShowSettings(true)}
           onToggleTheme={() => {
             const newTheme = isDark ? 'light' : 'dark';
@@ -447,6 +455,7 @@ function App() {
         open={showSessionInsights}
         onClose={() => setShowSessionInsights(false)}
       />
+      <SessionResumeDialog open={showResumeChooser} onClose={() => setShowResumeChooser(false)} />
 
       {/* Bookmarks Panel — Phase 3 step 4 */}
       <BookmarksPanel />

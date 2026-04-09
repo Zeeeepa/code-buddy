@@ -1116,6 +1116,24 @@
     "duration": "Runtime",
     "noRenderableContent": "No renderable text content"
   },
+  "sessionResume": {
+    "title": "Resume session",
+    "subtitle": "Pick a previous session and continue from its workspace",
+    "searchPlaceholder": "Search by title, model, workspace, or transcript…",
+    "empty": "No resumable sessions found",
+    "selectHint": "Select a session to resume",
+    "unknownModel": "Unknown model",
+    "messages": "Messages",
+    "tools": "Tool calls",
+    "tokens": "Tokens",
+    "updated": "Updated",
+    "preview": "Transcript preview",
+    "noPreview": "No transcript preview available",
+    "resume": "Resume",
+    "resuming": "Resuming…",
+    "resumeCta_one": "Resume {{count}} session",
+    "resumeCta_other": "Resume {{count}} sessions"
+  },
   "checkpoints": {
     "empty": "No checkpoints yet. Changes will be tracked automatically.",
     "undo": "Undo last change",
