@@ -16,6 +16,7 @@ import {
   BookOpen,
   FileSearch,
 } from 'lucide-react';
+import { ProjectSelector } from './ProjectSelector';
 
 type AttachedFile = {
   name: string;
@@ -505,6 +506,10 @@ export function WelcomeView() {
         )}
 
         {/* Quick Action Tags */}
+        <div className="max-w-[320px] mx-auto">
+          <ProjectSelector />
+        </div>
+
         <div className="flex flex-wrap gap-2 justify-center px-3">
           <button
             type="button"

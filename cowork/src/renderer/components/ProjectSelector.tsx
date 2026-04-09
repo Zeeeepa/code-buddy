@@ -125,6 +125,7 @@ export const ProjectSelector: React.FC = () => {
           onClick={() => setOpen(!open)}
           className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text-secondary bg-background/60 hover:bg-surface-hover border border-border-subtle transition-colors w-full"
           title={active ? t('project.projectLabel', { name: active.name }) : t('project.noActiveProject')}
+          data-testid="project-selector-button"
         >
           <FolderKanban size={14} className="text-accent shrink-0" />
           <span className="flex-1 text-left truncate text-text-primary">
