@@ -150,6 +150,22 @@ describe('ConfigStore applyToEnv', () => {
     expect(process.env.OPENAI_MODEL).toBe('qwen3.5:0.8b');
   });
 
+  it('exports lmstudio placeholder key and normalized base url when api key is empty', () => {
+    const store = new ConfigStore();
+
+    store.update({
+      provider: 'lmstudio',
+      apiKey: '',
+      baseUrl: 'http://localhost:1234',
+      model: 'local-model',
+    });
+    store.applyToEnv();
+
+    expect(process.env.OPENAI_API_KEY).toBe('sk-lmstudio-local-proxy');
+    expect(process.env.OPENAI_BASE_URL).toBe('http://localhost:1234/v1');
+    expect(process.env.OPENAI_MODEL).toBe('local-model');
+  });
+
   it('normalizes trailing /v1 for anthropic-compatible base url when applying env', () => {
     const store = new ConfigStore();
 

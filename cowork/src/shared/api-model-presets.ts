@@ -1,4 +1,11 @@
-export type SharedProviderType = 'openrouter' | 'anthropic' | 'custom' | 'openai' | 'gemini' | 'ollama';
+export type SharedProviderType =
+  | 'openrouter'
+  | 'anthropic'
+  | 'custom'
+  | 'openai'
+  | 'gemini'
+  | 'ollama'
+  | 'lmstudio';
 
 export type SharedCustomProtocolType = 'anthropic' | 'openai' | 'gemini';
 
@@ -17,6 +24,7 @@ export interface SharedProviderPresets {
   openai: SharedProviderPreset;
   gemini: SharedProviderPreset;
   ollama: SharedProviderPreset;
+  lmstudio: SharedProviderPreset;
 }
 
 export interface ModelInputGuidance {
@@ -93,6 +101,18 @@ export const API_PROVIDER_PRESETS: SharedProviderPresets = {
     ],
     keyPlaceholder: '可留空',
     keyHint: '多数 Ollama 部署可留空；如果你的代理层要求鉴权，也可以填写 Key',
+  },
+  lmstudio: {
+    name: 'LM Studio',
+    baseUrl: 'http://localhost:1234/v1',
+    models: [
+      { id: 'local-model', name: 'local-model' },
+      { id: 'qwen2.5-coder', name: 'qwen2.5-coder' },
+      { id: 'deepseek-coder', name: 'deepseek-coder' },
+      { id: 'llama-3.1-8b', name: 'llama-3.1-8b' },
+    ],
+    keyPlaceholder: '可留空',
+    keyHint: 'LM Studio 本地服务器通常无需 API Key；如果你经过代理层，也可以填写占位 Key。',
   },
   custom: {
     name: '更多模型',
@@ -183,6 +203,13 @@ export function getModelInputGuidance(
     return {
       placeholder: 'qwen3.5:0.8b, llama3.2:latest, deepseek-r1:latest',
       hint: 'Use the exact model ID returned by your Ollama server.',
+    };
+  }
+
+  if (provider === 'lmstudio') {
+    return {
+      placeholder: 'local-model, qwen2.5-coder, deepseek-coder, llama-3.1-8b',
+      hint: 'Use the exact model ID returned by your LM Studio server.',
     };
   }
 

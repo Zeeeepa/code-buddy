@@ -120,6 +120,7 @@
     "noModelsAvailable": "No models available",
     "selectProtocol": "Select the compatible protocol for the service",
     "enterOllamaUrl": "Enter the Ollama OpenAI-compatible service URL",
+    "enterLmStudioUrl": "Enter the LM Studio OpenAI-compatible service URL",
     "enterOpenAIUrl": "Enter OpenAI-compatible service URL",
     "enterAnthropicUrl": "Enter Anthropic-compatible service URL",
     "enterGeminiUrl": "Enter a Gemini-compatible base URL",
@@ -153,6 +154,7 @@
     "enableThinking": "Enable Thinking Mode",
     "enableThinkingHint": "Show Claude's thinking process step by step. This provides more transparency but may increase token usage.",
     "enableThinkingOllamaHint": "Most Ollama models do not support thinking mode. Enable only if your model explicitly supports it.",
+    "enableThinkingLocalHint": "Most local LM Studio models do not expose structured thinking. Enable only if your model and server support it.",
     "testSuccess": "Connection successful ({{ms}}ms)",
     "testSuccessNeedSave": "Connection test passed. Save settings before starting a session.",
     "testError": {
@@ -165,6 +167,7 @@
       "network_error": "Network error. Check your connection",
       "ollama_not_running": "Cannot connect to Ollama. Please make sure Ollama is running (ollama serve).",
       "ollama_loading": "Ollama is loading the model into memory. Large models may take 30–120 seconds. Please wait and try again.",
+      "lmstudio_not_running": "Cannot connect to LM Studio. Please make sure the local server is running on port 1234.",
       "unknown": "Connection failed"
     },
     "guidance": {
@@ -217,6 +220,10 @@
         "ollama": {
           "name": "Ollama",
           "note": "Prefer the dedicated Ollama provider tab for local model discovery and refresh."
+        },
+        "lmstudio": {
+          "name": "LM Studio",
+          "note": "Prefer the dedicated LM Studio tab for local OpenAI-compatible models running on port 1234."
         },
         "gemini": {
           "name": "Gemini custom endpoint",

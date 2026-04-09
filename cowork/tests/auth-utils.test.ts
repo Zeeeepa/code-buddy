@@ -1,17 +1,21 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  normalizeLmStudioBaseUrl,
   normalizeOllamaBaseUrl,
   getUnifiedUnsupportedCustomOpenAIBaseUrl,
   isOfficialOpenAIBaseUrl,
+  isLmStudioLegacyCustomOpenAIConfig,
   isOllamaLegacyCustomOpenAIConfig,
   isLoopbackBaseUrl,
   isLikelyOAuthAccessToken,
   normalizeAnthropicBaseUrl,
+  resolveLmStudioCredentials,
   resolveOllamaCredentials,
   resolveOpenAICredentials,
   sanitizeOpenAIAccountId,
   shouldAllowEmptyAnthropicApiKey,
+  shouldAllowEmptyLmStudioApiKey,
   shouldAllowEmptyOpenAIApiKey,
   shouldAllowEmptyOllamaApiKey,
   shouldAllowEmptyGeminiApiKey,
@@ -251,6 +255,32 @@ describe('auth-utils', () => {
     ).toBe(false);
   });
 
+  it('allows empty lmstudio api key for any configured lmstudio base url', () => {
+    expect(
+      shouldAllowEmptyLmStudioApiKey({
+        provider: 'lmstudio',
+        customProtocol: 'openai',
+        baseUrl: 'http://localhost:1234/v1',
+      })
+    ).toBe(true);
+
+    expect(
+      shouldAllowEmptyLmStudioApiKey({
+        provider: 'lmstudio',
+        customProtocol: 'openai',
+        baseUrl: 'https://lmstudio.example.internal/proxy/v1',
+      })
+    ).toBe(true);
+
+    expect(
+      shouldAllowEmptyLmStudioApiKey({
+        provider: 'custom',
+        customProtocol: 'openai',
+        baseUrl: 'http://localhost:1234/v1',
+      })
+    ).toBe(false);
+  });
+
   it('normalizes ollama base urls to an openai-compatible /v1 endpoint', () => {
     expect(normalizeOllamaBaseUrl('http://localhost:11434')).toBe('http://localhost:11434/v1');
     expect(normalizeOllamaBaseUrl('http://localhost:11434/')).toBe('http://localhost:11434/v1');
@@ -283,6 +313,32 @@ describe('auth-utils', () => {
     });
   });
 
+  it('normalizes lmstudio base urls to a /v1 endpoint', () => {
+    expect(normalizeLmStudioBaseUrl('http://localhost:1234')).toBe('http://localhost:1234/v1');
+    expect(normalizeLmStudioBaseUrl('http://localhost:1234/')).toBe('http://localhost:1234/v1');
+    expect(normalizeLmStudioBaseUrl('http://localhost:1234/v1')).toBe('http://localhost:1234/v1');
+    expect(normalizeLmStudioBaseUrl('http://localhost:1234/models')).toBe(
+      'http://localhost:1234/v1'
+    );
+    expect(normalizeLmStudioBaseUrl('https://relay.example.internal/lmstudio')).toBe(
+      'https://relay.example.internal/lmstudio/v1'
+    );
+  });
+
+  it('injects an internal placeholder key for lmstudio when api key is empty', () => {
+    const resolved = resolveLmStudioCredentials({
+      provider: 'lmstudio',
+      customProtocol: 'openai',
+      apiKey: '',
+      baseUrl: 'http://localhost:1234/models',
+    });
+
+    expect(resolved).toEqual({
+      apiKey: 'sk-lmstudio-local-proxy',
+      baseUrl: 'http://localhost:1234/v1',
+    });
+  });
+
   it('detects legacy custom openai localhost ollama configs conservatively', () => {
     expect(
       isOllamaLegacyCustomOpenAIConfig({
@@ -310,6 +366,40 @@ describe('auth-utils', () => {
 
     expect(
       isOllamaLegacyCustomOpenAIConfig({
+        provider: 'custom',
+        customProtocol: 'openai',
+        baseUrl: 'http://localhost:8080/v1',
+      })
+    ).toBe(false);
+  });
+
+  it('detects legacy custom openai localhost lmstudio configs conservatively', () => {
+    expect(
+      isLmStudioLegacyCustomOpenAIConfig({
+        provider: 'custom',
+        customProtocol: 'openai',
+        baseUrl: 'http://localhost:1234/v1',
+      })
+    ).toBe(true);
+
+    expect(
+      isLmStudioLegacyCustomOpenAIConfig({
+        provider: 'custom',
+        customProtocol: 'openai',
+        baseUrl: 'http://localhost:1234',
+      })
+    ).toBe(true);
+
+    expect(
+      isLmStudioLegacyCustomOpenAIConfig({
+        provider: 'custom',
+        customProtocol: 'openai',
+        baseUrl: 'https://lmstudio.example.internal/v1',
+      })
+    ).toBe(false);
+
+    expect(
+      isLmStudioLegacyCustomOpenAIConfig({
         provider: 'custom',
         customProtocol: 'openai',
         baseUrl: 'http://localhost:8080/v1',

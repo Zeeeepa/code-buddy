@@ -47,6 +47,8 @@ export function SettingsAPI() {
     isDiscoveringLocalOllama,
     enableThinking,
     isOllamaMode,
+    isLmStudioMode,
+    isLocalOpenAIProviderMode,
     requiresApiKey,
     protocolGuidanceText,
     protocolGuidanceTone,
@@ -128,7 +130,7 @@ export function SettingsAPI() {
         </label>
         <p className="text-xs leading-5 text-text-muted">{t('api.providerDescription')}</p>
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2">
-          {(['openrouter', 'anthropic', 'openai', 'gemini', 'ollama', 'custom'] as const).map(
+          {(['openrouter', 'anthropic', 'openai', 'gemini', 'ollama', 'lmstudio', 'custom'] as const).map(
             (p) => (
               <button
                 key={p}
@@ -206,7 +208,7 @@ export function SettingsAPI() {
         </div>
       )}
 
-      {(provider === 'custom' || provider === 'ollama') && (
+      {(provider === 'custom' || provider === 'ollama' || provider === 'lmstudio') && (
         <div className="space-y-3 py-5 border-b border-border-muted">
           <div className="flex items-center justify-between gap-2">
             <label
@@ -240,6 +242,8 @@ export function SettingsAPI() {
             placeholder={
               provider === 'ollama'
                 ? 'http://localhost:11434/v1'
+                : provider === 'lmstudio'
+                  ? 'http://localhost:1234/v1'
                 : customProtocol === 'openai'
                   ? 'https://api.openai.com/v1'
                   : customProtocol === 'gemini'
@@ -251,6 +255,8 @@ export function SettingsAPI() {
           <p className="text-xs text-text-muted">
             {provider === 'ollama'
               ? t('api.enterOllamaUrl')
+              : provider === 'lmstudio'
+                ? t('api.enterLmStudioUrl')
               : customProtocol === 'openai'
                 ? t('api.enterOpenAIUrl')
                 : customProtocol === 'gemini'
@@ -275,7 +281,7 @@ export function SettingsAPI() {
             {t('api.model')}
           </label>
           <div className="flex items-center gap-2">
-            {isOllamaMode && (
+            {isLocalOpenAIProviderMode && (
               <button
                 type="button"
                 onClick={() => {
@@ -299,7 +305,7 @@ export function SettingsAPI() {
                 }`}
               >
                 <Edit3 className="w-3 h-3" />
-                {isOllamaMode
+                {isLocalOpenAIProviderMode
                   ? useCustomModel
                     ? t('api.useDetectedModels')
                     : t('api.manualModel')
@@ -342,7 +348,7 @@ export function SettingsAPI() {
         {useCustomModel && <p className="text-xs text-text-muted">{modelInputHint}</p>}
 
         {/* Context Window & Max Tokens — only for non-registry providers */}
-        {(provider === 'ollama' || provider === 'custom') && (
+        {(provider === 'ollama' || provider === 'lmstudio' || provider === 'custom') && (
           <div className="grid grid-cols-2 gap-3 pt-2">
             <div>
               <label
@@ -405,11 +411,15 @@ export function SettingsAPI() {
           <label htmlFor="enable-thinking" className="space-y-0.5 flex-1">
             <div className="text-text-primary font-medium">{t('api.enableThinking')}</div>
             <div>{t('api.enableThinkingHint')}</div>
-            {isOllamaMode && (
+            {isOllamaMode ? (
               <div className="text-amber-500 dark:text-amber-400 text-xs mt-1">
                 {t('api.enableThinkingOllamaHint')}
               </div>
-            )}
+            ) : isLmStudioMode ? (
+              <div className="text-amber-500 dark:text-amber-400 text-xs mt-1">
+                {t('api.enableThinkingLocalHint')}
+              </div>
+            ) : null}
           </label>
         </div>
       </div>

@@ -46,6 +46,7 @@ describe('pi model resolution helpers', () => {
   it('routes openrouter through the openai-compatible protocol', () => {
     expect(resolvePiRouteProtocol('openrouter', 'anthropic')).toBe('openai');
     expect(resolvePiRouteProtocol('ollama', 'openai')).toBe('openai');
+    expect(resolvePiRouteProtocol('lmstudio', 'openai')).toBe('openai');
     expect(resolvePiRouteProtocol('custom', 'gemini')).toBe('gemini');
     expect(resolvePiRouteProtocol('custom', 'anthropic')).toBe('anthropic');
   });
@@ -104,6 +105,21 @@ describe('pi model resolution helpers', () => {
     expect(fallback).toEqual({
       provider: 'openai',
       modelId: 'qwen3.5:0.8b',
+    });
+  });
+
+  it('maps lmstudio synthetic fallbacks onto the openai provider', () => {
+    const fallback = resolveSyntheticPiModelFallback({
+      rawModel: 'local-model',
+      resolvedModelString: 'local-model',
+      rawProvider: 'lmstudio',
+      routeProtocol: 'openai',
+      baseUrl: 'http://localhost:1234/v1',
+    });
+
+    expect(fallback).toEqual({
+      provider: 'openai',
+      modelId: 'local-model',
     });
   });
 

@@ -62,7 +62,12 @@ vi.mock('../src/main/claude/pi-model-resolution', () => ({
       }
       return 'anthropic';
     }
-    if (provider === 'ollama' || provider === 'openai' || provider === 'openrouter') {
+    if (
+      provider === 'ollama' ||
+      provider === 'lmstudio' ||
+      provider === 'openai' ||
+      provider === 'openrouter'
+    ) {
       return 'openai';
     }
     if (provider === 'gemini') {
@@ -321,6 +326,30 @@ describe('probeWithClaudeSdk', () => {
 
     expect(result.ok).toBe(false);
     expect(result.errorType).toBe('ollama_not_running');
+    expect(result.details).toMatch(/ECONNREFUSED/i);
+  });
+
+  it('maps ECONNREFUSED to lmstudio_not_running for lmstudio provider', async () => {
+    mocks.completeSimple.mockRejectedValue(new Error('connect ECONNREFUSED 127.0.0.1:1234'));
+
+    const result = await probeWithClaudeSdk(
+      {
+        provider: 'lmstudio',
+        apiKey: '',
+        baseUrl: 'http://localhost:1234',
+        model: 'local-model',
+      },
+      createConfig({
+        provider: 'lmstudio',
+        apiKey: '',
+        baseUrl: 'http://localhost:1234',
+        model: 'local-model',
+        activeProfileKey: 'lmstudio',
+      })
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.errorType).toBe('lmstudio_not_running');
     expect(result.details).toMatch(/ECONNREFUSED/i);
   });
 

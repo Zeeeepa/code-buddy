@@ -14,7 +14,9 @@ import { PROVIDER_PRESETS, configStore } from './config-store';
 import { DEFAULT_OLLAMA_BASE_URL } from '../../shared/ollama-base-url';
 import { isLoopbackBaseUrl } from '../../shared/network/loopback';
 import {
+  normalizeLmStudioBaseUrl,
   normalizeAnthropicBaseUrl,
+  resolveLmStudioCredentials,
   resolveOllamaCredentials,
   resolveOpenAICredentials,
   shouldAllowEmptyAnthropicApiKey,
@@ -93,6 +95,9 @@ function defaultPort(
   if (provider === 'ollama' && isLoopback(hostname)) {
     return 11434;
   }
+  if (provider === 'lmstudio' && isLoopback(hostname)) {
+    return 1234;
+  }
   return protocol === 'https:' ? 443 : 80;
 }
 
@@ -100,6 +105,7 @@ function isOpenAICompatible(input: DiagnosticInput): boolean {
   return (
     input.provider === 'openai' ||
     input.provider === 'ollama' ||
+    input.provider === 'lmstudio' ||
     input.provider === 'openrouter' ||
     (input.provider === 'custom' && input.customProtocol === 'openai')
   );
@@ -163,6 +169,10 @@ function resolveClientBaseUrl(input: DiagnosticInput): string | undefined {
 
   if (input.provider === 'ollama') {
     return normalizeOllamaBaseUrl(raw || PROVIDER_PRESETS.ollama?.baseUrl);
+  }
+
+  if (input.provider === 'lmstudio') {
+    return normalizeLmStudioBaseUrl(raw || PROVIDER_PRESETS.lmstudio?.baseUrl);
   }
 
   if (isOpenAICompatible(input)) {
@@ -324,6 +334,13 @@ async function stepAuth(input: DiagnosticInput, step: DiagnosticStep): Promise<v
               apiKey,
               baseUrl: clientBaseUrl,
             })
+          : input.provider === 'lmstudio'
+            ? resolveLmStudioCredentials({
+                provider: input.provider,
+                customProtocol: input.customProtocol,
+                apiKey,
+                baseUrl: clientBaseUrl,
+              })
           : resolveOpenAICredentials({
               provider: input.provider,
               customProtocol: input.customProtocol,

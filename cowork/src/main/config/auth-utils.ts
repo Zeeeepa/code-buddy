@@ -9,6 +9,7 @@ const OFFICIAL_OPENAI_HOSTS = new Set(['api.openai.com', 'chatgpt.com']);
 export const OPENAI_PLATFORM_BASE_URL = 'https://api.openai.com/v1';
 export const LOCAL_OPENAI_PLACEHOLDER_KEY = 'sk-openai-local-proxy';
 export const OLLAMA_PLACEHOLDER_KEY = 'sk-ollama-local-proxy';
+export const LMSTUDIO_PLACEHOLDER_KEY = 'sk-lmstudio-local-proxy';
 
 type OpenAIConfigLike = Pick<AppConfig, 'provider' | 'customProtocol' | 'apiKey' | 'baseUrl'>;
 
@@ -42,6 +43,7 @@ export function isOpenAIProvider(config: Pick<AppConfig, 'provider' | 'customPro
   return (
     config.provider === 'openai' ||
     config.provider === 'ollama' ||
+    config.provider === 'lmstudio' ||
     (config.provider === 'custom' && config.customProtocol === 'openai')
   );
 }
@@ -114,6 +116,36 @@ export function normalizeOpenAICompatibleBaseUrl(baseUrl: string | undefined): s
 
 export function normalizeOllamaBaseUrl(baseUrl: string | undefined): string | undefined {
   return sharedNormalizeOllamaBaseUrl(baseUrl);
+}
+
+export function normalizeLmStudioBaseUrl(baseUrl: string | undefined): string | undefined {
+  const normalized = normalizeBaseUrl(baseUrl);
+  if (!normalized) {
+    return undefined;
+  }
+
+  try {
+    const parsed = new URL(normalized);
+    let pathname = parsed.pathname.replace(/\/+$/, '');
+    pathname = pathname
+      .replace(/\/chat\/completions$/i, '')
+      .replace(/\/completions$/i, '')
+      .replace(/\/responses$/i, '')
+      .replace(/\/models$/i, '')
+      .replace(/\/+$/, '');
+
+    if (!pathname || pathname === '/') {
+      parsed.pathname = '/v1';
+    } else if (!/\/v1$/i.test(pathname)) {
+      parsed.pathname = `${pathname}/v1`;
+    } else {
+      parsed.pathname = pathname;
+    }
+
+    return parsed.toString().replace(/\/+$/, '');
+  } catch {
+    return normalized;
+  }
 }
 
 function extractHostname(baseUrl: string | undefined): string | undefined {
@@ -189,6 +221,12 @@ export function shouldAllowEmptyOllamaApiKey(
   return config.provider === 'ollama';
 }
 
+export function shouldAllowEmptyLmStudioApiKey(
+  config: Pick<AppConfig, 'provider' | 'customProtocol' | 'baseUrl'>
+): boolean {
+  return config.provider === 'lmstudio';
+}
+
 export function resolveOllamaCredentials(
   config: OpenAIConfigLike
 ): ResolvedOpenAICredentials | null {
@@ -199,6 +237,19 @@ export function resolveOllamaCredentials(
   return {
     apiKey: trimmedApiKey || OLLAMA_PLACEHOLDER_KEY,
     baseUrl: normalizeOllamaBaseUrl(config.baseUrl),
+  };
+}
+
+export function resolveLmStudioCredentials(
+  config: OpenAIConfigLike
+): ResolvedOpenAICredentials | null {
+  if (config.provider !== 'lmstudio') {
+    return null;
+  }
+  const trimmedApiKey = config.apiKey?.trim();
+  return {
+    apiKey: trimmedApiKey || LMSTUDIO_PLACEHOLDER_KEY,
+    baseUrl: normalizeLmStudioBaseUrl(config.baseUrl),
   };
 }
 
@@ -241,6 +292,26 @@ export function isOllamaLegacyCustomOpenAIConfig(
     const port = parsed.port || (parsed.protocol === 'https:' ? '443' : '80');
     const pathname = parsed.pathname.replace(/\/+$/, '');
     return port === '11434' && (!pathname || pathname === '/v1');
+  } catch {
+    return false;
+  }
+}
+
+export function isLmStudioLegacyCustomOpenAIConfig(
+  config: Pick<AppConfig, 'provider' | 'customProtocol' | 'baseUrl'>
+): boolean {
+  if (!(config.provider === 'custom' && config.customProtocol === 'openai')) {
+    return false;
+  }
+  const normalized = normalizeBaseUrl(config.baseUrl);
+  if (!normalized || !isLoopbackBaseUrl(normalized)) {
+    return false;
+  }
+  try {
+    const parsed = new URL(normalized);
+    const port = parsed.port || (parsed.protocol === 'https:' ? '443' : '80');
+    const pathname = parsed.pathname.replace(/\/+$/, '');
+    return port === '1234' && (!pathname || pathname === '/v1');
   } catch {
     return false;
   }

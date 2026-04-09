@@ -1384,9 +1384,9 @@ ${hints.join('\n')}
         }
         log('[ClaudeAgentRunner] Set runtime API key for config provider:', piProvider);
       } else {
-        if (provider === 'ollama') {
+        if (provider === 'ollama' || provider === 'lmstudio') {
           log(
-            '[ClaudeAgentRunner] Ollama configured without explicit API key; relying on OpenAI-compatible placeholder/env auth path',
+            '[ClaudeAgentRunner] Local OpenAI-compatible provider configured without explicit API key; relying on placeholder/env auth path',
             safeStringify({
               provider,
               modelProvider: piModel.provider,

@@ -19,11 +19,15 @@ import {
 } from '../utils/store-encryption';
 import {
   isOpenAIProvider,
+  isLmStudioLegacyCustomOpenAIConfig,
   isOllamaLegacyCustomOpenAIConfig,
+  normalizeLmStudioBaseUrl,
   normalizeAnthropicBaseUrl,
   normalizeOllamaBaseUrl,
+  resolveLmStudioCredentials,
   resolveOllamaCredentials,
   resolveOpenAICredentials,
+  shouldAllowEmptyLmStudioApiKey,
   shouldAllowEmptyOllamaApiKey,
   shouldAllowEmptyAnthropicApiKey,
   shouldAllowEmptyGeminiApiKey,
@@ -34,7 +38,14 @@ import { API_PROVIDER_PRESETS, PI_AI_CURATED_PRESETS } from '../../shared/api-mo
 /**
  * Application configuration schema
  */
-export type ProviderType = 'openrouter' | 'anthropic' | 'custom' | 'openai' | 'gemini' | 'ollama';
+export type ProviderType =
+  | 'openrouter'
+  | 'anthropic'
+  | 'custom'
+  | 'openai'
+  | 'gemini'
+  | 'ollama'
+  | 'lmstudio';
 export type CustomProtocolType = 'anthropic' | 'openai' | 'gemini';
 export type AppTheme = 'dark' | 'light' | 'system';
 export type ProviderProfileKey =
@@ -43,6 +54,7 @@ export type ProviderProfileKey =
   | 'openai'
   | 'gemini'
   | 'ollama'
+  | 'lmstudio'
   | 'custom:anthropic'
   | 'custom:openai'
   | 'custom:gemini';
@@ -175,6 +187,11 @@ const defaultProfiles: Record<ProviderProfileKey, ProviderProfile> = {
     baseUrl: 'http://localhost:11434/v1',
     model: '',
   },
+  lmstudio: {
+    apiKey: '',
+    baseUrl: 'http://localhost:1234/v1',
+    model: 'local-model',
+  },
   gemini: {
     apiKey: '',
     baseUrl: 'https://generativelanguage.googleapis.com',
@@ -287,6 +304,7 @@ const PROFILE_KEYS: ProviderProfileKey[] = [
   'openai',
   'gemini',
   'ollama',
+  'lmstudio',
   'custom:anthropic',
   'custom:openai',
   'custom:gemini',
@@ -300,7 +318,8 @@ function isProviderType(value: unknown): value is ProviderType {
     value === 'custom' ||
     value === 'openai' ||
     value === 'gemini' ||
-    value === 'ollama'
+    value === 'ollama' ||
+    value === 'lmstudio'
   );
 }
 
@@ -354,6 +373,9 @@ function profileKeyToProvider(profileKey: ProviderProfileKey): {
   if (profileKey === 'ollama') {
     return { provider: 'ollama', customProtocol: 'openai' };
   }
+  if (profileKey === 'lmstudio') {
+    return { provider: 'lmstudio', customProtocol: 'openai' };
+  }
   return { provider: profileKey, customProtocol: 'anthropic' };
 }
 
@@ -384,7 +406,7 @@ function normalizeCustomProtocol(
 }
 
 function defaultProtocolForProvider(provider: ProviderType): CustomProtocolType {
-  if (provider === 'openai' || provider === 'ollama') {
+  if (provider === 'openai' || provider === 'ollama' || provider === 'lmstudio') {
     return 'openai';
   }
   if (provider === 'gemini') {
@@ -489,7 +511,11 @@ export class ConfigStore {
         ? profile.baseUrl.trim()
         : fallback.baseUrl;
     const baseUrl =
-      profileKey === 'ollama' ? normalizeOllamaBaseUrl(rawBaseUrl) || fallback.baseUrl : rawBaseUrl;
+      profileKey === 'ollama'
+        ? normalizeOllamaBaseUrl(rawBaseUrl) || fallback.baseUrl
+        : profileKey === 'lmstudio'
+          ? normalizeLmStudioBaseUrl(rawBaseUrl) || fallback.baseUrl
+          : rawBaseUrl;
     const result: ProviderProfile = {
       apiKey: typeof profile?.apiKey === 'string' ? profile.apiKey : '',
       baseUrl,
@@ -586,6 +612,16 @@ export class ConfigStore {
       })
     ) {
       profiles.ollama = this.normalizeProfile('ollama', profiles['custom:openai']);
+    }
+    if (
+      activeProfileKey === 'custom:openai' &&
+      isLmStudioLegacyCustomOpenAIConfig({
+        provider,
+        customProtocol,
+        baseUrl: profiles['custom:openai']?.baseUrl,
+      })
+    ) {
+      profiles.lmstudio = this.normalizeProfile('lmstudio', profiles['custom:openai']);
     }
 
     if (!profiles[activeProfileKey]) {
@@ -1290,7 +1326,10 @@ export class ConfigStore {
     baseUrl?: string;
     model?: string;
   }): boolean {
-    if (projection.provider === 'ollama' && !projection.model?.trim()) {
+    if (
+      (projection.provider === 'ollama' || projection.provider === 'lmstudio') &&
+      !projection.model?.trim()
+    ) {
       return false;
     }
     const apiKey = projection.apiKey?.trim();
@@ -1324,6 +1363,15 @@ export class ConfigStore {
     ) {
       return true;
     }
+    if (
+      shouldAllowEmptyLmStudioApiKey({
+        provider: projection.provider,
+        customProtocol: projection.customProtocol,
+        baseUrl: projection.baseUrl,
+      })
+    ) {
+      return true;
+    }
     const protocol: CustomProtocolType = normalizeCustomProtocol(
       projection.customProtocol,
       defaultProtocolForProvider(projection.provider)
@@ -1339,6 +1387,13 @@ export class ConfigStore {
             apiKey: projection.apiKey ?? '',
             baseUrl: projection.baseUrl,
           })
+        : projection.provider === 'lmstudio'
+          ? resolveLmStudioCredentials({
+              provider: projection.provider,
+              customProtocol: protocol,
+              apiKey: projection.apiKey ?? '',
+              baseUrl: projection.baseUrl,
+            })
         : resolveOpenAICredentials({
             provider: projection.provider,
             customProtocol: protocol,
@@ -1420,6 +1475,7 @@ export class ConfigStore {
     const useOpenAI =
       projectedConfig.provider === 'openai' ||
       projectedConfig.provider === 'ollama' ||
+      projectedConfig.provider === 'lmstudio' ||
       (projectedConfig.provider === 'custom' && projectedConfig.customProtocol === 'openai');
     const useGemini =
       projectedConfig.provider === 'gemini' ||
@@ -1429,6 +1485,8 @@ export class ConfigStore {
       const resolvedOpenAI =
         projectedConfig.provider === 'ollama'
           ? resolveOllamaCredentials(projectedConfig)
+          : projectedConfig.provider === 'lmstudio'
+            ? resolveLmStudioCredentials(projectedConfig)
           : resolveOpenAICredentials(projectedConfig);
       if (resolvedOpenAI?.apiKey) {
         process.env.OPENAI_API_KEY = resolvedOpenAI.apiKey;

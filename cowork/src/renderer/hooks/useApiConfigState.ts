@@ -74,6 +74,7 @@ const PROFILE_KEYS: ProviderProfileKey[] = [
   'openai',
   'gemini',
   'ollama',
+  'lmstudio',
   'custom:anthropic',
   'custom:openai',
   'custom:gemini',
@@ -90,7 +91,8 @@ function isProviderType(value: unknown): value is ProviderType {
     value === 'custom' ||
     value === 'openai' ||
     value === 'gemini' ||
-    value === 'ollama'
+    value === 'ollama' ||
+    value === 'lmstudio'
   );
 }
 
@@ -120,6 +122,9 @@ export function profileKeyToProvider(profileKey: ProviderProfileKey): {
 } {
   if (profileKey === 'ollama') {
     return { provider: 'ollama', customProtocol: 'openai' };
+  }
+  if (profileKey === 'lmstudio') {
+    return { provider: 'lmstudio', customProtocol: 'openai' };
   }
   if (profileKey === 'custom:openai') {
     return { provider: 'custom', customProtocol: 'openai' };
@@ -151,6 +156,51 @@ export function isCustomOpenAiLoopbackGateway(baseUrl: string): boolean {
   return isLoopbackBaseUrl(baseUrl);
 }
 
+function isLegacyLmStudioConfig(
+  config: Pick<AppConfig, 'provider' | 'customProtocol' | 'baseUrl'> | null | undefined
+): boolean {
+  if (!(config?.provider === 'custom' && config.customProtocol === 'openai')) {
+    return false;
+  }
+  const baseUrl = config.baseUrl?.trim();
+  if (!baseUrl || !isLoopbackBaseUrl(baseUrl)) {
+    return false;
+  }
+  try {
+    const parsed = new URL(baseUrl);
+    const port = parsed.port || (parsed.protocol === 'https:' ? '443' : '80');
+    const pathname = parsed.pathname.replace(/\/+$/, '');
+    return port === '1234' && (!pathname || pathname === '/v1');
+  } catch {
+    return false;
+  }
+}
+
+function normalizeLmStudioBaseUrl(baseUrl: string): string {
+  try {
+    const parsed = new URL(baseUrl);
+    let pathname = parsed.pathname.replace(/\/+$/, '');
+    pathname = pathname
+      .replace(/\/chat\/completions$/i, '')
+      .replace(/\/completions$/i, '')
+      .replace(/\/responses$/i, '')
+      .replace(/\/models$/i, '')
+      .replace(/\/+$/, '');
+
+    if (!pathname || pathname === '/') {
+      parsed.pathname = '/v1';
+    } else if (!/\/v1$/i.test(pathname)) {
+      parsed.pathname = `${pathname}/v1`;
+    } else {
+      parsed.pathname = pathname;
+    }
+
+    return parsed.toString().replace(/\/+$/, '');
+  } catch {
+    return baseUrl.replace(/\/+$/, '');
+  }
+}
+
 function isLegacyOllamaConfig(
   config: Pick<AppConfig, 'provider' | 'customProtocol' | 'baseUrl'> | null | undefined
 ): boolean {
@@ -174,6 +224,9 @@ function isLegacyOllamaConfig(
 function modelPresetForProfile(profileKey: ProviderProfileKey, presets: ProviderPresets) {
   if (profileKey === 'ollama') {
     return presets.ollama;
+  }
+  if (profileKey === 'lmstudio') {
+    return presets.lmstudio;
   }
   if (profileKey === 'custom:openai') {
     return presets.openai;
@@ -267,6 +320,8 @@ function normalizeProfile(
     apiKey: profile?.apiKey || '',
     baseUrl: profileKey === 'ollama'
       ? (normalizeOllamaBaseUrl(rawBaseUrl) || fallback.baseUrl)
+      : profileKey === 'lmstudio'
+        ? normalizeLmStudioBaseUrl(rawBaseUrl) || fallback.baseUrl
       : rawBaseUrl,
     model: hasPresetModel ? modelValue : fallback.model,
     customModel: hasPresetModel ? '' : modelValue,
@@ -281,8 +336,13 @@ export function buildApiConfigSnapshot(
   presets: ProviderPresets
 ): ConfigStateSnapshot {
   const migratedToOllama = config?.provider === 'ollama' || isLegacyOllamaConfig(config);
-  const provider = migratedToOllama ? 'ollama' : config?.provider || 'openrouter';
-  const customProtocol: CustomProtocolType = migratedToOllama
+  const migratedToLmStudio = config?.provider === 'lmstudio' || isLegacyLmStudioConfig(config);
+  const provider = migratedToOllama
+    ? 'ollama'
+    : migratedToLmStudio
+      ? 'lmstudio'
+      : config?.provider || 'openrouter';
+  const customProtocol: CustomProtocolType = migratedToOllama || migratedToLmStudio
     ? 'openai'
     : config?.customProtocol === 'openai'
       ? 'openai'
@@ -292,6 +352,8 @@ export function buildApiConfigSnapshot(
   const derivedProfileKey = profileKeyFromProvider(provider, customProtocol);
   const activeProfileKey = migratedToOllama
     ? 'ollama'
+    : migratedToLmStudio
+      ? 'lmstudio'
     : isProfileKey(config?.activeProfileKey)
       ? config.activeProfileKey
       : derivedProfileKey;
@@ -305,6 +367,18 @@ export function buildApiConfigSnapshot(
     profiles.ollama = normalizeProfile(
       'ollama',
       config?.profiles?.ollama ||
+        config?.profiles?.['custom:openai'] || {
+          apiKey: config?.apiKey || '',
+          baseUrl: config?.baseUrl,
+          model: config?.model,
+        },
+      presets
+    );
+  }
+  if (migratedToLmStudio) {
+    profiles.lmstudio = normalizeProfile(
+      'lmstudio',
+      config?.profiles?.lmstudio ||
         config?.profiles?.['custom:openai'] || {
           apiKey: config?.apiKey || '',
           baseUrl: config?.baseUrl,
@@ -387,12 +461,19 @@ export function buildApiConfigSets(
         customProtocol: isCustomProtocol(set.customProtocol) ? set.customProtocol : 'anthropic',
         baseUrl: set.profiles?.['custom:openai']?.baseUrl || config?.baseUrl,
       });
+      const isMigratedLmStudioSet = isLegacyLmStudioConfig({
+        provider: isProviderType(set.provider) ? set.provider : 'openrouter',
+        customProtocol: isCustomProtocol(set.customProtocol) ? set.customProtocol : 'anthropic',
+        baseUrl: set.profiles?.['custom:openai']?.baseUrl || config?.baseUrl,
+      });
       const provider = isMigratedOllamaSet
         ? 'ollama'
+        : isMigratedLmStudioSet
+          ? 'lmstudio'
         : isProviderType(set.provider)
           ? set.provider
           : 'openrouter';
-      const customProtocol = isMigratedOllamaSet
+      const customProtocol = isMigratedOllamaSet || isMigratedLmStudioSet
         ? 'openai'
         : isCustomProtocol(set.customProtocol)
           ? set.customProtocol
@@ -400,6 +481,8 @@ export function buildApiConfigSets(
       const fallbackActive = profileKeyFromProvider(provider, customProtocol);
       const activeProfileKey = isMigratedOllamaSet
         ? 'ollama'
+        : isMigratedLmStudioSet
+          ? 'lmstudio'
         : isProfileKey(set.activeProfileKey)
           ? set.activeProfileKey
           : fallbackActive;
@@ -428,6 +511,20 @@ export function buildApiConfigSets(
           model: ollamaProfile.useCustomModel
             ? ollamaProfile.customModel.trim() || ollamaProfile.model
             : ollamaProfile.model,
+        };
+      }
+      if (isMigratedLmStudioSet) {
+        const lmStudioProfile = normalizeProfile(
+          'lmstudio',
+          set.profiles?.lmstudio || set.profiles?.['custom:openai'],
+          presets
+        );
+        normalizedProfiles.lmstudio = {
+          apiKey: lmStudioProfile.apiKey,
+          baseUrl: lmStudioProfile.baseUrl,
+          model: lmStudioProfile.useCustomModel
+            ? lmStudioProfile.customModel.trim() || lmStudioProfile.model
+            : lmStudioProfile.model,
         };
       }
 
@@ -925,13 +1022,15 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
   const providerMeta = useMemo(() => profileKeyToProvider(activeProfileKey), [activeProfileKey]);
   const provider = providerMeta.provider;
   const customProtocol = providerMeta.customProtocol;
+  const isLocalOpenAIProvider = provider === 'ollama' || provider === 'lmstudio';
   const currentProfile =
     profiles[activeProfileKey] || defaultProfileForKey(activeProfileKey, presets);
   const modelPreset = modelPresetForProfile(activeProfileKey, presets);
   const currentPreset = modelPreset;
   const hasDiscoveredOllamaModels =
-    provider === 'ollama' && Object.prototype.hasOwnProperty.call(discoveredModels, activeProfileKey);
-  const modelOptions = provider === 'ollama'
+    isLocalOpenAIProvider &&
+    Object.prototype.hasOwnProperty.call(discoveredModels, activeProfileKey);
+  const modelOptions = isLocalOpenAIProvider
     ? (discoveredModels[activeProfileKey] || [])
     : hasDiscoveredOllamaModels
       ? (discoveredModels[activeProfileKey] || [])
@@ -956,7 +1055,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
   const customModel = currentProfile.customModel;
   const useCustomModel = currentProfile.useCustomModel;
   const shouldShowOllamaManualModelToggle =
-    provider !== 'ollama'
+    !isLocalOpenAIProvider
       || useCustomModel
       || Boolean(error)
       || modelOptions.length === 0;
@@ -1104,7 +1203,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
   ]);
 
   const allowEmptyApiKey =
-    provider === 'ollama' ||
+    isLocalOpenAIProvider ||
     (provider === 'custom' &&
       ((customProtocol === 'anthropic' && isCustomAnthropicLoopbackGateway(baseUrl)) ||
         (customProtocol === 'openai' && isCustomOpenAiLoopbackGateway(baseUrl)) ||
@@ -1336,7 +1435,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
   }, [activeProfileKey, baseUrl, provider]);
 
   useEffect(() => {
-    if (provider !== 'ollama') {
+    if (!isLocalOpenAIProvider) {
       return;
     }
     // Drop stale discovered model list when baseUrl changes
@@ -1361,7 +1460,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
         return current;
       },
     });
-  }, [activeProfileKey, baseUrl, provider, presets]);
+  }, [activeProfileKey, baseUrl, isLocalOpenAIProvider, provider, presets]);
 
   const handleTest = useCallback(async () => {
     if (requiresApiKey && !apiKey.trim()) {
@@ -1375,7 +1474,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
       return;
     }
 
-    if (provider === 'ollama' && !baseUrl.trim()) {
+    if (isLocalOpenAIProvider && !baseUrl.trim()) {
       showErrorKey('api.testError.missing_base_url');
       return;
     }
@@ -1385,7 +1484,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     dispatch({ type: 'SET_TEST_RESULT', payload: null });
     try {
       const resolvedBaseUrl =
-        provider === 'custom' || provider === 'ollama'
+        provider === 'custom' || isLocalOpenAIProvider
           ? baseUrl.trim()
           : (baseUrl.trim() || currentPreset.baseUrl || '').trim();
 
@@ -1421,6 +1520,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     customProtocol,
     model,
     provider,
+    isLocalOpenAIProvider,
     requiresApiKey,
     hasUnsavedChanges,
     clearError,
@@ -1442,7 +1542,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     dispatch({ type: 'SET_TEST_RESULT', payload: null });
     try {
       const resolvedBaseUrl =
-        provider === 'custom' || provider === 'ollama'
+        provider === 'custom' || isLocalOpenAIProvider
           ? baseUrl.trim()
           : (baseUrl.trim() || currentPreset.baseUrl || '').trim();
 
@@ -1467,6 +1567,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     apiKey,
     baseUrl,
     provider,
+    isLocalOpenAIProvider,
     customProtocol,
     model,
     customModel,
@@ -1482,7 +1583,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
   }, [handleDiagnose]);
 
   const refreshModelOptions = useCallback(async () => {
-    if (!isElectron || provider !== 'ollama') {
+    if (!isElectron || !isLocalOpenAIProvider) {
       return [];
     }
 
@@ -1502,7 +1603,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
       const latestTarget = latestOllamaTargetRef.current;
       if (
         requestId !== ollamaRefreshRequestIdRef.current
-        || latestTarget.provider !== 'ollama'
+        || latestTarget.provider !== provider
         || latestTarget.activeProfileKey !== requestedProfileKey
         || latestTarget.baseUrl !== requestedBaseUrl
       ) {
@@ -1535,7 +1636,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
       const latestTarget = latestOllamaTargetRef.current;
       if (
         requestId !== ollamaRefreshRequestIdRef.current
-        || latestTarget.provider !== 'ollama'
+        || latestTarget.provider !== provider
         || latestTarget.activeProfileKey !== requestedProfileKey
         || latestTarget.baseUrl !== requestedBaseUrl
       ) {
@@ -1557,7 +1658,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     activeProfileKey,
     apiKey,
     baseUrl,
-    presets,
+    isLocalOpenAIProvider,
     provider,
     clearError,
     showErrorKey,
@@ -1696,14 +1797,14 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
   // Auto-refresh model list when Ollama baseUrl changes (debounced).
   // Only fires for URLs that look plausible (start with http(s):// and have a host).
   useEffect(() => {
-    if (provider !== 'ollama') return;
+    if (!isLocalOpenAIProvider) return;
     const trimmed = baseUrl.trim();
     if (!trimmed || !/^https?:\/\/.{3,}/i.test(trimmed)) return;
     const timer = setTimeout(() => {
       void refreshModelOptions();
     }, 800);
     return () => clearTimeout(timer);
-  }, [provider, baseUrl, refreshModelOptions]);
+  }, [baseUrl, isLocalOpenAIProvider, refreshModelOptions]);
 
   const handleSave = useCallback(
     async (options?: { silentSuccess?: boolean }) => {
@@ -1718,7 +1819,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
         return false;
       }
 
-      if (provider === 'ollama' && !baseUrl.trim()) {
+      if (isLocalOpenAIProvider && !baseUrl.trim()) {
         showErrorKey('api.testError.missing_base_url');
         return false;
       }
@@ -1727,7 +1828,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
       dispatch({ type: 'SET_IS_SAVING', payload: true });
       try {
         const resolvedBaseUrl =
-          provider === 'custom' || provider === 'ollama'
+          provider === 'custom' || isLocalOpenAIProvider
             ? baseUrl.trim()
             : (currentPreset.baseUrl || baseUrl).trim();
 
@@ -1786,6 +1887,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
       presets,
       profiles,
       provider,
+      isLocalOpenAIProvider,
       requiresApiKey,
       clearError,
       clearSuccessMessage,
@@ -2072,6 +2174,8 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     handleDiagnose,
     handleDeepDiagnose,
     isOllamaMode: provider === 'ollama',
+    isLmStudioMode: provider === 'lmstudio',
+    isLocalOpenAIProviderMode: isLocalOpenAIProvider,
     shouldShowOllamaManualModelToggle,
     requiresApiKey,
     detectedProviderSetup,

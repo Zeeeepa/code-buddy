@@ -67,6 +67,7 @@ import {
   type CreateConfigSetPayload,
 } from './config/config-store';
 import { runConfigApiTest } from './config/config-test-routing';
+import { listLmStudioModels } from './config/lmstudio-api';
 import { listOllamaModels } from './config/ollama-api';
 import { mcpConfigStore } from './mcp/mcp-config-store';
 import { getSandboxAdapter, shutdownSandbox } from './sandbox/sandbox-adapter';
@@ -2404,10 +2405,13 @@ ipcMain.handle(
     _event,
     payload: { provider: AppConfig['provider']; apiKey: string; baseUrl?: string }
   ): Promise<ProviderModelInfo[]> => {
-    if (payload.provider !== 'ollama') {
-      return [];
+    if (payload.provider === 'ollama') {
+      return listOllamaModels(payload);
     }
-    return listOllamaModels(payload);
+    if (payload.provider === 'lmstudio') {
+      return listLmStudioModels(payload);
+    }
+    return [];
   }
 );
 

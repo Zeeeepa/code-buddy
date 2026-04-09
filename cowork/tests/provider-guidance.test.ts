@@ -35,6 +35,13 @@ describe('provider guidance helpers', () => {
     expect(detectCommonProviderSetup('http://localhost:3000/v1')).toBeNull();
   });
 
+  it('detects LM Studio on the local default port and prefers the dedicated provider tab', () => {
+    const setup = detectCommonProviderSetup('http://localhost:1234/v1');
+    expect(setup?.id).toBe('lmstudio');
+    expect(setup?.preferProviderTab).toBe('lmstudio');
+    expect(detectCommonProviderSetup('http://localhost:1235/v1')).toBeNull();
+  });
+
   it('keeps unknown hosts unmatched and exposes the generic OpenAI fallback separately', () => {
     expect(detectCommonProviderSetup('https://relay.example.internal/v1')).toBeNull();
     expect(getFallbackOpenAISetup().id).toBe('generic-openai');

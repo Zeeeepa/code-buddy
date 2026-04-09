@@ -20,6 +20,7 @@ describe('api config state helpers', () => {
   it('maps provider/protocol to profile key and back', () => {
     expect(profileKeyFromProvider('openrouter')).toBe('openrouter');
     expect(profileKeyFromProvider('ollama')).toBe('ollama');
+    expect(profileKeyFromProvider('lmstudio')).toBe('lmstudio');
     expect(profileKeyFromProvider('custom', 'openai')).toBe('custom:openai');
     expect(profileKeyFromProvider('custom', 'gemini')).toBe('custom:gemini');
     expect(profileKeyToProvider('custom:anthropic')).toEqual({
@@ -32,6 +33,10 @@ describe('api config state helpers', () => {
     });
     expect(profileKeyToProvider('ollama')).toEqual({
       provider: 'ollama',
+      customProtocol: 'openai',
+    });
+    expect(profileKeyToProvider('lmstudio')).toEqual({
+      provider: 'lmstudio',
       customProtocol: 'openai',
     });
   });
@@ -82,6 +87,30 @@ describe('api config state helpers', () => {
     expect(snapshot.profiles.ollama.baseUrl).toBe('http://localhost:11434/v1');
   });
 
+  it('conservatively upgrades legacy localhost lmstudio config into the lmstudio profile', () => {
+    const config = {
+      provider: 'custom',
+      customProtocol: 'openai',
+      activeProfileKey: 'custom:openai',
+      apiKey: '',
+      baseUrl: 'http://localhost:1234/v1',
+      model: 'local-model',
+      profiles: {
+        'custom:openai': {
+          apiKey: '',
+          baseUrl: 'http://localhost:1234/v1',
+          model: 'local-model',
+        },
+      },
+      isConfigured: true,
+    } as AppConfig;
+
+    const snapshot = buildApiConfigSnapshot(config, FALLBACK_PROVIDER_PRESETS);
+    expect(snapshot.activeProfileKey).toBe('lmstudio');
+    expect(snapshot.profiles.lmstudio.baseUrl).toBe('http://localhost:1234/v1');
+    expect(snapshot.profiles.lmstudio.model).toBe('local-model');
+  });
+
   it('keeps remote custom openai configs generic instead of auto-migrating them to ollama', () => {
     const config = {
       provider: 'custom',
@@ -108,6 +137,12 @@ describe('api config state helpers', () => {
     expect(FALLBACK_PROVIDER_PRESETS.ollama.baseUrl).toBe('http://localhost:11434/v1');
     expect(FALLBACK_PROVIDER_PRESETS.ollama.keyHint).toContain('Ollama');
     expect(getModelInputGuidance('ollama').placeholder).toContain('qwen');
+  });
+
+  it('exposes lmstudio presets and guidance', () => {
+    expect(FALLBACK_PROVIDER_PRESETS.lmstudio.baseUrl).toBe('http://localhost:1234/v1');
+    expect(FALLBACK_PROVIDER_PRESETS.lmstudio.keyHint).toContain('LM Studio');
+    expect(getModelInputGuidance('lmstudio').placeholder).toContain('local-model');
   });
 
   it('loads existing profile values without overwriting them with defaults', () => {

@@ -2,9 +2,11 @@ import { completeSimple, type UserMessage as PiUserMessage } from '@mariozechner
 import type { ApiTestInput, ApiTestResult } from '../../renderer/types';
 import { PROVIDER_PRESETS, type AppConfig, type CustomProtocolType } from '../config/config-store';
 import {
+  normalizeLmStudioBaseUrl,
   normalizeAnthropicBaseUrl,
   normalizeOllamaBaseUrl,
   normalizeOpenAICompatibleBaseUrl,
+  resolveLmStudioCredentials,
   resolveOllamaCredentials,
   resolveOpenAICredentials,
   shouldAllowEmptyAnthropicApiKey,
@@ -65,6 +67,17 @@ function resolveProbeApiKey(
     );
   }
 
+  if (input.provider === 'lmstudio') {
+    return (
+      resolveLmStudioCredentials({
+        provider: input.provider,
+        customProtocol: resolvedCustomProtocol,
+        apiKey: '',
+        baseUrl: effectiveBaseUrl,
+      })?.apiKey || ''
+    );
+  }
+
   if (
     input.provider === 'openai' ||
     input.provider === 'openrouter' ||
@@ -114,6 +127,8 @@ function buildProbeConfig(input: ApiTestInput, config: AppConfig): AppConfig {
   const effectiveBaseUrl =
     input.provider === 'ollama'
       ? normalizeOllamaBaseUrl(effectiveRawBaseUrl) || effectiveRawBaseUrl
+      : input.provider === 'lmstudio'
+        ? normalizeLmStudioBaseUrl(effectiveRawBaseUrl) || effectiveRawBaseUrl
       : resolvedCustomProtocol === 'openai'
         ? normalizeOpenAICompatibleBaseUrl(effectiveRawBaseUrl) || effectiveRawBaseUrl
         : resolvedCustomProtocol === 'gemini'
@@ -151,6 +166,9 @@ function mapPiAiError(errorText: string, durationMs: number, provider?: string):
   }
   if (provider === 'ollama' && /econnrefused/i.test(lowered)) {
     return { ok: false, latencyMs: durationMs, errorType: 'ollama_not_running', details };
+  }
+  if (provider === 'lmstudio' && /econnrefused/i.test(lowered)) {
+    return { ok: false, latencyMs: durationMs, errorType: 'lmstudio_not_running', details };
   }
   if (NETWORK_ERROR_RE.test(lowered)) {
     return { ok: false, latencyMs: durationMs, errorType: 'network_error', details };

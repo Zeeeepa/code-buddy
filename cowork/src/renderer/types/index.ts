@@ -583,7 +583,14 @@ export interface ExecutionContext {
 }
 
 // App Config types
-export type ProviderType = 'openrouter' | 'anthropic' | 'custom' | 'openai' | 'gemini' | 'ollama';
+export type ProviderType =
+  | 'openrouter'
+  | 'anthropic'
+  | 'custom'
+  | 'openai'
+  | 'gemini'
+  | 'ollama'
+  | 'lmstudio';
 export type CustomProtocolType = 'anthropic' | 'openai' | 'gemini';
 export type AppTheme = 'dark' | 'light' | 'system';
 export type ProviderProfileKey =
@@ -592,6 +599,7 @@ export type ProviderProfileKey =
   | 'openai'
   | 'gemini'
   | 'ollama'
+  | 'lmstudio'
   | 'custom:anthropic'
   | 'custom:openai'
   | 'custom:gemini';
@@ -659,6 +667,7 @@ export interface ProviderPresets {
   openai: ProviderPreset;
   gemini: ProviderPreset;
   ollama: ProviderPreset;
+  lmstudio: ProviderPreset;
 }
 
 export interface ProviderModelInfo {
@@ -690,6 +699,7 @@ export interface ApiTestResult {
     | 'network_error'
     | 'ollama_not_running'
     | 'ollama_loading'
+    | 'lmstudio_not_running'
     | 'unknown';
   details?: string;
 }

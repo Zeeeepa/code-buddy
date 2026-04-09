@@ -265,6 +265,37 @@ describe('ConfigStore provider profiles', () => {
     expect(store.isConfigured()).toBe(false);
   });
 
+  it('treats lmstudio as configured without api key when a model is selected', () => {
+    const store = new ConfigStore();
+
+    store.update({
+      provider: 'lmstudio',
+      apiKey: '',
+      baseUrl: 'http://localhost:1234/v1',
+      model: 'local-model',
+    });
+
+    expect(store.hasUsableCredentialsForActiveSet()).toBe(true);
+    expect(store.hasAnyUsableCredentials()).toBe(true);
+    expect(store.isConfigured()).toBe(true);
+  });
+
+  it('falls back to the default lmstudio model when the model field is cleared', () => {
+    const store = new ConfigStore();
+
+    store.update({
+      provider: 'lmstudio',
+      apiKey: '',
+      baseUrl: 'http://localhost:1234/v1',
+      model: '',
+    });
+
+    expect(store.getAll().model).toBe('local-model');
+    expect(store.hasUsableCredentialsForActiveSet()).toBe(true);
+    expect(store.hasAnyUsableCredentials()).toBe(true);
+    expect(store.isConfigured()).toBe(true);
+  });
+
   it('keeps non-loopback custom anthropic gateway requiring api key', () => {
     const store = new ConfigStore();
 

@@ -120,6 +120,7 @@
     "noModelsAvailable": "暂无可用模型",
     "selectProtocol": "选择服务的兼容协议",
     "enterOllamaUrl": "输入 Ollama 的 OpenAI 兼容服务 URL",
+    "enterLmStudioUrl": "输入 LM Studio 的 OpenAI 兼容服务 URL",
     "enterOpenAIUrl": "输入 OpenAI 兼容的服务 URL",
     "enterAnthropicUrl": "输入 Anthropic 兼容的服务 URL",
     "enterGeminiUrl": "输入 Gemini 兼容的服务 URL",
@@ -153,6 +154,7 @@
     "enableThinking": "启用思考模式",
     "enableThinkingHint": "显示 Claude 的思考过程。这提供更多透明度，但可能增加 token 消耗。",
     "enableThinkingOllamaHint": "大多数 Ollama 模型不支持思考模式，仅在模型明确支持时启用。",
+    "enableThinkingLocalHint": "大多数 LM Studio 本地模型不会暴露结构化思考输出，仅在模型与服务端明确支持时启用。",
     "testSuccess": "连接成功（{{ms}}ms）",
     "testSuccessNeedSave": "连接测试成功，请点击“保存设置”后再开始会话。",
     "testError": {
@@ -165,6 +167,7 @@
       "network_error": "网络连接失败，请检查网络或地址",
       "ollama_not_running": "无法连接 Ollama，请确认 Ollama 已启动（ollama serve）",
       "ollama_loading": "Ollama 正在将模型加载到内存中，大型模型可能需要 30–120 秒，请稍候后重试。",
+      "lmstudio_not_running": "无法连接 LM Studio，请确认本地服务已在 1234 端口启动。",
       "unknown": "连接失败"
     },
     "guidance": {
@@ -217,6 +220,10 @@
         "ollama": {
           "name": "Ollama",
           "note": "本地模型发现与刷新更适合使用专用的 Ollama 配置入口。"
+        },
+        "lmstudio": {
+          "name": "LM Studio",
+          "note": "运行在 1234 端口的本地 OpenAI 兼容模型更适合使用专用的 LM Studio 配置入口。"
         },
         "gemini": {
           "name": "Gemini 自定义端点",

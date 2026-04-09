@@ -216,4 +216,42 @@ describe('api config set helpers', () => {
       'https://ollama.example.internal/proxy/v1'
     );
   });
+
+  it('upgrades legacy localhost lmstudio config sets to lmstudio in UI bootstrap', () => {
+    const config = {
+      provider: 'custom',
+      customProtocol: 'openai',
+      activeProfileKey: 'custom:openai',
+      activeConfigSetId: 'legacy-lmstudio',
+      apiKey: '',
+      baseUrl: 'http://localhost:1234/v1',
+      model: 'local-model',
+      configSets: [
+        {
+          id: 'legacy-lmstudio',
+          name: 'Legacy LM Studio',
+          isSystem: false,
+          provider: 'custom',
+          customProtocol: 'openai',
+          activeProfileKey: 'custom:openai',
+          profiles: {
+            'custom:openai': {
+              apiKey: '',
+              baseUrl: 'http://localhost:1234/v1',
+              model: 'local-model',
+            },
+          },
+          enableThinking: false,
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+      isConfigured: true,
+    } as AppConfig;
+
+    const bootstrap = buildApiConfigBootstrap(config, FALLBACK_PROVIDER_PRESETS);
+    expect(bootstrap.snapshot.activeProfileKey).toBe('lmstudio');
+    expect(bootstrap.configSets[0].provider).toBe('lmstudio');
+    expect(bootstrap.configSets[0].activeProfileKey).toBe('lmstudio');
+    expect(bootstrap.configSets[0].profiles.lmstudio?.baseUrl).toBe('http://localhost:1234/v1');
+  });
 });

@@ -6,6 +6,7 @@ export type CommonProviderSetupId =
   | 'kimi-coding'
   | 'glm-anthropic'
   | 'ollama'
+  | 'lmstudio'
   | 'gemini-custom'
   | 'minimax'
   | 'generic-openai';
@@ -110,6 +111,22 @@ export const COMMON_PROVIDER_SETUPS: CommonProviderSetup[] = [
     matcher: {
       hosts: ['localhost', '127.0.0.1', '0.0.0.0', '[::1]'],
       ports: ['11434'],
+      pathPrefixes: ['', '/', '/v1'],
+    },
+  },
+  {
+    id: 'lmstudio',
+    nameKey: 'api.guidance.setups.lmstudio.name',
+    noteKey: 'api.guidance.setups.lmstudio.note',
+    applyProvider: 'lmstudio',
+    recommendedProtocol: 'openai',
+    recommendedBaseUrl: 'http://localhost:1234/v1',
+    exampleModel: 'local-model',
+    protocolLabel: 'LM Studio',
+    preferProviderTab: 'lmstudio',
+    matcher: {
+      hosts: ['localhost', '127.0.0.1', '[::1]'],
+      ports: ['1234'],
       pathPrefixes: ['', '/', '/v1'],
     },
   },

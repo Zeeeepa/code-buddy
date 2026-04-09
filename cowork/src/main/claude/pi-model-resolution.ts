@@ -2,7 +2,7 @@ import { getModel, type Api, type Model } from '@mariozechner/pi-ai';
 import { isOfficialOpenAIBaseUrl } from '../config/auth-utils';
 
 const COMMON_FALLBACK_PROVIDERS = ['openai', 'anthropic', 'google'] as const;
-const INVALID_REGISTRY_PROVIDERS = new Set(['', 'custom']);
+const INVALID_REGISTRY_PROVIDERS = new Set(['', 'custom', 'lmstudio']);
 const REASONING_MODEL_PATTERN =
   /\bthinking\b|\breasoner\b|deepseek-r1|kimi-k2|qwen3(?:\.5)?(?=[:/-]|$)/i;
 type PiRegistryProvider = Parameters<typeof getModel>[0];
@@ -47,6 +47,7 @@ export function resolvePiRouteProtocol(provider?: string, customProtocol?: strin
     return 'anthropic';
   }
   if (provider === 'ollama') return 'openai';
+  if (provider === 'lmstudio') return 'openai';
   if (provider === 'openai') return 'openai';
   if (provider === 'openrouter') return 'openai';
   if (provider === 'gemini') return 'gemini';
@@ -170,7 +171,9 @@ export function resolveSyntheticPiModelFallback(
   }
 
   const fallbackProvider =
-    input.rawProvider === 'custom' || input.rawProvider === 'ollama'
+    input.rawProvider === 'custom' ||
+    input.rawProvider === 'ollama' ||
+    input.rawProvider === 'lmstudio'
       ? input.routeProtocol || 'anthropic'
       : parsedProvider || input.rawProvider || input.routeProtocol || 'anthropic';
 
@@ -286,7 +289,7 @@ export function applyPiModelRuntimeOverrides(
   }
 
   if (
-    options.rawProvider === 'ollama' &&
+    (options.rawProvider === 'ollama' || options.rawProvider === 'lmstudio') &&
     nextModel.reasoning &&
     nextModel.api === 'openai-completions'
   ) {

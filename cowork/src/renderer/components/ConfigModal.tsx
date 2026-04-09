@@ -26,7 +26,7 @@ interface ConfigModalProps {
 }
 
 const PROVIDER_LABELS: Record<
-  'openrouter' | 'anthropic' | 'openai' | 'gemini' | 'ollama' | 'custom',
+  'openrouter' | 'anthropic' | 'openai' | 'gemini' | 'ollama' | 'lmstudio' | 'custom',
   string
 > = {
   openrouter: 'OpenRouter',
@@ -34,6 +34,7 @@ const PROVIDER_LABELS: Record<
   openai: 'OpenAI',
   gemini: 'Gemini',
   ollama: 'Ollama',
+  lmstudio: 'LM Studio',
   custom: 'Custom',
 };
 
@@ -68,6 +69,7 @@ export function ConfigModal({
     testResult,
     friendlyTestDetails,
     isOllamaMode,
+    isLocalOpenAIProviderMode,
     requiresApiKey,
     protocolGuidanceText,
     protocolGuidanceTone,
@@ -137,6 +139,8 @@ export function ConfigModal({
         return t('api.testError.network_error');
       case 'ollama_not_running':
         return t('api.testError.ollama_not_running');
+      case 'lmstudio_not_running':
+        return t('api.testError.lmstudio_not_running');
       default:
         return t('api.testError.unknown');
     }
@@ -201,7 +205,7 @@ export function ConfigModal({
               {t('api.provider')}
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {(['openrouter', 'anthropic', 'openai', 'gemini', 'ollama', 'custom'] as const).map(
+              {(['openrouter', 'anthropic', 'openai', 'gemini', 'ollama', 'lmstudio', 'custom'] as const).map(
                 (p) => (
                   <button
                     key={p}
@@ -273,7 +277,7 @@ export function ConfigModal({
           )}
 
           {/* Base URL - Editable for custom provider */}
-          {(provider === 'custom' || provider === 'ollama') && (
+          {(provider === 'custom' || provider === 'ollama' || provider === 'lmstudio') && (
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
@@ -303,6 +307,8 @@ export function ConfigModal({
                 placeholder={
                   provider === 'ollama'
                     ? 'http://localhost:11434/v1'
+                    : provider === 'lmstudio'
+                      ? 'http://localhost:1234/v1'
                     : customProtocol === 'openai'
                       ? 'https://api.openai.com/v1'
                       : customProtocol === 'gemini'
@@ -314,6 +320,8 @@ export function ConfigModal({
               <p className="text-xs text-text-muted">
                 {provider === 'ollama'
                   ? t('api.enterOllamaUrl')
+                  : provider === 'lmstudio'
+                    ? t('api.enterLmStudioUrl')
                   : customProtocol === 'openai'
                     ? t('api.enterOpenAIUrl')
                     : customProtocol === 'gemini'
@@ -335,7 +343,7 @@ export function ConfigModal({
                 {t('api.model')}
               </label>
               <div className="flex items-center gap-2">
-                {isOllamaMode && (
+                {isLocalOpenAIProviderMode && (
                   <button
                     type="button"
                     onClick={() => {
@@ -359,7 +367,7 @@ export function ConfigModal({
                     }`}
                   >
                     <Edit3 className="w-3 h-3" />
-                    {isOllamaMode
+                    {isLocalOpenAIProviderMode
                       ? (useCustomModel ? t('api.useDetectedModels') : t('api.manualModel'))
                       : (useCustomModel ? t('api.usePreset') : t('api.custom'))}
                   </button>
@@ -443,12 +451,12 @@ export function ConfigModal({
 
         {/* Footer */}
         <div className="px-6 py-4 bg-surface-hover border-t border-border">
-          {successMessage && (
-            <div className="mb-3 flex items-center gap-2 px-4 py-3 rounded-xl bg-success/10 text-success text-sm">
-              <CheckCircle className="w-4 h-4 flex-shrink-0" />
-              {successMessage}
-            </div>
-          )}
+              {successMessage && (
+                <div className="mb-3 flex items-center gap-2 px-4 py-3 rounded-xl bg-success/10 text-success text-sm">
+                  <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                  {successMessage}
+                </div>
+              )}
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={handleTest}

@@ -80,6 +80,31 @@ describe('runConfigApiTest', () => {
     expect(mocks.probeWithClaudeSdk).toHaveBeenCalledTimes(1);
   });
 
+  it('routes lmstudio through probeWithClaudeSdk', async () => {
+    const expected: ApiTestResult = { ok: true, latencyMs: 7 };
+    mocks.probeWithClaudeSdk.mockResolvedValue(expected);
+
+    const result = await runConfigApiTest(
+      {
+        provider: 'lmstudio',
+        apiKey: '',
+        baseUrl: 'http://localhost:1234/v1',
+        model: 'local-model',
+      },
+      {
+        ...createConfig(),
+        provider: 'lmstudio',
+        apiKey: '',
+        baseUrl: 'http://localhost:1234/v1',
+        model: 'local-model',
+        activeProfileKey: 'lmstudio',
+      }
+    );
+
+    expect(result).toEqual(expected);
+    expect(mocks.probeWithClaudeSdk).toHaveBeenCalledTimes(1);
+  });
+
   it('routes gemini through probeWithClaudeSdk', async () => {
     const expected: ApiTestResult = { ok: true, latencyMs: 18 };
     mocks.probeWithClaudeSdk.mockResolvedValue(expected);
