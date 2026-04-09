@@ -365,6 +365,7 @@ export class SessionManager {
     title: string,
     prompt: string,
     cwd?: string,
+    projectId?: string | null,
     allowedTools?: string[],
     content?: ContentBlock[]
   ): Promise<Session> {
@@ -372,9 +373,11 @@ export class SessionManager {
 
     // If no explicit cwd, fall back to active project's workspacePath
     let effectiveCwd = cwd;
-    let resolvedProjectId: string | null = null;
+    let resolvedProjectId: string | null = projectId ?? null;
     if (this.projectManager) {
-      resolvedProjectId = this.projectManager.getActiveId();
+      if (!resolvedProjectId) {
+        resolvedProjectId = this.projectManager.getActiveId();
+      }
       if (resolvedProjectId) {
         const activeProject = this.projectManager.get(resolvedProjectId);
         if (activeProject?.workspacePath && !effectiveCwd) {

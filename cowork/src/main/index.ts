@@ -4568,6 +4568,7 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         event.payload.title,
         event.payload.prompt,
         event.payload.cwd,
+        event.payload.projectId ?? null,
         event.payload.allowedTools,
         event.payload.content
       );

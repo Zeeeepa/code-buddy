@@ -485,7 +485,12 @@ export function useIPC() {
 
   // Start a new session
   const startSession = useCallback(
-    async (title: string, promptOrContent: string | ContentBlock[], cwd?: string) => {
+    async (
+      title: string,
+      promptOrContent: string | ContentBlock[],
+      cwd?: string,
+      projectId?: string | null
+    ) => {
       setLoading(true);
       console.log('[useIPC] Starting session:', title);
 
@@ -509,6 +514,7 @@ export function useIPC() {
           createdAt: Date.now(),
           updatedAt: Date.now(),
           cwd: cwd || '',
+          projectId: projectId ?? null,
           mountedPaths: [],
           allowedTools: [
             'webfetch',
@@ -564,6 +570,7 @@ export function useIPC() {
             title,
             prompt,
             cwd,
+            projectId,
             content, // Send full content blocks including images
           },
         });

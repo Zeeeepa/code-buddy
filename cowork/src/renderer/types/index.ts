@@ -430,7 +430,17 @@ export interface UpdateInfo {
 
 // IPC Event types
 export type ClientEvent =
-  | { type: 'session.start'; payload: { title: string; prompt: string; cwd?: string; allowedTools?: string[]; content?: ContentBlock[] } }
+  | {
+      type: 'session.start';
+      payload: {
+        title: string;
+        prompt: string;
+        cwd?: string;
+        projectId?: string | null;
+        allowedTools?: string[];
+        content?: ContentBlock[];
+      };
+    }
   | { type: 'session.continue'; payload: { sessionId: string; prompt: string; content?: ContentBlock[] } }
   | { type: 'session.stop'; payload: { sessionId: string } }
   | { type: 'session.delete'; payload: { sessionId: string } }

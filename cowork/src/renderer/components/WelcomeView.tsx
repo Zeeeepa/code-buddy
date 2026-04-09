@@ -42,6 +42,7 @@ export function WelcomeView() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { startSession, changeWorkingDir, isElectron } = useIPC();
   const workingDir = useAppStore((state) => state.workingDir);
+  const activeProjectId = useAppStore((state) => state.activeProjectId);
   const setGlobalNotice = useAppStore((state) => state.setGlobalNotice);
   const isConfigured = useAppStore((state) => state.isConfigured);
   const sessions = useAppStore((state) => state.sessions);
@@ -373,7 +374,12 @@ export function WelcomeView() {
     setIsSubmitting(true);
     try {
       const sessionTitle = getInitialSessionTitle(currentPrompt, attachedFiles[0]?.name);
-      const session = await startSession(sessionTitle, contentBlocks, workingDir || undefined);
+      const session = await startSession(
+        sessionTitle,
+        contentBlocks,
+        workingDir || undefined,
+        activeProjectId ?? undefined
+      );
       if (session) {
         setPrompt('');
         if (textareaRef.current) {
