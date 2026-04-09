@@ -25,8 +25,11 @@ import {
   CheckCircle2,
   AlertTriangle,
   XCircle,
+  Monitor,
 } from 'lucide-react';
 import { useActiveProjectId } from '../../store/selectors';
+import { useAppStore } from '../../store';
+import { deriveScopedPermissionRule } from '../../utils/permission-target-rule';
 
 type Bucket = 'allow' | 'deny';
 
@@ -42,6 +45,7 @@ const EXAMPLE_RULES: Array<{ rule: string; bucket: Bucket; hint: string }> = [
 export const SettingsPermissionRules: React.FC = () => {
   const { t } = useTranslation();
   const activeProjectId = useActiveProjectId();
+  const guiActions = useAppStore((s) => s.guiActions);
   const [allow, setAllow] = useState<string[]>([]);
   const [deny, setDeny] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -140,6 +144,33 @@ export const SettingsPermissionRules: React.FC = () => {
     const result = await api.rules.test(testTool, args, activeProjectId ?? undefined);
     setTestResult(result);
   }, [testTool, testArg, activeProjectId]);
+
+  const recentComputerUseSuggestions = React.useMemo(() => {
+    const seen = new Set<string>();
+    const suggestions: Array<{ rule: string; summary: string }> = [];
+
+    for (const action of [...guiActions].reverse()) {
+      const rule = deriveScopedPermissionRule(action.toolName, action.details || {});
+      if (!rule || seen.has(rule)) {
+        continue;
+      }
+      seen.add(rule);
+      const details = action.details || {};
+      const summary = [
+        typeof details.app === 'string' ? details.app : '',
+        typeof details.target === 'string' ? details.target : '',
+        typeof details.url === 'string' ? details.url : '',
+      ]
+        .filter(Boolean)
+        .join(' • ');
+      suggestions.push({ rule, summary });
+      if (suggestions.length >= 6) {
+        break;
+      }
+    }
+
+    return suggestions;
+  }, [guiActions]);
 
   const renderRuleRow = (bucket: Bucket, rule: string) => {
     const isEditing = editing?.bucket === bucket && editing.rule === rule;
@@ -321,6 +352,48 @@ export const SettingsPermissionRules: React.FC = () => {
               </div>
             ))}
           </div>
+        </section>
+
+        {/* Computer use quick rules */}
+        <section className="p-3 rounded-lg border border-border-muted bg-surface/40">
+          <div className="flex items-center gap-2 mb-2">
+            <Monitor size={12} className="text-accent" />
+            <h3 className="text-xs font-semibold text-text-primary uppercase tracking-wider">
+              {t('rules.computerUseTargets', 'Computer-use targets')}
+            </h3>
+          </div>
+          <p className="text-[10px] text-text-muted mb-2">
+            {t(
+              'rules.computerUseHint',
+              'Quick-add scoped allow rules from recent GUI and browser automation targets.'
+            )}
+          </p>
+          {recentComputerUseSuggestions.length === 0 ? (
+            <div className="text-[11px] text-text-muted italic">
+              {t('rules.computerUseEmpty', 'No recent computer-use targets yet')}
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {recentComputerUseSuggestions.map((suggestion) => (
+                <div
+                  key={suggestion.rule}
+                  className="flex items-center gap-2 p-1.5 rounded hover:bg-surface-hover text-[11px]"
+                >
+                  <code className="flex-1 font-mono text-text-primary truncate">{suggestion.rule}</code>
+                  {suggestion.summary && (
+                    <span className="text-text-muted truncate max-w-[220px]">{suggestion.summary}</span>
+                  )}
+                  <button
+                    onClick={() => void handleAdd('allow', suggestion.rule)}
+                    className="p-1 text-text-muted hover:text-accent"
+                    title={t('rules.addThis')}
+                  >
+                    <Plus size={10} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* Dry-run tester */}

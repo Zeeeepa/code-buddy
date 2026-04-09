@@ -4,6 +4,7 @@ import { useIPC } from '../hooks/useIPC';
 import type { PermissionRequest } from '../types';
 import { Shield, X, Check, AlertTriangle, Monitor } from 'lucide-react';
 import { useAppStore } from '../store';
+import { deriveScopedPermissionRule } from '../utils/permission-target-rule';
 
 interface PermissionDialogProps {
   permission: PermissionRequest;
@@ -68,31 +69,11 @@ export function PermissionDialog({ permission }: PermissionDialogProps) {
     return [app, target, url, text].filter(Boolean).join(' • ');
   })();
 
-  const derivedScopedRule = (() => {
-    const urlCandidate =
-      (typeof permission.input.url === 'string' ? permission.input.url : '') ||
-      (typeof relatedGuiAction?.details?.url === 'string' ? relatedGuiAction.details.url : '');
-    if (urlCandidate) {
-      try {
-        const parsed = new URL(urlCandidate);
-        return `${permission.toolName}(${parsed.origin}/*)`;
-      } catch {
-        return `${permission.toolName}(${urlCandidate}*)`;
-      }
-    }
-
-    const targetCandidate =
-      (typeof permission.input.target === 'string' ? permission.input.target : '') ||
-      (typeof relatedGuiAction?.details?.target === 'string' ? relatedGuiAction.details.target : '') ||
-      (typeof permission.input.app === 'string' ? permission.input.app : '') ||
-      (typeof relatedGuiAction?.details?.app === 'string' ? relatedGuiAction.details.app : '');
-
-    if (targetCandidate) {
-      return `${permission.toolName}(${targetCandidate}*)`;
-    }
-
-    return null;
-  })();
+  const derivedScopedRule = deriveScopedPermissionRule(
+    permission.toolName,
+    permission.input,
+    relatedGuiAction?.details
+  );
 
   return (
     <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
