@@ -17,6 +17,8 @@ export interface SessionInsightSummary {
   totalTokens: number;
   totalExecutionTimeMs: number;
   transcriptPreview: string;
+  matchSnippet?: string;
+  matchCount?: number;
 }
 
 export interface SessionInsightDetail {
@@ -51,6 +53,25 @@ function buildPreview(messages: Message[]): string {
     .replace(/\s+/g, ' ')
     .trim();
   return text.length > 220 ? `${text.slice(0, 217)}...` : text;
+}
+
+function buildMatchSnippet(text: string, query: string): string {
+  const normalizedText = text.replace(/\s+/g, ' ').trim();
+  if (!normalizedText) return '';
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return normalizedText.slice(0, 160);
+
+  const lower = normalizedText.toLowerCase();
+  const index = lower.indexOf(normalizedQuery);
+  if (index < 0) {
+    return normalizedText.length > 160 ? `${normalizedText.slice(0, 157)}...` : normalizedText;
+  }
+
+  const start = Math.max(0, index - 60);
+  const end = Math.min(normalizedText.length, index + normalizedQuery.length + 80);
+  const prefix = start > 0 ? '...' : '';
+  const suffix = end < normalizedText.length ? '...' : '';
+  return `${prefix}${normalizedText.slice(start, end)}${suffix}`;
 }
 
 export function buildSessionInsightSummary(
@@ -111,13 +132,48 @@ export class SessionInsightsBridge {
       return this.list(limit);
     }
 
-    return this.list(Number.MAX_SAFE_INTEGER)
-      .filter((summary) => {
-        const haystack = [summary.title, summary.model, summary.cwd, summary.transcriptPreview]
-          .filter(Boolean)
-          .join('\n')
-          .toLowerCase();
-        return haystack.includes(normalizedQuery);
+    const results: SessionInsightSummary[] = [];
+
+    for (const session of this.source.listSessions()) {
+      const messages = this.source.getMessages(session.id);
+      const traceSteps = this.source.getTraceSteps(session.id);
+      const summary = buildSessionInsightSummary(session, messages, traceSteps);
+      const transcriptEntries = messages
+        .map((message) => flattenMessageText(message))
+        .filter(Boolean);
+      const fullTranscript = transcriptEntries.join('\n\n');
+      const metadataHaystack = [summary.title, summary.model, summary.cwd]
+        .filter(Boolean)
+        .join('\n')
+        .toLowerCase();
+      const transcriptLower = fullTranscript.toLowerCase();
+      const metadataMatch = metadataHaystack.includes(normalizedQuery);
+      const transcriptMatch = transcriptLower.includes(normalizedQuery);
+      if (!metadataMatch && !transcriptMatch) {
+        continue;
+      }
+
+      const matchCount = transcriptEntries.filter((entry) =>
+        entry.toLowerCase().includes(normalizedQuery)
+      ).length;
+
+      results.push({
+        ...summary,
+        matchSnippet: transcriptMatch
+          ? buildMatchSnippet(fullTranscript, normalizedQuery)
+          : undefined,
+        matchCount,
+      });
+    }
+
+    return results
+      .sort((a, b) => {
+        const aScore = a.matchCount ?? 0;
+        const bScore = b.matchCount ?? 0;
+        if (aScore !== bScore) {
+          return bScore - aScore;
+        }
+        return b.updatedAt - a.updatedAt;
       })
       .slice(0, Math.max(1, limit));
   }

@@ -1114,6 +1114,8 @@
     "openSession": "打开会话",
     "messages": "消息",
     "tools": "工具调用",
+    "matches_one": "{{count}} 个匹配",
+    "matches_other": "{{count}} 个匹配",
     "tokens": "令牌",
     "duration": "运行时长",
     "noRenderableContent": "没有可渲染的文本内容"

@@ -31,6 +31,8 @@ interface SessionInsightSummary {
   totalTokens: number;
   totalExecutionTimeMs: number;
   transcriptPreview: string;
+  matchSnippet?: string;
+  matchCount?: number;
 }
 
 interface SessionInsightDetail {
@@ -204,6 +206,11 @@ export const SessionInsightsPanel: React.FC<SessionInsightsPanelProps> = ({ open
                 <div className="text-[11px] text-text-muted mt-0.5 truncate">
                   {item.model || t('sessionInsights.unknownModel', 'Unknown model')}
                 </div>
+                {query.trim() && item.matchSnippet && (
+                  <div className="mt-1 text-[11px] text-text-secondary line-clamp-2">
+                    {item.matchSnippet}
+                  </div>
+                )}
                 <div className="mt-1 flex items-center gap-2 text-[10px] text-text-muted">
                   <span className="inline-flex items-center gap-1">
                     <MessageSquare size={10} /> {item.messageCount}
@@ -211,6 +218,9 @@ export const SessionInsightsPanel: React.FC<SessionInsightsPanelProps> = ({ open
                   <span className="inline-flex items-center gap-1">
                     <Wrench size={10} /> {item.toolCallCount}
                   </span>
+                  {query.trim() && typeof item.matchCount === 'number' && item.matchCount > 0 && (
+                    <span>{t('sessionInsights.matches', { count: item.matchCount })}</span>
+                  )}
                   <span className="inline-flex items-center gap-1">
                     <Clock3 size={10} /> {formatDuration(item.totalExecutionTimeMs)}
                   </span>

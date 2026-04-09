@@ -106,6 +106,38 @@ describe('SessionInsightsBridge', () => {
     expect(bridge.search('checking auth flow')[0]?.sessionId).toBe('s1');
   });
 
+  it('searches full transcript text and returns a focused match snippet', () => {
+    const bridgeWithLongTranscript = new SessionInsightsBridge({
+      listSessions: () => sessions,
+      getMessages: (sessionId: string) =>
+        sessionId === 's1'
+          ? [
+              {
+                id: 'm-long',
+                sessionId: 's1',
+                role: 'assistant',
+                timestamp: 4,
+                content: [
+                  {
+                    type: 'text',
+                    text:
+                      'Prelude '.repeat(40) +
+                      'the hidden needle appears near the end of the transcript for search coverage',
+                  },
+                ],
+              } as Message,
+            ]
+          : (messagesBySession[sessionId] ?? []),
+      getTraceSteps: (sessionId: string) => traceStepsBySession[sessionId] ?? [],
+    });
+
+    const results = bridgeWithLongTranscript.search('hidden needle');
+    expect(results).toHaveLength(1);
+    expect(results[0]?.sessionId).toBe('s1');
+    expect(results[0]?.matchSnippet).toContain('hidden needle');
+    expect(results[0]?.matchCount).toBe(1);
+  });
+
   it('returns detailed transcript data for a session', () => {
     const detail = bridge.getDetail('s1');
     expect(detail?.summary.sessionId).toBe('s1');

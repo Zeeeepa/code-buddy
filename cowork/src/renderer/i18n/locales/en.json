@@ -1116,6 +1116,8 @@
     "openSession": "Open session",
     "messages": "Messages",
     "tools": "Tool calls",
+    "matches_one": "{{count}} match",
+    "matches_other": "{{count}} matches",
     "tokens": "Tokens",
     "duration": "Runtime",
     "noRenderableContent": "No renderable text content"
