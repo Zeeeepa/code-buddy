@@ -11,6 +11,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { log, logError } from '../utils/logger';
 import { getReasoningBridge } from '../reasoning/reasoning-bridge';
+import { createReasoningCapture } from '../reasoning/reasoning-capture';
 import type {
   Session,
   Message,
@@ -151,61 +152,13 @@ export class CodeBuddyEngineRunner {
 
     let fullContent = '';
     const contentBlocks: ContentBlock[] = [];
-    const reasoningBridge = getReasoningBridge();
-    const reasoningToolUseId = `${session.id}:reasoning:${userMessage.id}`;
-    let reasoningStarted = false;
-    let reasoningCompleted = false;
-    let reasoningNodeIndex = 0;
-    let reasoningBuffer = '';
-
-    const ensureReasoningTrace = () => {
-      if (reasoningStarted) return;
-      reasoningStarted = true;
-      reasoningBridge.pushEvent({
-        toolUseId: reasoningToolUseId,
-        sessionId: session.id,
-        type: 'start',
-        problem: prompt,
-        mode: session.model ?? 'embedded',
-      });
-    };
-
-    const flushReasoningBuffer = () => {
-      const label = reasoningBuffer.trim();
-      if (!label) {
-        reasoningBuffer = '';
-        return;
-      }
-      ensureReasoningTrace();
-      reasoningNodeIndex += 1;
-      reasoningBridge.pushEvent({
-        toolUseId: reasoningToolUseId,
-        sessionId: session.id,
-        type: 'node',
-        node: {
-          id: `node-${reasoningNodeIndex}`,
-          parentId: reasoningNodeIndex > 1 ? `node-${reasoningNodeIndex - 1}` : null,
-          depth: Math.max(0, reasoningNodeIndex - 1),
-          label,
-          selected: reasoningNodeIndex === 1,
-        },
-      });
-      reasoningBuffer = '';
-    };
-
-    const finalizeReasoningTrace = () => {
-      if (reasoningCompleted) return;
-      flushReasoningBuffer();
-      if (!reasoningStarted) return;
-      reasoningCompleted = true;
-      reasoningBridge.pushEvent({
-        toolUseId: reasoningToolUseId,
-        sessionId: session.id,
-        type: 'complete',
-        finalAnswer: fullContent || undefined,
-        iterations: reasoningNodeIndex,
-      });
-    };
+    const reasoningCapture = createReasoningCapture({
+      bridge: getReasoningBridge(),
+      toolUseId: `${session.id}:reasoning:${userMessage.id}`,
+      sessionId: session.id,
+      problem: prompt,
+      mode: session.model ?? 'embedded',
+    });
 
     try {
       await this.adapter.runSession(
@@ -225,10 +178,7 @@ export class CodeBuddyEngineRunner {
 
             case 'thinking':
               if (event.thinking) {
-                reasoningBuffer += event.thinking;
-                if (reasoningBuffer.length >= 160 || event.thinking.includes('\n')) {
-                  flushReasoningBuffer();
-                }
+                reasoningCapture.push(event.thinking);
                 sendToRenderer({
                   type: 'stream.thinking',
                   payload: { sessionId: session.id, delta: event.thinking },
@@ -409,7 +359,7 @@ export class CodeBuddyEngineRunner {
         },
       } as ServerEvent);
     } finally {
-      finalizeReasoningTrace();
+      reasoningCapture.complete(fullContent || undefined);
       // Notify session is idle
       sendToRenderer({
         type: 'session.status',

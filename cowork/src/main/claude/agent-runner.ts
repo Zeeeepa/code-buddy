@@ -62,6 +62,8 @@ import {
 import { buildPiSessionRuntimeSignature } from './pi-session-runtime';
 import { ThinkTagStreamParser } from './think-tag-parser';
 import { fetchOllamaModelInfo } from '../config/ollama-api';
+import { getReasoningBridge } from '../reasoning/reasoning-bridge';
+import { createReasoningCapture } from '../reasoning/reasoning-capture';
 
 // Virtual workspace path shown to the model (hides real sandbox path)
 const VIRTUAL_WORKSPACE_PATH = '/workspace';
@@ -906,6 +908,14 @@ ${hints.join('\n')}
     };
 
     const thinkingStepId = uuidv4();
+    const reasoningCapture = createReasoningCapture({
+      bridge: getReasoningBridge(),
+      toolUseId: thinkingStepId,
+      sessionId: session.id,
+      problem: prompt,
+      mode: session.model ?? 'claude',
+    });
+    let streamedText = '';
     let abortedByTimeout = false;
 
     try {
@@ -1980,7 +1990,6 @@ Tool routing:
       // Set up event handler to bridge pi-coding-agent events → our ServerEvent protocol
 
       // Accumulate streamed text deltas in case message_end.content is empty (pi SDK streaming behaviour)
-      let streamedText = '';
       let compactionStepId: string | undefined;
       let hasEmittedError = false;
       let terminalErrorText: string | undefined;
@@ -2096,6 +2105,7 @@ Tool routing:
                 markFirstStreamEvent(ame.type);
                 const parsed = thinkParser.push(ame.delta);
                 if (parsed.thinking) {
+                  reasoningCapture.push(parsed.thinking);
                   this.sendToRenderer({
                     type: 'stream.thinking',
                     payload: { sessionId: session.id, delta: parsed.thinking },
@@ -2107,6 +2117,7 @@ Tool routing:
                 }
               } else if (ame.type === 'thinking_delta') {
                 markFirstStreamEvent(ame.type);
+                reasoningCapture.push(ame.delta);
                 // Forward thinking delta to renderer for real-time display
                 this.sendToRenderer({
                   type: 'stream.thinking',
@@ -2149,6 +2160,7 @@ Tool routing:
               // Flush any buffered content from the think-tag parser
               const flushed = thinkParser.flush();
               if (flushed.thinking) {
+                reasoningCapture.push(flushed.thinking);
                 this.sendToRenderer({
                   type: 'stream.thinking',
                   payload: { sessionId: session.id, delta: flushed.thinking },
@@ -2493,6 +2505,7 @@ Tool routing:
         }
       }
     } finally {
+      reasoningCapture.complete(streamedText || undefined);
       this.activeControllers.delete(session.id);
       this.pathResolver.unregisterSession(session.id);
 

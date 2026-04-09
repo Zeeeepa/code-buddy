@@ -56,6 +56,20 @@ describe('ClaudeAgentRunner pi-coding-agent integration', () => {
     expect(agentRunnerContent).toContain("'[ClaudeAgentRunner] message_end raw message:'");
   });
 
+  it('feeds streamed thinking into the shared reasoning capture path', () => {
+    expect(agentRunnerContent).toContain(
+      "import { createReasoningCapture } from '../reasoning/reasoning-capture'"
+    );
+    expect(agentRunnerContent).toContain(
+      "import { getReasoningBridge } from '../reasoning/reasoning-bridge'"
+    );
+    expect(agentRunnerContent).toContain('const reasoningCapture = createReasoningCapture({');
+    expect(agentRunnerContent).toContain('reasoningCapture.push(parsed.thinking);');
+    expect(agentRunnerContent).toContain('reasoningCapture.push(ame.delta);');
+    expect(agentRunnerContent).toContain('reasoningCapture.push(flushed.thinking);');
+    expect(agentRunnerContent).toContain('reasoningCapture.complete(streamedText || undefined);');
+  });
+
   it('reuses the shared user-facing error helper', () => {
     expect(agentRunnerContent).toContain(
       "import { resolveMessageEndPayload, toUserFacingErrorText } from './agent-runner-message-end'"
