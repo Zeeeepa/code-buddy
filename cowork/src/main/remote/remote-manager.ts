@@ -57,6 +57,11 @@ export interface RemoteInteraction {
   expiresAt: number;
 }
 
+type RemotePromptPreprocessor = (
+  prompt: string,
+  actualSessionId?: string
+) => Promise<{ allowed: boolean; prompt?: string; message?: string }>;
+
 export class RemoteManager extends EventEmitter {
   private gateway?: RemoteGateway;
   private messageRouter: MessageRouter;
@@ -94,6 +99,7 @@ export class RemoteManager extends EventEmitter {
 
   // Debounce timers for sending buffered responses
   private sendTimers: Map<string, NodeJS.Timeout> = new Map();
+  private promptPreprocessor?: RemotePromptPreprocessor;
 
   // Promise-chain mutex for synchronizing pendingInteractions access
   private lockChain: Promise<void> = Promise.resolve();
@@ -160,6 +166,10 @@ export class RemoteManager extends EventEmitter {
    */
   setRendererCallback(callback: (event: ServerEvent) => void): void {
     this.sendToRenderer = callback;
+  }
+
+  setPromptPreprocessor(callback: RemotePromptPreprocessor): void {
+    this.promptPreprocessor = callback;
   }
 
   /**
@@ -1113,12 +1123,25 @@ export class RemoteManager extends EventEmitter {
 
     // Check if this is a new remote session
     const isNewSession = !this.remoteSessionIds.has(sessionId);
+    const existingActualSessionId = this.reverseSessionIdMapping.get(sessionId);
+    const processedPrompt = this.promptPreprocessor
+      ? await this.promptPreprocessor(prompt, existingActualSessionId)
+      : { allowed: true, prompt };
+
+    if (!processedPrompt.allowed) {
+      await this.doSendToChannel(
+        { channelType, channelId },
+        processedPrompt.message ?? 'This command is not available in remote sessions.'
+      );
+      return;
+    }
+    const finalPrompt = processedPrompt.prompt ?? prompt;
 
     if (isNewSession) {
       // Create new session with working directory
       const newSession = await this.agentExecutor.startSession(
-        buildRemoteSessionTitle(prompt),
-        prompt,
+        buildRemoteSessionTitle(finalPrompt),
+        finalPrompt,
         workingDirectory
       );
 
@@ -1151,16 +1174,21 @@ export class RemoteManager extends EventEmitter {
         payload: { sessionId: newSession.id, updates: newSession },
       });
 
-      this.emitRemoteUserMessage(newSession.id, content, prompt);
+      this.emitRemoteUserMessage(newSession.id, content, finalPrompt);
     } else {
       // Continue existing session - use actual session ID
-      const actualSessionId = this.reverseSessionIdMapping.get(sessionId);
+      const actualSessionId = existingActualSessionId;
       if (!actualSessionId) {
         throw new Error(`No actual session ID found for remote session: ${sessionId}`);
       }
       log('[RemoteManager] Continuing session:', actualSessionId, 'for remote:', sessionId);
-      this.emitRemoteUserMessage(actualSessionId, content, prompt);
-      await this.agentExecutor.continueSession(actualSessionId, prompt, content, workingDirectory);
+      this.emitRemoteUserMessage(actualSessionId, content, finalPrompt);
+      await this.agentExecutor.continueSession(
+        actualSessionId,
+        finalPrompt,
+        content,
+        workingDirectory
+      );
     }
 
     // Note: The actual response handling is done through the session manager

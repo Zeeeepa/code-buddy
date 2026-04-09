@@ -1287,6 +1287,15 @@ app
 
     // 初始化远程管理器
     remoteManager.setRendererCallback(sendToRenderer);
+    remoteManager.setPromptPreprocessor(async (prompt, sessionId) => {
+      if (!prompt.trim().startsWith('/')) {
+        return { allowed: true, prompt };
+      }
+      if (!slashCommandBridge) {
+        return { allowed: false, message: 'Slash commands are unavailable in remote sessions.' };
+      }
+      return slashCommandBridge.executeRemoteInput(prompt, sessionId);
+    });
     const agentExecutor: AgentExecutor = {
       startSession: async (title, prompt, cwd) => {
         if (!sessionManager) throw new Error('Session manager not initialized');

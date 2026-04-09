@@ -7,9 +7,20 @@
  * "Invoke" button that posts a one-shot message to the remote task
  * endpoint so users can quickly smoke-test a connection.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Trash2, RefreshCw, Play, AlertCircle, CheckCircle2, Globe, Cpu } from 'lucide-react';
+import {
+  Plus,
+  Trash2,
+  RefreshCw,
+  Play,
+  AlertCircle,
+  CheckCircle2,
+  Globe,
+  Cpu,
+  Search,
+  ShieldCheck,
+} from 'lucide-react';
 
 interface AgentCard {
   name: string;
@@ -17,6 +28,8 @@ interface AgentCard {
   url: string;
   version: string;
   skills: Array<{ id: string; name: string; description?: string }>;
+  authentication?: { schemes: string[] };
+  capabilities?: { streaming?: boolean; pushNotifications?: boolean };
 }
 
 interface RegisteredAgent {
@@ -33,6 +46,8 @@ export function SettingsA2AAgents() {
   const { t } = useTranslation();
   const [agents, setAgents] = useState<RegisteredAgent[]>([]);
   const [newUrl, setNewUrl] = useState('');
+  const [discoveredCard, setDiscoveredCard] = useState<AgentCard | null>(null);
+  const [isDiscovering, setIsDiscovering] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -54,16 +69,37 @@ export function SettingsA2AAgents() {
     void load();
   }, [load]);
 
+  const normalizedUrl = useMemo(() => newUrl.trim(), [newUrl]);
+
+  const handleDiscover = useCallback(async () => {
+    if (!normalizedUrl || !window.electronAPI?.a2a?.discover) return;
+    setIsDiscovering(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await window.electronAPI.a2a.discover(normalizedUrl);
+      if (!result.success) {
+        setDiscoveredCard(null);
+        setError(result.error ?? 'Discovery failed');
+      } else {
+        setDiscoveredCard(result.card as AgentCard);
+      }
+    } finally {
+      setIsDiscovering(false);
+    }
+  }, [normalizedUrl]);
+
   const handleAdd = useCallback(async () => {
-    if (!newUrl.trim() || !window.electronAPI?.a2a?.add) return;
+    if (!normalizedUrl || !window.electronAPI?.a2a?.add) return;
     setIsAdding(true);
     setError(null);
     try {
-      const result = await window.electronAPI.a2a.add(newUrl.trim());
+      const result = await window.electronAPI.a2a.add(normalizedUrl);
       if (!result.success) {
         setError(result.error ?? 'Add failed');
       } else {
         setNewUrl('');
+        setDiscoveredCard(null);
         setNotice(t('a2a.added', 'Agent registered'));
         setTimeout(() => setNotice(null), 2000);
         await load();
@@ -71,7 +107,7 @@ export function SettingsA2AAgents() {
     } finally {
       setIsAdding(false);
     }
-  }, [newUrl, load, t]);
+  }, [load, normalizedUrl, t]);
 
   const handleRemove = useCallback(
     async (id: string) => {
@@ -125,21 +161,97 @@ export function SettingsA2AAgents() {
       <div className="flex items-center gap-2">
         <input
           value={newUrl}
-          onChange={(ev) => setNewUrl(ev.target.value)}
+          onChange={(ev) => {
+            setNewUrl(ev.target.value);
+            setDiscoveredCard(null);
+          }}
           placeholder="https://agent.example.com"
           data-testid="a2a-add-url-input"
           className="flex-1 px-3 py-1.5 rounded-md bg-surface border border-border text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent font-mono"
         />
         <button
-          onClick={() => void handleAdd()}
-          disabled={isAdding || !newUrl.trim()}
+          onClick={() => void handleDiscover()}
+          disabled={isDiscovering || !normalizedUrl}
           data-testid="a2a-add-button"
           className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-accent text-white hover:bg-accent-hover disabled:opacity-50 transition-colors"
         >
-          <Plus size={12} />
-          {isAdding ? t('a2a.adding', 'Adding…') : t('a2a.add', 'Add')}
+          <Search size={12} />
+          {isDiscovering ? t('a2a.discovering', 'Discovering…') : t('a2a.discover', 'Discover')}
         </button>
       </div>
+
+      {discoveredCard && (
+        <div
+          className="border border-border rounded-lg p-4 space-y-3 bg-surface/40"
+          data-testid="a2a-discovery-preview"
+        >
+          <div className="flex items-start gap-2">
+            <ShieldCheck size={14} className="mt-0.5 text-accent shrink-0" />
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-text-primary">{discoveredCard.name}</div>
+              <div className="text-xs text-text-muted mt-0.5">{discoveredCard.description}</div>
+              <div className="text-[10px] text-text-muted mt-1 font-mono break-all">
+                {discoveredCard.url}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-1">
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface text-text-secondary">
+              v{discoveredCard.version}
+            </span>
+            {discoveredCard.capabilities?.streaming && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent/10 text-accent">
+                {t('a2a.streaming', 'Streaming')}
+              </span>
+            )}
+            {discoveredCard.capabilities?.pushNotifications && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent/10 text-accent">
+                {t('a2a.push', 'Push')}
+              </span>
+            )}
+            {discoveredCard.authentication?.schemes?.map((scheme) => (
+              <span
+                key={scheme}
+                className="text-[10px] px-2 py-0.5 rounded-full bg-warning/10 text-warning"
+              >
+                {scheme}
+              </span>
+            ))}
+          </div>
+
+          {discoveredCard.skills.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {discoveredCard.skills.map((skill) => (
+                <span
+                  key={skill.id}
+                  className="text-[10px] px-2 py-0.5 rounded-full bg-accent/10 text-accent"
+                  title={skill.description}
+                >
+                  {skill.name}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => void handleAdd()}
+              disabled={isAdding}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-accent text-white hover:bg-accent-hover disabled:opacity-50 transition-colors"
+            >
+              <Plus size={12} />
+              {isAdding ? t('a2a.adding', 'Adding…') : t('a2a.add', 'Add')}
+            </button>
+            <button
+              onClick={() => setDiscoveredCard(null)}
+              className="text-xs px-3 py-1.5 rounded-md bg-surface hover:bg-surface-hover text-text-secondary transition-colors"
+            >
+              {t('common.cancel', 'Cancel')}
+            </button>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="flex items-start gap-2 text-xs text-error bg-error/10 border border-error/30 rounded-md px-3 py-2">

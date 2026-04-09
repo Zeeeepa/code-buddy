@@ -44,6 +44,12 @@ export interface SlashCommandExecuteResult {
   handled?: boolean;
 }
 
+export interface RemoteSlashCommandResult {
+  allowed: boolean;
+  prompt?: string;
+  message?: string;
+}
+
 type CoreSlashModule = {
   builtinCommands: SlashCommandDef[];
   getCommandsByCategory: () => Record<string, SlashCommandDef[]>;
@@ -162,5 +168,38 @@ export class SlashCommandBridge {
       prompt: resolved,
       handled: false,
     };
+  }
+
+  async executeRemoteInput(
+    rawInput: string,
+    sessionId?: string
+  ): Promise<RemoteSlashCommandResult> {
+    const trimmed = rawInput.trim();
+    if (!trimmed.startsWith('/')) {
+      return { allowed: true, prompt: rawInput };
+    }
+
+    const parts = trimmed.slice(1).split(/\s+/).filter(Boolean);
+    const [name, ...args] = parts;
+    if (!name) {
+      return { allowed: false, message: 'Empty slash command is not available remotely.' };
+    }
+
+    const result = await this.execute(name, args, sessionId);
+    if (!result.success) {
+      return {
+        allowed: false,
+        message: result.error ?? `/${name} is not available in remote sessions.`,
+      };
+    }
+
+    if (result.handled || !result.prompt) {
+      return {
+        allowed: false,
+        message: `/${name} is not available in remote sessions.`,
+      };
+    }
+
+    return { allowed: true, prompt: result.prompt };
   }
 }
