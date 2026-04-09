@@ -17,6 +17,7 @@ import type {
   ScheduleCreateInput,
   ScheduleUpdateInput,
   ProviderModelInfo,
+  LocalLmStudioDiscoveryResult,
   LocalOllamaDiscoveryResult,
   Project,
   ProjectCreateInput,
@@ -182,6 +183,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('config.diagnose', input),
     discoverLocal: (payload?: { baseUrl?: string }): Promise<LocalOllamaDiscoveryResult> =>
       ipcRenderer.invoke('config.discover-local', payload),
+    discoverLocalLmStudio: (payload?: { baseUrl?: string }): Promise<LocalLmStudioDiscoveryResult> =>
+      ipcRenderer.invoke('config.discover-lmstudio-local', payload),
   },
 
   // Window control methods
@@ -1564,6 +1567,7 @@ declare global {
         }) => Promise<ProviderModelInfo[]>;
         diagnose: (input: DiagnosticInput) => Promise<DiagnosticResult>;
         discoverLocal: (payload?: { baseUrl?: string }) => Promise<LocalOllamaDiscoveryResult>;
+        discoverLocalLmStudio: (payload?: { baseUrl?: string }) => Promise<LocalLmStudioDiscoveryResult>;
       };
       window: {
         minimize: () => void;

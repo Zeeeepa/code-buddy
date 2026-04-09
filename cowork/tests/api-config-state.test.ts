@@ -339,4 +339,13 @@ describe('api config state helpers', () => {
     expect(shouldAutoDiscoverLocalOllamaBaseUrl('http://127.0.0.1:8080/v1')).toBe(false);
     expect(shouldAutoDiscoverLocalOllamaBaseUrl('https://ollama.example.internal/v1')).toBe(false);
   });
+
+  it('wires local LM Studio discovery through the shared config hook', () => {
+    const source = fs.readFileSync(hookPath, 'utf8');
+    expect(source).toContain('window.electronAPI.config.discoverLocalLmStudio({');
+    expect(source).toContain("showErrorKey('api.localLmStudioNotFound')");
+    expect(source).toContain("showSuccessKey('api.localLmStudioDiscovered'");
+    expect(source).toContain("showErrorKey('api.localLmStudioNoModels')");
+    expect(source).toContain('lmStudioDiscoverRequestIdRef');
+  });
 });

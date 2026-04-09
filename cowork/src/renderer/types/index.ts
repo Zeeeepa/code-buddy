@@ -741,21 +741,30 @@ export interface DiagnosticInput {
 }
 
 export interface LocalServiceInfo {
-  type: 'ollama';
+  type: 'ollama' | 'lmstudio';
   baseUrl: string;
   models?: string[];
 }
 
-export type LocalOllamaDiscoveryStatus =
+export type LocalProviderDiscoveryStatus =
   | 'unavailable'
   | 'service_available'
   | 'models_available';
 
+export type LocalOllamaDiscoveryStatus = LocalProviderDiscoveryStatus;
 export interface LocalOllamaDiscoveryResult {
   available: boolean;
   baseUrl: string;
   models?: string[];
   status: LocalOllamaDiscoveryStatus;
+}
+
+export type LocalLmStudioDiscoveryStatus = LocalProviderDiscoveryStatus;
+export interface LocalLmStudioDiscoveryResult {
+  available: boolean;
+  baseUrl: string;
+  models?: string[];
+  status: LocalLmStudioDiscoveryStatus;
 }
 
 // MCP types

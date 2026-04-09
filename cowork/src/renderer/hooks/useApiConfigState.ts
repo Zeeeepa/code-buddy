@@ -671,7 +671,7 @@ interface ApiConfigState {
   lastCustomProtocol: CustomProtocolType;
   // Signature of the last persisted state (used for dirty-check)
   savedDraftSignature: string;
-  // Ollama model discovery results keyed by profile
+  // Local provider model discovery results keyed by profile
   discoveredModels: Partial<Record<ProviderProfileKey, ProviderModelInfo[]>>;
   // Async loading flags
   isLoadingConfig: boolean;
@@ -679,6 +679,7 @@ interface ApiConfigState {
   isTesting: boolean;
   isRefreshingModels: boolean;
   isDiscoveringLocalOllama: boolean;
+  isDiscoveringLocalLmStudio: boolean;
   isMutatingConfigSet: boolean;
   isDiagnosing: boolean;
   // Error message — either a raw string or a i18n key + optional values
@@ -744,6 +745,7 @@ type ApiConfigAction =
   | { type: 'SET_IS_TESTING'; payload: boolean }
   | { type: 'SET_IS_REFRESHING_MODELS'; payload: boolean }
   | { type: 'SET_IS_DISCOVERING_LOCAL_OLLAMA'; payload: boolean }
+  | { type: 'SET_IS_DISCOVERING_LOCAL_LMSTUDIO'; payload: boolean }
   | { type: 'SET_IS_MUTATING_CONFIG_SET'; payload: boolean }
   | { type: 'SET_IS_DIAGNOSING'; payload: boolean }
   // Error message helpers
@@ -856,6 +858,9 @@ function apiConfigReducer(state: ApiConfigState, action: ApiConfigAction): ApiCo
     case 'SET_IS_DISCOVERING_LOCAL_OLLAMA':
       return { ...state, isDiscoveringLocalOllama: action.payload };
 
+    case 'SET_IS_DISCOVERING_LOCAL_LMSTUDIO':
+      return { ...state, isDiscoveringLocalLmStudio: action.payload };
+
     case 'SET_IS_MUTATING_CONFIG_SET':
       return { ...state, isMutatingConfigSet: action.payload };
 
@@ -938,6 +943,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     isTesting: false,
     isRefreshingModels: false,
     isDiscoveringLocalOllama: false,
+    isDiscoveringLocalLmStudio: false,
     errorText: '',
     errorKey: null,
     errorValues: undefined,
@@ -968,6 +974,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     isTesting,
     isRefreshingModels,
     isDiscoveringLocalOllama,
+    isDiscoveringLocalLmStudio,
     errorText,
     errorKey,
     errorValues,
@@ -981,16 +988,17 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
   } = state;
 
   const ollamaRefreshRequestIdRef = useRef(0);
-  const latestOllamaTargetRef = useRef<{
+  const latestLocalProviderTargetRef = useRef<{
     activeProfileKey: ProviderProfileKey;
     baseUrl: string;
     provider: ProviderType;
   }>({
     activeProfileKey,
     baseUrl: '',
-    provider: 'openrouter',
+      provider: 'openrouter',
   });
   const ollamaDiscoverRequestIdRef = useRef(0);
+  const lmStudioDiscoverRequestIdRef = useRef(0);
 
   const clearError = useCallback(() => {
     dispatch({ type: 'CLEAR_ERROR' });
@@ -1427,7 +1435,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
   ]);
 
   useEffect(() => {
-    latestOllamaTargetRef.current = {
+    latestLocalProviderTargetRef.current = {
       activeProfileKey,
       baseUrl: baseUrl.trim(),
       provider,
@@ -1600,7 +1608,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
         baseUrl: requestedBaseUrl || undefined,
       });
 
-      const latestTarget = latestOllamaTargetRef.current;
+      const latestTarget = latestLocalProviderTargetRef.current;
       if (
         requestId !== ollamaRefreshRequestIdRef.current
         || latestTarget.provider !== provider
@@ -1633,7 +1641,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
       });
       return models;
     } catch (refreshError) {
-      const latestTarget = latestOllamaTargetRef.current;
+      const latestTarget = latestLocalProviderTargetRef.current;
       if (
         requestId !== ollamaRefreshRequestIdRef.current
         || latestTarget.provider !== provider
@@ -1702,6 +1710,42 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     []
   );
 
+  const applyDiscoveredLmStudioState = useCallback(
+    (
+      targetProfileKey: ProviderProfileKey,
+      discoveredBaseUrl: string,
+      models: ProviderModelInfo[],
+      options?: { autoSelectModelId?: string }
+    ) => {
+      const normalizedBaseUrl = normalizeLmStudioBaseUrl(discoveredBaseUrl);
+
+      dispatch({
+        type: 'UPDATE_PROFILE_FN',
+        profileKey: targetProfileKey,
+        updater: (current) => {
+          const autoSelectModelId = options?.autoSelectModelId?.trim() || '';
+          const explicitManualModel = current.useCustomModel ? current.customModel.trim() : '';
+          const currentModel = explicitManualModel || current.model.trim();
+          const hasDiscoveredMatch = models.some((item) => item.id === currentModel);
+          const shouldAutoSelectModel =
+            Boolean(autoSelectModelId) &&
+            !explicitManualModel &&
+            (!currentModel || !hasDiscoveredMatch);
+
+          return {
+            ...current,
+            baseUrl: normalizedBaseUrl,
+            model: shouldAutoSelectModel ? autoSelectModelId : current.model,
+            useCustomModel: shouldAutoSelectModel ? false : current.useCustomModel,
+          };
+        },
+      });
+
+      dispatch({ type: 'SET_DISCOVERED_MODELS', profileKey: targetProfileKey, models });
+    },
+    []
+  );
+
   const discoverLocalOllama = useCallback(
     async (options?: { silent?: boolean }) => {
       if (!isElectron || provider !== 'ollama') {
@@ -1721,7 +1765,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
         const result = await window.electronAPI.config.discoverLocal({
           baseUrl: requestedBaseUrl || undefined,
         });
-        const latestTarget = latestOllamaTargetRef.current;
+        const latestTarget = latestLocalProviderTargetRef.current;
         if (
           requestId !== ollamaDiscoverRequestIdRef.current
           || latestTarget.provider !== 'ollama'
@@ -1755,7 +1799,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
         }
         return result;
       } catch (discoveryError) {
-        const latestTarget = latestOllamaTargetRef.current;
+        const latestTarget = latestLocalProviderTargetRef.current;
         if (
           requestId !== ollamaDiscoverRequestIdRef.current
           || latestTarget.provider !== 'ollama'
@@ -1784,6 +1828,98 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     [
       activeProfileKey,
       applyDiscoveredOllamaState,
+      baseUrl,
+      clearError,
+      clearSuccessMessage,
+      provider,
+      showErrorKey,
+      showErrorText,
+      showSuccessKey,
+    ]
+  );
+
+  const discoverLocalLmStudio = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!isElectron || provider !== 'lmstudio') {
+        return null;
+      }
+
+      const requestedProfileKey = activeProfileKey;
+      const requestedBaseUrl = baseUrl.trim();
+      const shouldClearDiscoveredModels = !requestedBaseUrl || isLoopbackBaseUrl(requestedBaseUrl);
+      const requestId = ++lmStudioDiscoverRequestIdRef.current;
+      dispatch({ type: 'SET_IS_DISCOVERING_LOCAL_LMSTUDIO', payload: true });
+      if (!options?.silent) {
+        clearError();
+      }
+
+      try {
+        const result = await window.electronAPI.config.discoverLocalLmStudio({
+          baseUrl: requestedBaseUrl || undefined,
+        });
+        const latestTarget = latestLocalProviderTargetRef.current;
+        if (
+          requestId !== lmStudioDiscoverRequestIdRef.current ||
+          latestTarget.provider !== 'lmstudio' ||
+          latestTarget.activeProfileKey !== requestedProfileKey ||
+          latestTarget.baseUrl !== requestedBaseUrl
+        ) {
+          return result;
+        }
+        if (!result.available) {
+          if (shouldClearDiscoveredModels) {
+            dispatch({ type: 'CLEAR_DISCOVERED_MODELS', profileKey: requestedProfileKey });
+          }
+          if (!options?.silent) {
+            showErrorKey('api.localLmStudioNotFound');
+          }
+          return result;
+        }
+
+        const models = normalizeDiscoveredOllamaModels(result.models);
+        applyDiscoveredLmStudioState(requestedProfileKey, result.baseUrl, models, {
+          autoSelectModelId: models[0]?.id,
+        });
+
+        if (!options?.silent) {
+          if (result.status === 'service_available') {
+            showErrorKey('api.localLmStudioNoModels');
+          } else {
+            showSuccessKey('api.localLmStudioDiscovered', { count: models.length });
+            setTimeout(() => clearSuccessMessage(), 2500);
+          }
+        }
+        return result;
+      } catch (discoveryError) {
+        const latestTarget = latestLocalProviderTargetRef.current;
+        if (
+          requestId !== lmStudioDiscoverRequestIdRef.current ||
+          latestTarget.provider !== 'lmstudio' ||
+          latestTarget.activeProfileKey !== requestedProfileKey ||
+          latestTarget.baseUrl !== requestedBaseUrl
+        ) {
+          return null;
+        }
+        if (shouldClearDiscoveredModels) {
+          dispatch({ type: 'CLEAR_DISCOVERED_MODELS', profileKey: requestedProfileKey });
+        }
+        if (!options?.silent) {
+          if (discoveryError instanceof Error) {
+            showErrorText(discoveryError.message);
+          } else {
+            showErrorKey('api.localLmStudioNotFound');
+          }
+        }
+        return null;
+      } finally {
+        if (requestId === lmStudioDiscoverRequestIdRef.current) {
+          dispatch({ type: 'SET_IS_DISCOVERING_LOCAL_LMSTUDIO', payload: false });
+        }
+      }
+    },
+    [
+      activeProfileKey,
+      applyDiscoveredLmStudioState,
       baseUrl,
       clearError,
       clearSuccessMessage,
@@ -2164,6 +2300,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     isTesting,
     isRefreshingModels,
     isDiscoveringLocalOllama,
+    isDiscoveringLocalLmStudio,
     error,
     successMessage,
     lastSaveCompletedAt,
@@ -2215,6 +2352,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     handleTest,
     refreshModelOptions,
     discoverLocalOllama,
+    discoverLocalLmStudio,
     setError: showErrorText,
     setSuccessMessage: showSuccessText,
   };

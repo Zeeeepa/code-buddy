@@ -17,4 +17,10 @@ describe('ConfigModal Claude-style layout', () => {
     expect(source).toContain('discoverLocalOllama');
     expect(source).toContain("t('api.discoverLocalOllama')");
   });
+
+  it('offers a local LM Studio discovery action in the base-url section', () => {
+    const source = fs.readFileSync(configModalPath, 'utf8');
+    expect(source).toContain('discoverLocalLmStudio');
+    expect(source).toContain("t('api.discoverLocalLmStudio')");
+  });
 });

@@ -66,10 +66,12 @@ export function ConfigModal({
     isTesting,
     isRefreshingModels,
     isDiscoveringLocalOllama,
+    isDiscoveringLocalLmStudio,
     testResult,
     friendlyTestDetails,
     isOllamaMode,
     isLocalOpenAIProviderMode,
+    isLmStudioMode,
     requiresApiKey,
     protocolGuidanceText,
     protocolGuidanceTone,
@@ -102,6 +104,7 @@ export function ConfigModal({
     handleTest,
     refreshModelOptions,
     discoverLocalOllama,
+    discoverLocalLmStudio,
     shouldShowOllamaManualModelToggle,
   } = useApiConfigState({
     enabled: isOpen,
@@ -284,7 +287,7 @@ export function ConfigModal({
                   <Server className="w-4 h-4" />
                   {t('api.baseUrl')}
                 </label>
-                {isOllamaMode && (
+                {isOllamaMode ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -298,7 +301,21 @@ export function ConfigModal({
                       ? t('api.discoveringLocalOllama')
                       : t('api.discoverLocalOllama')}
                   </button>
-                )}
+                ) : isLmStudioMode ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void discoverLocalLmStudio();
+                    }}
+                    disabled={isDiscoveringLocalLmStudio}
+                    className="flex items-center gap-1 text-xs px-2 py-1 rounded-md transition-all bg-accent-muted text-accent hover:bg-accent-muted/80 disabled:opacity-50"
+                  >
+                    <Plug className="w-3 h-3" />
+                    {isDiscoveringLocalLmStudio
+                      ? t('api.discoveringLocalLmStudio')
+                      : t('api.discoverLocalLmStudio')}
+                  </button>
+                ) : null}
               </div>
               <input
                 type="text"
@@ -328,9 +345,11 @@ export function ConfigModal({
                       ? t('api.enterGeminiUrl')
                       : t('api.enterAnthropicUrl')}
               </p>
-              {isOllamaMode && (
+              {isOllamaMode ? (
                 <p className="text-xs text-text-muted">{t('api.discoverLocalOllamaHint')}</p>
-              )}
+              ) : isLmStudioMode ? (
+                <p className="text-xs text-text-muted">{t('api.discoverLocalLmStudioHint')}</p>
+              ) : null}
               {provider === 'custom' && <GuidanceInlineHint text={baseUrlGuidanceText} />}
             </div>
           )}

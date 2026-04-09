@@ -30,10 +30,12 @@ import type {
   DiagnosticStep,
   DiagnosticStepName,
   DiagnosticVerificationLevel,
+  LocalLmStudioDiscoveryResult,
   LocalOllamaDiscoveryResult,
 } from '../../renderer/types';
 import { log, logWarn } from '../utils/logger';
 import { probeWithClaudeSdk } from '../claude/claude-sdk-one-shot';
+import { listLmStudioModels } from './lmstudio-api';
 import { fetchOllamaModelIndex } from './ollama-api';
 
 const STEP_NAMES: DiagnosticStepName[] = ['dns', 'tcp', 'tls', 'auth', 'model'];
@@ -654,6 +656,34 @@ export async function discoverLocalOllama(input?: {
       baseUrl: result.baseUrl,
     });
     return { available: true, baseUrl: result.baseUrl, models, status: 'models_available' };
+  } catch {
+    return { available: false, baseUrl, status: 'unavailable' };
+  }
+}
+
+export async function discoverLocalLmStudio(input?: {
+  baseUrl?: string;
+}): Promise<LocalLmStudioDiscoveryResult> {
+  const preferredBaseUrl = input?.baseUrl?.trim();
+  const baseUrl =
+    preferredBaseUrl && isLoopbackBaseUrl(preferredBaseUrl)
+      ? normalizeLmStudioBaseUrl(preferredBaseUrl) || 'http://localhost:1234/v1'
+      : 'http://localhost:1234/v1';
+
+  try {
+    const models = await listLmStudioModels({ baseUrl });
+    const modelIds = models.map((item) => item.id);
+
+    if (!modelIds.length) {
+      log('[Diagnostics] Local LM Studio discovered without loaded models');
+      return { available: true, baseUrl, models: [], status: 'service_available' };
+    }
+
+    log('[Diagnostics] Local LM Studio discovered', {
+      modelCount: modelIds.length,
+      baseUrl,
+    });
+    return { available: true, baseUrl, models: modelIds, status: 'models_available' };
   } catch {
     return { available: false, baseUrl, status: 'unavailable' };
   }

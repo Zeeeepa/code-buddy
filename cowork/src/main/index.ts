@@ -2435,6 +2435,16 @@ ipcMain.handle('config.discover-local', async (_event, payload?: { baseUrl?: str
   }
 });
 
+ipcMain.handle('config.discover-lmstudio-local', async (_event, payload?: { baseUrl?: string }) => {
+  try {
+    const { discoverLocalLmStudio } = await import('./config/api-diagnostics');
+    return await discoverLocalLmStudio(payload);
+  } catch (error) {
+    logError('[Config] Error discovering local LM Studio:', error);
+    return { available: false, baseUrl: payload?.baseUrl || 'http://localhost:1234/v1', status: 'unavailable' };
+  }
+});
+
 // MCP Server IPC handlers
 ipcMain.handle('mcp.getServers', () => {
   try {
