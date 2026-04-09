@@ -162,6 +162,7 @@ interface AppState {
   openTabs: Array<{ id: string; sessionId: string; title: string }>;
   showMemoryEditor: boolean;
   showActivityFeed: boolean;
+  showSessionInsights: boolean;
 
   // Phase 3 step 4: bookmarked message IDs for the active session
   bookmarkedMessageIds: Set<string>;
@@ -315,6 +316,7 @@ interface AppState {
   updateTabTitle: (sessionId: string, title: string) => void;
   setShowMemoryEditor: (show: boolean) => void;
   setShowActivityFeed: (show: boolean) => void;
+  setShowSessionInsights: (show: boolean) => void;
   setBookmarkedMessageIds: (ids: string[]) => void;
   toggleBookmarkedMessage: (messageId: string, bookmarked: boolean) => void;
   setShowBookmarksPanel: (show: boolean) => void;
@@ -421,6 +423,7 @@ export const useAppStore = create<AppState>((set) => ({
   openTabs: [],
   showMemoryEditor: false,
   showActivityFeed: false,
+  showSessionInsights: false,
   bookmarkedMessageIds: new Set<string>(),
   showBookmarksPanel: false,
   showSnippetsLibrary: false,
@@ -438,9 +441,10 @@ export const useAppStore = create<AppState>((set) => ({
   })(),
   splitPaneRatio: ((): number => {
     try {
-      const raw = typeof window !== 'undefined'
-        ? window.localStorage?.getItem('cowork.layout.splitRatio')
-        : null;
+      const raw =
+        typeof window !== 'undefined'
+          ? window.localStorage?.getItem('cowork.layout.splitRatio')
+          : null;
       const n = raw ? parseFloat(raw) : NaN;
       return Number.isFinite(n) && n > 0.15 && n < 0.85 ? n : 0.5;
     } catch {
@@ -845,7 +849,12 @@ export const useAppStore = create<AppState>((set) => ({
   setCheckpointTimeline: (timeline) => set({ checkpointTimeline: timeline }),
   addCheckpoint: (snapshot) =>
     set((state) => {
-      const current = state.checkpointTimeline || { snapshots: [], currentIndex: -1, canUndo: false, canRedo: false };
+      const current = state.checkpointTimeline || {
+        snapshots: [],
+        currentIndex: -1,
+        canUndo: false,
+        canRedo: false,
+      };
       const snapshots = [...current.snapshots, snapshot];
       return {
         checkpointTimeline: {
@@ -928,12 +937,11 @@ export const useAppStore = create<AppState>((set) => ({
     }),
   updateTabTitle: (sessionId, title) =>
     set((state) => ({
-      openTabs: state.openTabs.map((t) =>
-        t.sessionId === sessionId ? { ...t, title } : t
-      ),
+      openTabs: state.openTabs.map((t) => (t.sessionId === sessionId ? { ...t, title } : t)),
     })),
   setShowMemoryEditor: (show) => set({ showMemoryEditor: show }),
   setShowActivityFeed: (show) => set({ showActivityFeed: show }),
+  setShowSessionInsights: (show) => set({ showSessionInsights: show }),
   setBookmarkedMessageIds: (ids) => set({ bookmarkedMessageIds: new Set(ids) }),
   toggleBookmarkedMessage: (messageId, bookmarked) =>
     set((state) => {

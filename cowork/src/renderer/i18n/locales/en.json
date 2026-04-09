@@ -1101,6 +1101,21 @@
     "invokePlaceholder": "Send a message…",
     "removeConfirm": "Remove this agent?"
   },
+  "sessionInsights": {
+    "title": "Session insights",
+    "count_one": "{{count}} session",
+    "count_other": "{{count}} sessions",
+    "searchPlaceholder": "Search sessions and transcripts…",
+    "empty": "No sessions found",
+    "selectHint": "Select a session to inspect",
+    "unknownModel": "Unknown model",
+    "openSession": "Open session",
+    "messages": "Messages",
+    "tools": "Tool calls",
+    "tokens": "Tokens",
+    "duration": "Runtime",
+    "noRenderableContent": "No renderable text content"
+  },
   "checkpoints": {
     "empty": "No checkpoints yet. Changes will be tracked automatically.",
     "undo": "Undo last change",

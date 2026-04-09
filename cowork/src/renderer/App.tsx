@@ -33,6 +33,7 @@ import { FilePreviewPane } from './components/FilePreviewPane';
 import { ArtifactPanel } from './components/ArtifactPanel';
 import { ComputerUseOverlay } from './components/ComputerUseOverlay';
 import { ActivityFeed } from './components/ActivityFeed';
+import { SessionInsightsPanel } from './components/SessionInsightsPanel';
 import { BookmarksPanel } from './components/BookmarksPanel';
 import { SnippetsLibrary } from './components/SnippetsLibrary';
 import { PersonaSwitcherDialog } from './components/PersonaSwitcherDialog';
@@ -92,6 +93,7 @@ function App() {
   const showShortcutsDialog = useShowShortcutsDialog();
   const showGlobalSearch = useAppStore((s) => s.showGlobalSearch);
   const showActivityFeed = useAppStore((s) => s.showActivityFeed);
+  const showSessionInsights = useAppStore((s) => s.showSessionInsights);
   const setBookmarkedMessageIds = useAppStore((s) => s.setBookmarkedMessageIds);
   const setShowSnippetsLibrary = useAppStore((s) => s.setShowSnippetsLibrary);
   const showPersonaSwitcher = useAppStore((s) => s.showPersonaSwitcher);
@@ -116,6 +118,7 @@ function App() {
   const setShowShortcutsDialog = useAppStore((s) => s.setShowShortcutsDialog);
   const setShowGlobalSearch = useAppStore((s) => s.setShowGlobalSearch);
   const setShowActivityFeed = useAppStore((s) => s.setShowActivityFeed);
+  const setShowSessionInsights = useAppStore((s) => s.setShowSessionInsights);
   const setUpdateInfo = useAppStore((s) => s.setUpdateInfo);
   const setSearchActive = useAppStore((s) => s.setSearchActive);
   const setContextPanelCollapsed = useAppStore((s) => s.setContextPanelCollapsed);
@@ -241,6 +244,9 @@ function App() {
         // Phase 3 step 17: reasoning trace viewer
         e.preventDefault();
         setShowReasoningViewer(true);
+      } else if (mod && e.shiftKey && (e.key === 'i' || e.key === 'I')) {
+        e.preventDefault();
+        setShowSessionInsights(true);
       } else if (mod && e.key === '\\') {
         // Phase 3 step 8: toggle split-pane layout
         e.preventDefault();
@@ -283,6 +289,7 @@ function App() {
     setShowPersonaSwitcher,
     setShowTestRunner,
     setShowReasoningViewer,
+    setShowSessionInsights,
     toggleSplitPane,
   ]);
 
@@ -436,6 +443,10 @@ function App() {
 
       {/* Activity Feed — Phase 2 step 18 */}
       <ActivityFeed open={showActivityFeed} onClose={() => setShowActivityFeed(false)} />
+      <SessionInsightsPanel
+        open={showSessionInsights}
+        onClose={() => setShowSessionInsights(false)}
+      />
 
       {/* Bookmarks Panel — Phase 3 step 4 */}
       <BookmarksPanel />

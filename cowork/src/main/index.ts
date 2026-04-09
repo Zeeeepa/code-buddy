@@ -42,6 +42,7 @@ import { getModelCapabilities } from './config/model-capability-bridge';
 import { TemplateService } from './project/template-service';
 import { WorkflowBridge } from './workflows/workflow-bridge';
 import { SessionExportService } from './session/session-export-service';
+import { SessionInsightsBridge } from './session/session-insights-bridge';
 import { ActivityFeed } from './activity/activity-feed';
 import { BookmarksService } from './bookmarks/bookmarks-service';
 import { getSnippetsService } from './snippets/snippets-service';
@@ -161,6 +162,7 @@ let previewService: PreviewService | null = null;
 let templateService: TemplateService | null = null;
 let workflowBridge: WorkflowBridge | null = null;
 let sessionExportService: SessionExportService | null = null;
+let sessionInsightsBridge: SessionInsightsBridge | null = null;
 let activityFeed: ActivityFeed | null = null;
 let bookmarksService: BookmarksService | null = null;
 let configExportService: ConfigExportService | null = null;
@@ -1109,7 +1111,13 @@ app
     workflowBridge = new WorkflowBridge();
 
     // Session export — enhanced formats (markdown/json/html) with redaction
-    sessionExportService = new SessionExportService(sessionManager);
+    const sessionInsightsSource = sessionManager;
+    sessionExportService = new SessionExportService(sessionInsightsSource);
+    sessionInsightsBridge = new SessionInsightsBridge({
+      listSessions: () => sessionInsightsSource.listSessions(),
+      getMessages: (sessionId: string) => sessionInsightsSource.getMessages(sessionId),
+      getTraceSteps: (sessionId: string) => sessionInsightsSource.getTraceSteps(sessionId),
+    });
 
     // Activity feed — cross-project event log persisted in SQLite
     activityFeed = new ActivityFeed(db);
@@ -2814,6 +2822,33 @@ ipcMain.handle('activity.clear', async () => {
   if (!activityFeed) return { success: false };
   activityFeed.clear();
   return { success: true };
+});
+
+ipcMain.handle('sessionInsights.list', async (_event, limit?: number) => {
+  try {
+    return sessionInsightsBridge?.list(limit ?? 100) ?? [];
+  } catch (err) {
+    logError('[sessionInsights.list] failed:', err);
+    return [];
+  }
+});
+
+ipcMain.handle('sessionInsights.search', async (_event, query: string, limit?: number) => {
+  try {
+    return sessionInsightsBridge?.search(query ?? '', limit ?? 50) ?? [];
+  } catch (err) {
+    logError('[sessionInsights.search] failed:', err);
+    return [];
+  }
+});
+
+ipcMain.handle('sessionInsights.detail', async (_event, sessionId: string) => {
+  try {
+    return sessionInsightsBridge?.getDetail(sessionId) ?? null;
+  } catch (err) {
+    logError('[sessionInsights.detail] failed:', err);
+    return null;
+  }
 });
 
 // Workflow editor — Claude Cowork parity Phase 2 step 15

@@ -31,3 +31,10 @@ test('opens the reasoning trace viewer from the keyboard shortcut', async ({ app
   await expect(appPage.getByTestId('reasoning-trace-viewer')).toBeVisible();
   await expect(appPage.getByTestId('reasoning-empty-state')).toBeVisible();
 });
+
+test('opens the session insights panel from the titlebar', async ({ appPage }) => {
+  await appPage.getByTestId('session-insights-button').click();
+
+  await expect(appPage.getByTestId('session-insights-panel')).toBeVisible();
+  await expect(appPage.getByTestId('session-insights-empty')).toBeVisible();
+});

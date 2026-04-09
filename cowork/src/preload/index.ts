@@ -850,6 +850,78 @@ contextBridge.exposeInMainWorld('electronAPI', {
     clear: (): Promise<{ success: boolean }> => ipcRenderer.invoke('activity.clear'),
   },
 
+  sessionInsights: {
+    list: (
+      limit = 100
+    ): Promise<
+      Array<{
+        sessionId: string;
+        title: string;
+        status: 'idle' | 'running' | 'completed' | 'error';
+        model?: string;
+        cwd?: string;
+        createdAt: number;
+        updatedAt: number;
+        messageCount: number;
+        userMessageCount: number;
+        assistantMessageCount: number;
+        toolCallCount: number;
+        tokenInput: number;
+        tokenOutput: number;
+        totalTokens: number;
+        totalExecutionTimeMs: number;
+        transcriptPreview: string;
+      }>
+    > => ipcRenderer.invoke('sessionInsights.list', limit),
+    search: (
+      query: string,
+      limit = 50
+    ): Promise<
+      Array<{
+        sessionId: string;
+        title: string;
+        status: 'idle' | 'running' | 'completed' | 'error';
+        model?: string;
+        cwd?: string;
+        createdAt: number;
+        updatedAt: number;
+        messageCount: number;
+        userMessageCount: number;
+        assistantMessageCount: number;
+        toolCallCount: number;
+        tokenInput: number;
+        tokenOutput: number;
+        totalTokens: number;
+        totalExecutionTimeMs: number;
+        transcriptPreview: string;
+      }>
+    > => ipcRenderer.invoke('sessionInsights.search', query, limit),
+    detail: (
+      sessionId: string
+    ): Promise<{
+      summary: {
+        sessionId: string;
+        title: string;
+        status: 'idle' | 'running' | 'completed' | 'error';
+        model?: string;
+        cwd?: string;
+        createdAt: number;
+        updatedAt: number;
+        messageCount: number;
+        userMessageCount: number;
+        assistantMessageCount: number;
+        toolCallCount: number;
+        tokenInput: number;
+        tokenOutput: number;
+        totalTokens: number;
+        totalExecutionTimeMs: number;
+        transcriptPreview: string;
+      };
+      messages: import('../renderer/types').Message[];
+      traceSteps: import('../renderer/types').TraceStep[];
+    } | null> => ipcRenderer.invoke('sessionInsights.detail', sessionId),
+  },
+
   // Workflow visual editor (Claude Cowork parity Phase 2 step 15)
   workflow: {
     list: (): Promise<
@@ -2033,6 +2105,73 @@ declare global {
           }>
         >;
         clear: () => Promise<{ success: boolean }>;
+      };
+      sessionInsights: {
+        list: (limit?: number) => Promise<
+          Array<{
+            sessionId: string;
+            title: string;
+            status: 'idle' | 'running' | 'completed' | 'error';
+            model?: string;
+            cwd?: string;
+            createdAt: number;
+            updatedAt: number;
+            messageCount: number;
+            userMessageCount: number;
+            assistantMessageCount: number;
+            toolCallCount: number;
+            tokenInput: number;
+            tokenOutput: number;
+            totalTokens: number;
+            totalExecutionTimeMs: number;
+            transcriptPreview: string;
+          }>
+        >;
+        search: (
+          query: string,
+          limit?: number
+        ) => Promise<
+          Array<{
+            sessionId: string;
+            title: string;
+            status: 'idle' | 'running' | 'completed' | 'error';
+            model?: string;
+            cwd?: string;
+            createdAt: number;
+            updatedAt: number;
+            messageCount: number;
+            userMessageCount: number;
+            assistantMessageCount: number;
+            toolCallCount: number;
+            tokenInput: number;
+            tokenOutput: number;
+            totalTokens: number;
+            totalExecutionTimeMs: number;
+            transcriptPreview: string;
+          }>
+        >;
+        detail: (sessionId: string) => Promise<{
+          summary: {
+            sessionId: string;
+            title: string;
+            status: 'idle' | 'running' | 'completed' | 'error';
+            model?: string;
+            cwd?: string;
+            createdAt: number;
+            updatedAt: number;
+            messageCount: number;
+            userMessageCount: number;
+            assistantMessageCount: number;
+            toolCallCount: number;
+            tokenInput: number;
+            tokenOutput: number;
+            totalTokens: number;
+            totalExecutionTimeMs: number;
+            transcriptPreview: string;
+          };
+          messages: import('../renderer/types').Message[];
+          traceSteps: import('../renderer/types').TraceStep[];
+        } | null>;
       };
       workflow: {
         list: () => Promise<

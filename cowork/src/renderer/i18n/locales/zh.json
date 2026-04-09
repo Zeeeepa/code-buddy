@@ -1099,6 +1099,21 @@
     "invokePlaceholder": "发送消息…",
     "removeConfirm": "移除此智能体？"
   },
+  "sessionInsights": {
+    "title": "会话洞察",
+    "count_one": "{{count}} 个会话",
+    "count_other": "{{count}} 个会话",
+    "searchPlaceholder": "搜索会话和转录内容…",
+    "empty": "未找到会话",
+    "selectHint": "选择一个会话进行查看",
+    "unknownModel": "未知模型",
+    "openSession": "打开会话",
+    "messages": "消息",
+    "tools": "工具调用",
+    "tokens": "令牌",
+    "duration": "运行时长",
+    "noRenderableContent": "没有可渲染的文本内容"
+  },
   "checkpoints": {
     "empty": "暂无检查点。修改会被自动跟踪。",
     "undo": "撤销上次更改",
