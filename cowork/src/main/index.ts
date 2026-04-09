@@ -1556,6 +1556,19 @@ ipcMain.handle('checkpoint.restore', async (_event, snapshotId: string) => {
   }
 });
 
+ipcMain.handle(
+  'checkpoint.compare',
+  async (_event, cwd: string, fromCommit: string, toCommit: string) => {
+    try {
+      if (!cwd || !fromCommit || !toCommit) return [];
+      return getGitBridge().compareCommits(cwd, fromCommit, toCommit);
+    } catch (err) {
+      logError('[checkpoint.compare] failed:', err);
+      return [];
+    }
+  }
+);
+
 // ── Workspace IPC handlers ────────────────────────────────────────────
 ipcMain.handle('workspace.readDir', async (_event, dirPath: string) => {
   try {

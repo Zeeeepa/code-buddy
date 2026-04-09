@@ -39,6 +39,14 @@ export interface GitRepoStatus {
   error?: string;
 }
 
+export interface GitDiffEntry {
+  path: string;
+  action: 'create' | 'modify' | 'delete' | 'rename';
+  linesAdded: number;
+  linesRemoved: number;
+  excerpt: string;
+}
+
 function mapStatusCode(code: string): GitFileStatus {
   switch (code) {
     case 'M':
@@ -71,6 +79,17 @@ function runGit(cwd: string, args: string[], opts: { timeout?: number } = {}): s
 }
 
 export class GitBridge {
+  private countDiffLines(excerpt: string): { linesAdded: number; linesRemoved: number } {
+    let linesAdded = 0;
+    let linesRemoved = 0;
+    for (const line of excerpt.split('\n')) {
+      if (line.startsWith('+++') || line.startsWith('---')) continue;
+      if (line.startsWith('+')) linesAdded += 1;
+      if (line.startsWith('-')) linesRemoved += 1;
+    }
+    return { linesAdded, linesRemoved };
+  }
+
   /** Resolve the top-level git directory for `cwd` (or null if not a repo). */
   getRepoRoot(cwd: string): string | null {
     try {
@@ -215,6 +234,59 @@ export class GitBridge {
     } catch (err) {
       logWarn('[GitBridge] diff failed:', (err as Error).message);
       return '';
+    }
+  }
+
+  /** Compare two committed revisions and return file-level diffs. */
+  compareCommits(cwd: string, fromCommit: string, toCommit: string): GitDiffEntry[] {
+    const root = this.getRepoRoot(cwd);
+    if (!root || !fromCommit || !toCommit) return [];
+
+    try {
+      const raw = runGit(root, ['diff', '--name-status', '--find-renames', fromCommit, toCommit]);
+
+      return raw
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .map((line) => {
+          const parts = line.split('\t');
+          const status = parts[0] ?? '';
+          const code = status[0];
+          const action =
+            code === 'A' ? 'create' : code === 'D' ? 'delete' : code === 'R' ? 'rename' : 'modify';
+          const path = code === 'R' ? (parts[2] ?? parts[1] ?? '') : (parts[1] ?? '');
+          let excerpt = '';
+
+          try {
+            excerpt = runGit(
+              root,
+              ['diff', '--find-renames', '--unified=3', fromCommit, toCommit, '--', path],
+              { timeout: 8000 }
+            );
+            if (!excerpt.trim()) {
+              excerpt = runGit(
+                root,
+                ['diff', '--find-renames', '--summary', fromCommit, toCommit, '--', path],
+                { timeout: 8000 }
+              );
+            }
+          } catch {
+            excerpt = '';
+          }
+
+          const { linesAdded, linesRemoved } = this.countDiffLines(excerpt);
+          return {
+            path,
+            action,
+            linesAdded,
+            linesRemoved,
+            excerpt,
+          } satisfies GitDiffEntry;
+        });
+    } catch (err) {
+      logWarn('[GitBridge] compareCommits failed:', (err as Error).message);
+      return [];
     }
   }
 

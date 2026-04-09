@@ -8,7 +8,8 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Brain, Zap, RefreshCw, Trash2 } from 'lucide-react';
+import { X, Brain, Zap, RefreshCw, Trash2, Play, Pause, SkipBack, SkipForward } from 'lucide-react';
+import { buildReasoningPlaybackState } from '../utils/reasoning-playback';
 
 interface ReasoningNode {
   id: string;
@@ -55,6 +56,8 @@ export function ReasoningTraceViewer({ isOpen, onClose }: ReasoningTraceViewerPr
   const [detail, setDetail] = useState<ReasoningTrace | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [playbackIndex, setPlaybackIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const load = useCallback(async () => {
     if (!window.electronAPI?.reasoning?.listTraces) return;
@@ -80,18 +83,28 @@ export function ReasoningTraceViewer({ isOpen, onClose }: ReasoningTraceViewerPr
   useEffect(() => {
     if (!selectedId || !isOpen) {
       setDetail(null);
+      setPlaybackIndex(0);
+      setIsPlaying(false);
       return;
     }
     let cancelled = false;
     (async () => {
       if (!window.electronAPI?.reasoning?.getTrace) return;
       try {
-        const d = (await window.electronAPI.reasoning.getTrace(
+        const nextDetail = (await window.electronAPI.reasoning.getTrace(
           selectedId
         )) as ReasoningTrace | null;
-        if (!cancelled) setDetail(d);
+        if (!cancelled) {
+          setDetail(nextDetail);
+          setPlaybackIndex(nextDetail?.nodes?.length ? nextDetail.nodes.length - 1 : 0);
+          setIsPlaying(false);
+        }
       } catch {
-        if (!cancelled) setDetail(null);
+        if (!cancelled) {
+          setDetail(null);
+          setPlaybackIndex(0);
+          setIsPlaying(false);
+        }
       }
     })();
     return () => {
@@ -106,13 +119,40 @@ export function ReasoningTraceViewer({ isOpen, onClose }: ReasoningTraceViewerPr
     setTraces([]);
     setSelectedId(null);
     setDetail(null);
+    setPlaybackIndex(0);
+    setIsPlaying(false);
   }, [t]);
+
+  const playback = useMemo(
+    () => buildReasoningPlaybackState(detail?.nodes ?? [], playbackIndex),
+    [detail?.nodes, playbackIndex]
+  );
+
+  useEffect(() => {
+    if (!isPlaying || !playback.hasPlayback) {
+      return;
+    }
+    if (playback.clampedIndex >= playback.maxIndex) {
+      setIsPlaying(false);
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setPlaybackIndex((current) => {
+        const next = Math.min(current + 1, playback.maxIndex);
+        if (next >= playback.maxIndex) {
+          setIsPlaying(false);
+        }
+        return next;
+      });
+    }, 650);
+    return () => window.clearInterval(timer);
+  }, [isPlaying, playback.clampedIndex, playback.hasPlayback, playback.maxIndex]);
 
   const tree = useMemo(() => {
     if (!detail) return null;
     const byId = new Map<string, { node: ReasoningNode; children: ReasoningNode[] }>();
-    for (const n of detail.nodes) {
-      byId.set(n.id, { node: n, children: [] });
+    for (const node of playback.visibleNodes) {
+      byId.set(node.id, { node, children: [] });
     }
     const roots: ReasoningNode[] = [];
     for (const { node } of byId.values()) {
@@ -123,7 +163,7 @@ export function ReasoningTraceViewer({ isOpen, onClose }: ReasoningTraceViewerPr
       }
     }
     return { byId, roots };
-  }, [detail]);
+  }, [detail, playback.visibleNodes]);
 
   const renderNode = (node: ReasoningNode, depth: number): React.ReactNode => {
     const children = tree?.byId.get(node.id)?.children ?? [];
@@ -155,6 +195,11 @@ export function ReasoningTraceViewer({ isOpen, onClose }: ReasoningTraceViewerPr
   };
 
   if (!isOpen) return null;
+
+  const atLatestNode = playback.clampedIndex >= playback.maxIndex;
+  const playbackLabel = playback.activeNode
+    ? new Date(playback.activeNode.ts).toLocaleTimeString()
+    : t('reasoning.playback', 'Playback');
 
   return (
     <div
@@ -239,13 +284,82 @@ export function ReasoningTraceViewer({ isOpen, onClose }: ReasoningTraceViewerPr
               <div className="px-4 py-3 border-b border-border-muted">
                 <div className="text-xs text-text-muted">
                   {t('reasoning.mode', 'Mode')}:{' '}
-                  <span className="text-text-primary">{detail.mode}</span> · {detail.nodes.length}{' '}
+                  <span className="text-text-primary">{detail.mode}</span> ·{' '}
+                  {playback.visibleNodes.length}/{detail.nodes.length}{' '}
                   {t('reasoning.nodes', 'nodes')}
                 </div>
                 {detail.problem && (
                   <div className="text-sm text-text-primary mt-1">{detail.problem}</div>
                 )}
               </div>
+
+              <div className="px-4 py-3 border-b border-border-muted bg-surface/30 space-y-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setIsPlaying(false);
+                      setPlaybackIndex(0);
+                    }}
+                    disabled={playback.orderedNodes.length === 0}
+                    className="p-1.5 rounded bg-surface hover:bg-surface-hover disabled:opacity-40 disabled:cursor-not-allowed text-text-secondary"
+                    title={t('reasoning.jumpStart', 'Jump to start')}
+                  >
+                    <SkipBack size={12} />
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!playback.hasPlayback) return;
+                      if (playback.clampedIndex >= playback.maxIndex) {
+                        setPlaybackIndex(0);
+                      }
+                      setIsPlaying((current) => !current);
+                    }}
+                    disabled={!playback.hasPlayback}
+                    className="p-1.5 rounded bg-surface hover:bg-surface-hover disabled:opacity-40 disabled:cursor-not-allowed text-text-secondary"
+                    title={isPlaying ? t('reasoning.pause', 'Pause') : t('reasoning.play', 'Play')}
+                    data-testid="reasoning-playback-toggle"
+                  >
+                    {isPlaying ? <Pause size={12} /> : <Play size={12} />}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsPlaying(false);
+                      setPlaybackIndex(playback.maxIndex);
+                    }}
+                    disabled={playback.orderedNodes.length === 0}
+                    className="p-1.5 rounded bg-surface hover:bg-surface-hover disabled:opacity-40 disabled:cursor-not-allowed text-text-secondary"
+                    title={t('reasoning.jumpEnd', 'Jump to end')}
+                  >
+                    <SkipForward size={12} />
+                  </button>
+                  <input
+                    type="range"
+                    min={0}
+                    max={Math.max(playback.maxIndex, 0)}
+                    step={1}
+                    value={playback.clampedIndex}
+                    disabled={!playback.hasPlayback}
+                    onChange={(event) => {
+                      setIsPlaying(false);
+                      setPlaybackIndex(Number(event.target.value));
+                    }}
+                    className="flex-1 accent-[var(--color-accent)]"
+                    data-testid="reasoning-playback-slider"
+                  />
+                  <span className="text-[10px] text-text-muted min-w-[56px] text-right">
+                    {playback.orderedNodes.length === 0
+                      ? '0/0'
+                      : `${playback.clampedIndex + 1}/${playback.maxIndex + 1}`}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-text-muted">
+                  <span>
+                    {t('reasoning.playback', 'Playback')} {Math.round(playback.progress)}%
+                  </span>
+                  <span>{playbackLabel}</span>
+                </div>
+              </div>
+
               <div className="flex-1 overflow-y-auto px-4 py-3 space-y-0.5">
                 {tree && tree.roots.length > 0 ? (
                   tree.roots.map((root) => renderNode(root, 0))
@@ -255,7 +369,8 @@ export function ReasoningTraceViewer({ isOpen, onClose }: ReasoningTraceViewerPr
                   </div>
                 )}
               </div>
-              {detail.finalAnswer && (
+
+              {detail.finalAnswer && atLatestNode && (
                 <div className="border-t border-border-muted px-4 py-3 bg-success/5">
                   <div className="text-[10px] uppercase tracking-wide text-text-muted">
                     {t('reasoning.finalAnswer', 'Final answer')}
@@ -263,6 +378,12 @@ export function ReasoningTraceViewer({ isOpen, onClose }: ReasoningTraceViewerPr
                   <div className="text-xs text-text-primary mt-1 whitespace-pre-wrap">
                     {detail.finalAnswer}
                   </div>
+                </div>
+              )}
+
+              {detail.finalAnswer && !atLatestNode && (
+                <div className="border-t border-border-muted px-4 py-3 bg-surface/30 text-[10px] text-text-muted">
+                  {t('reasoning.finalAnswerHidden', 'Continue playback to reveal the final answer')}
                 </div>
               )}
             </>

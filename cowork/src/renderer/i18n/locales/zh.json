@@ -1112,7 +1112,13 @@
     "comparing": "正在比较两个检查点",
     "selectFirst": "点击一个检查点开始比较",
     "selectSecond": "点击第二个检查点进行比较",
-    "turn": "第"
+    "turn": "第",
+    "compareResult": "检查点比较",
+    "from": "起点",
+    "to": "终点",
+    "clearCompare": "清除",
+    "compareEmpty": "所选检查点之间没有文件变化。",
+    "filesChanged": "已更改 {{count}} 个文件"
   },
   "reasoning": {
     "title": "推理轨迹",
@@ -1122,7 +1128,13 @@
     "mode": "模式",
     "nodes": "节点",
     "score": "分数",
+    "playback": "回放",
+    "play": "播放",
+    "pause": "暂停",
+    "jumpStart": "跳到开头",
+    "jumpEnd": "跳到结尾",
     "finalAnswer": "最终答案",
+    "finalAnswerHidden": "继续回放以显示最终答案",
     "noNodes": "轨迹不包含节点",
     "selectHint": "选择轨迹以检查"
   },

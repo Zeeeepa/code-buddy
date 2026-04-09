@@ -1114,7 +1114,13 @@
     "comparing": "Comparing two checkpoints",
     "selectFirst": "Click a checkpoint to start compare",
     "selectSecond": "Click a second checkpoint to compare",
-    "turn": "Turn"
+    "turn": "Turn",
+    "compareResult": "Checkpoint comparison",
+    "from": "From",
+    "to": "To",
+    "clearCompare": "Clear",
+    "compareEmpty": "No file changes between selected checkpoints.",
+    "filesChanged": "{{count}} file(s) changed"
   },
   "reasoning": {
     "title": "Reasoning trace",
@@ -1124,7 +1130,13 @@
     "mode": "Mode",
     "nodes": "nodes",
     "score": "Score",
+    "playback": "Playback",
+    "play": "Play",
+    "pause": "Pause",
+    "jumpStart": "Jump to start",
+    "jumpEnd": "Jump to end",
     "finalAnswer": "Final answer",
+    "finalAnswerHidden": "Continue playback to reveal the final answer",
     "noNodes": "Trace contains no nodes",
     "selectHint": "Select a trace to inspect"
   },

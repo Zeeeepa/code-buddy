@@ -10,7 +10,16 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { log, logError } from '../utils/logger';
-import type { Session, Message, ServerEvent, ContentBlock, TextContent, ToolUseContent, ToolResultContent } from '../../renderer/types';
+import { getReasoningBridge } from '../reasoning/reasoning-bridge';
+import type {
+  Session,
+  Message,
+  ServerEvent,
+  ContentBlock,
+  TextContent,
+  ToolUseContent,
+  ToolResultContent,
+} from '../../renderer/types';
 
 /** Minimal EngineAdapter interface (avoids direct import from Code Buddy src) */
 interface EngineAdapter {
@@ -18,7 +27,7 @@ interface EngineAdapter {
     sessionId: string,
     messages: Array<{ role: string; content: string }>,
     onEvent: (event: EngineStreamEvent) => void,
-    options?: Record<string, unknown>,
+    options?: Record<string, unknown>
   ): Promise<{ content: string; tokenCount?: number; toolCallCount?: number }>;
   cancel(sessionId: string): void;
   clearSession(sessionId: string): void;
@@ -40,7 +49,13 @@ interface EngineStreamEvent {
   cost?: { inputTokens: number; outputTokens: number; totalCost: number };
   error?: string;
   askUser?: { question: string; options: string[] };
-  planProgress?: { taskId: string; status: string; total: number; completed: number; message?: string };
+  planProgress?: {
+    taskId: string;
+    status: string;
+    total: number;
+    completed: number;
+    message?: string;
+  };
   diffPreview?: { turnId: number; diffs: Array<Record<string, unknown>>; plan?: string };
 }
 
@@ -48,7 +63,11 @@ interface EngineStreamEvent {
 interface RunnerCallbacks {
   sendToRenderer: (event: ServerEvent) => void;
   saveMessage: (message: Message) => void;
-  requestSudoPassword?: (sessionId: string, toolUseId: string, command: string) => Promise<string | null>;
+  requestSudoPassword?: (
+    sessionId: string,
+    toolUseId: string,
+    command: string
+  ) => Promise<string | null>;
 }
 
 /**
@@ -132,6 +151,61 @@ export class CodeBuddyEngineRunner {
 
     let fullContent = '';
     const contentBlocks: ContentBlock[] = [];
+    const reasoningBridge = getReasoningBridge();
+    const reasoningToolUseId = `${session.id}:reasoning:${userMessage.id}`;
+    let reasoningStarted = false;
+    let reasoningCompleted = false;
+    let reasoningNodeIndex = 0;
+    let reasoningBuffer = '';
+
+    const ensureReasoningTrace = () => {
+      if (reasoningStarted) return;
+      reasoningStarted = true;
+      reasoningBridge.pushEvent({
+        toolUseId: reasoningToolUseId,
+        sessionId: session.id,
+        type: 'start',
+        problem: prompt,
+        mode: session.model ?? 'embedded',
+      });
+    };
+
+    const flushReasoningBuffer = () => {
+      const label = reasoningBuffer.trim();
+      if (!label) {
+        reasoningBuffer = '';
+        return;
+      }
+      ensureReasoningTrace();
+      reasoningNodeIndex += 1;
+      reasoningBridge.pushEvent({
+        toolUseId: reasoningToolUseId,
+        sessionId: session.id,
+        type: 'node',
+        node: {
+          id: `node-${reasoningNodeIndex}`,
+          parentId: reasoningNodeIndex > 1 ? `node-${reasoningNodeIndex - 1}` : null,
+          depth: Math.max(0, reasoningNodeIndex - 1),
+          label,
+          selected: reasoningNodeIndex === 1,
+        },
+      });
+      reasoningBuffer = '';
+    };
+
+    const finalizeReasoningTrace = () => {
+      if (reasoningCompleted) return;
+      flushReasoningBuffer();
+      if (!reasoningStarted) return;
+      reasoningCompleted = true;
+      reasoningBridge.pushEvent({
+        toolUseId: reasoningToolUseId,
+        sessionId: session.id,
+        type: 'complete',
+        finalAnswer: fullContent || undefined,
+        iterations: reasoningNodeIndex,
+      });
+    };
 
     try {
       await this.adapter.runSession(
@@ -151,6 +225,10 @@ export class CodeBuddyEngineRunner {
 
             case 'thinking':
               if (event.thinking) {
+                reasoningBuffer += event.thinking;
+                if (reasoningBuffer.length >= 160 || event.thinking.includes('\n')) {
+                  flushReasoningBuffer();
+                }
                 sendToRenderer({
                   type: 'stream.thinking',
                   payload: { sessionId: session.id, delta: event.thinking },
@@ -255,7 +333,11 @@ export class CodeBuddyEngineRunner {
                       sessionId: session.id,
                       diffs: (event.diffPreview.diffs || []).map((d: Record<string, unknown>) => ({
                         path: String(d.path || ''),
-                        action: String(d.action || 'modify') as 'create' | 'modify' | 'delete' | 'rename',
+                        action: String(d.action || 'modify') as
+                          | 'create'
+                          | 'modify'
+                          | 'delete'
+                          | 'rename',
                         linesAdded: Number(d.linesAdded || 0),
                         linesRemoved: Number(d.linesRemoved || 0),
                         excerpt: String(d.excerpt || ''),
@@ -287,7 +369,7 @@ export class CodeBuddyEngineRunner {
         {
           workingDirectory: session.cwd,
           model: session.model,
-        },
+        }
       );
 
       // Save assistant message
@@ -301,9 +383,10 @@ export class CodeBuddyEngineRunner {
         id: uuidv4(),
         sessionId: session.id,
         role: 'assistant',
-        content: assistantContent.length > 0
-          ? assistantContent
-          : [{ type: 'text', text: fullContent || '' } as TextContent],
+        content:
+          assistantContent.length > 0
+            ? assistantContent
+            : [{ type: 'text', text: fullContent || '' } as TextContent],
         timestamp: Date.now(),
       };
       saveMessage(assistantMessage);
@@ -316,7 +399,6 @@ export class CodeBuddyEngineRunner {
           message: assistantMessage,
         },
       } as ServerEvent);
-
     } catch (error) {
       logError('[CodeBuddyEngineRunner] session error', error);
       sendToRenderer({
@@ -327,6 +409,7 @@ export class CodeBuddyEngineRunner {
         },
       } as ServerEvent);
     } finally {
+      finalizeReasoningTrace();
       // Notify session is idle
       sendToRenderer({
         type: 'session.status',
@@ -358,7 +441,7 @@ export class CodeBuddyEngineRunner {
    */
   private convertMessages(
     messages: Message[],
-    currentPrompt: string,
+    currentPrompt: string
   ): Array<{ role: string; content: string }> {
     const result: Array<{ role: string; content: string }> = [];
 
@@ -385,9 +468,7 @@ export class CodeBuddyEngineRunner {
           case 'tool_result': {
             const tr = block as ToolResultContent;
             const status = tr.isError ? 'error' : 'success';
-            const preview = tr.content.length > 500
-              ? tr.content.slice(0, 500) + '...'
-              : tr.content;
+            const preview = tr.content.length > 500 ? tr.content.slice(0, 500) + '...' : tr.content;
             parts.push(`[Tool result (${status}): ${preview}]`);
             break;
           }
@@ -457,8 +538,7 @@ function extractScreenshotFromOutput(output: string | undefined): string | undef
     const parsed = JSON.parse(output);
     if (parsed && typeof parsed === 'object') {
       const obj = parsed as Record<string, unknown>;
-      const candidate =
-        obj.screenshot ?? obj.image ?? obj.imagePath ?? obj.screenshotPath;
+      const candidate = obj.screenshot ?? obj.image ?? obj.imagePath ?? obj.screenshotPath;
       if (typeof candidate === 'string' && candidate.length > 0) {
         return candidate;
       }
