@@ -9,6 +9,7 @@
  */
 
 import * as path from 'path';
+import * as fs from 'fs';
 import { execFileSync } from 'child_process';
 import { logWarn } from '../utils/logger';
 
@@ -45,6 +46,16 @@ export interface GitDiffEntry {
   linesAdded: number;
   linesRemoved: number;
   excerpt: string;
+}
+
+export interface GitWorktreeEntry {
+  path: string;
+  branch: string;
+  head: string;
+  bare: boolean;
+  detached: boolean;
+  locked: boolean;
+  prunable: boolean;
 }
 
 function mapStatusCode(code: string): GitFileStatus {
@@ -88,6 +99,66 @@ export class GitBridge {
       if (line.startsWith('-')) linesRemoved += 1;
     }
     return { linesAdded, linesRemoved };
+  }
+
+  private parseWorktrees(raw: string): GitWorktreeEntry[] {
+    const worktrees: GitWorktreeEntry[] = [];
+    let current: Partial<GitWorktreeEntry> = {};
+
+    for (const line of raw.split('\n')) {
+      if (line.startsWith('worktree ')) {
+        if (current.path) {
+          worktrees.push({
+            path: current.path,
+            branch: current.branch ?? '',
+            head: current.head ?? '',
+            bare: Boolean(current.bare),
+            detached: Boolean(current.detached),
+            locked: Boolean(current.locked),
+            prunable: Boolean(current.prunable),
+          });
+        }
+        current = { path: line.slice('worktree '.length) };
+        continue;
+      }
+      if (line.startsWith('HEAD ')) {
+        current.head = line.slice('HEAD '.length);
+        continue;
+      }
+      if (line.startsWith('branch ')) {
+        current.branch = line.slice('branch '.length).replace(/^refs\/heads\//, '');
+        continue;
+      }
+      if (line === 'bare') {
+        current.bare = true;
+        continue;
+      }
+      if (line === 'detached') {
+        current.detached = true;
+        continue;
+      }
+      if (line.startsWith('locked')) {
+        current.locked = true;
+        continue;
+      }
+      if (line.startsWith('prunable')) {
+        current.prunable = true;
+      }
+    }
+
+    if (current.path) {
+      worktrees.push({
+        path: current.path,
+        branch: current.branch ?? '',
+        head: current.head ?? '',
+        bare: Boolean(current.bare),
+        detached: Boolean(current.detached),
+        locked: Boolean(current.locked),
+        prunable: Boolean(current.prunable),
+      });
+    }
+
+    return worktrees;
   }
 
   /** Resolve the top-level git directory for `cwd` (or null if not a repo). */
@@ -287,6 +358,92 @@ export class GitBridge {
     } catch (err) {
       logWarn('[GitBridge] compareCommits failed:', (err as Error).message);
       return [];
+    }
+  }
+
+  listWorktrees(cwd: string): GitWorktreeEntry[] {
+    const root = this.getRepoRoot(cwd);
+    if (!root) return [];
+
+    try {
+      const raw = runGit(root, ['worktree', 'list', '--porcelain']);
+      return this.parseWorktrees(raw);
+    } catch (err) {
+      logWarn('[GitBridge] listWorktrees failed:', (err as Error).message);
+      return [];
+    }
+  }
+
+  addWorktree(
+    cwd: string,
+    targetPath: string,
+    branch?: string
+  ): { success: boolean; error?: string; path?: string; branch?: string } {
+    const root = this.getRepoRoot(cwd);
+    if (!root) return { success: false, error: 'Not a git repository' };
+
+    const resolvedPath = path.resolve(cwd, targetPath);
+    if (fs.existsSync(resolvedPath)) {
+      return { success: false, error: `Path already exists: ${resolvedPath}` };
+    }
+
+    const nextBranch = branch?.trim() || path.basename(resolvedPath);
+    const args = ['worktree', 'add'];
+
+    try {
+      runGit(root, ['rev-parse', '--verify', nextBranch], { timeout: 3000 });
+      args.push(resolvedPath, nextBranch);
+    } catch {
+      args.push('-b', nextBranch, resolvedPath);
+    }
+
+    try {
+      runGit(root, args, { timeout: 10000 });
+      return { success: true, path: resolvedPath, branch: nextBranch };
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
+    }
+  }
+
+  removeWorktree(
+    cwd: string,
+    targetPath: string,
+    force = false
+  ): { success: boolean; error?: string } {
+    const root = this.getRepoRoot(cwd);
+    if (!root) return { success: false, error: 'Not a git repository' };
+
+    const resolvedTarget = path.resolve(targetPath);
+    const currentRoot = this.getRepoRoot(cwd);
+    if (currentRoot && path.resolve(currentRoot) === resolvedTarget) {
+      return { success: false, error: 'Cannot remove the current worktree' };
+    }
+
+    const args = ['worktree', 'remove'];
+    if (force) args.push('--force');
+    args.push(resolvedTarget);
+
+    try {
+      runGit(root, args, { timeout: 10000 });
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
+    }
+  }
+
+  pruneWorktrees(cwd: string): { success: boolean; output?: string; error?: string } {
+    const root = this.getRepoRoot(cwd);
+    if (!root) return { success: false, error: 'Not a git repository' };
+
+    try {
+      const dryRun = runGit(root, ['worktree', 'prune', '--dry-run'], { timeout: 8000 });
+      if (!dryRun.trim()) {
+        return { success: true, output: '' };
+      }
+      runGit(root, ['worktree', 'prune'], { timeout: 8000 });
+      return { success: true, output: dryRun.trim() };
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
     }
   }
 

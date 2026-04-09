@@ -1287,6 +1287,33 @@ contextBridge.exposeInMainWorld('electronAPI', {
     suggestMessage: (cwd: string): Promise<{ message: string }> =>
       ipcRenderer.invoke('git.suggestMessage', cwd),
     branches: (cwd: string): Promise<string[]> => ipcRenderer.invoke('git.branches', cwd),
+    worktrees: (
+      cwd: string
+    ): Promise<
+      Array<{
+        path: string;
+        branch: string;
+        head: string;
+        bare: boolean;
+        detached: boolean;
+        locked: boolean;
+        prunable: boolean;
+      }>
+    > => ipcRenderer.invoke('git.worktrees', cwd),
+    addWorktree: (
+      cwd: string,
+      targetPath: string,
+      branch?: string
+    ): Promise<{ success: boolean; error?: string; path?: string; branch?: string }> =>
+      ipcRenderer.invoke('git.worktreeAdd', cwd, targetPath, branch),
+    removeWorktree: (
+      cwd: string,
+      targetPath: string,
+      force?: boolean
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('git.worktreeRemove', cwd, targetPath, force),
+    pruneWorktrees: (cwd: string): Promise<{ success: boolean; output?: string; error?: string }> =>
+      ipcRenderer.invoke('git.worktreePrune', cwd),
   },
 
   // Hunk-level diff accept/reject (Claude Cowork parity Phase 3 step 1)
@@ -2380,6 +2407,30 @@ declare global {
         ) => Promise<{ success: boolean; error?: string; hash?: string }>;
         suggestMessage: (cwd: string) => Promise<{ message: string }>;
         branches: (cwd: string) => Promise<string[]>;
+        worktrees: (cwd: string) => Promise<
+          Array<{
+            path: string;
+            branch: string;
+            head: string;
+            bare: boolean;
+            detached: boolean;
+            locked: boolean;
+            prunable: boolean;
+          }>
+        >;
+        addWorktree: (
+          cwd: string,
+          targetPath: string,
+          branch?: string
+        ) => Promise<{ success: boolean; error?: string; path?: string; branch?: string }>;
+        removeWorktree: (
+          cwd: string,
+          targetPath: string,
+          force?: boolean
+        ) => Promise<{ success: boolean; error?: string }>;
+        pruneWorktrees: (
+          cwd: string
+        ) => Promise<{ success: boolean; output?: string; error?: string }>;
       };
       diff: {
         parseHunks: (excerpt: string) => Promise<{

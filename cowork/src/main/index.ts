@@ -3481,6 +3481,44 @@ ipcMain.handle('git.branches', async (_event, cwd: string) => {
   }
 });
 
+ipcMain.handle('git.worktrees', async (_event, cwd: string) => {
+  try {
+    return getGitBridge().listWorktrees(cwd);
+  } catch {
+    return [];
+  }
+});
+
+ipcMain.handle(
+  'git.worktreeAdd',
+  async (_event, cwd: string, targetPath: string, branch?: string) => {
+    try {
+      return getGitBridge().addWorktree(cwd, targetPath, branch);
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
+    }
+  }
+);
+
+ipcMain.handle(
+  'git.worktreeRemove',
+  async (_event, cwd: string, targetPath: string, force?: boolean) => {
+    try {
+      return getGitBridge().removeWorktree(cwd, targetPath, !!force);
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
+    }
+  }
+);
+
+ipcMain.handle('git.worktreePrune', async (_event, cwd: string) => {
+  try {
+    return getGitBridge().pruneWorktrees(cwd);
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
 // Hunk diff accept/reject — Claude Cowork parity Phase 3 step 1
 ipcMain.handle('diff.parseHunks', async (_event, excerpt: string) => {
   try {
