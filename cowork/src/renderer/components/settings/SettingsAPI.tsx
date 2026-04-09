@@ -14,6 +14,7 @@ import { useApiConfigState } from '../../hooks/useApiConfigState';
 import { ApiConfigSetManager } from '../ApiConfigSetManager';
 import { CommonProviderSetupsCard, GuidanceInlineHint } from '../ProviderGuidance';
 import ApiDiagnosticsPanel from '../ApiDiagnosticsPanel';
+import { SettingsLocalProviders } from './SettingsLocalProviders';
 
 interface ModelOptionItem {
   id: string;
@@ -85,6 +86,7 @@ export function SettingsAPI() {
     refreshModelOptions,
     discoverLocalOllama,
     discoverLocalLmStudio,
+    applyLocalProviderProfile,
     diagnosticResult,
     isDiagnosing,
     handleDiagnose,
@@ -103,6 +105,12 @@ export function SettingsAPI() {
 
   return (
     <div className="space-y-5">
+      <SettingsLocalProviders
+        onConnect={(providerKey, payload) => {
+          applyLocalProviderProfile(providerKey, payload);
+        }}
+      />
+
       {/* Config Set Switcher */}
       <ApiConfigSetManager
         configSets={configSets}

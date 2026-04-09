@@ -1421,6 +1421,32 @@ export class SessionManager {
     return [...messages];
   }
 
+  replaceMessages(sessionId: string, messages: Message[]): void {
+    const session = this.db.sessions.get(sessionId);
+    if (!session) {
+      throw new Error(`Unknown session: ${sessionId}`);
+    }
+
+    const tx = this.db.raw.transaction((nextMessages: Message[]) => {
+      this.db.messages.deleteBySessionId(sessionId);
+      for (const message of nextMessages) {
+        this.db.messages.create({
+          id: message.id,
+          session_id: message.sessionId,
+          role: message.role,
+          content: JSON.stringify(message.content),
+          timestamp: message.timestamp,
+          token_usage: message.tokenUsage ? JSON.stringify(message.tokenUsage) : null,
+          execution_time_ms: message.executionTimeMs ?? null,
+        });
+      }
+    });
+
+    tx(messages);
+    this.messageCache.set(sessionId, [...messages]);
+    log('[SessionManager] Messages replaced for session:', sessionId, 'count:', messages.length);
+  }
+
   private normalizeContent(raw: string): ContentBlock[] {
     try {
       const parsed = JSON.parse(raw) as unknown;

@@ -923,6 +923,44 @@ contextBridge.exposeInMainWorld('electronAPI', {
       messages: import('../renderer/types').Message[];
       traceSteps: import('../renderer/types').TraceStep[];
     } | null> => ipcRenderer.invoke('sessionInsights.detail', sessionId),
+    audit: (
+      sessionId: string
+    ): Promise<{
+      sessionId: string;
+      issueCount: number;
+      orphanToolResults: number;
+      missingToolResults: number;
+      emptyMessages: number;
+      issues: Array<{
+        kind: 'orphan_tool_result' | 'missing_tool_result' | 'empty_message';
+        messageId?: string;
+        toolUseId?: string;
+        detail: string;
+      }>;
+    } | null> => ipcRenderer.invoke('sessionInsights.audit', sessionId),
+    repair: (
+      sessionId: string
+    ): Promise<{
+      sessionId: string;
+      changed: boolean;
+      removedOrphanToolResults: number;
+      injectedSyntheticToolResults: number;
+      removedEmptyMessages: number;
+      messages: import('../renderer/types').Message[];
+      audit: {
+        sessionId: string;
+        issueCount: number;
+        orphanToolResults: number;
+        missingToolResults: number;
+        emptyMessages: number;
+        issues: Array<{
+          kind: 'orphan_tool_result' | 'missing_tool_result' | 'empty_message';
+          messageId?: string;
+          toolUseId?: string;
+          detail: string;
+        }>;
+      };
+    } | null> => ipcRenderer.invoke('sessionInsights.repair', sessionId),
   },
 
   // Workflow visual editor (Claude Cowork parity Phase 2 step 15)
@@ -1463,6 +1501,36 @@ contextBridge.exposeInMainWorld('electronAPI', {
       message?: string;
       error?: string;
       handled?: boolean;
+      action?: {
+        type: 'open_schedule' | 'create_schedule';
+        draft?: {
+          prompt: string;
+          cwd?: string;
+          scheduleMode: 'once' | 'daily' | 'weekly';
+          runAt?: string;
+          selectedTimes?: string[];
+          selectedWeekdays?: number[];
+          enabled?: boolean;
+        };
+        createInput?: {
+          prompt: string;
+          cwd?: string;
+          runAt: number;
+          nextRunAt: number;
+          scheduleConfig:
+            | {
+                kind: 'daily';
+                times: string[];
+              }
+            | {
+                kind: 'weekly';
+                weekdays: number[];
+                times: string[];
+              }
+            | null;
+          enabled: boolean;
+        };
+      };
     }> => ipcRenderer.invoke('command.execute', name, args, sessionId),
   },
 
@@ -2176,6 +2244,40 @@ declare global {
           messages: import('../renderer/types').Message[];
           traceSteps: import('../renderer/types').TraceStep[];
         } | null>;
+        audit: (sessionId: string) => Promise<{
+          sessionId: string;
+          issueCount: number;
+          orphanToolResults: number;
+          missingToolResults: number;
+          emptyMessages: number;
+          issues: Array<{
+            kind: 'orphan_tool_result' | 'missing_tool_result' | 'empty_message';
+            messageId?: string;
+            toolUseId?: string;
+            detail: string;
+          }>;
+        } | null>;
+        repair: (sessionId: string) => Promise<{
+          sessionId: string;
+          changed: boolean;
+          removedOrphanToolResults: number;
+          injectedSyntheticToolResults: number;
+          removedEmptyMessages: number;
+          messages: import('../renderer/types').Message[];
+          audit: {
+            sessionId: string;
+            issueCount: number;
+            orphanToolResults: number;
+            missingToolResults: number;
+            emptyMessages: number;
+            issues: Array<{
+              kind: 'orphan_tool_result' | 'missing_tool_result' | 'empty_message';
+              messageId?: string;
+              toolUseId?: string;
+              detail: string;
+            }>;
+          };
+        } | null>;
       };
       workflow: {
         list: () => Promise<
@@ -2641,6 +2743,36 @@ declare global {
           message?: string;
           error?: string;
           handled?: boolean;
+          action?: {
+            type: 'open_schedule' | 'create_schedule';
+            draft?: {
+              prompt: string;
+              cwd?: string;
+              scheduleMode: 'once' | 'daily' | 'weekly';
+              runAt?: string;
+              selectedTimes?: string[];
+              selectedWeekdays?: number[];
+              enabled?: boolean;
+            };
+            createInput?: {
+              prompt: string;
+              cwd?: string;
+              runAt: number;
+              nextRunAt: number;
+              scheduleConfig:
+                | {
+                    kind: 'daily';
+                    times: string[];
+                  }
+                | {
+                    kind: 'weekly';
+                    weekdays: number[];
+                    times: string[];
+                  }
+                | null;
+              enabled: boolean;
+            };
+          };
         }>;
       };
       memory: {

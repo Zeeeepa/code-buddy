@@ -1673,6 +1673,45 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     showErrorText,
   ]);
 
+  const applyLocalProviderProfile = useCallback(
+    (
+      targetProvider: 'ollama' | 'lmstudio',
+      payload: {
+        baseUrl: string;
+        models?: ProviderModelInfo[];
+        selectedModel?: string;
+      }
+    ) => {
+      const targetProfileKey = profileKeyFromProvider(targetProvider);
+      const selectedModel =
+        payload.selectedModel?.trim() || payload.models?.[0]?.id || modelPresetForProfile(targetProfileKey, presets).models[0]?.id || '';
+
+      dispatch({
+        type: 'UPDATE_PROFILE_FN',
+        profileKey: targetProfileKey,
+        updater: (current) => ({
+          ...current,
+          apiKey: '',
+          baseUrl: payload.baseUrl,
+          model: selectedModel,
+          customModel: '',
+          useCustomModel: false,
+        }),
+      });
+
+      if (payload.models) {
+        dispatch({
+          type: 'SET_DISCOVERED_MODELS',
+          profileKey: targetProfileKey,
+          models: payload.models,
+        });
+      }
+
+      dispatch({ type: 'SET_ACTIVE_PROFILE_KEY', payload: targetProfileKey });
+    },
+    [presets]
+  );
+
   const applyDiscoveredOllamaState = useCallback(
     (
       targetProfileKey: ProviderProfileKey,
@@ -2353,6 +2392,7 @@ export function useApiConfigState(options: UseApiConfigStateOptions = {}) {
     refreshModelOptions,
     discoverLocalOllama,
     discoverLocalLmStudio,
+    applyLocalProviderProfile,
     setError: showErrorText,
     setSuccessMessage: showSuccessText,
   };

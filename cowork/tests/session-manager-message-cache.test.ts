@@ -149,4 +149,36 @@ describe('SessionManager message cache', () => {
     expect(msgs2[1].id).toBe('msg-b');
     expect(db.messages.getBySessionId).toHaveBeenCalledTimes(0);
   });
+
+  it('replaces persisted and cached messages for a session', () => {
+    const db = makeDb();
+    db.sessions.get = vi.fn(() => ({ id: 's1' }));
+    const rawTransaction = vi.fn((fn: (messages: unknown[]) => void) => (messages: unknown[]) => fn(messages));
+    const manager = new SessionManager(
+      {
+        ...(db as unknown as DatabaseInstance),
+        raw: {
+          transaction: rawTransaction,
+        },
+      } as unknown as DatabaseInstance,
+      vi.fn()
+    );
+
+    manager.getMessages('s1');
+    manager.replaceMessages('s1', [
+      {
+        id: 'm-replaced',
+        sessionId: 's1',
+        role: 'assistant',
+        content: [{ type: 'text', text: 'fixed transcript' }],
+        timestamp: 42,
+      },
+    ]);
+
+    const next = manager.getMessages('s1');
+    expect(db.messages.deleteBySessionId).toHaveBeenCalledWith('s1');
+    expect(db.messages.create).toHaveBeenCalledTimes(1);
+    expect(next).toHaveLength(1);
+    expect(next[0].id).toBe('m-replaced');
+  });
 });

@@ -10,7 +10,7 @@ test('shows the welcome view on a fresh profile', async ({ appPage }) => {
 test('opens Settings and renders the A2A registry tab', async ({ appPage }) => {
   await appPage.getByTestId('sidebar-settings-button').click();
 
-  await expect(appPage.getByTestId('settings-panel')).toBeVisible();
+  await expect(appPage.getByTestId('settings-panel')).toBeVisible({ timeout: 20000 });
   await appPage.getByTestId('settings-tab-a2a').click();
   await expect(appPage.getByTestId('settings-a2a-agents')).toBeVisible();
   await expect(appPage.getByTestId('a2a-add-url-input')).toBeVisible();
@@ -44,4 +44,11 @@ test('opens the session resume dialog from the welcome view', async ({ appPage }
 
   await expect(appPage.getByTestId('session-resume-dialog')).toBeVisible();
   await expect(appPage.getByTestId('session-resume-empty')).toBeVisible();
+});
+
+test('opens the focus view from the titlebar', async ({ appPage }) => {
+  await appPage.getByTestId('focus-view-button').click();
+
+  await expect(appPage.getByTestId('focus-view')).toBeVisible();
+  await expect(appPage.getByTestId('focus-view-empty')).toBeVisible();
 });

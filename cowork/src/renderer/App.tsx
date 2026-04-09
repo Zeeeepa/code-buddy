@@ -40,6 +40,7 @@ import { SnippetsLibrary } from './components/SnippetsLibrary';
 import { PersonaSwitcherDialog } from './components/PersonaSwitcherDialog';
 import { TestRunnerPanel } from './components/TestRunnerPanel';
 import { ReasoningTraceViewer } from './components/ReasoningTraceViewer';
+import { FocusView } from './components/FocusView';
 import { SplitPaneLayout } from './components/SplitPaneLayout';
 import { UpdateNotification } from './components/UpdateNotification';
 import { NotificationToastContainer } from './components/NotificationToast';
@@ -96,6 +97,7 @@ function App() {
   const showActivityFeed = useAppStore((s) => s.showActivityFeed);
   const showSessionInsights = useAppStore((s) => s.showSessionInsights);
   const showResumeChooser = useAppStore((s) => s.showResumeChooser);
+  const showFocusView = useAppStore((s) => s.showFocusView);
   const setBookmarkedMessageIds = useAppStore((s) => s.setBookmarkedMessageIds);
   const setShowSnippetsLibrary = useAppStore((s) => s.setShowSnippetsLibrary);
   const showPersonaSwitcher = useAppStore((s) => s.showPersonaSwitcher);
@@ -122,11 +124,12 @@ function App() {
   const setShowActivityFeed = useAppStore((s) => s.setShowActivityFeed);
   const setShowSessionInsights = useAppStore((s) => s.setShowSessionInsights);
   const setShowResumeChooser = useAppStore((s) => s.setShowResumeChooser);
+  const setShowFocusView = useAppStore((s) => s.setShowFocusView);
   const setUpdateInfo = useAppStore((s) => s.setUpdateInfo);
   const setSearchActive = useAppStore((s) => s.setSearchActive);
   const setContextPanelCollapsed = useAppStore((s) => s.setContextPanelCollapsed);
 
-  const { listSessions, isElectron } = useIPC();
+  const { listSessions, stopSession, isElectron } = useIPC();
   const { width } = useWindowSize();
   const initialized = useRef(false);
   const sidebarBeforeSettings = useRef(false);
@@ -253,6 +256,9 @@ function App() {
       } else if (mod && e.shiftKey && (e.key === 'o' || e.key === 'O')) {
         e.preventDefault();
         setShowResumeChooser(true);
+      } else if (mod && e.shiftKey && (e.key === 'f' || e.key === 'F')) {
+        e.preventDefault();
+        setShowFocusView(true);
       } else if (mod && e.key === '\\') {
         // Phase 3 step 8: toggle split-pane layout
         e.preventDefault();
@@ -297,6 +303,7 @@ function App() {
     setShowReasoningViewer,
     setShowSessionInsights,
     setShowResumeChooser,
+    setShowFocusView,
     toggleSplitPane,
   ]);
 
@@ -456,6 +463,13 @@ function App() {
         onClose={() => setShowSessionInsights(false)}
       />
       <SessionResumeDialog open={showResumeChooser} onClose={() => setShowResumeChooser(false)} />
+      {showFocusView && (
+        <FocusView
+          open={showFocusView}
+          onClose={() => setShowFocusView(false)}
+          onStopSession={stopSession}
+        />
+      )}
 
       {/* Bookmarks Panel — Phase 3 step 4 */}
       <BookmarksPanel />

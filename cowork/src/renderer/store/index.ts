@@ -40,6 +40,22 @@ export interface SessionExecutionClock {
   endAt: number | null;
 }
 
+export interface ScheduleDraft {
+  prompt: string;
+  cwd?: string;
+  scheduleMode: 'once' | 'daily' | 'weekly';
+  runAt?: string;
+  selectedTimes?: string[];
+  selectedWeekdays?: number[];
+  enabled?: boolean;
+  nonce: number;
+}
+
+export interface FocusedMessageTarget {
+  sessionId: string;
+  messageId: string;
+}
+
 // Unified per-session state that replaces 8 parallel xxxBySession Maps
 export interface SessionState {
   messages: Message[];
@@ -95,6 +111,8 @@ interface AppState {
   contextPanelCollapsed: boolean;
   showSettings: boolean;
   settingsTab: string | null;
+  scheduleDraft: ScheduleDraft | null;
+  focusedMessageTarget: FocusedMessageTarget | null;
 
   // Permission
   pendingPermission: PermissionRequest | null;
@@ -164,6 +182,7 @@ interface AppState {
   showActivityFeed: boolean;
   showSessionInsights: boolean;
   showResumeChooser: boolean;
+  showFocusView: boolean;
 
   // Phase 3 step 4: bookmarked message IDs for the active session
   bookmarkedMessageIds: Set<string>;
@@ -240,6 +259,10 @@ interface AppState {
   setContextPanelCollapsed: (collapsed: boolean) => void;
   setShowSettings: (show: boolean) => void;
   setSettingsTab: (tab: string | null) => void;
+  setScheduleDraft: (draft: Omit<ScheduleDraft, 'nonce'> | null) => void;
+  clearScheduleDraft: () => void;
+  setFocusedMessageTarget: (target: FocusedMessageTarget | null) => void;
+  clearFocusedMessageTarget: () => void;
 
   setPendingPermission: (permission: PermissionRequest | null) => void;
 
@@ -319,6 +342,7 @@ interface AppState {
   setShowActivityFeed: (show: boolean) => void;
   setShowSessionInsights: (show: boolean) => void;
   setShowResumeChooser: (show: boolean) => void;
+  setShowFocusView: (show: boolean) => void;
   setBookmarkedMessageIds: (ids: string[]) => void;
   toggleBookmarkedMessage: (messageId: string, bookmarked: boolean) => void;
   setShowBookmarksPanel: (show: boolean) => void;
@@ -397,6 +421,8 @@ export const useAppStore = create<AppState>((set) => ({
   contextPanelCollapsed: false,
   showSettings: false,
   settingsTab: null,
+  scheduleDraft: null,
+  focusedMessageTarget: null,
   pendingPermission: null,
   pendingSudoPassword: null,
   settings: defaultSettings,
@@ -427,6 +453,7 @@ export const useAppStore = create<AppState>((set) => ({
   showActivityFeed: false,
   showSessionInsights: false,
   showResumeChooser: false,
+  showFocusView: false,
   bookmarkedMessageIds: new Set<string>(),
   showBookmarksPanel: false,
   showSnippetsLibrary: false,
@@ -781,6 +808,13 @@ export const useAppStore = create<AppState>((set) => ({
   setContextPanelCollapsed: (collapsed) => set({ contextPanelCollapsed: collapsed }),
   setShowSettings: (show) => set({ showSettings: show }),
   setSettingsTab: (tab) => set({ settingsTab: tab }),
+  setScheduleDraft: (draft) =>
+    set({
+      scheduleDraft: draft ? { ...draft, nonce: Date.now() } : null,
+    }),
+  clearScheduleDraft: () => set({ scheduleDraft: null }),
+  setFocusedMessageTarget: (target) => set({ focusedMessageTarget: target }),
+  clearFocusedMessageTarget: () => set({ focusedMessageTarget: null }),
 
   // Permission actions
   setPendingPermission: (permission) => set({ pendingPermission: permission }),
@@ -946,6 +980,7 @@ export const useAppStore = create<AppState>((set) => ({
   setShowActivityFeed: (show) => set({ showActivityFeed: show }),
   setShowSessionInsights: (show) => set({ showSessionInsights: show }),
   setShowResumeChooser: (show) => set({ showResumeChooser: show }),
+  setShowFocusView: (show) => set({ showFocusView: show }),
   setBookmarkedMessageIds: (ids) => set({ bookmarkedMessageIds: new Set(ids) }),
   toggleBookmarkedMessage: (messageId, bookmarked) =>
     set((state) => {

@@ -42,6 +42,11 @@ export interface SlashCommandExecuteResult {
   error?: string;
   /** True when the command handled everything itself (no LLM round needed) */
   handled?: boolean;
+  action?: {
+    type: 'open_schedule' | 'create_schedule';
+    draft?: SlashScheduleDraft;
+    createInput?: SlashScheduleCreateInput;
+  };
 }
 
 export interface RemoteSlashCommandResult {
@@ -56,6 +61,243 @@ type CoreSlashModule = {
 };
 
 let cachedSlashModule: CoreSlashModule | null = null;
+
+export interface SlashScheduleDraft {
+  prompt: string;
+  cwd?: string;
+  scheduleMode: 'once' | 'daily' | 'weekly';
+  runAt?: string;
+  selectedTimes?: string[];
+  selectedWeekdays?: SlashScheduleWeekday[];
+  enabled?: boolean;
+}
+
+export type SlashScheduleWeekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+export interface SlashScheduleCreateInput {
+  prompt: string;
+  cwd?: string;
+  runAt: number;
+  nextRunAt: number;
+  scheduleConfig:
+    | {
+        kind: 'daily';
+        times: string[];
+      }
+      | {
+        kind: 'weekly';
+        weekdays: SlashScheduleWeekday[];
+        times: string[];
+      }
+    | null;
+  enabled: boolean;
+}
+
+const SYNTHETIC_COMMANDS: SlashCommandDef[] = [
+  {
+    name: 'schedule',
+    description: 'Open the schedule form to create a recurring or one-shot task',
+    prompt: '__OPEN_SCHEDULE__',
+    category: 'workflow',
+    isBuiltin: true,
+    arguments: [
+      {
+        name: 'rule',
+        description: 'Optional: daily 09:00 | weekly mon 09:00 | once 2026-04-10T09:00',
+        required: false,
+      },
+      {
+        name: 'task',
+        description: 'Prompt to run on the schedule',
+        required: false,
+      },
+    ],
+  },
+];
+
+function isTimeToken(value: string | undefined): value is string {
+  return typeof value === 'string' && /^\d{2}:\d{2}$/.test(value);
+}
+
+function weekdayTokenToIndex(value: string | undefined): SlashScheduleWeekday | null {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase();
+  const map: Record<string, SlashScheduleWeekday> = {
+    mon: 1,
+    monday: 1,
+    tue: 2,
+    tues: 2,
+    tuesday: 2,
+    wed: 3,
+    weds: 3,
+    wednesday: 3,
+    thu: 4,
+    thur: 4,
+    thurs: 4,
+    thursday: 4,
+    fri: 5,
+    friday: 5,
+    sat: 6,
+    saturday: 6,
+    sun: 0,
+    sunday: 0,
+  };
+  return normalized in map ? map[normalized] : null;
+}
+
+function normalizeDateTimeLocal(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) {
+    return undefined;
+  }
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  const hours = String(parsed.getHours()).padStart(2, '0');
+  const minutes = String(parsed.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+export function parseScheduleSlashArgs(args: string[]): SlashScheduleDraft {
+  const [first, second, third, ...rest] = args;
+
+  if (first?.toLowerCase() === 'daily' && isTimeToken(second)) {
+    return {
+      prompt: args.slice(2).join(' ').trim(),
+      scheduleMode: 'daily',
+      selectedTimes: [second],
+      enabled: true,
+    };
+  }
+
+  const weekday = weekdayTokenToIndex(second);
+  if (first?.toLowerCase() === 'weekly' && weekday !== null && isTimeToken(third)) {
+    return {
+      prompt: args.slice(3).join(' ').trim(),
+      scheduleMode: 'weekly',
+      selectedWeekdays: [weekday],
+      selectedTimes: [third],
+      enabled: true,
+    };
+  }
+
+  const onceDateToken =
+    first?.toLowerCase() === 'once'
+      ? normalizeDateTimeLocal(second)
+      : normalizeDateTimeLocal(first);
+  if (onceDateToken) {
+    return {
+      prompt: (first?.toLowerCase() === 'once' ? [third, ...rest] : [second, third, ...rest])
+        .filter(Boolean)
+        .join(' ')
+        .trim(),
+      scheduleMode: 'once',
+      runAt: onceDateToken,
+      enabled: true,
+    };
+  }
+
+  return {
+    prompt: args.join(' ').trim(),
+    scheduleMode: 'once',
+    enabled: true,
+  };
+}
+
+function buildNextRunAtForDaily(time: string, now = Date.now()): number {
+  const [hours, minutes] = time.split(':').map((value) => Number(value));
+  const next = new Date(now);
+  next.setSeconds(0, 0);
+  next.setHours(hours, minutes, 0, 0);
+  if (next.getTime() <= now) {
+    next.setDate(next.getDate() + 1);
+  }
+  return next.getTime();
+}
+
+function buildNextRunAtForWeekly(weekday: number, time: string, now = Date.now()): number {
+  const [hours, minutes] = time.split(':').map((value) => Number(value));
+  const next = new Date(now);
+  next.setSeconds(0, 0);
+  next.setHours(hours, minutes, 0, 0);
+
+  const currentWeekday = next.getDay();
+  let delta = weekday - currentWeekday;
+  if (delta < 0) {
+    delta += 7;
+  }
+  if (delta === 0 && next.getTime() <= now) {
+    delta = 7;
+  }
+  next.setDate(next.getDate() + delta);
+  return next.getTime();
+}
+
+export function buildScheduleCreateInputFromArgs(
+  args: string[],
+  now = Date.now()
+): SlashScheduleCreateInput | null {
+  const draft = parseScheduleSlashArgs(args);
+  const trimmedPrompt = draft.prompt.trim();
+  if (!trimmedPrompt) {
+    return null;
+  }
+
+  if (draft.scheduleMode === 'once') {
+    const nextRunAt = draft.runAt ? new Date(draft.runAt).getTime() : NaN;
+    if (!Number.isFinite(nextRunAt) || nextRunAt <= now) {
+      return null;
+    }
+    return {
+      prompt: trimmedPrompt,
+      cwd: draft.cwd,
+      runAt: nextRunAt,
+      nextRunAt,
+      scheduleConfig: null,
+      enabled: draft.enabled ?? true,
+    };
+  }
+
+  if (draft.scheduleMode === 'daily') {
+    const time = draft.selectedTimes?.[0];
+    if (!isTimeToken(time)) {
+      return null;
+    }
+    const nextRunAt = buildNextRunAtForDaily(time, now);
+    return {
+      prompt: trimmedPrompt,
+      cwd: draft.cwd,
+      runAt: nextRunAt,
+      nextRunAt,
+      scheduleConfig: {
+        kind: 'daily',
+        times: [time],
+      },
+      enabled: draft.enabled ?? true,
+    };
+  }
+
+  const weekday = draft.selectedWeekdays?.[0];
+  const time = draft.selectedTimes?.[0];
+  if (typeof weekday !== 'number' || !isTimeToken(time)) {
+    return null;
+  }
+  const nextRunAt = buildNextRunAtForWeekly(weekday, time, now);
+  return {
+    prompt: trimmedPrompt,
+    cwd: draft.cwd,
+    runAt: nextRunAt,
+    nextRunAt,
+    scheduleConfig: {
+      kind: 'weekly',
+      weekdays: [weekday],
+      times: [time],
+    },
+    enabled: draft.enabled ?? true,
+  };
+}
 
 async function loadSlashModule(): Promise<CoreSlashModule | null> {
   if (cachedSlashModule) return cachedSlashModule;
@@ -98,7 +340,10 @@ export class SlashCommandBridge {
 
     // Custom names take precedence over built-ins with the same name.
     const customNames = new Set(customs.map((c) => c.name));
-    return [...customs, ...builtins.filter((b) => !customNames.has(b.name))];
+    const synthetic = SYNTHETIC_COMMANDS.filter(
+      (item) => !customNames.has(item.name) && !builtins.some((builtin) => builtin.name === item.name)
+    );
+    return [...customs, ...synthetic, ...builtins.filter((b) => !customNames.has(b.name))];
   }
 
   /** Autocomplete suggestions for a `/` prefix (e.g. `/mem` → memory, mem-list). */
@@ -142,6 +387,24 @@ export class SlashCommandBridge {
     const cmd = all.find((c) => c.name === name);
     if (!cmd) {
       return { success: false, error: `Unknown command: /${name}` };
+    }
+
+    if (cmd.name === 'schedule') {
+      const createInput = buildScheduleCreateInputFromArgs(args);
+      return {
+        success: true,
+        handled: true,
+        message: createInput ? '__CREATE_SCHEDULE__' : '__OPEN_SCHEDULE__',
+        action: createInput
+          ? {
+              type: 'create_schedule',
+              createInput,
+            }
+          : {
+              type: 'open_schedule',
+              draft: parseScheduleSlashArgs(args),
+            },
+      };
     }
 
     const joined = args.join(' ').trim();

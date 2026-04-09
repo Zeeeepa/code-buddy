@@ -36,6 +36,8 @@ export function SettingsSchedule({ isActive }: { isActive: boolean }) {
   const { t } = useTranslation();
   const workingDir = useAppStore((state) => state.workingDir);
   const sessions = useAppStore((state) => state.sessions);
+  const scheduleDraft = useAppStore((state) => state.scheduleDraft);
+  const clearScheduleDraft = useAppStore((state) => state.clearScheduleDraft);
   const [tasks, setTasks] = useState<ScheduleTask[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<LocalizedBanner | null>(null);
@@ -85,6 +87,36 @@ export function SettingsSchedule({ isActive }: { isActive: boolean }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workingDir]);
+
+  useEffect(() => {
+    if (!isActive || !scheduleDraft) {
+      return;
+    }
+
+    setEditingId(null);
+    setEditingTaskSnapshot(null);
+    setPrompt(scheduleDraft.prompt || '');
+    setCwd(scheduleDraft.cwd || workingDir || '');
+    setScheduleMode(scheduleDraft.scheduleMode);
+    setEnabled(scheduleDraft.enabled ?? true);
+
+    if (scheduleDraft.scheduleMode === 'once') {
+      if (scheduleDraft.runAt) {
+        setRunAt(scheduleDraft.runAt);
+      }
+    } else {
+      setSelectedTimes(scheduleDraft.selectedTimes?.length ? scheduleDraft.selectedTimes : ['08:00']);
+      if (scheduleDraft.scheduleMode === 'weekly') {
+        setSelectedWeekdays(
+          (
+            scheduleDraft.selectedWeekdays?.length ? scheduleDraft.selectedWeekdays : [1]
+          ) as ScheduleWeekday[]
+        );
+      }
+    }
+
+    clearScheduleDraft();
+  }, [clearScheduleDraft, isActive, scheduleDraft, workingDir]);
 
   const loadTasks = useCallback(async (options: { silent?: boolean } = {}) => {
     if (!isElectron) return;

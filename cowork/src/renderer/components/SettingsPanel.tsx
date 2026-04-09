@@ -19,6 +19,8 @@ import {
   Layers,
   Webhook,
   Network,
+  FolderKanban,
+  Blocks,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useWindowSize } from '../hooks/useWindowSize';
@@ -41,6 +43,8 @@ import { SettingsCustomCommands } from './settings/SettingsCustomCommands';
 import { SettingsWorkspacePresets } from './settings/SettingsWorkspacePresets';
 import { SettingsHooks } from './settings/SettingsHooks';
 import { SettingsA2AAgents } from './settings/SettingsA2AAgents';
+import { SettingsCustomize } from './settings/SettingsCustomize';
+import { SettingsProjects } from './settings/SettingsProjects';
 
 interface SettingsPanelProps {
   onClose: () => void;
@@ -49,6 +53,8 @@ interface SettingsPanelProps {
     | 'sandbox'
     | 'connectors'
     | 'skills'
+    | 'customize'
+    | 'projects'
     | 'schedule'
     | 'remote'
     | 'logs'
@@ -71,6 +77,8 @@ type TabId =
   | 'sandbox'
   | 'connectors'
   | 'skills'
+  | 'customize'
+  | 'projects'
   | 'schedule'
   | 'remote'
   | 'logs'
@@ -91,6 +99,8 @@ const VALID_TABS = new Set<TabId>([
   'sandbox',
   'connectors',
   'skills',
+  'customize',
+  'projects',
   'schedule',
   'remote',
   'logs',
@@ -176,6 +186,18 @@ export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProp
       label: t('settings.skills'),
       icon: Package,
       description: t('settings.skillsDesc'),
+    },
+    {
+      id: 'customize' as TabId,
+      label: t('settings.customize', 'Customize'),
+      icon: Blocks,
+      description: t('settings.customizeDesc', 'Plugins, connectors, workflows, hooks, and reusable workspace behavior'),
+    },
+    {
+      id: 'projects' as TabId,
+      label: t('settings.projects', 'Projects'),
+      icon: FolderKanban,
+      description: t('settings.projectsDesc', 'Workspace profiles with project-scoped memory'),
     },
     {
       id: 'schedule' as TabId,
@@ -365,6 +387,18 @@ export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProp
               </div>
               <div className={activeTab === 'skills' ? '' : 'hidden'}>
                 {viewedTabs.has('skills') && <SettingsSkills isActive={activeTab === 'skills'} />}
+              </div>
+              <div className={activeTab === 'customize' ? '' : 'hidden'}>
+                {viewedTabs.has('customize') && (
+                  <SettingsCustomize
+                    onNavigate={(tab) => {
+                      setActiveTab(tab);
+                    }}
+                  />
+                )}
+              </div>
+              <div className={activeTab === 'projects' ? '' : 'hidden'}>
+                {viewedTabs.has('projects') && <SettingsProjects />}
               </div>
               <div className={activeTab === 'schedule' ? '' : 'hidden'}>
                 {viewedTabs.has('schedule') && (

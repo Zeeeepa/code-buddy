@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useIPC } from '../hooks/useIPC';
 import type { PermissionRequest } from '../types';
-import { Shield, X, Check, AlertTriangle } from 'lucide-react';
+import { Shield, X, Check, AlertTriangle, Monitor } from 'lucide-react';
+import { useAppStore } from '../store';
 
 interface PermissionDialogProps {
   permission: PermissionRequest;
@@ -12,6 +13,10 @@ export function PermissionDialog({ permission }: PermissionDialogProps) {
   const { t } = useTranslation();
   const { respondToPermission } = useIPC();
   const [pendingAlwaysAllow, setPendingAlwaysAllow] = useState(false);
+  const [rememberingTarget, setRememberingTarget] = useState(false);
+  const guiActions = useAppStore((s) => s.guiActions);
+  const setShowComputerUseOverlay = useAppStore((s) => s.setShowComputerUseOverlay);
+  const activeProjectId = useAppStore((s) => s.activeProjectId);
 
   const getToolDescription = (toolName: string): string => {
     const key = `permission.toolDescriptions.${toolName}`;
@@ -33,6 +38,62 @@ export function PermissionDialog({ permission }: PermissionDialogProps) {
     'edit_file',
   ].includes(permission.toolName);
 
+  const relatedGuiAction = [...guiActions]
+    .reverse()
+    .find(
+      (action) =>
+        action.toolUseId === permission.toolUseId ||
+        (action.sessionId === permission.sessionId &&
+          Date.now() - action.timestamp < 60_000 &&
+          action.toolName === permission.toolName)
+    );
+
+  const isComputerUsePermission =
+    Boolean(relatedGuiAction) ||
+    /gui|computer|chrome|screenshot/i.test(permission.toolName || '');
+
+  const screenshotSrc = relatedGuiAction?.screenshot?.startsWith('data:')
+    ? relatedGuiAction.screenshot
+    : relatedGuiAction?.screenshot
+      ? `file://${relatedGuiAction.screenshot.replace(/\\/g, '/')}`
+      : undefined;
+
+  const computerUseSummary = (() => {
+    if (!relatedGuiAction) return '';
+    const detailObj = relatedGuiAction.details || {};
+    const url = typeof detailObj.url === 'string' ? detailObj.url : '';
+    const text = typeof detailObj.text === 'string' ? detailObj.text : '';
+    const app = typeof detailObj.app === 'string' ? detailObj.app : '';
+    const target = typeof detailObj.target === 'string' ? detailObj.target : '';
+    return [app, target, url, text].filter(Boolean).join(' • ');
+  })();
+
+  const derivedScopedRule = (() => {
+    const urlCandidate =
+      (typeof permission.input.url === 'string' ? permission.input.url : '') ||
+      (typeof relatedGuiAction?.details?.url === 'string' ? relatedGuiAction.details.url : '');
+    if (urlCandidate) {
+      try {
+        const parsed = new URL(urlCandidate);
+        return `${permission.toolName}(${parsed.origin}/*)`;
+      } catch {
+        return `${permission.toolName}(${urlCandidate}*)`;
+      }
+    }
+
+    const targetCandidate =
+      (typeof permission.input.target === 'string' ? permission.input.target : '') ||
+      (typeof relatedGuiAction?.details?.target === 'string' ? relatedGuiAction.details.target : '') ||
+      (typeof permission.input.app === 'string' ? permission.input.app : '') ||
+      (typeof relatedGuiAction?.details?.app === 'string' ? relatedGuiAction.details.app : '');
+
+    if (targetCandidate) {
+      return `${permission.toolName}(${targetCandidate}*)`;
+    }
+
+    return null;
+  })();
+
   return (
     <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
       <div className="card w-full max-w-md p-6 m-4 shadow-elevated animate-slide-up">
@@ -45,6 +106,8 @@ export function PermissionDialog({ permission }: PermissionDialogProps) {
           >
             {isHighRisk ? (
               <AlertTriangle className="w-6 h-6 text-warning" />
+            ) : isComputerUsePermission ? (
+              <Monitor className="w-6 h-6 text-accent" />
             ) : (
               <Shield className="w-6 h-6 text-accent" />
             )}
@@ -59,6 +122,50 @@ export function PermissionDialog({ permission }: PermissionDialogProps) {
             </p>
           </div>
         </div>
+
+        {isComputerUsePermission && (
+          <div className="mt-4 space-y-3">
+            <div className="p-4 bg-surface-muted rounded-xl">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2 text-sm font-medium text-text-primary">
+                  <Monitor className="w-4 h-4 text-accent" />
+                  {t('permission.computerUseTitle', 'Computer use context')}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowComputerUseOverlay(true)}
+                  className="text-xs text-accent hover:text-accent-hover"
+                >
+                  {t('permission.openComputerUseOverlay', 'Open overlay')}
+                </button>
+              </div>
+              {computerUseSummary && (
+                <div className="text-xs text-text-secondary mb-2">{computerUseSummary}</div>
+              )}
+              {relatedGuiAction?.click && (
+                <div className="text-[11px] text-text-muted mb-2">
+                  {t('permission.computerUseClickAt', {
+                    x: relatedGuiAction.click.x,
+                    y: relatedGuiAction.click.y,
+                  })}
+                </div>
+              )}
+              {screenshotSrc ? (
+                <div className="rounded-lg overflow-hidden border border-border bg-background max-h-52">
+                  <img
+                    src={screenshotSrc}
+                    alt="computer-use-preview"
+                    className="w-full h-auto max-h-52 object-contain"
+                  />
+                </div>
+              ) : (
+                <div className="text-xs text-text-muted">
+                  {t('permission.computerUseNoScreenshot', 'No screenshot available for this action')}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Tool Details */}
         <div className="mt-4 p-4 bg-surface-muted rounded-xl">
@@ -103,6 +210,33 @@ export function PermissionDialog({ permission }: PermissionDialogProps) {
             {t('permission.allow')}
           </button>
         </div>
+
+        {derivedScopedRule && (
+          <button
+            onClick={async () => {
+              if (!window.electronAPI?.rules?.add) return;
+              setRememberingTarget(true);
+              try {
+                const result = await window.electronAPI.rules.add(
+                  'allow',
+                  derivedScopedRule,
+                  activeProjectId ?? undefined
+                );
+                if (result.success) {
+                  respondToPermission(permission.toolUseId, 'allow');
+                }
+              } finally {
+                setRememberingTarget(false);
+              }
+            }}
+            disabled={rememberingTarget}
+            className="w-full mt-2 btn btn-ghost text-sm"
+          >
+            {rememberingTarget
+              ? t('permission.rememberingTarget', 'Saving rule…')
+              : t('permission.alwaysAllowTarget', { target: derivedScopedRule })}
+          </button>
+        )}
 
         {/* Always Allow option */}
         {!pendingAlwaysAllow ? (

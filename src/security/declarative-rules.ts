@@ -98,8 +98,26 @@ function extractPrimaryArg(toolName: string, toolArgs: Record<string, unknown>):
     return (toolArgs.path as string) || (toolArgs.pattern as string) || null;
   }
 
+  if (name.includes('chrome') || name.includes('gui') || name.includes('computer')) {
+    return (
+      (toolArgs.url as string) ||
+      (toolArgs.target as string) ||
+      (toolArgs.app as string) ||
+      (toolArgs.text as string) ||
+      null
+    );
+  }
+
   // For other tools, try common arg names
-  return (toolArgs.file_path as string) || (toolArgs.path as string) || (toolArgs.command as string) || null;
+  return (
+    (toolArgs.url as string) ||
+    (toolArgs.target as string) ||
+    (toolArgs.app as string) ||
+    (toolArgs.file_path as string) ||
+    (toolArgs.path as string) ||
+    (toolArgs.command as string) ||
+    null
+  );
 }
 
 /**

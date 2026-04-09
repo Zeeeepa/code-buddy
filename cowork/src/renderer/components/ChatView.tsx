@@ -28,7 +28,7 @@ import { FileAttachmentChip } from './FileAttachmentChip';
 import { ContextWindowGauge } from './ContextWindowGauge';
 import type { ExecutionMode } from '../types';
 import { usePermissionMode, useSearchState } from '../store/selectors';
-import type { Message, ContentBlock } from '../types';
+import type { Message, ContentBlock, ScheduleCreateInput, ScheduleWeekday } from '../types';
 import { findMessageSearchMatches } from '../utils/session-search';
 import { Send, Square, Plus, Loader2, Plug, X, Clock, Eye } from 'lucide-react';
 
@@ -39,6 +39,37 @@ type AttachedFile = {
   type: string;
   inlineDataBase64?: string;
 };
+
+function toScheduleCreateInput(
+  input: {
+    prompt: string;
+    cwd?: string;
+    runAt: number;
+    nextRunAt: number;
+    scheduleConfig:
+      | { kind: 'daily'; times: string[] }
+      | { kind: 'weekly'; weekdays: number[]; times: string[] }
+      | null;
+    enabled: boolean;
+  },
+  fallbackCwd: string
+): ScheduleCreateInput {
+  return {
+    prompt: input.prompt,
+    cwd: input.cwd || fallbackCwd,
+    runAt: input.runAt,
+    nextRunAt: input.nextRunAt,
+    scheduleConfig:
+      input.scheduleConfig?.kind === 'weekly'
+        ? {
+            kind: 'weekly',
+            weekdays: input.scheduleConfig.weekdays as ScheduleWeekday[],
+            times: input.scheduleConfig.times,
+          }
+        : input.scheduleConfig,
+    enabled: input.enabled,
+  };
+}
 
 export function ChatView() {
   const { t } = useTranslation();
@@ -56,6 +87,11 @@ export function ChatView() {
   const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
   const showMemoryEditor = useAppStore((s) => s.showMemoryEditor);
   const setShowMemoryEditor = useAppStore((s) => s.setShowMemoryEditor);
+  const setShowSettings = useAppStore((s) => s.setShowSettings);
+  const setSettingsTab = useAppStore((s) => s.setSettingsTab);
+  const setScheduleDraft = useAppStore((s) => s.setScheduleDraft);
+  const focusedMessageTarget = useAppStore((s) => s.focusedMessageTarget);
+  const clearFocusedMessageTarget = useAppStore((s) => s.clearFocusedMessageTarget);
   const { continueSession, stopSession, isElectron } = useIPC();
   const [prompt, setPrompt] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -138,6 +174,25 @@ export function ChatView() {
     () => findMessageSearchMatches(displayedMessages, searchQuery),
     [displayedMessages, searchQuery]
   );
+
+  useEffect(() => {
+    if (!focusedMessageTarget || focusedMessageTarget.sessionId !== activeSessionId) {
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      const element = document.getElementById(`message-${focusedMessageTarget.messageId}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        clearFocusedMessageTarget();
+      }
+    }, 50);
+    return () => window.clearTimeout(handle);
+  }, [
+    activeSessionId,
+    clearFocusedMessageTarget,
+    displayedMessages.length,
+    focusedMessageTarget,
+  ]);
 
   useEffect(() => {
     setCurrentSearchMatch(0);
@@ -700,6 +755,91 @@ export function ChatView() {
 
     setIsSubmitting(true);
     try {
+      const trimmedPrompt = currentPrompt.trim();
+      const isSlashInput =
+        pastedImages.length === 0 &&
+        attachedFiles.length === 0 &&
+        /^\/[\w-]+(?:\s+.*)?$/.test(trimmedPrompt);
+
+      if (isSlashInput && window.electronAPI?.command?.execute) {
+        const [, commandName = '', argString = ''] =
+          trimmedPrompt.match(/^\/([\w-]+)(?:\s+(.*))?$/) || [];
+        const args = argString ? argString.split(/\s+/).filter(Boolean) : [];
+        const result = await window.electronAPI.command.execute(
+          commandName,
+          args,
+          activeSessionId ?? undefined
+        );
+
+        if (result.action?.type === 'create_schedule' && result.action.createInput) {
+          await window.electronAPI.schedule.create(
+            toScheduleCreateInput(result.action.createInput, activeSession?.cwd || '')
+          );
+          setGlobalNotice({
+            id: `schedule-created-${Date.now()}`,
+            type: 'success',
+            message: t('schedule.created'),
+          });
+          setPrompt('');
+          if (textareaRef.current) {
+            textareaRef.current.value = '';
+          }
+          return;
+        }
+
+        if (result.action?.type === 'open_schedule' && result.action.draft) {
+          setScheduleDraft({
+            ...result.action.draft,
+            cwd: result.action.draft.cwd || activeSession?.cwd || undefined,
+          });
+          setSettingsTab('schedule');
+          setShowSettings(true);
+          setPrompt('');
+          if (textareaRef.current) {
+            textareaRef.current.value = '';
+          }
+          return;
+        }
+
+        if (result.handled) {
+          if (result.message) {
+            setGlobalNotice({
+              id: `slash-info-${Date.now()}`,
+              type: 'info',
+              message: commandName ? `/${commandName}: ${result.message}` : result.message,
+            });
+          }
+          setPrompt('');
+          if (textareaRef.current) {
+            textareaRef.current.value = '';
+          }
+          return;
+        }
+
+        if (result.success && result.prompt) {
+          await continueSession(activeSessionId, [
+            {
+              type: 'text',
+              text: result.prompt,
+            },
+          ]);
+          setPrompt('');
+          if (textareaRef.current) {
+            textareaRef.current.value = '';
+          }
+          return;
+        }
+
+        if (result.error) {
+          setGlobalNotice({
+            id: `slash-error-${Date.now()}`,
+            type: 'error',
+            message: result.error,
+          });
+          return;
+        }
+      }
+
       // Build content blocks
       const contentBlocks: ContentBlock[] = [];
 
@@ -1203,7 +1343,25 @@ export function ChatView() {
 
               const result = await api.command.execute(item.name, [], activeSessionId ?? undefined);
 
-              if (result.handled && result.message) {
+              if (result.action?.type === 'create_schedule' && result.action.createInput) {
+                await window.electronAPI.schedule.create(
+                  toScheduleCreateInput(result.action.createInput, activeSession?.cwd || '')
+                );
+                useAppStore.getState().setGlobalNotice?.({
+                  id: `schedule-created-${Date.now()}`,
+                  type: 'success',
+                  message: t('schedule.created'),
+                });
+                setPrompt('');
+              } else if (result.action?.type === 'open_schedule' && result.action.draft) {
+                setScheduleDraft({
+                  ...result.action.draft,
+                  cwd: result.action.draft.cwd || activeSession?.cwd || undefined,
+                });
+                setSettingsTab('schedule');
+                setShowSettings(true);
+                setPrompt('');
+              } else if (result.handled && result.message) {
                 // Built-in tokens (__CLEAR_CHAT__, __HELP__, etc.) require
                 // additional wiring in subsequent Phase 2 steps. For now,
                 // surface them as informational notices.

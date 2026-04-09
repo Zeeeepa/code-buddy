@@ -1,4 +1,4 @@
-import { Minus, Square, X, Copy, Bell, Activity, Star, BarChart3 } from 'lucide-react';
+import { Minus, Square, X, Copy, Bell, Activity, Star, BarChart3, Focus } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../store';
@@ -65,6 +65,15 @@ export function Titlebar() {
         data-testid="session-insights-button"
       >
         <BarChart3 className="w-4 h-4 text-text-secondary" />
+      </button>
+
+      <button
+        onClick={() => useAppStore.getState().setShowFocusView(true)}
+        className="w-10 h-full flex items-center justify-center titlebar-no-drag hover:bg-surface transition-colors"
+        title="Focus view"
+        data-testid="focus-view-button"
+      >
+        <Focus className="w-4 h-4 text-text-secondary" />
       </button>
 
       {/* Notification bell (Claude Cowork parity) */}

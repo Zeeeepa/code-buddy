@@ -27,10 +27,37 @@ export interface SessionInsightDetail {
   traceSteps: TraceStep[];
 }
 
+export interface SessionTranscriptAuditIssue {
+  kind: 'orphan_tool_result' | 'missing_tool_result' | 'empty_message';
+  messageId?: string;
+  toolUseId?: string;
+  detail: string;
+}
+
+export interface SessionTranscriptAudit {
+  sessionId: string;
+  issueCount: number;
+  orphanToolResults: number;
+  missingToolResults: number;
+  emptyMessages: number;
+  issues: SessionTranscriptAuditIssue[];
+}
+
+export interface SessionTranscriptRepairResult {
+  sessionId: string;
+  changed: boolean;
+  removedOrphanToolResults: number;
+  injectedSyntheticToolResults: number;
+  removedEmptyMessages: number;
+  messages: Message[];
+  audit: SessionTranscriptAudit;
+}
+
 export interface SessionInsightsSource {
   listSessions(): Session[];
   getMessages(sessionId: string): Message[];
   getTraceSteps(sessionId: string): TraceStep[];
+  replaceMessages?(sessionId: string, messages: Message[]): void;
 }
 
 function flattenMessageText(message: Message): string {
@@ -72,6 +99,167 @@ function buildMatchSnippet(text: string, query: string): string {
   const prefix = start > 0 ? '...' : '';
   const suffix = end < normalizedText.length ? '...' : '';
   return `${prefix}${normalizedText.slice(start, end)}${suffix}`;
+}
+
+export function auditSessionTranscript(
+  sessionId: string,
+  messages: Message[]
+): SessionTranscriptAudit {
+  const toolUseIds = new Map<string, string>();
+  const toolResultIds = new Map<string, string[]>();
+  const issues: SessionTranscriptAuditIssue[] = [];
+
+  for (const message of messages) {
+    const hasRenderableContent = message.content.some((block) => {
+      if (block.type === 'text') return block.text.trim().length > 0;
+      if (block.type === 'thinking') return block.thinking.trim().length > 0;
+      if (block.type === 'tool_result') return block.content.trim().length > 0 || block.images?.length;
+      if (block.type === 'tool_use') return true;
+      if (block.type === 'file_attachment') return true;
+      return false;
+    });
+
+    if (!hasRenderableContent) {
+      issues.push({
+        kind: 'empty_message',
+        messageId: message.id,
+        detail: 'Message has no renderable content.',
+      });
+    }
+
+    for (const block of message.content) {
+      if (block.type === 'tool_use') {
+        toolUseIds.set(block.id, message.id);
+      }
+      if (block.type === 'tool_result') {
+        const list = toolResultIds.get(block.toolUseId) || [];
+        list.push(message.id);
+        toolResultIds.set(block.toolUseId, list);
+      }
+    }
+  }
+
+  for (const [toolUseId, messageIds] of toolResultIds.entries()) {
+    if (!toolUseIds.has(toolUseId)) {
+      for (const messageId of messageIds) {
+        issues.push({
+          kind: 'orphan_tool_result',
+          messageId,
+          toolUseId,
+          detail: `tool_result references unknown tool_use id "${toolUseId}".`,
+        });
+      }
+    }
+  }
+
+  for (const [toolUseId, messageId] of toolUseIds.entries()) {
+    if (!toolResultIds.has(toolUseId)) {
+      issues.push({
+        kind: 'missing_tool_result',
+        messageId,
+        toolUseId,
+        detail: `tool_use "${toolUseId}" has no matching tool_result.`,
+      });
+    }
+  }
+
+  return {
+    sessionId,
+    issueCount: issues.length,
+    orphanToolResults: issues.filter((issue) => issue.kind === 'orphan_tool_result').length,
+    missingToolResults: issues.filter((issue) => issue.kind === 'missing_tool_result').length,
+    emptyMessages: issues.filter((issue) => issue.kind === 'empty_message').length,
+    issues,
+  };
+}
+
+export function repairSessionTranscript(
+  sessionId: string,
+  messages: Message[]
+): SessionTranscriptRepairResult {
+  const toolUseIds = new Set<string>();
+  const toolResultIds = new Set<string>();
+
+  for (const message of messages) {
+    for (const block of message.content) {
+      if (block.type === 'tool_use') {
+        toolUseIds.add(block.id);
+      }
+      if (block.type === 'tool_result') {
+        toolResultIds.add(block.toolUseId);
+      }
+    }
+  }
+
+  let removedOrphanToolResults = 0;
+  let removedEmptyMessages = 0;
+  let injectedSyntheticToolResults = 0;
+  const repaired: Message[] = [];
+
+  for (const message of messages) {
+    const filteredContent = message.content.filter((block) => {
+      if (block.type !== 'tool_result') {
+        return true;
+      }
+      const keep = toolUseIds.has(block.toolUseId);
+      if (!keep) {
+        removedOrphanToolResults += 1;
+      }
+      return keep;
+    });
+
+    const hasRenderableContent = filteredContent.some((block) => {
+      if (block.type === 'text') return block.text.trim().length > 0;
+      if (block.type === 'thinking') return block.thinking.trim().length > 0;
+      if (block.type === 'tool_result') return block.content.trim().length > 0 || Boolean(block.images?.length);
+      if (block.type === 'tool_use') return true;
+      if (block.type === 'file_attachment') return true;
+      return false;
+    });
+
+    if (!hasRenderableContent) {
+      removedEmptyMessages += 1;
+      continue;
+    }
+
+    repaired.push({
+      ...message,
+      content: filteredContent,
+    });
+
+    for (const block of filteredContent) {
+      if (block.type === 'tool_use' && !toolResultIds.has(block.id)) {
+        injectedSyntheticToolResults += 1;
+        repaired.push({
+          id: `${message.id}:synthetic-result:${block.id}`,
+          sessionId: message.sessionId,
+          role: 'assistant',
+          content: [
+            {
+              type: 'tool_result',
+              toolUseId: block.id,
+              content: '[result lost during transcript repair]',
+              isError: true,
+            },
+          ],
+          timestamp: message.timestamp + injectedSyntheticToolResults,
+        });
+      }
+    }
+  }
+
+  const changed =
+    removedOrphanToolResults > 0 || removedEmptyMessages > 0 || injectedSyntheticToolResults > 0;
+
+  return {
+    sessionId,
+    changed,
+    removedOrphanToolResults,
+    injectedSyntheticToolResults,
+    removedEmptyMessages,
+    messages: repaired,
+    audit: auditSessionTranscript(sessionId, repaired),
+  };
 }
 
 export function buildSessionInsightSummary(
@@ -188,5 +376,21 @@ export class SessionInsightsBridge {
       messages,
       traceSteps,
     };
+  }
+
+  getAudit(sessionId: string): SessionTranscriptAudit | null {
+    const session = this.source.listSessions().find((entry) => entry.id === sessionId);
+    if (!session) return null;
+    return auditSessionTranscript(sessionId, this.source.getMessages(sessionId));
+  }
+
+  repair(sessionId: string): SessionTranscriptRepairResult | null {
+    const session = this.source.listSessions().find((entry) => entry.id === sessionId);
+    if (!session) return null;
+    const result = repairSessionTranscript(sessionId, this.source.getMessages(sessionId));
+    if (result.changed) {
+      this.source.replaceMessages?.(sessionId, result.messages);
+    }
+    return result;
   }
 }

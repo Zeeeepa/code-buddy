@@ -1118,6 +1118,8 @@ app
       listSessions: () => sessionInsightsSource.listSessions(),
       getMessages: (sessionId: string) => sessionInsightsSource.getMessages(sessionId),
       getTraceSteps: (sessionId: string) => sessionInsightsSource.getTraceSteps(sessionId),
+      replaceMessages: (sessionId: string, messages) =>
+        sessionInsightsSource.replaceMessages(sessionId, messages),
     });
 
     // Activity feed — cross-project event log persisted in SQLite
@@ -2870,6 +2872,24 @@ ipcMain.handle('sessionInsights.detail', async (_event, sessionId: string) => {
     return sessionInsightsBridge?.getDetail(sessionId) ?? null;
   } catch (err) {
     logError('[sessionInsights.detail] failed:', err);
+    return null;
+  }
+});
+
+ipcMain.handle('sessionInsights.audit', async (_event, sessionId: string) => {
+  try {
+    return sessionInsightsBridge?.getAudit(sessionId) ?? null;
+  } catch (err) {
+    logError('[sessionInsights.audit] failed:', err);
+    return null;
+  }
+});
+
+ipcMain.handle('sessionInsights.repair', async (_event, sessionId: string) => {
+  try {
+    return sessionInsightsBridge?.repair(sessionId) ?? null;
+  } catch (err) {
+    logError('[sessionInsights.repair] failed:', err);
     return null;
   }
 });

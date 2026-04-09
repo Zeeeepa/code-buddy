@@ -41,6 +41,20 @@ interface SessionInsightDetail {
   traceSteps: TraceStep[];
 }
 
+interface SessionTranscriptAudit {
+  sessionId: string;
+  issueCount: number;
+  orphanToolResults: number;
+  missingToolResults: number;
+  emptyMessages: number;
+  issues: Array<{
+    kind: 'orphan_tool_result' | 'missing_tool_result' | 'empty_message';
+    messageId?: string;
+    toolUseId?: string;
+    detail: string;
+  }>;
+}
+
 interface SessionInsightsPanelProps {
   open: boolean;
   onClose: () => void;
@@ -76,15 +90,20 @@ function flattenMessageText(message: Message): string {
 
 export const SessionInsightsPanel: React.FC<SessionInsightsPanelProps> = ({ open, onClose }) => {
   const { t } = useTranslation();
+  const activeSessionId = useAppStore((s) => s.activeSessionId);
   const setActiveSession = useAppStore((s) => s.setActiveSession);
   const setMessages = useAppStore((s) => s.setMessages);
   const setTraceSteps = useAppStore((s) => s.setTraceSteps);
+  const setFocusedMessageTarget = useAppStore((s) => s.setFocusedMessageTarget);
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<SessionInsightSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<SessionInsightDetail | null>(null);
   const [loadingList, setLoadingList] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [loadingAudit, setLoadingAudit] = useState(false);
+  const [repairingAudit, setRepairingAudit] = useState(false);
+  const [audit, setAudit] = useState<SessionTranscriptAudit | null>(null);
 
   const loadList = useCallback(async () => {
     if (!window.electronAPI?.sessionInsights) return;
@@ -134,6 +153,62 @@ export const SessionInsightsPanel: React.FC<SessionInsightsPanelProps> = ({ open
     setActiveSession(detail.summary.sessionId);
     onClose();
   }, [detail, onClose, setActiveSession, setMessages, setTraceSteps]);
+
+  const openSessionAtMessage = useCallback(
+    (messageId: string) => {
+      if (!detail) return;
+      setMessages(detail.summary.sessionId, detail.messages);
+      setTraceSteps(detail.summary.sessionId, detail.traceSteps);
+      setFocusedMessageTarget({
+        sessionId: detail.summary.sessionId,
+        messageId,
+      });
+      setActiveSession(detail.summary.sessionId);
+      onClose();
+    },
+    [detail, onClose, setActiveSession, setFocusedMessageTarget, setMessages, setTraceSteps]
+  );
+
+  const loadAudit = useCallback(async () => {
+    if (!selectedId || !window.electronAPI?.sessionInsights?.audit) {
+      return;
+    }
+    setLoadingAudit(true);
+    try {
+      const result = await window.electronAPI.sessionInsights.audit(selectedId);
+      setAudit(result as SessionTranscriptAudit | null);
+    } finally {
+      setLoadingAudit(false);
+    }
+  }, [selectedId]);
+
+  const repairAudit = useCallback(async () => {
+    if (!selectedId || !window.electronAPI?.sessionInsights?.repair) {
+      return;
+    }
+    setRepairingAudit(true);
+    try {
+      const result = await window.electronAPI.sessionInsights.repair(selectedId);
+      if (result) {
+        setAudit(result.audit as SessionTranscriptAudit);
+        setMessages(selectedId, result.messages);
+        setDetail((current) =>
+          current && current.summary.sessionId === selectedId
+            ? { ...current, messages: result.messages }
+            : current
+        );
+        if (activeSessionId === selectedId) {
+          setActiveSession(selectedId);
+        }
+      }
+    } finally {
+      setRepairingAudit(false);
+    }
+  }, [activeSessionId, selectedId, setActiveSession, setMessages]);
+
+  useEffect(() => {
+    setAudit(null);
+  }, [selectedId]);
 
   if (!open) return null;
 
@@ -256,6 +331,22 @@ export const SessionInsightsPanel: React.FC<SessionInsightsPanelProps> = ({ open
                     <ArrowRight size={12} />
                     {t('sessionInsights.openSession', 'Open session')}
                   </button>
+                  <button
+                    onClick={() => void loadAudit()}
+                    disabled={loadingAudit}
+                    className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs text-text-secondary hover:bg-surface-hover disabled:opacity-50 transition-colors"
+                  >
+                    {loadingAudit ? <Loader2 size={12} className="animate-spin" /> : null}
+                    {t('sessionInsights.auditTranscript', 'Audit transcript')}
+                  </button>
+                  <button
+                    onClick={() => void repairAudit()}
+                    disabled={repairingAudit}
+                    className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs text-text-secondary hover:bg-surface-hover disabled:opacity-50 transition-colors"
+                  >
+                    {repairingAudit ? <Loader2 size={12} className="animate-spin" /> : null}
+                    {t('sessionInsights.repairTranscript', 'Repair transcript')}
+                  </button>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-[11px] text-text-muted">
@@ -281,6 +372,51 @@ export const SessionInsightsPanel: React.FC<SessionInsightsPanelProps> = ({ open
                     {selectedSummary.cwd}
                   </div>
                 )}
+
+                {audit && (
+                  <div className="rounded-lg border border-border-muted bg-surface px-3 py-3 space-y-2">
+                    <div className="text-xs font-medium text-text-primary">
+                      {t('sessionInsights.auditTitle', 'Transcript audit')}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[11px] text-text-muted">
+                      <div>{t('sessionInsights.auditIssues', { count: audit.issueCount })}</div>
+                      <div>{t('sessionInsights.auditMissingResults', { count: audit.missingToolResults })}</div>
+                      <div>{t('sessionInsights.auditOrphans', { count: audit.orphanToolResults })}</div>
+                      <div>{t('sessionInsights.auditEmptyMessages', { count: audit.emptyMessages })}</div>
+                    </div>
+                    {audit.issueCount === 0 ? (
+                      <div className="text-[11px] text-success">
+                        {t('sessionInsights.auditClean', 'No transcript issues detected')}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {audit.issues.map((issue, index) => (
+                          <div
+                            key={`${issue.kind}-${issue.messageId || issue.toolUseId || index}`}
+                            className="rounded-md border border-border bg-background px-2.5 py-2 text-[11px]"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="font-medium text-text-primary">{issue.kind}</div>
+                                <div className="mt-1 text-text-muted break-words">{issue.detail}</div>
+                              </div>
+                              {issue.messageId && (
+                                <button
+                                  type="button"
+                                  onClick={() => openSessionAtMessage(issue.messageId!)}
+                                  className="shrink-0 text-accent hover:text-accent-hover"
+                                  title={t('sessionInsights.jumpToMessage', 'Open this message in Chat')}
+                                >
+                                  <ArrowRight size={12} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3">
@@ -301,9 +437,14 @@ export const SessionInsightsPanel: React.FC<SessionInsightsPanelProps> = ({ open
                       >
                         <div className="px-3 py-2 bg-surface flex items-center justify-between text-[11px]">
                           <span className="font-medium text-text-primary">{message.role}</span>
-                          <span className="text-text-muted">
+                          <button
+                            type="button"
+                            onClick={() => openSessionAtMessage(message.id)}
+                            className="text-text-muted hover:text-text-primary transition-colors"
+                            title={t('sessionInsights.jumpToMessage', 'Open this message in Chat')}
+                          >
                             {new Date(message.timestamp).toLocaleString()}
-                          </span>
+                          </button>
                         </div>
                         <div className="px-3 py-2 text-xs text-text-secondary whitespace-pre-wrap break-words">
                           {text ||
