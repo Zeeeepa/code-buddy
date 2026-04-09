@@ -11,9 +11,14 @@ import { useAppStore } from '../store';
 interface MessageCardProps {
   message: Message;
   isStreaming?: boolean;
+  searchMatchState?: 'none' | 'match' | 'active';
 }
 
-export const MessageCard = memo(function MessageCard({ message, isStreaming }: MessageCardProps) {
+export const MessageCard = memo(function MessageCard({
+  message,
+  isStreaming,
+  searchMatchState = 'none',
+}: MessageCardProps) {
   const { t } = useTranslation();
   const isUser = message.role === 'user';
   const isQueued = message.localStatus === 'queued';
@@ -91,7 +96,16 @@ export const MessageCard = memo(function MessageCard({ message, isStreaming }: M
   }, [activeSessionId, activeProjectId, message.id, message.role]);
 
   return (
-    <div className="animate-fade-in" id={`message-${message.id}`}>
+    <div
+      className={`animate-fade-in rounded-xl transition-all ${
+        searchMatchState === 'active'
+          ? 'ring-2 ring-accent/60 bg-accent/5'
+          : searchMatchState === 'match'
+            ? 'ring-1 ring-accent/30'
+            : ''
+      }`}
+      id={`message-${message.id}`}
+    >
       {isUser ? (
         // User message - compact styling with smaller padding and radius
         <div className="flex items-start gap-2 justify-end group">
@@ -214,9 +228,7 @@ export const MessageCard = memo(function MessageCard({ message, isStreaming }: M
                   <span className="text-text-primary font-medium">
                     {artifact.title ?? t(`artifact.kind.${artifact.kind}`)}
                   </span>
-                  <span className="text-text-muted uppercase text-[9px]">
-                    {artifact.kind}
-                  </span>
+                  <span className="text-text-muted uppercase text-[9px]">{artifact.kind}</span>
                 </button>
               ))}
             </div>

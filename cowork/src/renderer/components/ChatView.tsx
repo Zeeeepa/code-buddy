@@ -29,6 +29,7 @@ import { ContextWindowGauge } from './ContextWindowGauge';
 import type { ExecutionMode } from '../types';
 import { usePermissionMode, useSearchState } from '../store/selectors';
 import type { Message, ContentBlock } from '../types';
+import { findMessageSearchMatches } from '../utils/session-search';
 import { Send, Square, Plus, Loader2, Plug, X, Clock, Eye } from 'lucide-react';
 
 type AttachedFile = {
@@ -62,6 +63,7 @@ export function ChatView() {
     { id: string; name: string; connected: boolean; toolCount: number }[]
   >([]);
   const [showConnectorLabel, setShowConnectorLabel] = useState(true);
+  const [currentSearchMatch, setCurrentSearchMatch] = useState(0);
   const headerRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const connectorMeasureRef = useRef<HTMLDivElement>(null);
@@ -131,6 +133,32 @@ export function ChatView() {
 
     return [...messages.slice(0, insertIndex), streamingMessage, ...messages.slice(insertIndex)];
   }, [activeSessionId, activeTurn?.userMessageId, messages, partialMessage, partialThinking]);
+
+  const searchMatches = useMemo(
+    () => findMessageSearchMatches(displayedMessages, searchQuery),
+    [displayedMessages, searchQuery]
+  );
+
+  useEffect(() => {
+    setCurrentSearchMatch(0);
+  }, [searchQuery, searchActive, activeSessionId]);
+
+  useEffect(() => {
+    if (!searchActive || searchMatches.length === 0) return;
+    const targetId = searchMatches[Math.min(currentSearchMatch, searchMatches.length - 1)];
+    const element = document.getElementById(`message-${targetId}`);
+    element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [currentSearchMatch, searchActive, searchMatches]);
+
+  const goToNextSearchMatch = useCallback(() => {
+    if (searchMatches.length === 0) return;
+    setCurrentSearchMatch((index) => (index + 1) % searchMatches.length);
+  }, [searchMatches.length]);
+
+  const goToPreviousSearchMatch = useCallback(() => {
+    if (searchMatches.length === 0) return;
+    setCurrentSearchMatch((index) => (index - 1 + searchMatches.length) % searchMatches.length);
+  }, [searchMatches.length]);
 
   // Format execution time for display
   const formatExecutionTime = useCallback((ms: number): string => {
@@ -537,9 +565,10 @@ export function ChatView() {
 
     // Detect folder drops — switch working directory
     const folderFiles = files.filter((file) => {
-      const filePath = 'path' in file && typeof (file as File & { path?: string }).path === 'string'
-        ? (file as File & { path?: string }).path
-        : '';
+      const filePath =
+        'path' in file && typeof (file as File & { path?: string }).path === 'string'
+          ? (file as File & { path?: string }).path
+          : '';
       // Folders have empty type and a path
       return !file.type && filePath && !file.name.includes('.');
     });
@@ -825,10 +854,10 @@ export function ChatView() {
           query={searchQuery}
           onQueryChange={(q) => useAppStore.getState().setSearchQuery(q)}
           onClose={() => useAppStore.getState().setSearchActive(false)}
-          matchCount={0}
-          currentMatch={0}
-          onNext={() => {}}
-          onPrev={() => {}}
+          matchCount={searchMatches.length}
+          currentMatch={currentSearchMatch}
+          onNext={goToNextSearchMatch}
+          onPrev={goToPreviousSearchMatch}
         />
       )}
 
@@ -837,9 +866,7 @@ export function ChatView() {
         <div className="px-4 lg:px-8 py-2 bg-accent/10 border-b border-accent/30 flex items-center gap-2">
           <Eye size={14} className="text-accent shrink-0" />
           <div className="flex-1 min-w-0">
-            <div className="text-xs font-semibold text-accent">
-              {t('planMode.activeTitle')}
-            </div>
+            <div className="text-xs font-semibold text-accent">{t('planMode.activeTitle')}</div>
             <div className="text-[11px] text-text-muted truncate">
               {t('planMode.activeDescription')}
             </div>
@@ -878,7 +905,17 @@ export function ChatView() {
                 typeof message.id === 'string' && message.id.startsWith('partial-');
               return (
                 <div key={message.id}>
-                  <MessageCard message={message} isStreaming={isStreaming} />
+                  <MessageCard
+                    message={message}
+                    isStreaming={isStreaming}
+                    searchMatchState={
+                      searchMatches.includes(message.id)
+                        ? searchMatches[currentSearchMatch] === message.id
+                          ? 'active'
+                          : 'match'
+                        : 'none'
+                    }
+                  />
                 </div>
               );
             })
@@ -980,9 +1017,7 @@ export function ChatView() {
             {/* Phase 2 step 17: inline memory editor */}
             {showMemoryEditor && (
               <div className="mb-3">
-                <MemoryEditCard
-                  onClose={() => setShowMemoryEditor(false)}
-                />
+                <MemoryEditCard onClose={() => setShowMemoryEditor(false)} />
               </div>
             )}
 
@@ -1126,9 +1161,7 @@ export function ChatView() {
           onSelect={(item: MentionItem) => {
             if (!mentionState || !textareaRef.current) return;
             const before = prompt.slice(0, mentionState.startPos);
-            const afterCaret = prompt.slice(
-              mentionState.startPos + mentionState.prefix.length + 1
-            );
+            const afterCaret = prompt.slice(mentionState.startPos + mentionState.prefix.length + 1);
             const newValue = `${before}${item.value}${afterCaret}`;
             setPrompt(newValue);
             setMentionState(null);
