@@ -39,6 +39,11 @@ type CoreDeclarativeRulesModule = {
     toolArgs: Record<string, unknown>,
     projectRoot?: string
   ) => PermissionDecision;
+  explainDeclarativePermission?: (
+    toolName: string,
+    toolArgs: Record<string, unknown>,
+    projectRoot?: string
+  ) => RuleTestResult;
   clearPermissionsCache: () => void;
 };
 
@@ -232,6 +237,9 @@ export class RulesBridge {
       return { decision: 'ask' };
     }
     try {
+      if (typeof mod.explainDeclarativePermission === 'function') {
+        return mod.explainDeclarativePermission(toolName, toolArgs, projectRoot);
+      }
       const decision = mod.checkDeclarativePermission(toolName, toolArgs, projectRoot);
       return { decision };
     } catch (err) {

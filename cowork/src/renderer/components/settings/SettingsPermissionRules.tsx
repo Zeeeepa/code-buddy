@@ -60,6 +60,7 @@ export const SettingsPermissionRules: React.FC = () => {
   const [testArg, setTestArg] = useState('npm install');
   const [testResult, setTestResult] = useState<{
     decision: 'allow' | 'ask' | 'deny';
+    matchedRule?: string;
   } | null>(null);
 
   const load = useCallback(async () => {
@@ -498,6 +499,11 @@ export const SettingsPermissionRules: React.FC = () => {
               <span className="text-text-muted">
                 — {t(`rules.decision.${testResult.decision}`)}
               </span>
+              {testResult.matchedRule && (
+                <code className="ml-auto font-mono text-[10px] text-text-primary truncate">
+                  {t('rules.matchedRule', { rule: testResult.matchedRule })}
+                </code>
+              )}
             </div>
           )}
         </section>

@@ -15,5 +15,6 @@ describe('SettingsPermissionRules computer-use quick rules', () => {
     expect(source).toContain("deriveScopedPermissionRule(action.toolName");
     expect(source).toContain('groupedAllow');
     expect(source).toContain("t('rules.scope.site'");
+    expect(source).toContain("t('rules.matchedRule'");
   });
 });

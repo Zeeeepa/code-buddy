@@ -25,6 +25,11 @@ import { matchGlobPatterns, resolvePathPattern } from '../utils/glob-utils.js';
 
 export type PermissionDecision = 'allow' | 'ask' | 'deny';
 
+export interface DeclarativePermissionExplanation {
+  decision: PermissionDecision;
+  matchedRule?: string;
+}
+
 export interface DeclarativePermissions {
   allow?: string[];
   deny?: string[];
@@ -259,7 +264,23 @@ export function checkDeclarativePermission(
   toolArgs: Record<string, unknown>,
   projectRoot: string = process.cwd(),
 ): PermissionDecision {
+  return explainDeclarativePermission(toolName, toolArgs, projectRoot).decision;
+}
+
+export function explainDeclarativePermission(
+  toolName: string,
+  toolArgs: Record<string, unknown>,
+  projectRoot: string = process.cwd(),
+): DeclarativePermissionExplanation {
   const permissions = loadPermissions(projectRoot);
+  return explainDeclarativePermissionFromPermissions(toolName, toolArgs, permissions);
+}
+
+export function explainDeclarativePermissionFromPermissions(
+  toolName: string,
+  toolArgs: Record<string, unknown>,
+  permissions: DeclarativePermissions,
+): DeclarativePermissionExplanation {
   const primaryArg = extractPrimaryArg(toolName, toolArgs);
 
   // For compound bash commands, ALL sub-commands must be allowed
@@ -268,35 +289,37 @@ export function checkDeclarativePermission(
     if (subCommands.length > 1) {
       // Check deny first — any denied sub-command blocks everything
       for (const sub of subCommands) {
-        const subDecision = checkSingleCommand(toolName, sub, permissions);
-        if (subDecision === 'deny') {
+        const subResult = explainSingleCommand(toolName, sub, permissions);
+        if (subResult.decision === 'deny') {
           logger.debug(`Declarative deny: compound command blocked by "${sub}"`);
-          return 'deny';
+          return subResult;
         }
       }
       // Then check allow — all must be allowed
+      let matchedRule: string | undefined;
       for (const sub of subCommands) {
-        const subDecision = checkSingleCommand(toolName, sub, permissions);
-        if (subDecision !== 'allow') return 'ask';
+        const subResult = explainSingleCommand(toolName, sub, permissions);
+        if (subResult.decision !== 'allow') return { decision: 'ask' };
+        matchedRule ||= subResult.matchedRule;
       }
-      return 'allow';
+      return { decision: 'allow', matchedRule };
     }
   }
 
-  return checkSingleCommand(toolName, primaryArg, permissions);
+  return explainSingleCommand(toolName, primaryArg, permissions);
 }
 
-function checkSingleCommand(
+function explainSingleCommand(
   toolName: string,
   primaryArg: string | null,
   permissions: DeclarativePermissions,
-): PermissionDecision {
+): DeclarativePermissionExplanation {
   // Deny rules take precedence
   if (permissions.deny) {
     for (const rule of permissions.deny) {
       if (matchesRule(rule, toolName, primaryArg)) {
         logger.debug(`Declarative deny: ${toolName} matched rule "${rule}"`);
-        return 'deny';
+        return { decision: 'deny', matchedRule: rule };
       }
     }
   }
@@ -306,13 +329,13 @@ function checkSingleCommand(
     for (const rule of permissions.allow) {
       if (matchesRule(rule, toolName, primaryArg)) {
         logger.debug(`Declarative allow: ${toolName} matched rule "${rule}"`);
-        return 'allow';
+        return { decision: 'allow', matchedRule: rule };
       }
     }
   }
 
   // No matching rule
-  return 'ask';
+  return { decision: 'ask' };
 }
 
 /**

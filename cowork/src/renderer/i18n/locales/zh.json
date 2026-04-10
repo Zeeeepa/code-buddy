@@ -1041,6 +1041,7 @@
     "computerUseTargets": "计算机使用目标",
     "computerUseHint": "根据最近的 GUI / 浏览器自动化目标快速添加范围更小的允许规则。",
     "computerUseEmpty": "还没有最近的计算机使用目标",
+    "matchedRule": "匹配规则：{{rule}}",
     "scope": {
       "site": "站点规则",
       "siteHint": "限定到特定站点来源或网页目标的规则",
