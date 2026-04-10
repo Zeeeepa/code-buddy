@@ -13,5 +13,7 @@ describe('SettingsPermissionRules computer-use quick rules', () => {
     expect(source).toContain('recentComputerUseSuggestions');
     expect(source).toContain("t('rules.computerUseTargets'");
     expect(source).toContain("deriveScopedPermissionRule(action.toolName");
+    expect(source).toContain('groupedAllow');
+    expect(source).toContain("t('rules.scope.site'");
   });
 });

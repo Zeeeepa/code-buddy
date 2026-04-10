@@ -1041,6 +1041,14 @@
     "computerUseTargets": "计算机使用目标",
     "computerUseHint": "根据最近的 GUI / 浏览器自动化目标快速添加范围更小的允许规则。",
     "computerUseEmpty": "还没有最近的计算机使用目标",
+    "scope": {
+      "site": "站点规则",
+      "siteHint": "限定到特定站点来源或网页目标的规则",
+      "app": "应用/目标规则",
+      "appHint": "限定到应用名、界面目标或计算机使用表面的规则",
+      "generic": "通用规则",
+      "genericHint": "范围较广的工具、文件或命令规则"
+    },
     "dryRun": "规则测试",
     "dryRunHint": "测试规则对工具调用的决策 —— 调用不会被实际执行。",
     "test": "测试",

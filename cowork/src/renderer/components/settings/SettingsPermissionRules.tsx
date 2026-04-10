@@ -30,6 +30,7 @@ import {
 import { useActiveProjectId } from '../../store/selectors';
 import { useAppStore } from '../../store';
 import { deriveScopedPermissionRule } from '../../utils/permission-target-rule';
+import { groupPermissionRules, type PermissionRuleScope } from '../../utils/permission-rule-classification';
 
 type Bucket = 'allow' | 'deny';
 
@@ -172,6 +173,31 @@ export const SettingsPermissionRules: React.FC = () => {
     return suggestions;
   }, [guiActions]);
 
+  const groupedAllow = React.useMemo(() => groupPermissionRules(allow), [allow]);
+  const groupedDeny = React.useMemo(() => groupPermissionRules(deny), [deny]);
+
+  const scopeMeta: Array<{
+    key: PermissionRuleScope;
+    label: string;
+    hint: string;
+  }> = [
+    {
+      key: 'site',
+      label: t('rules.scope.site', 'Site rules'),
+      hint: t('rules.scope.siteHint', 'Rules scoped to specific origins or web targets'),
+    },
+    {
+      key: 'app',
+      label: t('rules.scope.app', 'App/target rules'),
+      hint: t('rules.scope.appHint', 'Rules scoped to app names, UI targets, or computer-use surfaces'),
+    },
+    {
+      key: 'generic',
+      label: t('rules.scope.generic', 'Generic rules'),
+      hint: t('rules.scope.genericHint', 'Broad tool, file, or command rules'),
+    },
+  ];
+
   const renderRuleRow = (bucket: Bucket, rule: string) => {
     const isEditing = editing?.bucket === bucket && editing.rule === rule;
     return (
@@ -253,14 +279,28 @@ export const SettingsPermissionRules: React.FC = () => {
             </h3>
             <span className="text-[10px] text-text-muted ml-auto">{allow.length}</span>
           </div>
-          <div className="space-y-1 mb-2">
+          <div className="space-y-3 mb-2">
             {loading && (
               <div className="text-[11px] text-text-muted">{t('common.loading')}</div>
             )}
             {!loading && allow.length === 0 && (
               <div className="text-[11px] text-text-muted italic">{t('rules.empty')}</div>
             )}
-            {!loading && allow.map((rule) => renderRuleRow('allow', rule))}
+            {!loading &&
+              allow.length > 0 &&
+              scopeMeta.map((scope) =>
+                groupedAllow[scope.key].length > 0 ? (
+                  <div key={`allow-${scope.key}`} className="space-y-1">
+                    <div className="px-1">
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                        {scope.label}
+                      </div>
+                      <div className="text-[10px] text-text-muted">{scope.hint}</div>
+                    </div>
+                    {groupedAllow[scope.key].map((rule) => renderRuleRow('allow', rule))}
+                  </div>
+                ) : null
+              )}
           </div>
           <div className="flex items-center gap-2">
             <input
@@ -291,14 +331,28 @@ export const SettingsPermissionRules: React.FC = () => {
             </h3>
             <span className="text-[10px] text-text-muted ml-auto">{deny.length}</span>
           </div>
-          <div className="space-y-1 mb-2">
+          <div className="space-y-3 mb-2">
             {loading && (
               <div className="text-[11px] text-text-muted">{t('common.loading')}</div>
             )}
             {!loading && deny.length === 0 && (
               <div className="text-[11px] text-text-muted italic">{t('rules.empty')}</div>
             )}
-            {!loading && deny.map((rule) => renderRuleRow('deny', rule))}
+            {!loading &&
+              deny.length > 0 &&
+              scopeMeta.map((scope) =>
+                groupedDeny[scope.key].length > 0 ? (
+                  <div key={`deny-${scope.key}`} className="space-y-1">
+                    <div className="px-1">
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                        {scope.label}
+                      </div>
+                      <div className="text-[10px] text-text-muted">{scope.hint}</div>
+                    </div>
+                    {groupedDeny[scope.key].map((rule) => renderRuleRow('deny', rule))}
+                  </div>
+                ) : null
+              )}
           </div>
           <div className="flex items-center gap-2">
             <input

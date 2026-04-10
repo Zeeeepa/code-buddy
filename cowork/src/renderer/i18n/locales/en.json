@@ -1043,6 +1043,14 @@
     "computerUseTargets": "Computer-use targets",
     "computerUseHint": "Quick-add scoped allow rules from recent GUI and browser automation targets.",
     "computerUseEmpty": "No recent computer-use targets yet",
+    "scope": {
+      "site": "Site rules",
+      "siteHint": "Rules scoped to specific origins or web targets",
+      "app": "App/target rules",
+      "appHint": "Rules scoped to app names, UI targets, or computer-use surfaces",
+      "generic": "Generic rules",
+      "genericHint": "Broad tool, file, or command rules"
+    },
     "dryRun": "Dry-run tester",
     "dryRunHint": "Check what decision the rules would make for a tool call — the call is NOT executed.",
     "test": "Test",
