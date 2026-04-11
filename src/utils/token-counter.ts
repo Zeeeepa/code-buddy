@@ -4,7 +4,22 @@
  * Tiktoken is lazy-loaded on first use to reduce startup time (23 MB module).
  * The module is loaded synchronously when first needed, but the application
  * can start without it.
+ *
+ * This is the canonical TokenCounter implementation for the entire codebase.
+ * The previous duplicate at src/context/token-counter.ts has been collapsed
+ * into a thin re-export shim that forwards to this module so there is a
+ * single source of truth for token counting and a single tiktoken load.
  */
+
+/**
+ * Simplified message shape for token counting.
+ * Supports both string content and multimodal content arrays.
+ */
+export interface TokenCounterMessage {
+  role: string;
+  content: string | null | unknown[];
+  tool_calls?: unknown[];
+}
 
 // Lazy-loaded tiktoken module
 let tiktoken: typeof import('tiktoken') | null = null;
@@ -74,19 +89,32 @@ export class TokenCounter {
   }
 
   /**
-   * Count tokens in messages array (for chat completions)
+   * Count tokens in messages array (for chat completions).
+   *
+   * Accepts the widened TokenCounterMessage shape so multimodal content
+   * (array of parts like `{ type: "text", text: "..." }`) is handled —
+   * previously this was only in the context/ duplicate, so callers that
+   * passed image messages got zero tokens for the content.
    */
-  countMessageTokens(
-    messages: Array<{ role: string; content: string | null; tool_calls?: unknown }>
-  ): number {
+  countMessageTokens(messages: TokenCounterMessage[]): number {
     let totalTokens = 0;
 
     for (const message of messages) {
       // Every message follows <|start|>{role/name}\n{content}<|end|\>\n
       totalTokens += 3; // Base tokens per message
 
-      if (message.content && typeof message.content === 'string') {
-        totalTokens += this.countTokens(message.content);
+      if (message.content) {
+        if (typeof message.content === 'string') {
+          totalTokens += this.countTokens(message.content);
+        } else if (Array.isArray(message.content)) {
+          // Multimodal content parts — count the text parts; image parts
+          // are tracked by the provider-specific pricing, not by us.
+          for (const part of message.content) {
+            if (typeof part === 'object' && part !== null && 'text' in part && typeof (part as { text: unknown }).text === 'string') {
+              totalTokens += this.countTokens((part as { text: string }).text);
+            }
+          }
+        }
       }
 
       if (message.role) {

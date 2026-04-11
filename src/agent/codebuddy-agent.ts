@@ -230,6 +230,20 @@ export class CodeBuddyAgent extends BaseAgent {
       getSessionCostLimit: this.getSessionCostLimit.bind(this),
     });
 
+    // Wire the ContextEngine provider so multi-agent lifecycle hooks
+    // (onSubagentStarted / onSubagentEnded / ownsCompaction, cf. OpenClaw Vague 2 Phase 1)
+    // can reach the active context engine installed on the ContextManager.
+    // Without this, setContextEngineProvider was defined but never called, leaving
+    // the three call sites in agent-tools.ts (prepareSubagentSpawn, completeAgent,
+    // closeAgent) as no-ops — same dead-wiring pattern as the prior ICM bridge bug.
+    import('./multi-agent/agent-tools.js').then(({ setContextEngineProvider }) => {
+      setContextEngineProvider(() => this.contextManager.getContextEngine?.() ?? null);
+    }).catch(err => {
+      logger.warn('Failed to wire ContextEngine provider for sub-agents', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+
     // Initialize default middleware pipeline with WorkflowGuardMiddleware + ReasoningMiddleware
     import('./middleware/index.js').then(async ({ MiddlewarePipeline, WorkflowGuardMiddleware }) => {
       if (!this.executor.getMiddlewarePipeline()) {
@@ -1273,9 +1287,10 @@ export class CodeBuddyAgent extends BaseAgent {
    * Should be called when the agent is no longer needed
    */
   dispose(): void {
-    // Fire SessionEnd user hook (non-blocking)
+    // Fire SessionEnd user hook (non-blocking). Shutdown errors should be
+    // visible (warn, not debug) — silent debug logs masked prior bugs.
     getUserHooksManager(process.cwd()).executeHooks('SessionEnd', {}).catch(
-      (err) => logger.debug(`[user-hooks] SessionEnd error: ${err}`)
+      (err) => logger.warn(`[user-hooks] SessionEnd error: ${err instanceof Error ? err.message : String(err)}`)
     );
     // Remove only the forwarding listeners we attached (not other listeners)
     if (this.repairListeners.start) {
@@ -1288,6 +1303,15 @@ export class CodeBuddyAgent extends BaseAgent {
       this.budgetAlertManager.off('alert', this._budgetAlertListener);
       this._budgetAlertListener = undefined;
     }
+    // Release the ContextEngine provider to avoid retaining this agent instance
+    // via the agent-tools module-level closure.
+    import('./multi-agent/agent-tools.js').then(({ setContextEngineProvider }) => {
+      setContextEngineProvider(() => null);
+    }).catch(err => {
+      logger.warn('Failed to release ContextEngine provider on dispose', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
     this.peerRoutingConfig = null;
     super.dispose();
   }

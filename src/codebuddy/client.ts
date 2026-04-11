@@ -8,6 +8,7 @@ import { normalizeBaseURL, DEFAULT_BASE_URL } from "../utils/base-url.js";
 import { getCircuitBreaker, CircuitOpenError } from "../providers/circuit-breaker.js";
 import type { CircuitBreakerConfig } from "../providers/circuit-breaker.js";
 import { parseRateLimitHeaders, storeRateLimitInfo } from "../utils/rate-limit-display.js";
+import { mapProviderError } from "../errors/index.js";
 
 export type CodeBuddyMessage = ChatCompletionMessageParam;
 
@@ -1174,8 +1175,28 @@ export class CodeBuddyClient {
         throw error;
       }
       const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`CodeBuddy API error: ${message}`);
+      // Map raw provider errors to actionable, user-friendly messages so
+      // the CLI tells the user *how* to recover (bad key → config set;
+      // rate limit → wait or /switch; context too large → /compact, etc.)
+      throw new Error(mapProviderError(message, this.detectProviderLabel()));
     }
+  }
+
+  /**
+   * Derive a short provider label from the current model for error messages.
+   * E.g. "grok-code-fast-1" → "grok", "claude-sonnet-4-6" → "claude".
+   */
+  private detectProviderLabel(): string {
+    const m = this.currentModel.toLowerCase();
+    if (m.startsWith('grok')) return 'grok';
+    if (m.startsWith('claude')) return 'anthropic';
+    if (m.startsWith('gemini')) return 'gemini';
+    if (m.startsWith('gpt') || m.startsWith('o1') || m.startsWith('o3') || m.startsWith('o4')) return 'openai';
+    if (m.startsWith('ollama') || m.includes(':ollama')) return 'ollama';
+    if (m.startsWith('deepseek')) return 'deepseek';
+    if (m.startsWith('qwen')) return 'qwen';
+    if (m.startsWith('mistral')) return 'mistral';
+    return 'provider';
   }
 
   /**
@@ -1635,7 +1656,8 @@ export class CodeBuddyClient {
         throw error;
       }
       const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`CodeBuddy API error: ${message}`);
+      // Map raw provider errors to actionable messages (see chat()).
+      throw new Error(mapProviderError(message, this.detectProviderLabel()));
     }
   }
 

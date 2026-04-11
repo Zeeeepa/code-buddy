@@ -93,6 +93,23 @@ export class RestorableCompressor {
   private static readonly MAX_STORE_ENTRIES = 500;
 
   /**
+   * Enforce the MAX_STORE_ENTRIES cap by FIFO-evicting ~20% of the oldest
+   * entries when the store grows past the limit. Called from every code path
+   * that adds to the store so the in-memory map cannot grow unbounded in
+   * long sessions (previously only writeToolResult() enforced the cap, so
+   * compress() could leak entries indefinitely in sessions without disk-
+   * backed tool results).
+   */
+  private ensureCapacity(): void {
+    if (this.store.size <= RestorableCompressor.MAX_STORE_ENTRIES) return;
+    const evictCount = Math.floor(RestorableCompressor.MAX_STORE_ENTRIES * 0.2);
+    const keysToEvict = [...this.store.keys()].slice(0, evictCount);
+    for (const key of keysToEvict) {
+      this.store.delete(key);
+    }
+  }
+
+  /**
    * Compress a slice of messages that are about to be dropped.
    *
    * For each message, identifiers are extracted and the full content is
@@ -141,6 +158,9 @@ export class RestorableCompressor {
         stubLen: stub.length,
       });
     }
+
+    // Prevent unbounded growth of the in-memory store.
+    this.ensureCapacity();
 
     return {
       messages: compressed,
@@ -220,15 +240,10 @@ export class RestorableCompressor {
       }
       const filePath = path.join(dir, `${callId}.txt`);
       fs.writeFileSync(filePath, content, 'utf-8');
-      // Also store in memory for fast access
+      // Also store in memory for fast access; enforce capacity to prevent
+      // memory leak in long sessions (shared helper with compress()).
       this.store.set(callId, content);
-      // Auto-evict oldest entries if store grows too large (prevent memory leak in long sessions)
-      if (this.store.size > RestorableCompressor.MAX_STORE_ENTRIES) {
-        const keysToEvict = [...this.store.keys()].slice(0, Math.floor(RestorableCompressor.MAX_STORE_ENTRIES * 0.2));
-        for (const key of keysToEvict) {
-          this.store.delete(key);
-        }
-      }
+      this.ensureCapacity();
     } catch (err) {
       // Non-critical: disk write failure should not break tool execution
       logger.debug('RestorableCompressor: failed to write tool result to disk', { callId, err });

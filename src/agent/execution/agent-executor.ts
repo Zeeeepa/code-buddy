@@ -392,6 +392,63 @@ export class AgentExecutor {
    * @param messages - LLM message array (modified in place)
    * @returns Array of new chat entries created during this turn
    */
+  /**
+   * Shared pre-processing for user messages across the sequential and
+   * streaming agentic loops.
+   *
+   * Extracted from previously-duplicated code in processUserMessage and
+   * processUserMessageStream (F10): handles @mention expansion, fires
+   * persona auto-selection, and feeds the knowledge graph in the
+   * background. Returns the cleaned message (with `@web` / `@git` /
+   * `@terminal` markers removed). Both paths must call this before
+   * entering their respective main loops so the loops stay parity.
+   *
+   * All sub-steps are best-effort: any individual failure is swallowed at
+   * debug level so a broken plugin cannot break the main loop.
+   */
+  private async preprocessUserMessage(
+    message: string,
+    messages: CodeBuddyMessage[],
+  ): Promise<string> {
+    // 1. Process @mentions and inject context blocks
+    try {
+      const { processMentions } = await import('../../input/context-mentions.js');
+      const mentionResult = await processMentions(message);
+      if (mentionResult.contextBlocks.length > 0) {
+        message = mentionResult.cleanedMessage;
+        // Update the last user message in the messages array to match
+        const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+        if (lastUserMsg && typeof lastUserMsg.content === 'string') {
+          lastUserMsg.content = message;
+        }
+        for (const block of mentionResult.contextBlocks) {
+          messages.push({
+            role: 'system' as const,
+            content: `<context type="${block.type}" source="${block.source}">\n${block.content}\n</context>`,
+          });
+        }
+      }
+    } catch { /* mention processing optional */ }
+
+    // 2. Auto-select persona (fire-and-forget, no await needed)
+    try {
+      const { getPersonaManager } = await import('../../personas/persona-manager.js');
+      getPersonaManager().autoSelectPersona({ message });
+    } catch { /* persona auto-select optional */ }
+
+    // 3. Auto-extract entities into the knowledge graph (background)
+    try {
+      const { getKnowledgeGraph, isTrivialMessage } = await import('../../memory/knowledge-graph.js');
+      if (!isTrivialMessage(message)) {
+        const kg = getKnowledgeGraph();
+        await kg.load();
+        kg.extractFromMessageDeduped(message);
+      }
+    } catch { /* non-critical */ }
+
+    return message;
+  }
+
   async processUserMessage(
     message: string,
     history: ChatEntry[],
@@ -401,26 +458,10 @@ export class AgentExecutor {
     const maxToolRounds = this.config.maxToolRounds;
     let toolRounds = 0;
 
-    // Process @mentions (e.g., @web, @git, @terminal) and inject context
-    try {
-      const { processMentions } = await import('../../input/context-mentions.js');
-      const mentionResult = await processMentions(message);
-      if (mentionResult.contextBlocks.length > 0) {
-        message = mentionResult.cleanedMessage;
-        // Update the last user message in the messages array
-        const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
-        if (lastUserMsg && typeof lastUserMsg.content === 'string') {
-          lastUserMsg.content = message;
-        }
-        // Inject context blocks
-        for (const block of mentionResult.contextBlocks) {
-          messages.push({
-            role: 'system' as const,
-            content: `<context type="${block.type}" source="${block.source}">\n${block.content}\n</context>`,
-          });
-        }
-      }
-    } catch { /* mention processing optional */ }
+    // Shared pre-processing: @mentions, persona auto-select, knowledge
+    // graph extraction. Factored into preprocessUserMessage so the
+    // streaming path stays in parity with this one (F10).
+    message = await this.preprocessUserMessage(message, messages);
 
     // Track token usage for cost calculation (recalculated each round for accuracy)
     let inputTokens = this.deps.tokenCounter.countMessageTokens(messages as Parameters<typeof this.deps.tokenCounter.countMessageTokens>[0]);
@@ -445,21 +486,8 @@ export class AgentExecutor {
         }
       }
 
-      // Auto-select persona based on user message context (fire-and-forget)
-      try {
-        const { getPersonaManager } = await import('../../personas/persona-manager.js');
-        getPersonaManager().autoSelectPersona({ message });
-      } catch { /* persona auto-select optional */ }
-
-      // Auto-extract entities from user message into knowledge graph (background, non-blocking)
-      try {
-        const { getKnowledgeGraph, isTrivialMessage } = await import('../../memory/knowledge-graph.js');
-        if (!isTrivialMessage(message)) {
-          const kg = getKnowledgeGraph();
-          await kg.load();
-          kg.extractFromMessageDeduped(message);
-        }
-      } catch { /* non-critical */ }
+      // Persona auto-select + knowledge graph extraction moved to
+      // preprocessUserMessage() above (F10).
 
       // Run before_turn middleware (sequential path)
       const pipeline = this.deps.middlewarePipeline;
@@ -482,6 +510,17 @@ export class AgentExecutor {
         }
         if (mwResult.action === 'warn' && mwResult.message) {
           logger.warn(`Middleware warning: ${mwResult.message}`);
+          // Surface the warning to the user via a visible ChatEntry so the
+          // Ink TUI renders it (previously the message was only pushed to
+          // the system context for the LLM; the user saw nothing — defeating
+          // the whole point of ContextWarningMiddleware).
+          const warnEntry: ChatEntry = {
+            type: 'assistant',
+            content: `⚠️  ${mwResult.message}`,
+            timestamp: new Date(),
+          };
+          history.push(warnEntry);
+          newEntries.push(warnEntry);
           messages.push({
             role: 'system' as const,
             content: `<context type="middleware-hint">\n${mwResult.message}\n</context>`,
@@ -873,8 +912,16 @@ export class AgentExecutor {
                 );
                 if (acResult?.success) {
                   logger.debug('Auto-commit:', { hash: acResult.commitHash });
+                } else if (acResult && acResult.message && /failed/i.test(acResult.message)) {
+                  // A real commit failure (stage/commit error) — not a benign
+                  // "no files to commit" or "not a git repo". Surface it to the
+                  // user so disk-full / repo-lock / pre-commit-hook issues are
+                  // not silently swallowed.
+                  logger.warn(`Auto-commit failed: ${acResult.message}`);
                 }
-              } catch { /* auto-commit is optional */ }
+              } catch (err) {
+                logger.debug('Auto-commit threw', { err: err instanceof Error ? err.message : String(err) });
+              }
             }
 
             // --- Fix 11: YOLO cost display after each tool ---
@@ -947,6 +994,14 @@ export class AgentExecutor {
             }
             if (mwResult.action === 'warn' && mwResult.message) {
               logger.warn(`Middleware after-turn warning: ${mwResult.message}`);
+              // Surface after-turn warnings to the user (parity with before-turn).
+              const warnEntry: ChatEntry = {
+                type: 'assistant',
+                content: `⚠️  ${mwResult.message}`,
+                timestamp: new Date(),
+              };
+              history.push(warnEntry);
+              newEntries.push(warnEntry);
             }
           }
           // Note: cost is recorded once at end-of-loop, not here (avoids double-counting)
@@ -1123,24 +1178,10 @@ export class AgentExecutor {
     messages: CodeBuddyMessage[],
     abortController: AbortController | null
   ): AsyncGenerator<StreamingChunk, void, unknown> {
-    // Process @mentions (e.g., @web, @git, @terminal) and inject context — streaming path
-    try {
-      const { processMentions } = await import('../../input/context-mentions.js');
-      const mentionResult = await processMentions(message);
-      if (mentionResult.contextBlocks.length > 0) {
-        message = mentionResult.cleanedMessage;
-        const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
-        if (lastUserMsg && typeof lastUserMsg.content === 'string') {
-          lastUserMsg.content = message;
-        }
-        for (const block of mentionResult.contextBlocks) {
-          messages.push({
-            role: 'system' as const,
-            content: `<context type="${block.type}" source="${block.source}">\n${block.content}\n</context>`,
-          });
-        }
-      }
-    } catch { /* mention processing optional */ }
+    // Shared pre-processing with the sequential path (@mentions, persona
+    // auto-select, knowledge graph extraction). Single source of truth in
+    // preprocessUserMessage (F10).
+    message = await this.preprocessUserMessage(message, messages);
 
     // Calculate input tokens
     let inputTokens = this.deps.tokenCounter.countMessageTokens(messages as Parameters<typeof this.deps.tokenCounter.countMessageTokens>[0]);
@@ -1155,22 +1196,6 @@ export class AgentExecutor {
 
     try {
       const pipeline = this.deps.middlewarePipeline;
-
-      // Auto-select persona based on user message context (fire-and-forget, streaming path)
-      try {
-        const { getPersonaManager } = await import('../../personas/persona-manager.js');
-        getPersonaManager().autoSelectPersona({ message });
-      } catch { /* persona auto-select optional */ }
-
-      // Auto-extract entities from user message into knowledge graph (streaming, background)
-      try {
-        const { getKnowledgeGraph, isTrivialMessage } = await import('../../memory/knowledge-graph.js');
-        if (!isTrivialMessage(message)) {
-          const kgExtract = getKnowledgeGraph();
-          await kgExtract.load();
-          kgExtract.extractFromMessageDeduped(message);
-        }
-      } catch { /* non-critical */ }
 
       let terminateDetectedStreaming = false;
       while (toolRounds < maxToolRounds) {
@@ -1643,8 +1668,13 @@ export class AgentExecutor {
                 );
                 if (acResult?.success) {
                   logger.debug('Auto-commit (stream):', { hash: acResult.commitHash });
+                } else if (acResult && acResult.message && /failed/i.test(acResult.message)) {
+                  // Real commit failure — surface to the user (see sequential path above).
+                  logger.warn(`Auto-commit failed: ${acResult.message}`);
                 }
-              } catch { /* auto-commit is optional */ }
+              } catch (err) {
+                logger.debug('Auto-commit threw (stream)', { err: err instanceof Error ? err.message : String(err) });
+              }
             }
 
             // --- Fix 11: YOLO cost display after each tool (streaming path) ---

@@ -9,7 +9,14 @@
  */
 
 import { readdirSync, existsSync, readFileSync, statSync } from 'fs';
-import { join, basename } from 'path';
+import { join, basename, dirname } from 'path';
+import { fileURLToPath } from 'node:url';
+
+// ESM equivalent of __dirname (CLAUDE.md § Testing Gotchas).
+// The previous `__dirname` reference threw ReferenceError at module load,
+// which silently disabled this entire test file.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Get the repo root (assuming tests are in /tests/skills/)
 const REPO_ROOT = join(__dirname, '..', '..');
@@ -157,7 +164,13 @@ const skillDirs = existsSync(BUNDLED_SKILLS_DIR)
       .sort()
   : [];
 
-describe('Bundled SKILL.md Files', () => {
+// Skip the entire suite in environments where the bundled skills directory
+// is absent (e.g. fresh clones, CI images without the skills submodule).
+// The directory is optional runtime data, not source code, so its absence
+// should not fail the test suite.
+const hasBundledSkills = existsSync(BUNDLED_SKILLS_DIR);
+
+describe.skipIf(!hasBundledSkills)('Bundled SKILL.md Files', () => {
   beforeAll(() => {
     // Check that bundled skills directory exists
     expect(existsSync(BUNDLED_SKILLS_DIR)).toBe(true);

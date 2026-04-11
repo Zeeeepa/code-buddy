@@ -1,218 +1,124 @@
 /**
- * Token Counter
- * 
- * Provides utilities for counting tokens in strings and messages.
- * Uses tiktoken for accuracy, with character-based fallback for robustness.
+ * Token Counter — unified surface that re-exports the canonical class
+ * from src/utils/token-counter.ts while keeping the free-function API
+ * (countTokens / countMessageTokens / countMessagesTokens) that the
+ * context/compaction/* modules import.
+ *
+ * Historically there were two full implementations (this file and
+ * src/utils/token-counter.ts). The class is now a single source of
+ * truth — this file delegates to it via createTokenCounter() and a
+ * model-keyed cache. The free functions still take a `model` parameter
+ * because callers in src/context/compaction/* use that signature.
+ *
+ * Note: we intentionally still `import` from 'tiktoken' here so tests
+ * that mock `tiktoken` at the vitest level (see context-manager-v3.test
+ * for the canonical pattern) continue to affect token counting used by
+ * context management code. The utils canonical class uses a lazy
+ * `require('tiktoken')` which is not intercepted by ESM vi.mock.
  */
 
 import { encoding_for_model, TiktokenModel, get_encoding, Tiktoken } from 'tiktoken';
 import { logger } from '../utils/logger.js';
+import {
+  TokenCounter as CanonicalTokenCounter,
+  createTokenCounter as canonicalCreateTokenCounter,
+  type TokenCounterMessage,
+} from '../utils/token-counter.js';
+
+export type { TokenCounterMessage } from '../utils/token-counter.js';
+/** Re-exported for callers that used the context/ interface name. */
+export type TokenCounter = CanonicalTokenCounter;
 
 /**
- * Simplified message structure for token counting.
+ * Create a token counter instance.
+ * Returns the canonical lazy-loaded counter from utils/token-counter.ts
+ * so streaming-handler, context-manager-v2 and friends all share the
+ * same implementation and the same tiktoken WASM load.
  */
-export interface TokenCounterMessage {
-  /** Role of the message (system, user, assistant, tool). */
-  role: string;
-  /** Content of the message. Can be a string, null, or array of parts. */
-  content: string | null | unknown[];
-  /** Optional tool calls within the message. */
-  tool_calls?: unknown[];
+export function createTokenCounter(model: string = 'gpt-4'): CanonicalTokenCounter {
+  return canonicalCreateTokenCounter(model);
 }
 
-/**
- * Interface for token counting implementations.
- */
-export interface TokenCounter {
-  /** Counts tokens in a plain text string. */
-  countTokens(text: string): number;
-  /** Counts tokens in a list of conversation messages. */
-  countMessageTokens(messages: TokenCounterMessage[]): number;
-  /** Estimates token count for a streaming chunk. */
-  estimateStreamingTokens(chunk: string): number;
-  /** Releases resources used by the counter. */
-  dispose(): void;
+// ============================================================================
+// Free functions with the legacy `(text, model)` signature.
+//
+// These intentionally use a LOCAL tiktoken encoder instead of delegating
+// to the canonical class, because several context-management tests mock
+// `tiktoken` at the vi.mock level and expect that mock to apply to these
+// functions. Keeping a direct tiktoken import here preserves that
+// behavior (the class-based path still uses lazy `require('tiktoken')`
+// for startup speed).
+// ============================================================================
+
+interface ModelEncoder {
+  encoder: Tiktoken | null;
 }
 
-/**
- * Creates a token counter instance for a specific model.
- * Automatically handles fallbacks if tiktoken or specific model encodings are unavailable.
- * 
- * @param model - The model name (e.g., 'gpt-4', 'gpt-3.5-turbo').
- * @returns A TokenCounter implementation.
- */
-export function createTokenCounter(model: string = 'gpt-4'): TokenCounter {
-  let encoder: Tiktoken;
+const encoderCache = new Map<string, ModelEncoder>();
 
+function getEncoder(model: string): Tiktoken | null {
+  const cached = encoderCache.get(model);
+  if (cached) return cached.encoder;
+
+  let encoder: Tiktoken | null = null;
   try {
-    // Try to get encoding for specific model
     encoder = encoding_for_model(model as TiktokenModel);
-  } catch (_error) {
-    // Fallback to cl100k_base (used by GPT-4, GPT-3.5-turbo)
-    logger.debug(`Could not load encoding for model ${model}, falling back to cl100k_base`);
+  } catch {
     try {
       encoder = get_encoding('cl100k_base');
-    } catch (_e) {
-      // Ultimate fallback to estimation if tiktoken fails completely (e.g. wasm issues)
-      logger.warn('Failed to initialize tiktoken, using character-based estimation');
-      return new EstimatingTokenCounter();
+    } catch (err) {
+      logger.debug('Failed to initialize tiktoken encoder, falling back to estimation', { err });
+      encoder = null;
     }
   }
-
-  return new TiktokenCounter(encoder);
+  encoderCache.set(model, { encoder });
+  return encoder;
 }
 
-/**
- * Token counter implementation using the tiktoken library.
- */
-class TiktokenCounter implements TokenCounter {
-  private encoder: Tiktoken;
-
-  constructor(encoder: Tiktoken) {
-    this.encoder = encoder;
-  }
-
-  countTokens(text: string): number {
-    if (!text) return 0;
-    try {
-      return this.encoder.encode(text).length;
-    } catch (error) {
-      logger.warn('Token counting failed, falling back to estimation', { error });
-      return Math.ceil(text.length / 4);
-    }
-  }
-
-  countMessageTokens(messages: TokenCounterMessage[]): number {
-    let numTokens = 0;
-
-    // Per-message overhead (format dependent, simplified for approximation)
-    // <|start|>{role}\n{content}<|end|>
-    const tokensPerMessage = 3;
-
-    for (const message of messages) {
-      numTokens += tokensPerMessage;
-
-      // Role
-      numTokens += this.countTokens(message.role);
-
-      // Content - handle both string and array formats
-      if (message.content) {
-        if (typeof message.content === 'string') {
-          numTokens += this.countTokens(message.content);
-        } else if (Array.isArray(message.content)) {
-          // Handle content parts array (OpenAI format)
-          for (const part of message.content) {
-            if (typeof part === 'object' && part !== null && 'text' in part) {
-              numTokens += this.countTokens((part as { text: string }).text);
-            }
-          }
-        }
-      }
-
-      // Tool calls overhead
-      if (message.tool_calls && Array.isArray(message.tool_calls)) {
-        numTokens += this.countTokens(JSON.stringify(message.tool_calls));
-      }
-    }
-
-    numTokens += 3; // Priming tokens for next response
-    return numTokens;
-  }
-
-  estimateStreamingTokens(chunk: string): number {
-    return this.countTokens(chunk);
-  }
-
-  dispose(): void {
-    try {
-      this.encoder.free();
-    } catch {
-      // Ignore cleanup errors
-    }
-  }
+function estimateTokensFromChars(text: string): number {
+  return Math.ceil((text || '').length / 4);
 }
 
-/**
- * Fallback estimator when tiktoken is unavailable (e.g., in environments
- * where WASM or the library cannot load).
- */
-class EstimatingTokenCounter implements TokenCounter {
-  countTokens(text: string): number {
-    if (!text) return 0;
-    // Average English token is ~4 characters
-    // Code can be denser, so we use 3.5 as a safer estimate
-    return Math.ceil(text.length / 3.5);
-  }
-
-  countMessageTokens(messages: TokenCounterMessage[]): number {
-    let chars = 0;
-    for (const msg of messages) {
-      chars += msg.role.length;
-      if (msg.content) {
-        if (typeof msg.content === 'string') {
-          chars += msg.content.length;
-        } else if (Array.isArray(msg.content)) {
-          for (const part of msg.content) {
-            if (typeof part === 'object' && part !== null && 'text' in part) {
-              chars += (part as { text: string }).text.length;
-            }
-          }
-        }
-      }
-      if (msg.tool_calls) chars += JSON.stringify(msg.tool_calls).length;
-    }
-    return this.countTokens('a'.repeat(chars)); // Dummy string for calc
-  }
-
-  estimateStreamingTokens(chunk: string): number {
-    return this.countTokens(chunk);
-  }
-
-  dispose(): void {}
-}
-
-// ============================================================================
-// Singleton and Helper Functions
-// ============================================================================
-
-/** Cache of token counters by model */
-const counterCache = new Map<string, TokenCounter>();
-
-/**
- * Get or create a cached token counter for a model
- */
-function getCounter(model: string = 'gpt-4'): TokenCounter {
-  let counter = counterCache.get(model);
-  if (!counter) {
-    counter = createTokenCounter(model);
-    counterCache.set(model, counter);
-  }
-  return counter;
-}
-
-/**
- * Count tokens in a text string
- * @param text - The text to count tokens in
- * @param model - The model to use for token counting (default: gpt-4)
- */
+/** Count tokens in a plain text string for the given model. */
 export function countTokens(text: string, model: string = 'gpt-4'): number {
-  return getCounter(model).countTokens(text);
+  if (!text) return 0;
+  const enc = getEncoder(model);
+  if (!enc) return estimateTokensFromChars(text);
+  try {
+    return enc.encode(text).length;
+  } catch {
+    return estimateTokensFromChars(text);
+  }
 }
 
-/**
- * Count tokens in a single message
- * @param message - The message to count tokens in
- * @param model - The model to use for token counting (default: gpt-4)
- */
+function tokensForMessage(message: TokenCounterMessage, model: string): number {
+  let n = 3; // per-message overhead
+  n += countTokens(message.role || '', model);
+  if (message.content) {
+    if (typeof message.content === 'string') {
+      n += countTokens(message.content, model);
+    } else if (Array.isArray(message.content)) {
+      for (const part of message.content) {
+        if (typeof part === 'object' && part !== null && 'text' in part && typeof (part as { text: unknown }).text === 'string') {
+          n += countTokens((part as { text: string }).text, model);
+        }
+      }
+    }
+  }
+  if (message.tool_calls) {
+    n += countTokens(JSON.stringify(message.tool_calls), model);
+  }
+  return n;
+}
+
+/** Count tokens in a single message. */
 export function countMessageTokens(message: TokenCounterMessage, model: string = 'gpt-4'): number {
-  return getCounter(model).countMessageTokens([message]);
+  return tokensForMessage(message, model) + 3; // priming tokens
 }
 
-/**
- * Count tokens in multiple messages
- * @param messages - The messages to count tokens in
- * @param model - The model to use for token counting (default: gpt-4)
- */
+/** Count tokens in an array of messages. */
 export function countMessagesTokens(messages: TokenCounterMessage[], model: string = 'gpt-4'): number {
-  return getCounter(model).countMessageTokens(messages);
+  let total = 0;
+  for (const m of messages) total += tokensForMessage(m, model);
+  return total + 3; // priming tokens
 }

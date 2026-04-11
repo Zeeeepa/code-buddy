@@ -313,10 +313,26 @@ export class BashTool implements Disposable {
             const { DockerSandbox } = await import('../../sandbox/docker-sandbox.js');
             const sandbox = new DockerSandbox();
             const sbResult = await sandbox.execute(command, { timeout });
+            // Build a rich error message so the LLM can self-correct instead
+            // of seeing only "Sandbox exit code 127". We combine stderr
+            // (sbResult.error) with the exit code, and — if both are empty —
+            // fall back to the tail of stdout as a hint (some commands write
+            // their diagnostic to stdout rather than stderr).
+            let errorMsg: string | undefined;
+            if (sbResult.exitCode !== 0) {
+              const parts: string[] = [];
+              if (sbResult.error) parts.push(sbResult.error.trim());
+              parts.push(`exit code ${sbResult.exitCode}`);
+              if (!sbResult.error && sbResult.output) {
+                const tail = sbResult.output.trim().split('\n').slice(-5).join('\n');
+                if (tail) parts.push(`stdout tail: ${tail}`);
+              }
+              errorMsg = parts.join(' | ');
+            }
             return {
               success: sbResult.exitCode === 0,
               output: sbResult.output || undefined,
-              error: sbResult.exitCode !== 0 ? (sbResult.error || `Sandbox exit code ${sbResult.exitCode}`) : undefined,
+              error: errorMsg,
             };
           } catch {
             // Docker sandbox unavailable, fall through to direct execution

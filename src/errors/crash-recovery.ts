@@ -6,7 +6,7 @@
  * startup and offers the user a chance to resume.
  */
 
-import { readFile, readdir, rm } from 'fs/promises';
+import { readFile, readdir, rm, writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { homedir } from 'os';
@@ -18,10 +18,36 @@ export interface RecoveryInfo {
   messageCount: number;
   lastUserMessage: string;
   crashReason?: string;
+  attempts: number;
 }
 
 /** The crash handler writes to ~/.codebuddy/recovery/ */
 const RECOVERY_DIR = join(homedir(), '.codebuddy', 'recovery');
+
+/** Maximum number of failed recovery attempts before we stop offering recovery. */
+const MAX_RECOVERY_ATTEMPTS = 3;
+
+/**
+ * Record a new recovery attempt in latest.json.
+ * Called by the CLI before it tries to resume from a crash so that
+ * repeated crash-on-resume cycles eventually break the loop.
+ */
+export async function recordRecoveryAttempt(): Promise<number> {
+  const recoveryDir = RECOVERY_DIR;
+  if (!existsSync(recoveryDir)) return 0;
+  const latestFile = join(recoveryDir, 'latest.json');
+  if (!existsSync(latestFile)) return 0;
+  try {
+    const content = await readFile(latestFile, 'utf-8');
+    const data = JSON.parse(content);
+    data.attempts = (typeof data.attempts === 'number' ? data.attempts : 0) + 1;
+    await writeFile(latestFile, JSON.stringify(data, null, 2), 'utf-8');
+    return data.attempts;
+  } catch (err) {
+    logger.debug(`Failed to record recovery attempt: ${err instanceof Error ? err.message : String(err)}`);
+    return 0;
+  }
+}
 
 /**
  * Check if there's a pending crash recovery.
@@ -42,6 +68,21 @@ export async function checkCrashRecovery(cwd: string = process.cwd()): Promise<R
       // Only offer recovery for crashes within the last hour
       const age = Date.now() - new Date(latestData.timestamp).getTime();
       if (age > 3600000) {
+        return null;
+      }
+
+      // Break the recovery loop after MAX_RECOVERY_ATTEMPTS failures:
+      // if the user repeatedly resumes and immediately re-crashes (e.g. the
+      // recovered state itself is what triggers the crash), each attempt
+      // bumps the counter. Past the threshold we refuse to offer recovery
+      // and leave a visible warning so the user knows why and starts a
+      // fresh session instead of fighting an infinite loop.
+      const attempts = typeof latestData.attempts === 'number' ? latestData.attempts : 0;
+      if (attempts >= MAX_RECOVERY_ATTEMPTS) {
+        logger.warn(
+          `Crash recovery disabled after ${attempts} failed attempts — start a fresh session. ` +
+          `Clear ~/.codebuddy/recovery/latest.json manually if you want to retry.`,
+        );
         return null;
       }
 
@@ -74,6 +115,7 @@ export async function checkCrashRecovery(cwd: string = process.cwd()): Promise<R
         messageCount,
         lastUserMessage: lastUserMessage.substring(0, 500),
         crashReason: latestData.reason || undefined,
+        attempts,
       };
     }
 
@@ -110,6 +152,7 @@ export async function checkCrashRecovery(cwd: string = process.cwd()): Promise<R
       messageCount: messages.length,
       lastUserMessage: lastUserMessage.substring(0, 500),
       crashReason: data.error?.message || undefined,
+      attempts: typeof data.attempts === 'number' ? data.attempts : 0,
     };
   } catch (err) {
     logger.debug(`Failed to read recovery info: ${err instanceof Error ? err.message : String(err)}`);
@@ -169,7 +212,6 @@ export async function saveRecoveryCheckpoint(
 ): Promise<void> {
   const recoveryDir = RECOVERY_DIR;
   try {
-    const { mkdir, writeFile } = await import('fs/promises');
     if (!existsSync(recoveryDir)) {
       await mkdir(recoveryDir, { recursive: true });
     }

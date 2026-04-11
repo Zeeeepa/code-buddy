@@ -167,15 +167,29 @@ export class SessionStore {
     await this.ensureSessionsDirectory();
     const filePath = this.getSessionFilePath(session.id);
 
+    await withSessionLock(filePath, async () => {
+      await this.writeSessionUnlocked(session);
+    });
+  }
+
+  /**
+   * Serialize and write a session to disk WITHOUT acquiring a lock.
+   *
+   * Used by code paths that already hold the lock (e.g. addMessageToCurrentSession
+   * wraps load→mutate→save in a single withSessionLock call). Nested
+   * withSessionLock calls are NOT safely reentrant: the inner release()
+   * would unlink the lock file and leave the outer critical section
+   * unprotected. Callers MUST hold the session lock before invoking this.
+   */
+  private async writeSessionUnlocked(session: Session): Promise<void> {
+    if (this.ephemeral) return;
+    const filePath = this.getSessionFilePath(session.id);
     const data = {
       ...session,
       createdAt: session.createdAt.toISOString(),
-      lastAccessedAt: new Date().toISOString()
+      lastAccessedAt: new Date().toISOString(),
     };
-
-    await withSessionLock(filePath, async () => {
-      await fsPromises.writeFile(filePath, JSON.stringify(data, null, 2));
-    });
+    await fsPromises.writeFile(filePath, JSON.stringify(data, null, 2));
   }
 
   /**
@@ -214,42 +228,55 @@ export class SessionStore {
   }
 
   /**
-   * Add a message to the current session
+   * Add a message to the current session.
+   *
+   * The load→mutate→save sequence is wrapped in a single withSessionLock
+   * call so two concurrent callers cannot overwrite each other's messages
+   * (the previous implementation only locked inside saveSession, which left
+   * the load→mutate window unprotected — two writers could both read the
+   * same snapshot, each push their own message, and one save would silently
+   * clobber the other).
    */
   async addMessageToCurrentSession(entry: ChatEntry): Promise<void> {
     if (!this.currentSessionId || !this.autoSave) return;
 
-    const session = await this.loadSession(this.currentSessionId);
-    if (!session) return;
+    await this.ensureSessionsDirectory();
+    const filePath = this.getSessionFilePath(this.currentSessionId);
 
-    const message = this.convertChatEntryToMessage(entry);
-    session.messages.push(message);
-    session.lastAccessedAt = new Date();
+    await withSessionLock(filePath, async () => {
+      const session = await this.loadSession(this.currentSessionId!);
+      if (!session) return;
 
-    // Auto-generate title from first user message if session has default name
-    if (entry.type === 'user' && session.messages.filter(m => m.type === 'user').length === 1) {
-      try {
-        const { generateConversationTitle } = await import('../utils/conversation-title.js');
-        const title = generateConversationTitle(entry.content);
-        if (title && title !== 'New conversation') {
-          session.name = title;
-        }
-      } catch { /* title generation optional */ }
-    }
+      const message = this.convertChatEntryToMessage(entry);
+      session.messages.push(message);
+      session.lastAccessedAt = new Date();
 
-    // Store in SQLite if enabled
-    if (this.dbRepository) {
-      const dbMessage: Omit<DBMessage, 'id' | 'created_at'> = {
-        session_id: this.currentSessionId,
-        role: message.type === 'tool_result' ? 'tool' : message.type === 'tool_call' ? 'assistant' : message.type === 'reasoning' ? 'assistant' : message.type === 'plan_progress' ? 'assistant' : message.type === 'steer' ? 'user' : message.type === 'diff_preview' ? 'assistant' : message.type,
-        content: message.content,
-        tool_calls: message.toolCallName ? [{ name: message.toolCallName }] : undefined,
-        metadata: message.toolCallSuccess !== undefined ? { success: message.toolCallSuccess } : undefined,
-      };
-      this.dbRepository.addMessage(dbMessage);
-    }
+      // Auto-generate title from first user message if session has default name
+      if (entry.type === 'user' && session.messages.filter(m => m.type === 'user').length === 1) {
+        try {
+          const { generateConversationTitle } = await import('../utils/conversation-title.js');
+          const title = generateConversationTitle(entry.content);
+          if (title && title !== 'New conversation') {
+            session.name = title;
+          }
+        } catch { /* title generation optional */ }
+      }
 
-    await this.saveSession(session);
+      // Store in SQLite if enabled
+      if (this.dbRepository) {
+        const dbMessage: Omit<DBMessage, 'id' | 'created_at'> = {
+          session_id: this.currentSessionId!,
+          role: message.type === 'tool_result' ? 'tool' : message.type === 'tool_call' ? 'assistant' : message.type === 'reasoning' ? 'assistant' : message.type === 'plan_progress' ? 'assistant' : message.type === 'steer' ? 'user' : message.type === 'diff_preview' ? 'assistant' : message.type,
+          content: message.content,
+          tool_calls: message.toolCallName ? [{ name: message.toolCallName }] : undefined,
+          metadata: message.toolCallSuccess !== undefined ? { success: message.toolCallSuccess } : undefined,
+        };
+        this.dbRepository.addMessage(dbMessage);
+      }
+
+      // writeSessionUnlocked skips the lock because we are already inside it.
+      await this.writeSessionUnlocked(session);
+    });
   }
 
   /**

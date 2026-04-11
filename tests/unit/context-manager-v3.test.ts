@@ -8,6 +8,51 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import type { CodeBuddyMessage } from '../../src/codebuddy/client.js';
 
+// Mock tiktoken at the utils level. After the F7 TokenCounter consolidation
+// src/context/token-counter.ts delegates createTokenCounter() to the
+// canonical implementation in src/utils/token-counter.ts, which uses a
+// lazy `require('tiktoken')` that is NOT intercepted by Vitest's ESM-level
+// `vi.mock('tiktoken', …)`. So we mock the token-counter module itself —
+// createTokenCounter returns a fake counter whose `countMessageTokens`
+// charges roughly 1 token per 4 characters, preserving the previous test
+// expectations (messages of 350+ chars push a 100-token budget over 80%).
+const fakeCountTokens = (text: string | null | unknown[]): number => {
+  if (!text) return 0;
+  if (typeof text === 'string') return Math.ceil(text.length / 4);
+  if (Array.isArray(text)) {
+    let n = 0;
+    for (const part of text) {
+      if (typeof part === 'object' && part !== null && 'text' in part && typeof (part as { text: unknown }).text === 'string') {
+        n += Math.ceil((part as { text: string }).text.length / 4);
+      }
+    }
+    return n;
+  }
+  return 0;
+};
+
+const fakeCounter = {
+  countTokens: jest.fn((text: string) => fakeCountTokens(text)),
+  countMessageTokens: jest.fn((messages: Array<{ role?: string; content?: string | null | unknown[] }>) => {
+    let n = 0;
+    for (const m of messages) {
+      n += (m.role ?? '').length / 4;
+      n += fakeCountTokens(m.content ?? null);
+      n += 3; // per-message overhead, matches real impl
+    }
+    return Math.ceil(n + 3); // priming tokens
+  }),
+  estimateStreamingTokens: jest.fn((text: string) => fakeCountTokens(text)),
+  dispose: jest.fn(),
+};
+
+jest.mock('../../src/utils/token-counter.js', () => ({
+  createTokenCounter: jest.fn().mockReturnValue(fakeCounter),
+  TokenCounter: jest.fn(),
+}));
+
+// Keep the tiktoken mock for any callers that still import it directly
+// (src/context/token-counter.ts free functions do).
 jest.mock('tiktoken', () => ({
   encoding_for_model: jest.fn(function() { return {
     encode: jest.fn((text: string) => new Array(Math.ceil(text.length / 4))),

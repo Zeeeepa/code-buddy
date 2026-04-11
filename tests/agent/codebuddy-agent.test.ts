@@ -98,6 +98,9 @@ jest.mock('../../src/utils/token-counter.js', () => ({
   createTokenCounter: jest.fn().mockReturnValue({
     countTokens: jest.fn().mockReturnValue(100),
     countMessageTokens: jest.fn().mockReturnValue(50),
+    // estimateStreamingTokens is now required because streaming-handler
+    // imports from the unified utils/token-counter module (F7 consolidation).
+    estimateStreamingTokens: jest.fn().mockReturnValue(10),
     dispose: jest.fn(),
   }),
   TokenCounter: jest.fn(),

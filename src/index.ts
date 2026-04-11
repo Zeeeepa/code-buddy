@@ -32,6 +32,33 @@ import {
   getShutdownManager,
 } from "./utils/graceful-shutdown.js";
 
+/**
+ * CLI output helper.
+ *
+ * Prior to the F4 cleanup this file used `console.*` ~97 times, which
+ * violated the CLAUDE.md rule that production code must go through the
+ * `logger` (tests spy on `logger.warn` for assertions). Wrapping behind
+ * `cli.*` gives us:
+ *   - `cli.info` / `cli.warn` / `cli.error` → delegated to `logger` so log
+ *     level, LOG_FILE, and test spies all work uniformly.
+ *   - `cli.stdout` → raw `process.stdout.write` for pipeable output
+ *     (`buddy list-models`, `--output json`, tool results). These MUST
+ *     stay on stdout because users pipe them into other tools; routing
+ *     them through the logger would send them to stderr.
+ */
+const cli = {
+  info: (msg: string) => logger.info(msg),
+  warn: (msg: string) => logger.warn(msg),
+  error: (msg: string, err?: unknown) => {
+    if (err !== undefined) {
+      logger.error(msg, { error: err instanceof Error ? err.message : String(err) });
+    } else {
+      logger.error(msg);
+    }
+  },
+  stdout: (msg: string) => process.stdout.write(msg + '\n'),
+};
+
 // CLI command modules are loaded lazily below (see registerLazyCommands)
 // to avoid importing heavy transitive dependencies at startup.
 
@@ -46,13 +73,13 @@ function recordStartupPhase(name: string): void {
 
 function logStartupMetrics(): void {
   if (!PERF_TIMING || startupPhases.length === 0) return;
-  console.log('\n=== Startup Performance ===');
-  console.log(`Total time: ${Date.now() - STARTUP_TIME}ms`);
-  console.log('Phase breakdown:');
+  cli.info('\n=== Startup Performance ===');
+  cli.info(`Total time: ${Date.now() - STARTUP_TIME}ms`);
+  cli.info('Phase breakdown:');
   for (const phase of startupPhases) {
-    console.log(`  ${phase.name}: ${phase.time}ms`);
+    cli.info(`  ${phase.name}: ${phase.time}ms`);
   }
-  console.log('===========================\n');
+  cli.info('===========================\n');
 }
 
 recordStartupPhase('imports-start');
@@ -150,9 +177,9 @@ async function ensureEnvLoaded(): Promise<void> {
 // Minimal logger for startup errors (no chalk dependency)
 const startupLogger = {
   error: (msg: string, err?: unknown) => {
-    console.error(msg, err instanceof Error ? err.message : err);
+    cli.error(msg, err instanceof Error ? err.message : err);
   },
-  warn: (msg: string) => console.warn(msg),
+  warn: (msg: string) => cli.warn(msg),
 };
 
 // ============================================================================
@@ -375,22 +402,21 @@ async function saveCommandLineSettings(
       credManager.setApiKey(apiKey);
       const status = credManager.getSecurityStatus();
       if (status.encryptionEnabled) {
-        console.log("✅ API key saved securely (encrypted) to ~/.codebuddy/credentials.enc");
+        cli.info("✅ API key saved securely (encrypted) to ~/.codebuddy/credentials.enc");
       } else {
-        console.log("✅ API key saved to ~/.codebuddy/credentials.enc");
-        console.error("⚠️ Consider enabling encryption for better security");
+        cli.info("✅ API key saved to ~/.codebuddy/credentials.enc");
+        cli.error("⚠️ Consider enabling encryption for better security");
       }
     }
 
     // Save base URL to settings (not sensitive)
     if (baseURL) {
       settingsManager.updateUserSetting("baseURL", baseURL);
-      console.log("✅ Base URL saved to ~/.codebuddy/user-settings.json");
+      cli.info("✅ Base URL saved to ~/.codebuddy/user-settings.json");
     }
   } catch (error) {
-    console.warn(
-      "⚠️ Could not save settings to file:",
-      error instanceof Error ? error.message : "Unknown error"
+    cli.warn(
+      `⚠️ Could not save settings to file: ${error instanceof Error ? error.message : "Unknown error"}`,
     );
   }
 }
@@ -435,8 +461,8 @@ async function handleCommitAndPushHeadless(
     const confirmationService = ConfirmationService.getInstance();
     confirmationService.setSessionFlag("allOperations", true);
 
-    console.log("🤖 Processing commit and push...\n");
-    console.log("> /commit-and-push\n");
+    cli.info("🤖 Processing commit and push...\n");
+    cli.info("> /commit-and-push\n");
 
     // First check if there are any changes at all
     const initialStatusResult = await agent.executeBashCommand(
@@ -444,23 +470,23 @@ async function handleCommitAndPushHeadless(
     );
 
     if (!initialStatusResult.success || !initialStatusResult.output?.trim()) {
-      console.log("❌ No changes to commit. Working directory is clean.");
+      cli.info("❌ No changes to commit. Working directory is clean.");
       process.exit(1);
     }
 
-    console.log("✅ git status: Changes detected");
+    cli.info("✅ git status: Changes detected");
 
     // Add all changes
     const addResult = await agent.executeBashCommand("git add .");
 
     if (!addResult.success) {
-      console.log(
+      cli.info(
         `❌ git add: ${addResult.error || "Failed to stage changes"}`
       );
       process.exit(1);
     }
 
-    console.log("✅ git add: Changes staged");
+    cli.info("✅ git add: Changes staged");
 
     // Get staged changes for commit message generation
     const diffResult = await agent.executeBashCommand("git diff --cached");
@@ -477,7 +503,7 @@ ${diffResult.output || "No staged changes shown"}
 Follow conventional commit format (feat:, fix:, docs:, etc.) and keep it under 72 characters.
 Respond with ONLY the commit message, no additional text.`;
 
-    console.log("🤖 Generating commit message...");
+    cli.info("🤖 Generating commit message...");
 
     const commitMessageEntries = await agent.processUserMessage(commitPrompt);
     let commitMessage = "";
@@ -491,20 +517,20 @@ Respond with ONLY the commit message, no additional text.`;
     }
 
     if (!commitMessage) {
-      console.log("❌ Failed to generate commit message");
+      cli.info("❌ Failed to generate commit message");
       process.exit(1);
     }
 
     // Clean the commit message
     const cleanCommitMessage = commitMessage.replace(/^["']|["']$/g, "");
-    console.log(`✅ Generated commit message: "${cleanCommitMessage}"`);
+    cli.info(`✅ Generated commit message: "${cleanCommitMessage}"`);
 
     // Execute the commit
     const commitCommand = `git commit -m "${cleanCommitMessage}"`;
     const commitResult = await agent.executeBashCommand(commitCommand);
 
     if (commitResult.success) {
-      console.log(
+      cli.info(
         `✅ git commit: ${
           commitResult.output?.split("\n")[0] || "Commit successful"
         }`
@@ -518,22 +544,22 @@ Respond with ONLY the commit message, no additional text.`;
         !pushResult.success &&
         pushResult.error?.includes("no upstream branch")
       ) {
-        console.log("🔄 Setting upstream and pushing...");
+        cli.info("🔄 Setting upstream and pushing...");
         pushResult = await agent.executeBashCommand("git push -u origin HEAD");
       }
 
       if (pushResult.success) {
-        console.log(
+        cli.info(
           `✅ git push: ${
             pushResult.output?.split("\n")[0] || "Push successful"
           }`
         );
       } else {
-        console.log(`❌ git push: ${pushResult.error || "Push failed"}`);
+        cli.info(`❌ git push: ${pushResult.error || "Push failed"}`);
         process.exit(1);
       }
     } else {
-      console.log(`❌ git commit: ${commitResult.error || "Commit failed"}`);
+      cli.info(`❌ git commit: ${commitResult.error || "Commit failed"}`);
       process.exit(1);
     }
   } catch (error: unknown) {
@@ -789,9 +815,9 @@ async function processPromptHeadless(
         const { validateOutputSchema } = await import("./utils/output-schema-validator.js");
         const validation = validateOutputSchema(messages, outputSchemaPath);
         if (!validation.valid) {
-          console.error('Output schema validation failed:');
+          cli.error('Output schema validation failed:');
           for (const error of validation.errors) {
-            console.error(`  - ${error}`);
+            cli.error(`  - ${error}`);
           }
           await finalizeHeadlessRun(2);
           return;
@@ -812,9 +838,10 @@ async function processPromptHeadless(
     // Output in the requested format
     const format = outputFormat.toLowerCase();
     if (format === 'text' || format === 'markdown') {
-      // Text/markdown: only output the final assistant response
+      // Text/markdown: only output the final assistant response.
+      // MUST go to stdout so users can pipe it: `buddy "question" | jq`.
       if (resultText) {
-        console.log(resultText);
+        cli.stdout(resultText);
       }
     } else if (format === 'stream-json' || format === 'streaming') {
       // Stream JSON: each message on its own line (NDJSON)
@@ -829,8 +856,8 @@ async function processPromptHeadless(
         model: usedModel,
       }) + '\n');
     } else {
-      // Default: json — structured output with result, cost, and model
-      console.log(JSON.stringify({
+      // Default: json — structured output goes to stdout (pipeable).
+      cli.stdout(JSON.stringify({
         result: resultText,
         cost: {
           total: sessionCost,
@@ -844,9 +871,10 @@ async function processPromptHeadless(
     const errorMessage = error instanceof Error ? error.message : String(error);
     const format = outputFormat.toLowerCase();
     if (format === 'text' || format === 'markdown') {
-      console.error(`Error: ${errorMessage}`);
+      cli.error(`Error: ${errorMessage}`);
     } else {
-      console.log(
+      // JSON error envelope also goes to stdout so piping stays consistent.
+      cli.stdout(
         JSON.stringify({
           error: errorMessage,
           result: null,
@@ -1118,7 +1146,7 @@ program
     if (options.init) {
       const { initCodeBuddyProject, formatInitResult } = await lazyImport.initProject();
       const result = await initCodeBuddyProject();
-      console.log(formatInitResult(result));
+      cli.info(formatInitResult(result));
       process.exit(result.success ? 0 : 1);
     }
 
@@ -1132,14 +1160,15 @@ program
         }
         const data = await response.json() as { data?: Array<{ id: string; owned_by?: string }> };
 
-        console.log("📋 Available models:\n");
+        // Pipeable listing: stdout so `buddy --list-models | grep ...` works.
+        cli.stdout("📋 Available models:\n");
         if (data.data && data.data.length > 0) {
           data.data.forEach((model: { id: string; owned_by?: string }) => {
-            console.log(`  • ${model.id}`);
+            cli.stdout(`  • ${model.id}`);
           });
-          console.log(`\n  Total: ${data.data.length} model(s)`);
+          cli.stdout(`\n  Total: ${data.data.length} model(s)`);
         } else {
-          console.log("  (no models found)");
+          cli.stdout("  (no models found)");
         }
         process.exit(0);
       } catch (error) {
@@ -1156,22 +1185,23 @@ program
       const promptManager = getPromptManager();
       const prompts = await promptManager.listPrompts();
 
-      console.log("📋 Available system prompts:\n");
-      console.log("  Built-in:");
+      // Pipeable listing (see --list-models).
+      cli.stdout("📋 Available system prompts:\n");
+      cli.stdout("  Built-in:");
       prompts.filter(p => p.source === 'builtin').forEach(p => {
-        console.log(`    • ${p.id}`);
+        cli.stdout(`    • ${p.id}`);
       });
 
       const userPrompts = prompts.filter(p => p.source === 'user');
       if (userPrompts.length > 0) {
-        console.log("\n  User (~/.codebuddy/prompts/):");
+        cli.stdout("\n  User (~/.codebuddy/prompts/):");
         userPrompts.forEach(p => {
-          console.log(`    • ${p.id}`);
+          cli.stdout(`    • ${p.id}`);
         });
       }
 
-      console.log("\n💡 Usage: codebuddy --system-prompt <id>");
-      console.log("   Create custom prompts in ~/.codebuddy/prompts/<name>.md");
+      cli.stdout("\n💡 Usage: codebuddy --system-prompt <id>");
+      cli.stdout("   Create custom prompts in ~/.codebuddy/prompts/<name>.md");
       process.exit(0);
     }
 
@@ -1181,24 +1211,25 @@ program
       const loader = getCustomAgentLoader();
       const agents = loader.listAgents();
 
-      console.log("📋 Available custom agents:\n");
+      // Pipeable listing (see --list-models).
+      cli.stdout("📋 Available custom agents:\n");
 
       if (agents.length === 0) {
-        console.log("  (no custom agents found)");
-        console.log("\n💡 Create agents in ~/.codebuddy/agents/");
-        console.log("   Example: ~/.codebuddy/agents/_example.toml");
+        cli.stdout("  (no custom agents found)");
+        cli.stdout("\n💡 Create agents in ~/.codebuddy/agents/");
+        cli.stdout("   Example: ~/.codebuddy/agents/_example.toml");
       } else {
         agents.forEach(agent => {
           const tags = agent.tags?.length ? ` [${agent.tags.join(', ')}]` : '';
-          console.log(`  • ${agent.id}: ${agent.name}${tags}`);
+          cli.stdout(`  • ${agent.id}: ${agent.name}${tags}`);
           if (agent.description) {
-            console.log(`      ${agent.description}`);
+            cli.stdout(`      ${agent.description}`);
           }
         });
-        console.log(`\n  Total: ${agents.length} agent(s)`);
+        cli.stdout(`\n  Total: ${agents.length} agent(s)`);
       }
 
-      console.log("\n💡 Usage: codebuddy --agent <id>");
+      cli.info("\n💡 Usage: codebuddy --agent <id>");
       process.exit(0);
     }
 
@@ -1214,8 +1245,8 @@ program
       }
 
       await sessionStore.resumeSession(lastSession.id);
-      console.log(`📂 Resuming session: ${lastSession.name} (${lastSession.id.slice(0, 8)})`);
-      console.log(`   ${lastSession.messages.length} messages, last accessed: ${lastSession.lastAccessedAt.toLocaleString()}\n`);
+      cli.info(`📂 Resuming session: ${lastSession.name} (${lastSession.id.slice(0, 8)})`);
+      cli.info(`   ${lastSession.messages.length} messages, last accessed: ${lastSession.lastAccessedAt.toLocaleString()}\n`);
     }
 
     // Handle --resume flag (resume specific session by ID, like mistral-vibe)
@@ -1226,17 +1257,17 @@ program
 
       if (!session) {
         logger.error(`❌ Session not found: ${options.resume}`);
-        console.log("\n📋 Recent sessions:");
+        cli.info("\n📋 Recent sessions:");
         const recent = await sessionStore.getRecentSessions(5);
         recent.forEach(s => {
-          console.log(`   ${s.id.slice(0, 8)} - ${s.name} (${s.messages.length} messages)`);
+          cli.info(`   ${s.id.slice(0, 8)} - ${s.name} (${s.messages.length} messages)`);
         });
         process.exit(1);
       }
 
       await sessionStore.resumeSession(session.id);
-      console.log(`📂 Resuming session: ${session.name} (${session.id.slice(0, 8)})`);
-      console.log(`   ${session.messages.length} messages, last accessed: ${session.lastAccessedAt.toLocaleString()}\n`);
+      cli.info(`📂 Resuming session: ${session.name} (${session.id.slice(0, 8)})`);
+      cli.info(`   ${session.messages.length} messages, last accessed: ${session.lastAccessedAt.toLocaleString()}\n`);
     }
 
     // Load environment before changing cwd so root .env values (API keys) remain available
@@ -1264,7 +1295,7 @@ program
     });
 
     if (options.allowOutside) {
-      console.error("Warning: Workspace isolation DISABLED - file access is unrestricted");
+      cli.error("Warning: Workspace isolation DISABLED - file access is unrestricted");
     }
 
     // Initialize observability (Sentry/OpenTelemetry)
@@ -1297,7 +1328,7 @@ program
       // Enable force-tools mode for local models
       if (options.forceTools) {
         process.env.GROK_FORCE_TOOLS = 'true';
-        console.error("🔧 Force tools: ENABLED (function calling for local models)");
+        cli.error("🔧 Force tools: ENABLED (function calling for local models)");
       }
 
       // Handle auto-approve mode (like mistral-vibe)
@@ -1305,7 +1336,7 @@ program
         const { ConfirmationService } = await import("./utils/confirmation-service.js");
         const confirmationService = ConfirmationService.getInstance();
         confirmationService.setSessionFlag("allOperations", true);
-        console.error("✅ Auto-approve: ENABLED (all tool executions will be approved)");
+        cli.error("✅ Auto-approve: ENABLED (all tool executions will be approved)");
       }
 
       // CC18: Handle --permission-mode
@@ -1316,10 +1347,10 @@ program
         if (validModes.includes(options.permissionMode as typeof validModes[number])) {
           const success = mgr.setMode(options.permissionMode as typeof validModes[number]);
           if (success) {
-            console.error(`Permission mode: ${options.permissionMode}`);
+            cli.error(`Permission mode: ${options.permissionMode}`);
           }
         } else {
-          console.error(`Invalid permission mode: ${options.permissionMode}. Valid: ${validModes.join(', ')}`);
+          cli.error(`Invalid permission mode: ${options.permissionMode}. Valid: ${validModes.join(', ')}`);
         }
       }
 
@@ -1331,8 +1362,8 @@ program
         confirmationService.setSessionFlag("fileOperations", true);
         confirmationService.setSessionFlag("bashCommands", true);
         process.env.GROK_SKIP_PERMISSIONS = 'true';
-        console.error("⚠️  DANGEROUS: All permission checks BYPASSED");
-        console.error("   Only use this in trusted containers without network access!");
+        cli.error("⚠️  DANGEROUS: All permission checks BYPASSED");
+        cli.error("   Only use this in trusted containers without network access!");
       }
 
       // Handle --add-dir: grant additional writable directories to sandbox
@@ -1346,7 +1377,7 @@ program
         } catch (_err) {
           // Sandbox manager may not be initialized; dirs already passed to workspace isolation
         }
-        console.error(`Writable directories added: ${options.addDir.join(', ')}`);
+        cli.error(`Writable directories added: ${options.addDir.join(', ')}`);
       }
 
       // Handle --ephemeral: skip session persistence
@@ -1354,7 +1385,7 @@ program
         const { getSessionStore } = await import("./persistence/session-store.js");
         const sessionStore = getSessionStore();
         sessionStore.setEphemeral(true);
-        console.error("Ephemeral mode: ENABLED (session will not be saved)");
+        cli.error("Ephemeral mode: ENABLED (session will not be saved)");
       }
 
       // Handle --allowed-tools / --disallowed-tools (like Claude Code --allowedTools / --disallowedTools)
@@ -1367,17 +1398,17 @@ program
         });
         setToolFilter(newFilter);
         if (options.allowedTools) {
-          console.error(`Allowed tools: ${options.allowedTools}`);
+          cli.error(`Allowed tools: ${options.allowedTools}`);
         }
         if (options.disallowedTools) {
-          console.error(`Disallowed tools: ${options.disallowedTools}`);
+          cli.error(`Disallowed tools: ${options.disallowedTools}`);
         }
       }
 
       // Handle --mcp-debug
       if (options.mcpDebug) {
         process.env.MCP_DEBUG = 'true';
-        console.error("🔍 MCP debug: ENABLED");
+        cli.error("🔍 MCP debug: ENABLED");
       }
 
       // Set max-price for cost limit (like mistral-vibe)
@@ -1397,7 +1428,7 @@ program
 
         const allTools = await getAllCodeBuddyTools();
         const result = filterTools(allTools, filter);
-        console.error(formatFilterResult(result));
+        cli.error(formatFilterResult(result));
       }
 
       // Handle --yolo flag (equivalent to /yolo on, skip confirmation in non-interactive)
@@ -1410,13 +1441,13 @@ program
           maxAutoCommands: 100,
         });
         process.env.YOLO_MODE = 'true';
-        console.error("YOLO mode: ENABLED (full autonomy, $100 cost cap)");
+        cli.error("YOLO mode: ENABLED (full autonomy, $100 cost cap)");
       }
 
       // Handle vim mode
       if (options.vim) {
         process.env.GROK_VIM_MODE = 'true';
-        console.error("Vim mode: ENABLED");
+        cli.error("Vim mode: ENABLED");
       }
 
       // Merge --print alias into --prompt
@@ -1483,14 +1514,14 @@ program
           logger.error(`❌ Agent not found: ${options.agent}`);
           const agents = loader.listAgents();
           if (agents.length > 0) {
-            console.log("\n📋 Available agents:");
-            agents.forEach(a => console.log(`   • ${a.id}`));
+            cli.info("\n📋 Available agents:");
+            agents.forEach(a => cli.info(`   • ${a.id}`));
           }
           process.exit(1);
         }
 
         customAgentConfig = agentConfig;
-        console.log(`🤖 Using agent: ${agentConfig.name}`);
+        cli.info(`🤖 Using agent: ${agentConfig.name}`);
 
         // Override model if specified in agent config
         if (agentConfig.model) {
@@ -1514,10 +1545,10 @@ program
 
       // Probe for tool support if requested
       if (options.probeTools) {
-        console.log("🔍 Probing model for tool support...");
+        cli.info("🔍 Probing model for tool support...");
         const hasToolSupport = await agent.probeToolSupport();
         if (!hasToolSupport) {
-          console.log("ℹ️ Tool support: NOT DETECTED (switching to chat-only mode)");
+          cli.info("ℹ️ Tool support: NOT DETECTED (switching to chat-only mode)");
           agent.switchToChatOnlyMode();
         }
       }
@@ -1529,9 +1560,9 @@ program
           const { getSecurityModeManager } = await lazyImport.securityModes();
           const securityManager = getSecurityModeManager();
           securityManager.setMode(options.securityMode);
-          console.log(`🛡️ Security mode: ${options.securityMode.toUpperCase()}`);
+          cli.info(`🛡️ Security mode: ${options.securityMode.toUpperCase()}`);
         } else {
-          console.warn(`⚠️ Invalid security mode: ${options.securityMode}. Using default (suggest).`);
+          cli.warn(`⚠️ Invalid security mode: ${options.securityMode}. Using default (suggest).`);
         }
       }
 
@@ -1540,7 +1571,7 @@ program
         const { ConfirmationService } = await import("./utils/confirmation-service.js");
         const confirmationService = ConfirmationService.getInstance();
         confirmationService.setDryRunMode(true);
-        console.log("🔍 Dry-run mode: ENABLED (changes will be previewed, not applied)");
+        cli.info("🔍 Dry-run mode: ENABLED (changes will be previewed, not applied)");
       }
 
       // Load context files if specified and inject into agent
@@ -1554,7 +1585,7 @@ program
         });
         const files = await contextLoader.loadFiles();
         if (files.length > 0) {
-          console.log(contextLoader.getSummary(files));
+          cli.info(contextLoader.getSummary(files));
           // Inject context into agent's message history as a system message
           const contextContent = contextLoader.formatForPrompt(files);
           agent.addSystemContext(contextContent);
@@ -1564,7 +1595,7 @@ program
       // Configure caching and performance
       recordStartupPhase('perf-init-start');
       if (options.cache === false) {
-        console.log("📦 Response cache: DISABLED");
+        cli.info("📦 Response cache: DISABLED");
         // Disable performance caching when cache is disabled
         const { getPerformanceManager } = await lazyImport.performance();
         getPerformanceManager({ enabled: false });
@@ -1578,10 +1609,10 @@ program
       // Configure self-healing
       if (options.selfHeal === false) {
         agent.setSelfHealing(false);
-        console.log("🔧 Self-healing: DISABLED");
+        cli.info("🔧 Self-healing: DISABLED");
       }
 
-      console.log("🤖 Starting Code Buddy Conversational Assistant...\n");
+      cli.info("🤖 Starting Code Buddy Conversational Assistant...\n");
 
       recordStartupPhase('user-settings-start');
       await ensureUserSettingsDirectory();
@@ -1595,13 +1626,13 @@ program
           if (recovery) {
             const age = Date.now() - new Date(recovery.timestamp).getTime();
             const mins = Math.round(age / 60000);
-            console.log('== Previous Session Crash Detected ==');
-            console.log(`   Time: ${new Date(recovery.timestamp).toLocaleString()} (${mins} min ago)`);
+            cli.info('== Previous Session Crash Detected ==');
+            cli.info(`   Time: ${new Date(recovery.timestamp).toLocaleString()} (${mins} min ago)`);
             if (recovery.crashReason) {
-              console.log(`   Reason: ${recovery.crashReason}`);
+              cli.info(`   Reason: ${recovery.crashReason}`);
             }
             if (recovery.sessionId && recovery.sessionId !== 'unknown') {
-              console.log(`   Session: ${recovery.sessionId}`);
+              cli.info(`   Session: ${recovery.sessionId}`);
               // Attempt to auto-resume the crashed session
               try {
                 const { getSessionStore } = await import('./persistence/session-store.js');
@@ -1609,22 +1640,22 @@ program
                 const session = await sessionStore.getSessionByPartialId(recovery.sessionId);
                 if (session) {
                   await sessionStore.resumeSession(session.id);
-                  console.log(`   Resuming session: ${session.name} (${session.messages.length} messages)`);
+                  cli.info(`   Resuming session: ${session.name} (${session.messages.length} messages)`);
                 } else {
-                  console.log('   Session no longer available — starting fresh.');
+                  cli.info('   Session no longer available — starting fresh.');
                 }
               } catch (err) {
                 logger.debug('Failed to resume crashed session', { error: String(err) });
-                console.log('   Could not resume session — starting fresh.');
+                cli.info('   Could not resume session — starting fresh.');
               }
             }
             if (recovery.lastUserMessage) {
               const preview = recovery.lastUserMessage.length > 80
                 ? recovery.lastUserMessage.substring(0, 80) + '...'
                 : recovery.lastUserMessage;
-              console.log(`   Last message: "${preview}"`);
+              cli.info(`   Last message: "${preview}"`);
             }
-            console.log('');
+            cli.info('');
             // Clear the recovery marker so we don't show this again
             await clearRecoveryFiles();
           }
@@ -1979,8 +2010,9 @@ program
     if (options.list) {
       const { CodeBuddyMCPServer } = await import("./mcp/mcp-server.js");
       const tools = CodeBuddyMCPServer.getToolDefinitions();
+      // Pipeable listing.
       for (const tool of tools) {
-        console.log(`${tool.name}: ${tool.description}`);
+        cli.stdout(`${tool.name}: ${tool.description}`);
       }
       return;
     }
@@ -2247,7 +2279,8 @@ program
     if (opts.output) flags.push('--output', opts.output as string);
     const fullArgs = [subcommand || 'list', ...(args || []), ...flags].join(' ');
     const result = await handleBackup(fullArgs);
-    if (result.response) console.log(result.response);
+    // Backup command output is pipeable (scripts often capture it).
+    if (result.response) cli.stdout(result.response);
   });
 
 // Cloud — background agent tasks (Cursor/Codex parity)
@@ -2258,7 +2291,8 @@ program
     const { handleCloud } = await import('./commands/handlers/cloud-handlers.js');
     const fullArgs = [subcommand || 'list', ...(args || [])];
     const result = await handleCloud(fullArgs);
-    if (result.entry?.content) console.log(result.entry.content);
+    // Cloud command output is pipeable (scripts often capture task IDs).
+    if (result.entry?.content) cli.stdout(result.entry.content);
   });
 
 // Completions — generate or install shell completion scripts

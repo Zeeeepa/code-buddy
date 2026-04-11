@@ -84,19 +84,27 @@ async function handleGenerate(noDiagrams: boolean, noMetrics: boolean): Promise<
       }
     }
 
-    const { generateDocs } = await import('../../docs/docs-generator.js');
-    const result = await generateDocs(graph, {
-      includeDiagrams: !noDiagrams,
-      includeMetrics: !noMetrics,
-    });
+    // Migrated from the deprecated V1 docs-generator.ts (deleted) to the V2
+    // docs-pipeline.ts implementation (DISCOVER → PLAN → GENERATE → LINK).
+    // The V2 API returns `pagesGenerated` instead of V1's `entityCount`;
+    // the rest of the output format is equivalent.
+    const { runDocsPipeline } = await import('../../docs/docs-pipeline.js');
+    const result = await runDocsPipeline(graph);
 
     const output = [
       `Documentation generated in ${result.durationMs}ms:`,
       `  Files: ${result.files.join(', ')}`,
-      `  Entities documented: ${result.entityCount}`,
+      `  Pages generated: ${result.pagesGenerated}`,
+      `  Concepts linked: ${result.conceptsLinked}`,
       `  Output: .codebuddy/docs/`,
       result.errors.length > 0 ? `  Errors: ${result.errors.join('; ')}` : '',
     ].filter(Boolean).join('\n');
+
+    // Keep a hint about the unused flags so users upgrading to V2 know they
+    // are now handled via config (loadDocsConfig) rather than per-call flags.
+    if (noDiagrams || noMetrics) {
+      logger.debug('docs-command: --no-diagrams / --no-metrics ignored under V2 pipeline (set via .codebuddy/docs.config.json).');
+    }
 
     return { output, success: true };
   } catch (err) {

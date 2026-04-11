@@ -137,8 +137,18 @@ export class ContextManagerV2 {
   private totalTokensSaved: number = 0;
   /** Cached token count for getStats() */
   private _cachedStatsTokenCount = 0;
-  /** Message count at time of last cache */
-  private _cachedStatsMessageCount = -1;
+  /**
+   * Content-aware cache key for getStats().
+   *
+   * Previously this was `messages.length` alone, which produced stale hits
+   * when messages were mutated in place (common: tool results populated,
+   * assistant content sanitized, tool_calls appended). Now we compute a
+   * cheap O(N) fingerprint over the array: length + sum of content char
+   * counts + total tool_calls count. Any mutation of content or tool_calls
+   * invalidates the cache. The scan is microseconds vs ~20–50 ms for a
+   * full tiktoken recount.
+   */
+  private _cachedStatsFingerprint = '';
   /** Last compression timestamp */
   private lastCompressionTime: Date | null = null;
 
@@ -237,16 +247,38 @@ export class ContextManagerV2 {
   }
 
   /**
+   * Compute a cheap fingerprint of the messages array for cache invalidation.
+   * Covers additions, in-place content mutation, and tool_call changes.
+   */
+  private computeStatsFingerprint(messages: CodeBuddyMessage[]): string {
+    let contentLen = 0;
+    let toolCallsCount = 0;
+    for (const msg of messages) {
+      if (typeof msg.content === 'string') {
+        contentLen += msg.content.length;
+      } else if (Array.isArray(msg.content)) {
+        // Multimodal content: count JSON length as a rough signal
+        contentLen += JSON.stringify(msg.content).length;
+      }
+      if ('tool_calls' in msg && Array.isArray(msg.tool_calls)) {
+        toolCallsCount += msg.tool_calls.length;
+      }
+    }
+    return `${messages.length}:${contentLen}:${toolCallsCount}`;
+  }
+
+  /**
    * Get context statistics
    */
   getStats(messages: CodeBuddyMessage[]): ContextStats {
     let totalTokens: number;
-    if (messages.length === this._cachedStatsMessageCount) {
+    const fingerprint = this.computeStatsFingerprint(messages);
+    if (fingerprint === this._cachedStatsFingerprint) {
       totalTokens = this._cachedStatsTokenCount;
     } else {
       totalTokens = this.countTokens(messages);
       this._cachedStatsTokenCount = totalTokens;
-      this._cachedStatsMessageCount = messages.length;
+      this._cachedStatsFingerprint = fingerprint;
     }
     const maxTokens = this.effectiveLimit;
     const usagePercent = (totalTokens / maxTokens) * 100;

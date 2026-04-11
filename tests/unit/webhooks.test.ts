@@ -3,12 +3,12 @@
  * Tests webhook registration, event delivery, retry logic, signature verification, and persistence
  */
 
-import * as https from 'https';
-import * as http from 'http';
-import * as crypto from 'crypto';
+import * as https from 'node:https';
+import * as http from 'node:http';
+import * as crypto from 'node:crypto';
 import * as fs from 'fs-extra';
-import * as path from 'path';
-import * as os from 'os';
+import * as path from 'node:path';
+import * as os from 'node:os';
 import {
   WebhookManager,
   WebhookConfig,
@@ -30,20 +30,28 @@ jest.mock('fs-extra', () => {
   return { ...impl, default: impl };
 });
 
-// Mock https and http modules
-jest.mock('https', () => {
-  const actualHttps = await vi.importActual('https');
+// Mock https and http modules.
+//
+// NOTE: the factory MUST be async when using `await vi.importActual()`.
+// The previous form used `jest.mock('https', () => { const x = await ... })`
+// with `await` inside a non-async arrow function, which is a SyntaxError —
+// Vitest 4 surfaced this as `Failed to resolve entry for package "https"`
+// and silently disabled the entire file.
+vi.mock('node:https', async () => {
+  const actualHttps = await vi.importActual<typeof import('node:https')>('node:https');
   return {
     ...actualHttps,
-    request: jest.fn(),
+    request: vi.fn(),
+    default: { ...actualHttps, request: vi.fn() },
   };
 });
 
-jest.mock('http', () => {
-  const actualHttp = await vi.importActual('http');
+vi.mock('node:http', async () => {
+  const actualHttp = await vi.importActual<typeof import('node:http')>('node:http');
   return {
     ...actualHttp,
-    request: jest.fn(),
+    request: vi.fn(),
+    default: { ...actualHttp, request: vi.fn() },
   };
 });
 

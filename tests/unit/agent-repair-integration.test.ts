@@ -67,6 +67,9 @@ jest.mock('../../src/codebuddy/tools.js', () => ({
 jest.mock('../../src/utils/token-counter.js', () => ({
   createTokenCounter: jest.fn().mockReturnValue({
     countTokens: jest.fn().mockReturnValue(100),
+    countMessageTokens: jest.fn().mockReturnValue(50),
+    // estimateStreamingTokens needed after F7 TokenCounter consolidation.
+    estimateStreamingTokens: jest.fn().mockReturnValue(10),
     dispose: jest.fn(),
   }),
 }));
