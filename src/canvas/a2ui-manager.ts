@@ -44,6 +44,17 @@ export interface A2UIManagerEvents {
 // A2UI Manager
 // ============================================================================
 
+/**
+ * Maximum number of concurrent A2UI surfaces kept in memory.
+ * Surfaces are created lazily by `beginRendering` / `surfaceUpdate` /
+ * `dataModelUpdate` messages. Without a cap, a workflow that opens many
+ * canvases without explicitly sending `deleteSurface` (e.g. a browser
+ * tab closed on the client side before the server flushes) would grow
+ * the Map indefinitely. The cap below plus FIFO eviction on overflow
+ * bounds worst-case memory without affecting normal use.
+ */
+const MAX_SURFACES = 1000;
+
 export class A2UIManager extends EventEmitter {
   private surfaces: Map<string, Surface> = new Map();
   private dataObservers: Map<string, Map<string, Array<(value: unknown) => void>>> = new Map();
@@ -183,9 +194,20 @@ export class A2UIManager extends EventEmitter {
   // ==========================================================================
 
   /**
-   * Create a new surface
+   * Create a new surface.
+   *
+   * If the Map has reached `MAX_SURFACES`, FIFO-evict the oldest entry
+   * and also purge its associated data observers so we don't leak those
+   * either. This mirrors the pattern used by RestorableCompressor.
    */
   private createSurface(id: string): Surface {
+    if (this.surfaces.size >= MAX_SURFACES) {
+      const oldestKey = this.surfaces.keys().next().value;
+      if (oldestKey !== undefined) {
+        this.surfaces.delete(oldestKey);
+        this.dataObservers.delete(oldestKey);
+      }
+    }
     const surface: Surface = {
       id,
       components: new Map(),

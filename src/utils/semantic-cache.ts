@@ -12,7 +12,7 @@
 
 import { EventEmitter } from 'events';
 import * as fs from 'fs/promises';
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync } from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 
@@ -151,7 +151,15 @@ export class SemanticCache<T = unknown> extends EventEmitter {
       this.initializeLSH();
     }
 
-    this.loadFromDisk();
+    // Load synchronously so the public sync API (set/lookup) cannot race
+    // the disk load. The previous implementation kicked off an async IIFE
+    // from the constructor, which meant a caller that did
+    // `new SemanticCache()` and immediately called `set()` would race the
+    // background load: the set landed in an empty Map, then the load
+    // overwrote it with the disk snapshot, silently dropping the write.
+    // Synchronous I/O at construction is acceptable — the cache file is
+    // small (<5 MB in practice) and this is a single call at startup.
+    this.loadFromDiskSync();
   }
 
   /**
@@ -636,32 +644,33 @@ export class SemanticCache<T = unknown> extends EventEmitter {
   }
 
   /**
-   * Load cache from disk
+   * Load cache from disk synchronously (called from the constructor).
+   *
+   * Must be sync so the public set/lookup API cannot race the load —
+   * see the constructor comment for the full rationale.
    */
-  private loadFromDisk(): void {
+  private loadFromDiskSync(): void {
     if (!this.config.persistToDisk) return;
+    if (!existsSync(this.config.cachePath)) return;
 
-    // Use async loading
-    (async () => {
-      try {
-        const content = await fs.readFile(this.config.cachePath, 'utf-8');
-        const data = JSON.parse(content);
+    try {
+      const content = readFileSync(this.config.cachePath, 'utf-8');
+      const data = JSON.parse(content);
 
-        if (Array.isArray(data.entries)) {
-          const now = Date.now();
-          for (const entry of data.entries) {
-            // Skip expired entries
-            if (entry.expiresAt > now) {
-              this.cache.set(entry.key, entry);
-            }
+      if (Array.isArray(data.entries)) {
+        const now = Date.now();
+        for (const entry of data.entries) {
+          // Skip expired entries
+          if (entry.expiresAt > now) {
+            this.cache.set(entry.key, entry);
           }
-          this.stats.totalEntries = this.cache.size;
-          this.emit('cache:loaded', { count: this.cache.size });
         }
-      } catch {
-        // File doesn't exist or is invalid - start fresh
+        this.stats.totalEntries = this.cache.size;
+        this.emit('cache:loaded', { count: this.cache.size });
       }
-    })();
+    } catch {
+      // File doesn't exist or is invalid - start fresh
+    }
   }
 
   /**

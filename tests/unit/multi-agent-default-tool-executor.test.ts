@@ -17,6 +17,9 @@ function createMockAgent(role: AgentRole) {
   return {
     ...emitter,
     on: emitter.on.bind(emitter),
+    // off() added because MultiAgentSystem.dispose() now removes the
+    // per-agent forwarding listeners explicitly (F26 fix).
+    off: emitter.off.bind(emitter),
     emit: emitter.emit.bind(emitter),
     removeAllListeners: emitter.removeAllListeners.bind(emitter),
     getRole: vi.fn().mockReturnValue(role),

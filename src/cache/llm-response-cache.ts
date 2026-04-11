@@ -565,14 +565,22 @@ export class LLMResponseCache extends EventEmitter {
   }
 
   /**
-   * Dispose resources
+   * Dispose resources.
+   *
+   * Previously this method called `saveToDisk()` without awaiting it and
+   * then immediately called `this.cache.clear()`. Since `saveToDisk` is
+   * async, the cache-clear race was destroying the in-memory snapshot
+   * before the write could land on disk, so the LLM response cache was
+   * effectively reset on every graceful shutdown (Ctrl+C → CacheManager
+   * → LLMResponseCache.dispose). Made async and await both the timer
+   * cleanup and the save so the cache actually persists.
    */
-  dispose(): void {
+  async dispose(): Promise<void> {
     if (this.saveTimeout) {
       clearTimeout(this.saveTimeout);
       this.saveTimeout = null;
     }
-    this.saveToDisk();
+    await this.saveToDisk();
     this.cache.clear();
     this.removeAllListeners();
   }

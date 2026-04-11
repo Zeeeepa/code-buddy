@@ -61,6 +61,40 @@ const DEFAULT_CONFIG: SandboxConfig = {
 // Docker Sandbox
 // ============================================================================
 
+/**
+ * Module-level set of container names that need to be killed on process
+ * exit. This is shared across DockerSandbox instances so a single
+ * `process.on(...)` handler covers every sandbox in the runtime.
+ *
+ * Rationale (F22): the per-instance `activeContainers` Set is correctly
+ * maintained on the async close/error handlers, but if the Node process
+ * crashes, is killed with SIGKILL, or exits via an uncaught exception,
+ * those handlers never fire and Docker containers stay up, silently
+ * consuming RAM/CPU/ports until the user runs `docker rm -f` by hand.
+ */
+const globalActiveContainers: Set<string> = new Set();
+let processCleanupInstalled = false;
+
+function installProcessCleanup(): void {
+  if (processCleanupInstalled) return;
+  processCleanupInstalled = true;
+  const killAll = () => {
+    for (const name of globalActiveContainers) {
+      try {
+        spawnSync('docker', ['kill', name], { stdio: 'ignore', timeout: 3000 });
+      } catch {
+        // Best effort — the container may already be gone.
+      }
+    }
+    globalActiveContainers.clear();
+  };
+  // `exit` fires for normal termination, SIGINT/SIGTERM for Ctrl+C /
+  // supervisor kills. We use `.once` so a re-register doesn't stack.
+  process.once('exit', killAll);
+  process.once('SIGINT', killAll);
+  process.once('SIGTERM', killAll);
+}
+
 export class DockerSandbox extends EventEmitter implements SandboxBackendInterface {
   readonly name = 'docker';
   private config: SandboxConfig;
@@ -69,6 +103,9 @@ export class DockerSandbox extends EventEmitter implements SandboxBackendInterfa
   constructor(config?: Partial<SandboxConfig>) {
     super();
     this.config = { ...DEFAULT_CONFIG, ...config };
+    // Install module-level cleanup the first time any DockerSandbox is
+    // constructed so we don't pay the cost when Docker isn't used at all.
+    installProcessCleanup();
   }
 
   /**
@@ -108,6 +145,7 @@ export class DockerSandbox extends EventEmitter implements SandboxBackendInterfa
       let killed = false;
 
       this.activeContainers.add(containerName);
+      globalActiveContainers.add(containerName);
       this.emit('container:started', containerName);
 
       proc.stdout.on('data', (data: Buffer) => {
@@ -133,6 +171,7 @@ export class DockerSandbox extends EventEmitter implements SandboxBackendInterfa
       proc.on('close', (code) => {
         clearTimeout(timer);
         this.activeContainers.delete(containerName);
+        globalActiveContainers.delete(containerName);
         this.emit('container:stopped', containerName);
 
         const exitCode = code ?? 1;
@@ -162,6 +201,7 @@ export class DockerSandbox extends EventEmitter implements SandboxBackendInterfa
       proc.on('error', (err) => {
         clearTimeout(timer);
         this.activeContainers.delete(containerName);
+        globalActiveContainers.delete(containerName);
         this.emit('container:stopped', containerName);
 
         resolve({
@@ -192,6 +232,7 @@ export class DockerSandbox extends EventEmitter implements SandboxBackendInterfa
     let timedOut = false;
 
     this.activeContainers.add(containerName);
+    globalActiveContainers.add(containerName);
     this.emit('container:started', containerName);
 
     const timer = setTimeout(() => {
@@ -229,6 +270,7 @@ export class DockerSandbox extends EventEmitter implements SandboxBackendInterfa
         clearTimeout(timer);
         streamDone = true;
         this.activeContainers.delete(containerName);
+        globalActiveContainers.delete(containerName);
         this.emit('container:stopped', containerName);
         if (resolveChunk) {
           const r = resolveChunk;
@@ -242,6 +284,7 @@ export class DockerSandbox extends EventEmitter implements SandboxBackendInterfa
         clearTimeout(timer);
         streamDone = true;
         this.activeContainers.delete(containerName);
+        globalActiveContainers.delete(containerName);
         this.emit('container:stopped', containerName);
         if (resolveChunk) {
           const r = resolveChunk;
@@ -281,6 +324,7 @@ export class DockerSandbox extends EventEmitter implements SandboxBackendInterfa
     try {
       spawnSync('docker', ['kill', containerId], { stdio: 'pipe', timeout: 10000 });
       this.activeContainers.delete(containerId);
+      globalActiveContainers.delete(containerId);
       return true;
     } catch {
       return false;

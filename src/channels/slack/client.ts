@@ -171,6 +171,14 @@ export class SlackChannel extends BaseChannel {
             });
 
             this.ws.on('error', (error) => {
+              // Ensure the ping interval is cleared if the socket errors
+              // out after `open` — handleClose() may not always fire
+              // before the error surfaces, and leaking setInterval leaks
+              // a reference to `this` (preventing GC of a closed channel).
+              if (this.pingInterval) {
+                clearInterval(this.pingInterval);
+                this.pingInterval = null;
+              }
               this.emit('error', 'slack', error);
               if (!this.status.connected) {
                 reject(error);

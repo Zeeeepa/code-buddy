@@ -356,8 +356,20 @@ export class CredentialManager extends EventEmitter {
         dataToWrite = content;
       }
 
-      // Write with secure permissions (owner read/write only)
-      fs.writeFileSync(this.credentialsPath, dataToWrite, { mode: 0o600 });
+      // Atomic write: stage to a temp file then rename into place so a
+      // concurrent reader (another Code Buddy process, agent background
+      // task, etc.) never observes a half-written credentials file.
+      // Without this, the reader could hit `JSON.parse` on a truncated
+      // payload and log "credentials invalid" on a perfectly good key.
+      const tmpPath = `${this.credentialsPath}.tmp.${process.pid}`;
+      fs.writeFileSync(tmpPath, dataToWrite, { mode: 0o600 });
+      try {
+        fs.renameSync(tmpPath, this.credentialsPath);
+      } catch (renameErr) {
+        // Best-effort cleanup of the temp file before re-throwing.
+        try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+        throw renameErr;
+      }
 
       // Update cache
       this.cachedCredentials = credentials;

@@ -59,6 +59,13 @@ export interface ToTConfig {
   temperature?: number;
   verbose?: boolean;
   executeCode?: boolean;
+  /**
+   * Maximum time per individual LLM rollout call, in milliseconds.
+   * Prevents the MCTS search from hanging indefinitely on a slow or
+   * unresponsive provider. Defaults to 60 s — a generous upper bound for
+   * a single thought generation / evaluation / refinement call.
+   */
+  llmTimeoutMs?: number;
 }
 
 const DEFAULT_TOT_CONFIG: ToTConfig = {
@@ -66,6 +73,7 @@ const DEFAULT_TOT_CONFIG: ToTConfig = {
   temperature: 0.7,
   verbose: false,
   executeCode: true,
+  llmTimeoutMs: 60_000,
 };
 
 /**
@@ -95,6 +103,40 @@ export class TreeOfThoughtReasoner extends EventEmitter {
       baseURL
     );
     this.executeCommand = executeCommand;
+  }
+
+  /**
+   * Invoke the LLM with a hard timeout.
+   *
+   * MCTS rollouts fan out to dozens of `client.chat()` calls (generate /
+   * evaluate / refine thoughts). Without a per-call timeout, a single
+   * slow or stuck provider response freezes the entire reasoning search
+   * — and `/think deep` / `/think exhaustive` become uninterruptible.
+   * We wrap each call in a `Promise.race` against a timer so the
+   * generator can continue or fail gracefully after `llmTimeoutMs`.
+   *
+   * Throws a `reasoning:llm-timeout` error whose message the caller's
+   * try/catch handles (all four reasoning methods already have a
+   * try/catch with a sensible fallback).
+   */
+  private chatWithTimeout(
+    messages: CodeBuddyMessage[],
+    tools: Parameters<CodeBuddyClient['chat']>[1],
+    opts?: Parameters<CodeBuddyClient['chat']>[2],
+  ): Promise<Awaited<ReturnType<CodeBuddyClient['chat']>>> {
+    const timeoutMs = this.config.llmTimeoutMs ?? 60_000;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        reject(new Error(`reasoning:llm-timeout after ${timeoutMs}ms`));
+      }, timeoutMs);
+    });
+    return Promise.race([
+      this.client.chat(messages, tools, opts),
+      timeoutPromise,
+    ]).finally(() => {
+      if (timer) clearTimeout(timer);
+    });
   }
 
   /**
@@ -239,7 +281,7 @@ Think through this step by step:`;
       { role: "user", content: userPrompt },
     ];
 
-    const response = await this.client.chat(messages, []);
+    const response = await this.chatWithTimeout(messages, []);
     const content = response.choices[0]?.message?.content || "";
 
     return this.parseCoTResponse(content);
@@ -282,7 +324,7 @@ Approach 2:
     ];
 
     try {
-      const response = await this.client.chat(messages, [], {
+      const response = await this.chatWithTimeout(messages, [], {
         temperature: this.config.temperature,
       });
 
@@ -327,7 +369,7 @@ Rate this thought (0-1):`;
     ];
 
     try {
-      const response = await this.client.chat(messages, [], {
+      const response = await this.chatWithTimeout(messages, [], {
         temperature: 0.1,
       });
 
@@ -410,7 +452,7 @@ Provide an improved version of this thought that addresses the feedback:`;
     ];
 
     try {
-      const response = await this.client.chat(messages, []);
+      const response = await this.chatWithTimeout(messages, []);
       return response.choices[0]?.message?.content || node.content;
     } catch (error) {
       logger.warn('LLM call failed during thought refinement', { error: getErrorMessage(error) });

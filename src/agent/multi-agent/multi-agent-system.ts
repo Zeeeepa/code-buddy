@@ -65,6 +65,14 @@ export class MultiAgentSystem extends EventEmitter {
   private toolExecutor: ToolExecutor;
   private defaultRegistryInitialized = false;
 
+  /**
+   * Handler references captured when forwarding agent events, so dispose
+   * can call `.off()` and avoid leaking listeners (F26). Keyed by role,
+   * then by event name. Each entry points to the exact function passed
+   * to `.on()` so the removal is idempotent.
+   */
+  private agentListeners: Map<AgentRole, Map<string, (...args: unknown[]) => void>> = new Map();
+
   constructor(
     apiKey: string,
     baseURL?: string,
@@ -100,16 +108,40 @@ export class MultiAgentSystem extends EventEmitter {
   }
 
   /**
-   * Set up event forwarding from all agents
+   * Set up event forwarding from all agents.
+   *
+   * Each handler is captured in `this.agentListeners` so `dispose()` can
+   * remove them one-by-one. Previously these six listeners per agent
+   * were added with `.on()` but never removed — for workloads that
+   * create and discard many MultiAgentSystem instances (multi-turn YOLO
+   * with fresh sub-agents) this accumulated listeners on the underlying
+   * BaseAgent EventEmitter, leaking closures and eventually tripping
+   * Node's `MaxListenersExceededWarning`.
    */
   private setupAgentEventForwarding(): void {
     for (const [role, agent] of this.agents) {
-      agent.on("agent:start", (data) => this.emit("agent:start", { ...data, role }));
-      agent.on("agent:complete", (data) => this.emit("agent:complete", { ...data, role }));
-      agent.on("agent:error", (data) => this.emit("agent:error", { ...data, role }));
-      agent.on("agent:message", (message) => this.handleAgentMessage(message));
-      agent.on("agent:tool", (data) => this.emit("agent:tool", { ...data, role }));
-      agent.on("agent:round", (data) => this.emit("agent:round", { ...data, role }));
+      const handlers: Map<string, (...args: unknown[]) => void> = new Map();
+      const startH = (data: unknown) => this.emit("agent:start", { ...(data as object), role });
+      const completeH = (data: unknown) => this.emit("agent:complete", { ...(data as object), role });
+      const errorH = (data: unknown) => this.emit("agent:error", { ...(data as object), role });
+      const messageH = (message: unknown) => this.handleAgentMessage(message as AgentMessage);
+      const toolH = (data: unknown) => this.emit("agent:tool", { ...(data as object), role });
+      const roundH = (data: unknown) => this.emit("agent:round", { ...(data as object), role });
+
+      agent.on("agent:start", startH);
+      agent.on("agent:complete", completeH);
+      agent.on("agent:error", errorH);
+      agent.on("agent:message", messageH);
+      agent.on("agent:tool", toolH);
+      agent.on("agent:round", roundH);
+
+      handlers.set("agent:start", startH as (...args: unknown[]) => void);
+      handlers.set("agent:complete", completeH as (...args: unknown[]) => void);
+      handlers.set("agent:error", errorH as (...args: unknown[]) => void);
+      handlers.set("agent:message", messageH as (...args: unknown[]) => void);
+      handlers.set("agent:tool", toolH as (...args: unknown[]) => void);
+      handlers.set("agent:round", roundH as (...args: unknown[]) => void);
+      this.agentListeners.set(role, handlers);
     }
   }
 
@@ -767,10 +799,23 @@ export class MultiAgentSystem extends EventEmitter {
   }
 
   /**
-   * Dispose and cleanup
+   * Dispose and cleanup.
+   *
+   * Removes the per-agent forwarding listeners captured in
+   * setupAgentEventForwarding (F26) before clearing the local emitter,
+   * so BaseAgent instances don't retain dangling references to this
+   * MultiAgentSystem through their own listener arrays.
    */
   dispose(): void {
     this.reset();
+    for (const [role, handlers] of this.agentListeners) {
+      const agent = this.agents.get(role);
+      if (!agent) continue;
+      for (const [event, handler] of handlers) {
+        agent.off(event, handler);
+      }
+    }
+    this.agentListeners.clear();
     this.removeAllListeners();
   }
 

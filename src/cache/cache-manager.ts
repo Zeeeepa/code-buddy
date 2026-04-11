@@ -1181,7 +1181,9 @@ export class CacheManager extends EventEmitter {
       await this.persistToDisk();
     }
 
-    this.llmCache.dispose();
+    // LLMResponseCache.dispose is now async (F21) so it can await its
+    // final saveToDisk before clearing the in-memory map.
+    await this.llmCache.dispose();
     this.fileCache.dispose();
     this.embeddingCache.dispose();
     this.searchCache.dispose();

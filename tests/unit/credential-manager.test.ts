@@ -17,6 +17,10 @@ const mockFs = vi.hoisted(() => ({
   mkdirSync: vi.fn(),
   chmodSync: vi.fn(),
   statSync: vi.fn(),
+  // renameSync is required after F24: CredentialManager.saveCredentials
+  // now writes to a .tmp file and renames it into place atomically.
+  renameSync: vi.fn(),
+  unlinkSync: vi.fn(),
 }));
 vi.mock('fs', () => ({ ...mockFs, default: mockFs }));
 
