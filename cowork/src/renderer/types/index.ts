@@ -439,6 +439,7 @@ export type ClientEvent =
         projectId?: string | null;
         allowedTools?: string[];
         content?: ContentBlock[];
+        memoryEnabled?: boolean;
       };
     }
   | { type: 'session.continue'; payload: { sessionId: string; prompt: string; content?: ContentBlock[] } }

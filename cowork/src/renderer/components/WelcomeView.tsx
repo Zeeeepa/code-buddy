@@ -15,6 +15,7 @@ import {
   Paperclip,
   BookOpen,
   FileSearch,
+  Brain,
 } from 'lucide-react';
 import { ProjectSelector } from './ProjectSelector';
 
@@ -39,6 +40,7 @@ export function WelcomeView() {
   >([]);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [memoryEnabled, setMemoryEnabled] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { startSession, changeWorkingDir, isElectron } = useIPC();
   const workingDir = useAppStore((state) => state.workingDir);
@@ -378,7 +380,8 @@ export function WelcomeView() {
         sessionTitle,
         contentBlocks,
         workingDir || undefined,
-        activeProjectId ?? undefined
+        activeProjectId ?? undefined,
+        memoryEnabled
       );
       if (session) {
         setPrompt('');
@@ -653,6 +656,22 @@ export function WelcomeView() {
           {/* Bottom Actions */}
           <div className="flex items-center justify-between pt-3 border-t border-border-muted">
             <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setMemoryEnabled(!memoryEnabled)}
+                className={`flex items-center gap-2 text-sm transition-colors ${
+                  memoryEnabled
+                    ? 'text-accent hover:text-accent-hover'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+                title={t('welcome.toggleMemory', 'Toggle cross-session memory')}
+              >
+                <Brain className="w-4 h-4" />
+                <span className="hidden sm:inline">
+                  {memoryEnabled ? t('welcome.memoryEnabled', 'Memory On') : t('welcome.memoryDisabled', 'Memory Off')}
+                </span>
+              </button>
+
               <button
                 type="button"
                 onClick={handleSelectFolder}

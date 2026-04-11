@@ -367,7 +367,8 @@ export class SessionManager {
     cwd?: string,
     projectId?: string | null,
     allowedTools?: string[],
-    content?: ContentBlock[]
+    content?: ContentBlock[],
+    memoryEnabled: boolean = false
   ): Promise<Session> {
     log('[SessionManager] Starting new session:', title);
 
@@ -390,7 +391,7 @@ export class SessionManager {
       }
     }
 
-    const session = this.createSession(title, effectiveCwd, allowedTools);
+    const session = this.createSession(title, effectiveCwd, allowedTools, memoryEnabled);
 
     // Attach active project if any (Claude Cowork parity)
     if (resolvedProjectId) {
@@ -463,7 +464,7 @@ export class SessionManager {
     return [{ virtual: WORKSPACE_MOUNT_VIRTUAL_PATH, real: cwd }];
   }
 
-  private createSession(title: string, cwd?: string, allowedTools?: string[]): Session {
+  private createSession(title: string, cwd?: string, allowedTools?: string[], memoryEnabled: boolean = false): Session {
     const now = Date.now();
     // Prefer frontend-provided cwd; fallback to env vars if provided
     const envCwd = process.env.COWORK_WORKDIR || process.env.WORKDIR || process.env.DEFAULT_CWD;
@@ -487,7 +488,7 @@ export class SessionManager {
         'glob',
         'grep',
       ],
-      memoryEnabled: false,
+      memoryEnabled,
       model: configStore.get('model') || undefined,
       createdAt: now,
       updatedAt: now,

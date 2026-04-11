@@ -4570,7 +4570,8 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         event.payload.cwd,
         event.payload.projectId ?? null,
         event.payload.allowedTools,
-        event.payload.content
+        event.payload.content,
+        event.payload.memoryEnabled
       );
 
     case 'session.continue':

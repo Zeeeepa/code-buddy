@@ -489,7 +489,8 @@ export function useIPC() {
       title: string,
       promptOrContent: string | ContentBlock[],
       cwd?: string,
-      projectId?: string | null
+      projectId?: string | null,
+      memoryEnabled?: boolean
     ) => {
       setLoading(true);
       console.log('[useIPC] Starting session:', title);
@@ -571,6 +572,7 @@ export function useIPC() {
             prompt,
             cwd,
             projectId,
+            memoryEnabled,
             content, // Send full content blocks including images
           },
         });

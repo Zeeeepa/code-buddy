@@ -1528,6 +1528,7 @@ ${hints.join('\n')}
       }
 
       let contextualPrompt = prompt;
+
       if (!cachedSession) {
         // Cold start: inject recent history into prompt if available
         const conversationMessages = existingMessages.filter(
@@ -1796,6 +1797,58 @@ Tool routing:
       // Bridge MCP tools as customTools for pi-coding-agent.
       // Re-read every query so newly added/removed MCP servers take effect immediately.
       const mcpCustomTools = this.mcpManager ? buildMcpCustomTools(this.mcpManager) : [];
+      
+      // --- Cross-Session Memory Implementation ---
+      if (session.memoryEnabled) {
+        const memoryFile = path.join(effectiveCwd, '.claude', 'memory.json');
+        
+        const readProjectMemory = (): string[] => {
+          try {
+            if (fs.existsSync(memoryFile)) {
+              return JSON.parse(fs.readFileSync(memoryFile, 'utf8')) as string[];
+            }
+          } catch (e) {
+            logWarn('[ClaudeAgentRunner] Failed to read memory.json:', e);
+          }
+          return [];
+        };
+
+        const saveProjectMemory = (fact: string): string => {
+          try {
+            const memoryDir = path.dirname(memoryFile);
+            if (!fs.existsSync(memoryDir)) {
+              fs.mkdirSync(memoryDir, { recursive: true });
+            }
+            const memories = readProjectMemory();
+            if (!memories.includes(fact)) {
+              memories.push(fact);
+              fs.writeFileSync(memoryFile, JSON.stringify(memories, null, 2), 'utf8');
+            }
+            return `Successfully saved memory: ${fact}`;
+          } catch (e) {
+            return `Failed to save memory: ${e}`;
+          }
+        };
+
+        // 1. Inject custom memory tool
+        mcpCustomTools.push({
+          name: 'save_memory',
+          description: 'Save a fact, convention, or preference to persistent cross-session memory for this workspace. Use this when the user asks you to remember something or when you learn a critical project rule.',
+          inputSchema: Type.Object({
+            fact: Type.String({ description: 'The clear, self-contained statement to remember.' })
+          }),
+          execute: async ({ fact }: { fact: string }) => saveProjectMemory(fact),
+        } as unknown as ToolDefinition);
+
+        // 2. Inject memories into the contextual prompt
+        const memories = readProjectMemory();
+        if (memories.length > 0) {
+          const memoryContext = `<project_memory>\nThe following facts and preferences have been explicitly remembered from previous sessions. You MUST adhere to these rules and utilize this knowledge:\n${memories.map(m => `- ${m}`).join('\n')}\n</project_memory>\n\n`;
+          contextualPrompt = memoryContext + contextualPrompt;
+          logCtx(`[ClaudeAgentRunner] Injected ${memories.length} cross-session memory entries.`);
+        }
+      }
+      // ------------------------------------------
       if (mcpCustomTools.length > 0) {
         log(
           `[ClaudeAgentRunner] Registered ${mcpCustomTools.length} MCP tools as customTools:`,
