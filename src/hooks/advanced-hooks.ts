@@ -1,7 +1,7 @@
 /**
  * Advanced Hook System
  *
- * Extends the basic hook system with Claude Code-like capabilities:
+ * Extends the basic hook system with Native Engine-like capabilities:
  * - Command hooks: run shell commands, parse JSON stdout for decisions
  * - Prompt hooks: LLM-evaluated hooks using stored prompt instructions
  * - Agent hooks: subagent evaluation hooks for delegated review/approval flows

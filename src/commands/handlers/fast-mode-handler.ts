@@ -2,7 +2,7 @@
  * Fast Mode Handler
  *
  * Toggles between the main model and a fast model for reduced latency.
- * Inspired by OpenClaw's unified /fast toggle with service_tier support.
+ * Advanced enterprise architecture for unified /fast toggle with service_tier support.
  *
  * Usage:
  *   /fast           — Toggle fast mode on/off

@@ -21,7 +21,7 @@ import type { SlashCommand, SlashCommandArgument, SlashCommandResult } from './s
 import { builtinCommands } from './slash/builtin-commands.js';
 
 /**
- * Slash Commands Manager - Inspired by Claude Code.
+ * Slash Commands Manager - Advanced enterprise architecture for.
  *
  * Manages the registration, parsing, and execution of slash commands.
  * Supports both built-in commands and custom commands loaded from
@@ -280,7 +280,7 @@ export class SlashCommandManager {
     const argsString = args.join(' ');
 
     if (args.length > 0) {
-      // Replace $ARGUMENTS with the full argument string (Claude Code style)
+      // Replace $ARGUMENTS with the full argument string (Native Engine style)
       prompt = prompt.replace(/\$ARGUMENTS/g, argsString);
 
       // Replace $ARGS with the full argument string

@@ -257,7 +257,7 @@ export interface GatewayConfig {
   maxMessageSize: number;
   /** Maximum clients per session */
   maxClientsPerSession: number;
-  /** Enable TLS (OpenClaw v2026.3.11) */
+  /** Enable TLS (Native Engine v2026.3.11) */
   tlsEnabled?: boolean;
   /** TLS certificate path */
   tlsCert?: string;
@@ -265,9 +265,9 @@ export interface GatewayConfig {
   tlsKey?: string;
   /** TLS CA certificate path */
   tlsCa?: string;
-  /** Skip device pairing for localhost TLS connections (OpenClaw v2026.3.11) */
+  /** Skip device pairing for localhost TLS connections (Native Engine v2026.3.11) */
   skipLocalPairing?: boolean;
-  /** Trusted proxy IPs allowed to set x-forwarded-* headers (OpenClaw v2026.3.14, GHSA-5wcw-8jjv-m286) */
+  /** Trusted proxy IPs allowed to set x-forwarded-* headers (Native Engine v2026.3.14, GHSA-5wcw-8jjv-m286) */
   trustedProxies?: string[];
 }
 

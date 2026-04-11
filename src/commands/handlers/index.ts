@@ -74,6 +74,9 @@ export {
   handleToolAnalytics,
 } from './core-handlers.js';
 
+// Ultraplan handler
+export { handleUltraplan } from './ultraplan-handler.js';
+
 // Export handlers
 export {
   handleExport,
@@ -113,12 +116,12 @@ export {
   handleConfig,
 } from './vibe-handlers.js';
 
-// Permissions handlers (Claude Code-inspired)
+// Permissions handlers (Enterprise-grade)
 export {
   handlePermissions,
 } from './permissions-handlers.js';
 
-// Worktree handlers (Claude Code-inspired)
+// Worktree handlers (Enterprise-grade)
 export {
   handleWorktree,
 } from './worktree-handlers.js';
@@ -223,7 +226,7 @@ export {
   handleStarter,
 } from './starter-handlers.js';
 
-// Fast mode handler (OpenClaw-aligned)
+// Fast mode handler (Enterprise-aligned)
 export {
   handleFastMode,
   isFastModeEnabled,
@@ -235,12 +238,12 @@ export {
   setFastModel,
 } from './fast-mode-handler.js';
 
-// Backup handlers (OpenClaw v2026.3.8 alignment)
+// Backup handlers (Native Engine v2026.3.8 alignment)
 export {
   handleBackup,
 } from './backup-handlers.js';
 
-// BTW handler (OpenClaw v2026.3.14 alignment)
+// BTW handler (Native Engine v2026.3.14 alignment)
 export {
   handleBtw,
   setBtwClient,

@@ -2,7 +2,7 @@
  * Sandbox Registry
  *
  * Strategy pattern registry that routes to the best available sandbox backend.
- * OpenClaw v2026.3.14 — pluggable sandbox backends.
+ * Native Engine v2026.3.14 — pluggable sandbox backends.
  */
 
 import { logger } from '../utils/logger.js';

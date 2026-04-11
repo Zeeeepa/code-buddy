@@ -5,7 +5,7 @@
  * Gated by OLLAMA_HOST environment variable (defaults to http://localhost:11434).
  * Includes onboarding hooks for auth, discovery, and model picking.
  *
- * OpenClaw v2026.3.19 — Provider Plugin Onboarding Architecture.
+ * Native Engine v2026.3.19 — Provider Plugin Onboarding Architecture.
  */
 
 import { logger } from '../../utils/logger.js';

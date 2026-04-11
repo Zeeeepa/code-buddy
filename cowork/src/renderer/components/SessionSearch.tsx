@@ -2,6 +2,7 @@
  * SessionSearch — In-message search with highlighting (Cmd+F)
  */
 import React, { useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface SessionSearchProps {
@@ -23,6 +24,7 @@ export const SessionSearch: React.FC<SessionSearchProps> = ({
   onNext,
   onPrev,
 }) => {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -49,19 +51,21 @@ export const SessionSearch: React.FC<SessionSearchProps> = ({
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Search in messages..."
+        placeholder={t('sessionSearch.placeholder', 'Search in messages…')}
         className="flex-1 text-xs bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500"
       />
       {query && (
         <span className="text-xs text-zinc-500 flex-shrink-0">
-          {matchCount > 0 ? `${currentMatch + 1}/${matchCount}` : 'No results'}
+          {matchCount > 0
+            ? `${currentMatch + 1}/${matchCount}`
+            : t('sessionSearch.noResults', 'No results')}
         </span>
       )}
       <button
         onClick={onPrev}
         disabled={matchCount === 0}
         className="p-1 text-zinc-500 hover:text-zinc-300 disabled:opacity-30 transition-colors"
-        title="Previous (Shift+Enter)"
+        title={t('sessionSearch.previous', 'Previous (Shift+Enter)')}
       >
         <ChevronUp size={14} />
       </button>
@@ -69,14 +73,14 @@ export const SessionSearch: React.FC<SessionSearchProps> = ({
         onClick={onNext}
         disabled={matchCount === 0}
         className="p-1 text-zinc-500 hover:text-zinc-300 disabled:opacity-30 transition-colors"
-        title="Next (Enter)"
+        title={t('sessionSearch.next', 'Next (Enter)')}
       >
         <ChevronDown size={14} />
       </button>
       <button
         onClick={onClose}
         className="p-1 text-zinc-500 hover:text-zinc-300 transition-colors"
-        title="Close (Esc)"
+        title={t('sessionSearch.close', 'Close (Esc)')}
       >
         <X size={14} />
       </button>

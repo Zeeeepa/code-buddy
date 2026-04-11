@@ -132,11 +132,11 @@ describe('runConfigApiTest', () => {
     expect(mocks.probeWithClaudeSdk).toHaveBeenCalledTimes(1);
   });
 
-  it('returns failure when Claude Code executable is not found', async () => {
+  it('returns failure when Native Engine executable is not found', async () => {
     const probeFailure: ApiTestResult = {
       ok: false,
       errorType: 'unknown',
-      details: 'Claude Code executable not found. Please install @anthropic-ai/claude-code',
+      details: 'Native Engine executable not found. Please install @anthropic-ai/claude-code',
     };
     mocks.probeWithClaudeSdk.mockResolvedValue(probeFailure);
 

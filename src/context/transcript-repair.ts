@@ -5,7 +5,7 @@
  * tool_call, and vice versa. LLM providers reject malformed transcripts
  * (e.g., orphaned tool results without their calling assistant message).
  *
- * OpenClaw v2026.3.11 alignment.
+ * Native Engine v2026.3.11 alignment.
  */
 
 import type { CodeBuddyMessage } from '../codebuddy/client.js';

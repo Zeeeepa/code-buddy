@@ -87,6 +87,23 @@ const coreCommands: SlashCommand[] = [
     isBuiltin: true
   },
   {
+    name: 'plan',
+    description: 'Enter plan mode (research and design phase)',
+    prompt: '__PLAN_MODE__',
+    filePath: '',
+    isBuiltin: true
+  },
+  {
+    name: 'ultraplan',
+    description: 'Spawn parallel specialized agents to research and synthesize the best execution plan (Best-of-N)',
+    prompt: '__ULTRAPLAN__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'prompt', description: 'The task to plan for', required: true }
+    ]
+  },
+  {
     name: 'config',
     description: 'Validate configuration files and environment variables',
     prompt: '__CONFIG__',
@@ -252,7 +269,7 @@ Keep the commit message concise but descriptive.`,
   },
   {
     name: 'worktree',
-    description: 'Manage git worktrees for parallel instances (Claude Code-style)',
+    description: 'Manage git worktrees for parallel instances (Standard)',
     prompt: '__WORKTREE__',
     filePath: '',
     isBuiltin: true,
@@ -802,7 +819,7 @@ const autonomyCommands: SlashCommand[] = [
   },
   {
     name: 'permissions',
-    description: 'Manage tool permissions and allowlist (Claude Code-style)',
+    description: 'Manage tool permissions and allowlist (Standard)',
     prompt: '__PERMISSIONS__',
     filePath: '',
     isBuiltin: true,

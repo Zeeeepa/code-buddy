@@ -16,6 +16,7 @@ import {
   Shield,
   ShieldCheck,
   ShieldX,
+  Search,
   Plus,
   Trash2,
   Edit2,
@@ -30,7 +31,12 @@ import {
 import { useActiveProjectId } from '../../store/selectors';
 import { useAppStore } from '../../store';
 import { deriveScopedPermissionRule } from '../../utils/permission-target-rule';
-import { groupPermissionRules, type PermissionRuleScope } from '../../utils/permission-rule-classification';
+import {
+  classifyPermissionRule,
+  groupPermissionRules,
+  type PermissionRuleScope,
+} from '../../utils/permission-rule-classification';
+import { buildPermissionRuleTestArgs } from '../../utils/permission-rule-preview';
 
 type Bucket = 'allow' | 'deny';
 
@@ -43,15 +49,21 @@ const EXAMPLE_RULES: Array<{ rule: string; bucket: Bucket; hint: string }> = [
   { rule: 'Edit(.env*)', bucket: 'deny', hint: 'Block edits to env files' },
 ];
 
-export const SettingsPermissionRules: React.FC = () => {
+export const SettingsPermissionRules: React.FC<{ isActive?: boolean }> = ({ isActive = false }) => {
   const { t } = useTranslation();
   const activeProjectId = useActiveProjectId();
   const guiActions = useAppStore((s) => s.guiActions);
+  const permissionRuleTestDraft = useAppStore((s) => s.permissionRuleTestDraft);
+  const permissionRuleDraft = useAppStore((s) => s.permissionRuleDraft);
+  const clearPermissionRuleTestDraft = useAppStore((s) => s.clearPermissionRuleTestDraft);
+  const clearPermissionRuleDraft = useAppStore((s) => s.clearPermissionRuleDraft);
   const [allow, setAllow] = useState<string[]>([]);
   const [deny, setDeny] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [newAllow, setNewAllow] = useState('');
   const [newDeny, setNewDeny] = useState('');
+  const [ruleQuery, setRuleQuery] = useState('');
+  const [scopeFilter, setScopeFilter] = useState<'all' | PermissionRuleScope>('all');
   const [editing, setEditing] = useState<{ bucket: Bucket; rule: string; value: string } | null>(
     null
   );
@@ -136,16 +148,54 @@ export const SettingsPermissionRules: React.FC = () => {
   const handleTest = useCallback(async () => {
     const api = window.electronAPI;
     if (!api?.rules) return;
-    const args: Record<string, unknown> = {};
-    // Map common tool arg shapes
-    const normalizedTool = testTool.toLowerCase();
-    if (normalizedTool === 'bash') args.command = testArg;
-    else if (['edit', 'write', 'read'].includes(normalizedTool)) args.path = testArg;
-    else args.input = testArg;
-
+    const args = buildPermissionRuleTestArgs(testTool, testArg);
     const result = await api.rules.test(testTool, args, activeProjectId ?? undefined);
     setTestResult(result);
   }, [testTool, testArg, activeProjectId]);
+
+  useEffect(() => {
+    if (!isActive || !permissionRuleTestDraft) {
+      return;
+    }
+
+    setTestTool(permissionRuleTestDraft.toolName);
+    setTestArg(permissionRuleTestDraft.testArg);
+    setTestResult(null);
+    clearPermissionRuleTestDraft();
+
+    const api = window.electronAPI;
+    if (!api?.rules) {
+      return;
+    }
+
+    const args = buildPermissionRuleTestArgs(
+      permissionRuleTestDraft.toolName,
+      permissionRuleTestDraft.testArg
+    );
+    void api.rules
+      .test(permissionRuleTestDraft.toolName, args, activeProjectId ?? undefined)
+      .then((result) => setTestResult(result))
+      .catch(() => {
+        setTestResult(null);
+      });
+  }, [activeProjectId, clearPermissionRuleTestDraft, isActive, permissionRuleTestDraft]);
+
+  useEffect(() => {
+    if (!isActive || !permissionRuleDraft) {
+      return;
+    }
+
+    if (permissionRuleDraft.bucket === 'allow') {
+      setNewAllow(permissionRuleDraft.rule);
+      setNewDeny('');
+    } else {
+      setNewAllow('');
+      setNewDeny(permissionRuleDraft.rule);
+    }
+    setRuleQuery('');
+    setScopeFilter(classifyPermissionRule(permissionRuleDraft.rule));
+    clearPermissionRuleDraft();
+  }, [clearPermissionRuleDraft, isActive, permissionRuleDraft]);
 
   const recentComputerUseSuggestions = React.useMemo(() => {
     const seen = new Set<string>();
@@ -253,8 +303,22 @@ export const SettingsPermissionRules: React.FC = () => {
     );
   };
 
+  const matchesRuleFilter = React.useCallback(
+    (rule: string, scope: PermissionRuleScope) => {
+      if (scopeFilter !== 'all' && scopeFilter !== scope) {
+        return false;
+      }
+      const normalizedQuery = ruleQuery.trim().toLowerCase();
+      if (!normalizedQuery) {
+        return true;
+      }
+      return rule.toLowerCase().includes(normalizedQuery);
+    },
+    [ruleQuery, scopeFilter]
+  );
+
   return (
-    <div className="flex flex-col h-full overflow-y-auto">
+    <div className="flex flex-col h-full overflow-y-auto" data-testid="settings-permission-rules">
       <div className="px-4 py-3 border-b border-border-muted">
         <div className="flex items-center gap-2">
           <Shield size={14} className="text-accent" />
@@ -271,6 +335,41 @@ export const SettingsPermissionRules: React.FC = () => {
       )}
 
       <div className="p-4 space-y-6">
+        <section className="p-3 rounded-lg border border-border-muted bg-surface/40 space-y-3">
+          <div className="flex items-center gap-2">
+            <Search size={12} className="text-accent" />
+            <h3 className="text-xs font-semibold text-text-primary uppercase tracking-wider">
+              {t('rules.filterTitle', 'Find rules')}
+            </h3>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-text-muted" />
+            <input
+              type="text"
+              value={ruleQuery}
+              onChange={(e) => setRuleQuery(e.target.value)}
+              placeholder={t('rules.searchPlaceholder', 'Search rules…')}
+              className="w-full rounded-lg border border-border bg-background pl-8 pr-3 py-2 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {(['all', 'site', 'app', 'generic'] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setScopeFilter(value)}
+                className={`px-2.5 py-1 rounded-full text-[11px] border transition-colors ${
+                  scopeFilter === value
+                    ? 'border-accent bg-accent/10 text-accent'
+                    : 'border-border-muted text-text-secondary hover:bg-surface-hover'
+                }`}
+              >
+                {value === 'all' ? t('rules.filterAll', 'All scopes') : t(`rules.scope.${value}`)}
+              </button>
+            ))}
+          </div>
+        </section>
+
         {/* Allow list */}
         <section>
           <div className="flex items-center gap-2 mb-2">
@@ -290,7 +389,7 @@ export const SettingsPermissionRules: React.FC = () => {
             {!loading &&
               allow.length > 0 &&
               scopeMeta.map((scope) =>
-                groupedAllow[scope.key].length > 0 ? (
+                groupedAllow[scope.key].filter((rule) => matchesRuleFilter(rule, scope.key)).length > 0 ? (
                   <div key={`allow-${scope.key}`} className="space-y-1">
                     <div className="px-1">
                       <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
@@ -298,7 +397,9 @@ export const SettingsPermissionRules: React.FC = () => {
                       </div>
                       <div className="text-[10px] text-text-muted">{scope.hint}</div>
                     </div>
-                    {groupedAllow[scope.key].map((rule) => renderRuleRow('allow', rule))}
+                    {groupedAllow[scope.key]
+                      .filter((rule) => matchesRuleFilter(rule, scope.key))
+                      .map((rule) => renderRuleRow('allow', rule))}
                   </div>
                 ) : null
               )}
@@ -311,6 +412,7 @@ export const SettingsPermissionRules: React.FC = () => {
               onKeyDown={(e) => e.key === 'Enter' && handleAdd('allow', newAllow)}
               placeholder={t('rules.addPlaceholder')}
               className="flex-1 px-2 py-1 text-xs font-mono bg-surface border border-border rounded text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
+              data-testid="settings-rules-allow-input"
             />
             <button
               onClick={() => void handleAdd('allow', newAllow)}
@@ -342,7 +444,7 @@ export const SettingsPermissionRules: React.FC = () => {
             {!loading &&
               deny.length > 0 &&
               scopeMeta.map((scope) =>
-                groupedDeny[scope.key].length > 0 ? (
+                groupedDeny[scope.key].filter((rule) => matchesRuleFilter(rule, scope.key)).length > 0 ? (
                   <div key={`deny-${scope.key}`} className="space-y-1">
                     <div className="px-1">
                       <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
@@ -350,7 +452,9 @@ export const SettingsPermissionRules: React.FC = () => {
                       </div>
                       <div className="text-[10px] text-text-muted">{scope.hint}</div>
                     </div>
-                    {groupedDeny[scope.key].map((rule) => renderRuleRow('deny', rule))}
+                    {groupedDeny[scope.key]
+                      .filter((rule) => matchesRuleFilter(rule, scope.key))
+                      .map((rule) => renderRuleRow('deny', rule))}
                   </div>
                 ) : null
               )}
@@ -363,6 +467,7 @@ export const SettingsPermissionRules: React.FC = () => {
               onKeyDown={(e) => e.key === 'Enter' && handleAdd('deny', newDeny)}
               placeholder={t('rules.addPlaceholder')}
               className="flex-1 px-2 py-1 text-xs font-mono bg-surface border border-border rounded text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
+              data-testid="settings-rules-deny-input"
             />
             <button
               onClick={() => void handleAdd('deny', newDeny)}
@@ -467,6 +572,7 @@ export const SettingsPermissionRules: React.FC = () => {
               onChange={(e) => setTestTool(e.target.value)}
               placeholder="Tool name"
               className="w-32 px-2 py-1 text-xs font-mono bg-surface border border-border rounded text-text-primary focus:outline-none focus:border-accent"
+              data-testid="settings-rules-test-tool-input"
             />
             <input
               type="text"
@@ -474,6 +580,7 @@ export const SettingsPermissionRules: React.FC = () => {
               onChange={(e) => setTestArg(e.target.value)}
               placeholder="Primary arg (command / path)"
               className="flex-1 px-2 py-1 text-xs font-mono bg-surface border border-border rounded text-text-primary focus:outline-none focus:border-accent"
+              data-testid="settings-rules-test-arg-input"
             />
             <button
               onClick={() => void handleTest()}

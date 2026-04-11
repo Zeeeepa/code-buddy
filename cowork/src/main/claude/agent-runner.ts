@@ -564,7 +564,7 @@ ${hints.join('\n')}
    */
   private physicalDirExists(dirPath: string): boolean {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+       
       const originalFs = require('original-fs') as typeof import('fs');
       return originalFs.existsSync(dirPath) && originalFs.statSync(dirPath).isDirectory();
     } catch {
@@ -1788,7 +1788,7 @@ Tool routing:
 
       // Collect skill directories for pi's native skill discovery.
       // SkillsAdapter handles path resolution, disabled skill filtering,
-      // and compatibility with Claude Code / OpenClaw ecosystems.
+      // and compatibility with Native Engine / Native Engine ecosystems.
       const skillPaths = this._skillsAdapter
         ? this._skillsAdapter.getSkillPaths()
         : this.legacySkillPaths();

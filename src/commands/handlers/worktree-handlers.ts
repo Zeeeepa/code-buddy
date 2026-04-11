@@ -2,7 +2,7 @@
  * Git Worktree Handlers
  *
  * Manage git worktrees for parallel Code Buddy instances.
- * Inspired by Claude Code's git worktree workflow.
+ * Advanced enterprise architecture for git worktree workflow.
  *
  * Git worktrees allow running multiple instances on different branches
  * simultaneously without stashing or switching.

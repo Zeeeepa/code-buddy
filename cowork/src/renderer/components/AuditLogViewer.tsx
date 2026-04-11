@@ -18,6 +18,7 @@ import {
   AlertCircle,
   Loader2,
 } from 'lucide-react';
+import { formatAppDateTime, formatAppNumber, formatAppTime, joinAppList } from '../utils/i18n-format';
 
 interface AuditRunSummary {
   runId: string;
@@ -71,7 +72,7 @@ function fmtCost(cost?: number): string {
 
 function fmtTs(ts: number): string {
   try {
-    return new Date(ts).toLocaleString();
+    return formatAppDateTime(ts);
   } catch {
     return String(ts);
   }
@@ -253,7 +254,7 @@ export function AuditLogViewer() {
             <span className="text-text-primary">{runs.length}</span> {t('audit.runs', 'runs')}
           </span>
           <span>
-            {fmtCost(totals.cost)} · {totals.tokens.toLocaleString()} tokens · {totals.tools}{' '}
+            {fmtCost(totals.cost)} · {formatAppNumber(totals.tokens)} {t('audit.tokens', 'tokens')} · {totals.tools}{' '}
             {t('audit.tools', 'tools')}
           </span>
         </div>
@@ -306,7 +307,7 @@ export function AuditLogViewer() {
                   </span>
                   <span>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] ${statusClass(run.status)}`}>
-                      {run.status}
+                      {t(`audit.${run.status}`, run.status)}
                     </span>
                   </span>
                   <span className="text-right text-text-secondary tabular-nums">
@@ -355,7 +356,7 @@ export function AuditLogViewer() {
                           {(detail.tags ?? []).length > 0 && (
                             <span>
                               {t('audit.tags', 'Tags')}:{' '}
-                              <span className="text-text-primary">{(detail.tags ?? []).join(', ')}</span>
+                              <span className="text-text-primary">{joinAppList(detail.tags ?? [])}</span>
                             </span>
                           )}
                         </div>
@@ -372,7 +373,11 @@ export function AuditLogViewer() {
                               >
                                 <Clock size={10} className="mt-0.5 text-text-muted shrink-0" />
                                 <span className="text-text-muted w-36 shrink-0">
-                                  {new Date(ev.ts).toLocaleTimeString()}
+                                  {formatAppTime(ev.ts, {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    second: '2-digit',
+                                  })}
                                 </span>
                                 <span className="text-accent w-28 shrink-0 flex items-center gap-1">
                                   <Activity size={10} />

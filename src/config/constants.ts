@@ -120,6 +120,10 @@ export const SUPPORTED_MODELS = {
   'gemini-2.0-flash-thinking': { maxTokens: 1000000, provider: 'google' },
   'gemini-1.5-pro': { maxTokens: 2000000, provider: 'google' },
   'gemini-1.5-flash': { maxTokens: 1000000, provider: 'google' },
+  // Gemma 4 models (via bundled plugin)
+  'gemma-4-27b-it': { maxTokens: 8192, provider: 'bundled-gemma4' },
+  'gemma-4-9b-it': { maxTokens: 8192, provider: 'bundled-gemma4' },
+  'gemma-4-2b-it': { maxTokens: 8192, provider: 'bundled-gemma4' },
   // GPT models
   'gpt-5': { maxTokens: 400000, provider: 'openai' },
   'gpt-4.1': { maxTokens: 1000000, provider: 'openai' },

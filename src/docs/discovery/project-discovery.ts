@@ -96,7 +96,7 @@ export interface ProjectProfile {
     architectureOverview: string;
     /** Key subsystem table from CLAUDE.md */
     subsystemTable: string;
-    /** Inspired-by / integration features (OpenClaw, Codex, etc.) */
+    /** Inspired-by / integration features (Native Engine, Codex, etc.) */
     inspiredFeatures: Array<{ name: string; source: string; location: string; description: string }>;
   };
   /** Extracted API surface (CLI commands + HTTP endpoints) */
@@ -437,7 +437,7 @@ function extractReadmeContext(cwd: string): ProjectProfile['readmeContext'] {
       if (fallback) result.subsystemTable = fallback[0].substring(0, 4000);
     }
 
-    // Extract inspired-by features (OpenClaw, Codex, Manus, etc.)
+    // Extract inspired-by features (Native Engine, Codex, Manus, etc.)
     // Pattern: "### Feature Name (Source-inspired)" or "Feature (Source-inspired)" in h3/h4
     for (const m of claude.matchAll(/### (.+?)\s*\((\w[\w\s]*?)-inspired\)\s*\n([\s\S]*?)(?=\n###|\n## [^#])/g)) {
       const name = m[1].trim();
@@ -455,39 +455,39 @@ function extractReadmeContext(cwd: string): ProjectProfile['readmeContext'] {
       });
     }
 
-    // Capture "### OpenManus/OpenClaw Section (paths)" headings
-    for (const m of claude.matchAll(/### ((?:OpenManus|OpenClaw)[^(\n]*)\s*(?:\(([^)]*)\))?\s*\n([\s\S]*?)(?=\n###|\n## [^#])/g)) {
+    // Capture "### OpenManus/Native Engine Section (paths)" headings
+    for (const m of claude.matchAll(/### ((?:OpenManus|Native Engine)[^(\n]*)\s*(?:\(([^)]*)\))?\s*\n([\s\S]*?)(?=\n###|\n## [^#])/g)) {
       const name = m[1].trim();
       const location = m[2]?.replace(/`/g, '').split(',')[0]?.trim() ?? '';
       const descLine = m[3].split('\n').find(l => l.trim() && !l.startsWith('|') && !l.startsWith('`') && !l.startsWith('```'));
       if (!result.inspiredFeatures.some(f => f.name === name)) {
         result.inspiredFeatures.push({
           name,
-          source: name.includes('OpenManus') ? 'OpenManus' : 'OpenClaw',
+          source: name.includes('OpenManus') ? 'OpenManus' : 'Native Engine',
           location,
           description: descLine?.trim().substring(0, 200) ?? '',
         });
       }
     }
 
-    // Scan subsystem table rows mentioning OpenClaw/Codex/OpenManus
-    for (const m of claude.matchAll(/\| ([^|]+?) \| `([^`]+)` \|([^|]*(?:OpenClaw|Codex|Manus|OpenManus)[^|]*)\|/g)) {
+    // Scan subsystem table rows mentioning Native Engine/Codex/OpenManus
+    for (const m of claude.matchAll(/\| ([^|]+?) \| `([^`]+)` \|([^|]*(?:Native Engine|Codex|Manus|OpenManus)[^|]*)\|/g)) {
       const name = m[1].trim();
       const location = m[2].trim();
       const desc = m[3].trim();
       if (!result.inspiredFeatures.some(f => f.name === name)) {
-        const source = /OpenManus/i.test(desc) ? 'OpenManus' : /OpenClaw/i.test(desc) ? 'OpenClaw' : 'Codex';
+        const source = /OpenManus/i.test(desc) ? 'OpenManus' : /Native Engine/i.test(desc) ? 'Native Engine' : 'Codex';
         result.inspiredFeatures.push({ name, source, location, description: desc.substring(0, 200) });
       }
     }
 
-    // Scan for "# commands (OpenClaw parity)" style sections
-    for (const m of claude.matchAll(/# .+?\(OpenClaw[^)]*\)\s*\n([\s\S]*?)(?=\n#[^#])/g)) {
+    // Scan for "# commands (Native Engine parity)" style sections
+    for (const m of claude.matchAll(/# .+?\(Native Engine[^)]*\)\s*\n([\s\S]*?)(?=\n#[^#])/g)) {
       const commands = [...m[1].matchAll(/^(?:buddy|\/)\s+(.+)$/gm)].map(c => c[1].trim());
-      if (commands.length > 0 && !result.inspiredFeatures.some(f => f.name === 'OpenClaw CLI Commands')) {
+      if (commands.length > 0 && !result.inspiredFeatures.some(f => f.name === 'Native Engine CLI Commands')) {
         result.inspiredFeatures.push({
-          name: 'OpenClaw CLI Commands',
-          source: 'OpenClaw',
+          name: 'Native Engine CLI Commands',
+          source: 'Native Engine',
           location: 'src/commands/',
           description: `${commands.length} commands: ${commands.slice(0, 8).join(', ')}`,
         });

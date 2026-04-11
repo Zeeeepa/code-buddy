@@ -1,5 +1,5 @@
 /**
- * SSRF Guard — OpenClaw-inspired server-side request forgery protection
+ * SSRF Guard — Enterprise-grade server-side request forgery protection
  *
  * Applied to all outbound HTTP calls made by the agent (web_fetch, media
  * download, webhook delivery). Blocks all private/loopback/link-local

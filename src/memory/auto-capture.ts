@@ -1,7 +1,7 @@
 /**
  * Auto-Capture Memory System
  *
- * Inspired by OpenClaw's intelligent memory capture.
+ * Advanced enterprise architecture for intelligent memory capture.
  * Automatically detects and stores important information from conversations.
  *
  * Features:

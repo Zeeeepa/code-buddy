@@ -31,7 +31,7 @@ export interface SandboxConfig {
   networkEnabled: boolean;
   /** Whether the root filesystem is read-only */
   readOnly: boolean;
-  /** Timezone override (IANA format e.g. 'America/New_York') — OpenClaw v2026.3.8 alignment */
+  /** Timezone override (IANA format e.g. 'America/New_York') — Native Engine v2026.3.8 alignment */
   timezone?: string;
 }
 
@@ -417,7 +417,7 @@ export class DockerSandbox extends EventEmitter implements SandboxBackendInterfa
       args.push('-e', `CODEBUDDY_CLI_VERSION=${process.env.CODEBUDDY_CLI_VERSION}`);
     }
 
-    // Timezone override (OpenClaw v2026.3.8 — CODEBUDDY_TZ env)
+    // Timezone override (Native Engine v2026.3.8 — CODEBUDDY_TZ env)
     const tz = config.timezone || process.env.CODEBUDDY_TZ;
     if (tz) {
       // Validate IANA timezone format (Continent/City)

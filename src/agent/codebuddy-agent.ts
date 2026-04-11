@@ -231,7 +231,7 @@ export class CodeBuddyAgent extends BaseAgent {
     });
 
     // Wire the ContextEngine provider so multi-agent lifecycle hooks
-    // (onSubagentStarted / onSubagentEnded / ownsCompaction, cf. OpenClaw Vague 2 Phase 1)
+    // (onSubagentStarted / onSubagentEnded / ownsCompaction, cf. Native Engine Vague 2 Phase 1)
     // can reach the active context engine installed on the ContextManager.
     // Without this, setContextEngineProvider was defined but never called, leaving
     // the three call sites in agent-tools.ts (prepareSubagentSpawn, completeAgent,

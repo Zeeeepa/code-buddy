@@ -2,7 +2,7 @@
  * Update Command
  *
  * Manages Code Buddy update channels and performs updates.
- * Inspired by OpenClaw's `openclaw update --channel stable|beta|dev`.
+ * Advanced enterprise architecture for `Native Engine update --channel stable|beta|dev`.
  *
  * Usage:
  *   buddy update                    # Update to latest on current channel

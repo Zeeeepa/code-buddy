@@ -5,7 +5,7 @@
  * during reasoning. When tool confidence is low, the agent can search for
  * relevant skills that provide the needed capability.
  *
- * OpenClaw-inspired "self-improving" capability — the agent expands its
+ * Enterprise-grade "self-improving" capability — the agent expands its
  * own toolset at runtime by finding and installing community skills.
  */
 

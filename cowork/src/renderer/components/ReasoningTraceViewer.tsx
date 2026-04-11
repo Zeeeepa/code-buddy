@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, Brain, Zap, RefreshCw, Trash2, Play, Pause, SkipBack, SkipForward } from 'lucide-react';
 import { buildReasoningPlaybackState } from '../utils/reasoning-playback';
+import { formatAppNumber, formatAppTime } from '../utils/i18n-format';
 
 interface ReasoningNode {
   id: string;
@@ -184,7 +185,9 @@ export function ReasoningTraceViewer({ isOpen, onClose }: ReasoningTraceViewerPr
             {hasScore && (
               <div className="text-[10px] text-text-muted mt-0.5">
                 {t('reasoning.score', 'Score')}: {(node.score ?? 0).toFixed(3)}
-                {node.tokensUsed ? ` · ${node.tokensUsed} tokens` : ''}
+                {node.tokensUsed
+                  ? ` · ${formatAppNumber(node.tokensUsed)} ${t('reasoning.tokens', 'tokens')}`
+                  : ''}
               </div>
             )}
           </div>
@@ -198,7 +201,11 @@ export function ReasoningTraceViewer({ isOpen, onClose }: ReasoningTraceViewerPr
 
   const atLatestNode = playback.clampedIndex >= playback.maxIndex;
   const playbackLabel = playback.activeNode
-    ? new Date(playback.activeNode.ts).toLocaleTimeString()
+    ? formatAppTime(playback.activeNode.ts, {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      })
     : t('reasoning.playback', 'Playback');
 
   return (
@@ -271,8 +278,10 @@ export function ReasoningTraceViewer({ isOpen, onClose }: ReasoningTraceViewerPr
                 {trace.problem || trace.toolUseId}
               </div>
               <div className="text-[10px] text-text-muted mt-0.5">
-                {trace.mode} · {new Date(trace.startedAt).toLocaleTimeString()}
-                {trace.iterations ? ` · ${trace.iterations} iters` : ''}
+                {trace.mode} · {formatAppTime(trace.startedAt)}
+                {trace.iterations
+                  ? ` · ${trace.iterations} ${t('reasoning.iterations', 'iterations')}`
+                  : ''}
               </div>
             </button>
           ))}

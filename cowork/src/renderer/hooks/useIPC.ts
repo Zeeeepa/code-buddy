@@ -304,7 +304,7 @@ export function useIPC() {
             }
             break;
 
-          // ── New events for Claude Code parity ──────────────────────────
+          // ── New events for Enterprise parity ──────────────────────────
           case 'diff.preview':
             store.addDiffPreview(
               event.payload.sessionId,

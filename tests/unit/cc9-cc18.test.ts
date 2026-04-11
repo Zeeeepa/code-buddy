@@ -1,5 +1,5 @@
 /**
- * Tests for CC9-CC18 — Claude Code Parity Round 2
+ * Tests for CC9-CC18 — Enterprise parity Round 2
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';

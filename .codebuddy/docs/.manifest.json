@@ -1,0 +1,320 @@
+{
+  "1-overview": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": [
+      "src/utils/logger",
+      "src/types",
+      "src/codebuddy/client",
+      "src/knowledge/knowledge-graph",
+      "src/services/vfs/unified-vfs-router"
+    ]
+  },
+  "1-1-getting-started": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": [
+      "src/advanced/session-replay",
+      "src/agent/agent-loader",
+      "src/agent/architect-mode"
+    ]
+  },
+  "1-2-key-concepts": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": []
+  },
+  "2-architecture": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": [
+      "src/utils/logger",
+      "src/types",
+      "src/codebuddy/client",
+      "src/knowledge/knowledge-graph",
+      "src/services/vfs/unified-vfs-router",
+      "src/codebuddy/tool-definitions/types",
+      "src/agent/codebuddy-agent",
+      "src/channels",
+      "src/optimization/latency-optimizer",
+      "src/commands/handlers/branch-handlers"
+    ]
+  },
+  "3-commands-utils": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": [
+      "src/agent/codebuddy-agent",
+      "src/config/constants",
+      "src/utils/base-url",
+      "src/utils/model-utils",
+      "src/utils/settings-manager",
+      "src/utils/confirmation-service",
+      "src/commands/slash/types",
+      "src/server/middleware",
+      "src/utils/glob-utils",
+      "src/commands/slash-commands"
+    ]
+  },
+  "4-agent-utils": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": [
+      "src/utils/logger",
+      "src/workflows/types",
+      "src/utils/session-enhancements",
+      "src/workflows/state-manager",
+      "src/workflows/step-manager",
+      "src/advanced/session-replay",
+      "src/agent/agent-loader",
+      "src/agent/background-tasks",
+      "src/agent/cache-trace",
+      "src/agent/definitions/agent-definition-loader"
+    ]
+  },
+  "5-tools": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": [
+      "src/types",
+      "src/knowledge/knowledge-graph",
+      "src/tools/registry/types",
+      "src/knowledge/graph-pagerank",
+      "src/tools",
+      "src/tools/base-tool",
+      "src/knowledge/community-detection",
+      "src/knowledge/knowledge-manager",
+      "src/knowledge/scanners",
+      "src/security/dependency-vuln-scanner"
+    ]
+  },
+  "6-agent-security": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": [
+      "src/optimization/latency-optimizer",
+      "src/utils/cost-tracker",
+      "src/utils/token-counter",
+      "src/mcp/transports",
+      "src/checkpoints/checkpoint-manager",
+      "src/plugins/sandbox-worker",
+      "src/codebuddy/tools",
+      "src/errors",
+      "src/optimization/model-routing",
+      "src/utils/json-validator"
+    ]
+  },
+  "7-context-agent": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": [
+      "src/codebuddy/client",
+      "src/persistence/conversation-branches",
+      "src/utils/retry",
+      "src/config/model-tools",
+      "src/utils/rate-limit-display",
+      "src/providers/circuit-breaker",
+      "src/tools/types",
+      "src/context/context-engine",
+      "src/context/token-counter",
+      "src/context/types"
+    ]
+  },
+  "8-channels": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": [
+      "src/channels/core",
+      "src/channels/pro/types",
+      "src/channels/pro/scoped-auth",
+      "src/channels/reconnection-manager",
+      "src/channels/pro/run-tracker",
+      "src/channels/pro/ci-watcher",
+      "src/channels/pro/diff-first",
+      "src/channels/pro/enhanced-commands",
+      "src/channels/pro/run-commands",
+      "src/channels/pro/pro-features"
+    ]
+  },
+  "9-codebuddy": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": [
+      "src/codebuddy/tool-definitions/types",
+      "src/codebuddy/tool-definitions/advanced-tools",
+      "src/codebuddy/tool-definitions/agent-tools",
+      "src/codebuddy/tool-definitions/batch-tools",
+      "src/codebuddy/tool-definitions/browser-tools",
+      "src/codebuddy/tool-definitions/bug-finder-tools",
+      "src/codebuddy/tool-definitions/canvas-tools",
+      "src/codebuddy/tool-definitions/codebase-replace-tools",
+      "src/codebuddy/tool-definitions/computer-control-tools",
+      "src/codebuddy/tool-definitions/core-tools"
+    ]
+  },
+  "10-commands": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": [
+      "src/commands/handlers/branch-handlers",
+      "src/voice/speech-recognition",
+      "src/utils/telemetry-config",
+      "src/tools/codebase-replace-tool",
+      "src/intelligence/proactive-suggestions",
+      "src/personas/persona-manager",
+      "src/testing/coverage-targets",
+      "src/voice/voice-to-code",
+      "src/observability/tracing",
+      "src/commands/handlers/bug-handler"
+    ]
+  },
+  "11-tools-unified-vfs-router-": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": [
+      "src/services/vfs/unified-vfs-router",
+      "src/workspace/workspace-isolation",
+      "src/tools/intelligence/ast-parser",
+      "src/tools/intelligence/dependency-analyzer",
+      "src/tools/intelligence/symbol-search",
+      "src/services/vfs/memory-vfs-provider",
+      "src/sync/index",
+      "src/tools/batch-processor",
+      "src/tools/changelog-generator",
+      "src/tools/code-formatter"
+    ]
+  },
+  "12-agent": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": [
+      "src/agent/repo-profiling/types",
+      "src/agent/repo-profiling/fs-helpers",
+      "src/agent/repo-profiling/languages/language-profiler",
+      "src/agent/repo-profiling/repo-profiler",
+      "src/agent/repo-profiling/infrastructure/directory-profiler",
+      "src/agent/repo-profiling/cache",
+      "src/agent/repo-profiling/context-pack",
+      "src/agent/repo-profiling/infrastructure",
+      "src/agent/repo-profiling/languages",
+      "src/agent/repo-profiling/languages/dotnet-profiler"
+    ]
+  },
+  "13-database-analytics": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": [
+      "src/database/schema",
+      "src/database/database-manager",
+      "src/database/repositories/analytics-repository",
+      "src/events",
+      "src/database/repositories/session-repository",
+      "src/database/repositories/memory-repository",
+      "src/database/repositories/cache-repository",
+      "src/analytics",
+      "src/database/migration",
+      "src/database/repositories/embedding-repository"
+    ]
+  },
+  "14-agent-persistence": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": [
+      "src/agent/types",
+      "src/agent/profiles",
+      "src/persistence/session-store",
+      "src/agent/operating-modes",
+      "src/persistence/session-lock",
+      "src/context/context-files",
+      "src/agent/profiles/types",
+      "src/agent/agent-mode",
+      "src/security/session-encryption",
+      "src/mcp/mcp-resources"
+    ]
+  },
+  "15-agent-utils-todo-tracker-": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": [
+      "src/agent/todo-tracker",
+      "src/utils/output-sanitizer",
+      "src/utils/sanitize",
+      "src/agent/execution/agent-executor",
+      "src/context/restorable-compression",
+      "src/agent/execution/query-classifier",
+      "src/agent/middleware",
+      "src/agent/response-constraint",
+      "src/context/observation-variator",
+      "src/context/proactive-compaction"
+    ]
+  },
+  "16-plugins": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": [
+      "src/plugins/types",
+      "src/plugins/bundled/azure-provider",
+      "src/plugins/bundled/bedrock-provider",
+      "src/plugins/bundled/copilot-provider",
+      "src/plugins/bundled/fireworks-provider",
+      "src/plugins/bundled/groq-provider",
+      "src/plugins/bundled/ollama-provider",
+      "src/plugins/bundled/openrouter-provider",
+      "src/plugins/bundled/together-provider",
+      "src/plugins/bundled/vllm-provider"
+    ]
+  },
+  "17-ui": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": [
+      "src/ui/context/theme-context",
+      "src/ui/dashboard/hooks/use-dashboard-data",
+      "src/ui/dashboard/components/metric-card",
+      "src/ui/dashboard/components/mini-chart",
+      "src/observability/dashboard",
+      "src/ui/dashboard/views/costs-view",
+      "src/ui/dashboard/views/latency-view",
+      "src/ui/dashboard/views/overview-view",
+      "src/ui/dashboard/views/tools-view",
+      "src/ui/components/EnhancedChatInput"
+    ]
+  },
+  "18-logger": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": [
+      "src/utils/logger"
+    ]
+  },
+  "19-types": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": [
+      "src/types"
+    ]
+  },
+  "20-client": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": [
+      "src/codebuddy/client"
+    ]
+  },
+  "21-knowledge-graph": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": [
+      "src/knowledge/knowledge-graph"
+    ]
+  },
+  "22-unified-vfs-router": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": [
+      "src/services/vfs/unified-vfs-router"
+    ]
+  },
+  "23-metrics": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": []
+  },
+  "24-security": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": [
+      "src/security"
+    ]
+  },
+  "25-configuration": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": []
+  },
+  "26-api-reference": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": []
+  },
+  "27-testing": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": []
+  },
+  "28-troubleshooting": {
+    "generatedAt": 1774741190544,
+    "sourceFiles": []
+  }
+}

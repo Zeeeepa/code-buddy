@@ -1,7 +1,7 @@
 /**
  * Browser Automation Module
  *
- * OpenClaw-inspired browser control via CDP (Chrome DevTools Protocol).
+ * Enterprise-grade browser control via CDP (Chrome DevTools Protocol).
  * Uses Playwright for robust cross-browser automation.
  *
  * Features:

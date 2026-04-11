@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Star, X, Search, Trash2, MessageCircle, User2 } from 'lucide-react';
 import { useAppStore } from '../store';
+import { formatAppDateTime } from '../utils/i18n-format';
 
 interface Bookmark {
   id: number;
@@ -165,7 +166,7 @@ export function BookmarksPanel() {
                     <p className="text-[10px] text-text-muted mt-1 italic">{bookmark.note}</p>
                   )}
                   <p className="text-[10px] text-text-muted mt-1">
-                    {new Date(bookmark.createdAt).toLocaleString()}
+                    {formatAppDateTime(bookmark.createdAt)}
                   </p>
                 </button>
                 <button

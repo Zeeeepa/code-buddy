@@ -29,6 +29,199 @@ export interface RuleTestResult {
   matchedRule?: string;
 }
 
+function parseRule(rule: string): { toolName: string; argPattern: string | null } {
+  const match = rule.match(/^(\w+)\((.+)\)$/);
+  if (match) {
+    return { toolName: match[1], argPattern: match[2] };
+  }
+  return { toolName: rule.trim(), argPattern: null };
+}
+
+function patternToRegex(pattern: string): RegExp {
+  const escaped = pattern
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    .replace(/\*\*/g, '§DOUBLESTAR§')
+    .replace(/\*/g, '[^]*')
+    .replace(/§DOUBLESTAR§/g, '.*');
+  return new RegExp(`^${escaped}$`);
+}
+
+function isPathLikeTool(toolName: string): boolean {
+  return [
+    'edit',
+    'str_replace_editor',
+    'str_replace',
+    'write',
+    'create_file',
+    'file_write',
+    'read',
+    'view_file',
+    'file_read',
+    'glob',
+    'grep',
+    'search',
+  ].includes(toolName.toLowerCase());
+}
+
+function normalizePathLikeValue(value: string): string {
+  return value.replace(/\\/g, '/');
+}
+
+function extractPrimaryArg(toolName: string, toolArgs: Record<string, unknown>): string | null {
+  const name = toolName.toLowerCase();
+
+  if (name === 'bash' || name === 'shell_exec') {
+    return (toolArgs.command as string) || (toolArgs.cmd as string) || null;
+  }
+
+  if (['edit', 'str_replace_editor', 'str_replace'].includes(name)) {
+    return (toolArgs.file_path as string) || (toolArgs.path as string) || null;
+  }
+
+  if (['write', 'create_file', 'file_write'].includes(name)) {
+    return (toolArgs.file_path as string) || (toolArgs.path as string) || null;
+  }
+
+  if (['read', 'view_file', 'file_read'].includes(name)) {
+    return (toolArgs.file_path as string) || (toolArgs.path as string) || null;
+  }
+
+  if (name === 'glob') {
+    return (toolArgs.pattern as string) || (toolArgs.path as string) || null;
+  }
+
+  if (name === 'grep' || name === 'search') {
+    return (toolArgs.path as string) || (toolArgs.pattern as string) || null;
+  }
+
+  if (name.includes('chrome') || name.includes('gui') || name.includes('computer')) {
+    return (
+      (toolArgs.url as string) ||
+      (toolArgs.target as string) ||
+      (toolArgs.app as string) ||
+      (toolArgs.text as string) ||
+      null
+    );
+  }
+
+  return (
+    (toolArgs.url as string) ||
+    (toolArgs.target as string) ||
+    (toolArgs.app as string) ||
+    (toolArgs.file_path as string) ||
+    (toolArgs.path as string) ||
+    (toolArgs.command as string) ||
+    (toolArgs.input as string) ||
+    null
+  );
+}
+
+function splitBashCommands(command: string): string[] {
+  return command
+    .split(/\s*(?:&&|\|\||;)\s*/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function matchesRule(rule: string, toolName: string, primaryArg: string | null): boolean {
+  const parsed = parseRule(rule);
+  const normalizedTool = toolName.toLowerCase();
+  const normalizedRule = parsed.toolName.toLowerCase();
+
+  if (normalizedRule !== normalizedTool) {
+    const aliases: Record<string, string[]> = {
+      bash: ['shell_exec', 'bash'],
+      edit: ['str_replace_editor', 'str_replace', 'edit'],
+      write: ['create_file', 'file_write', 'write'],
+      read: ['view_file', 'file_read', 'read'],
+    };
+
+    let aliasMatch = false;
+    for (const [canonical, aliasList] of Object.entries(aliases)) {
+      if (
+        (aliasList.includes(normalizedRule) || normalizedRule === canonical) &&
+        (aliasList.includes(normalizedTool) || normalizedTool === canonical)
+      ) {
+        aliasMatch = true;
+        break;
+      }
+    }
+
+    if (!aliasMatch) {
+      return false;
+    }
+  }
+
+  if (parsed.argPattern === null) {
+    return true;
+  }
+
+  if (primaryArg === null) {
+    return false;
+  }
+
+  const candidate = isPathLikeTool(toolName) ? normalizePathLikeValue(primaryArg) : primaryArg;
+  const pattern = isPathLikeTool(toolName)
+    ? normalizePathLikeValue(parsed.argPattern)
+    : parsed.argPattern;
+
+  return patternToRegex(pattern).test(candidate);
+}
+
+export function explainPermissionWithLocalRules(
+  toolName: string,
+  toolArgs: Record<string, unknown>,
+  permissions: DeclarativePermissions
+): RuleTestResult {
+  const primaryArg = extractPrimaryArg(toolName, toolArgs);
+  const normalizedTool = toolName.toLowerCase();
+
+  if ((normalizedTool === 'bash' || normalizedTool === 'shell_exec') && primaryArg) {
+    const subCommands = splitBashCommands(primaryArg);
+    if (subCommands.length > 1) {
+      for (const subCommand of subCommands) {
+        const subResult = explainPermissionWithLocalRules(
+          toolName,
+          { ...toolArgs, command: subCommand, cmd: subCommand },
+          permissions
+        );
+        if (subResult.decision === 'deny') {
+          return subResult;
+        }
+      }
+
+      let matchedRule: string | undefined;
+      for (const subCommand of subCommands) {
+        const subResult = explainPermissionWithLocalRules(
+          toolName,
+          { ...toolArgs, command: subCommand, cmd: subCommand },
+          permissions
+        );
+        if (subResult.decision !== 'allow') {
+          return { decision: 'ask' };
+        }
+        matchedRule = matchedRule || subResult.matchedRule;
+      }
+
+      return { decision: 'allow', matchedRule };
+    }
+  }
+
+  for (const rule of permissions.deny ?? []) {
+    if (matchesRule(rule, toolName, primaryArg)) {
+      return { decision: 'deny', matchedRule: rule };
+    }
+  }
+
+  for (const rule of permissions.allow ?? []) {
+    if (matchesRule(rule, toolName, primaryArg)) {
+      return { decision: 'allow', matchedRule: rule };
+    }
+  }
+
+  return { decision: 'ask' };
+}
+
 type CoreDeclarativeRulesModule = {
   loadPermissions: (projectRoot?: string) => {
     allow?: string[];
@@ -234,7 +427,8 @@ export class RulesBridge {
   ): Promise<RuleTestResult> {
     const mod = await loadRulesModule();
     if (!mod) {
-      return { decision: 'ask' };
+      const permissions = await this.list(projectRoot);
+      return explainPermissionWithLocalRules(toolName, toolArgs, permissions);
     }
     try {
       if (typeof mod.explainDeclarativePermission === 'function') {
@@ -244,7 +438,8 @@ export class RulesBridge {
       return { decision };
     } catch (err) {
       logWarn('[RulesBridge] test failed:', err);
-      return { decision: 'ask' };
+      const permissions = await this.list(projectRoot);
+      return explainPermissionWithLocalRules(toolName, toolArgs, permissions);
     }
   }
 

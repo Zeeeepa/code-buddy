@@ -6,7 +6,7 @@
  * Auth via AZURE_OPENAI_API_KEY or Azure AD token (AZURE_OPENAI_AD_TOKEN).
  * Includes onboarding hooks for auth, discovery, and model picking.
  *
- * OpenClaw v2026.3.19 — Azure OpenAI provider plugin.
+ * Native Engine v2026.3.19 — Azure OpenAI provider plugin.
  */
 
 import { logger } from '../../utils/logger.js';

@@ -44,7 +44,7 @@ export function Titlebar() {
       <button
         onClick={() => useAppStore.getState().setShowBookmarksPanel(true)}
         className="w-10 h-full flex items-center justify-center titlebar-no-drag hover:bg-surface transition-colors ml-auto"
-        title="Bookmarks"
+        title={t('bookmarks.title')}
       >
         <Star className="w-4 h-4 text-text-secondary" />
       </button>
@@ -53,7 +53,7 @@ export function Titlebar() {
       <button
         onClick={() => useAppStore.getState().setShowActivityFeed(true)}
         className="w-10 h-full flex items-center justify-center titlebar-no-drag hover:bg-surface transition-colors"
-        title="Activity"
+        title={t('activity.title')}
       >
         <Activity className="w-4 h-4 text-text-secondary" />
       </button>
@@ -61,7 +61,7 @@ export function Titlebar() {
       <button
         onClick={() => useAppStore.getState().setShowSessionInsights(true)}
         className="w-10 h-full flex items-center justify-center titlebar-no-drag hover:bg-surface transition-colors"
-        title="Session insights"
+        title={t('sessionInsights.title')}
         data-testid="session-insights-button"
       >
         <BarChart3 className="w-4 h-4 text-text-secondary" />
@@ -70,7 +70,7 @@ export function Titlebar() {
       <button
         onClick={() => useAppStore.getState().setShowFocusView(true)}
         className="w-10 h-full flex items-center justify-center titlebar-no-drag hover:bg-surface transition-colors"
-        title="Focus view"
+        title={t('focusView.title')}
         data-testid="focus-view-button"
       >
         <Focus className="w-4 h-4 text-text-secondary" />
@@ -82,7 +82,7 @@ export function Titlebar() {
         className={`w-10 h-full flex items-center justify-center titlebar-no-drag hover:bg-surface transition-colors relative ${
           isMac ? 'mr-2' : ''
         }`}
-        title="Notifications"
+        title={t('notifications.title')}
       >
         <Bell className="w-4 h-4 text-text-secondary" />
         {unreadCount > 0 && (

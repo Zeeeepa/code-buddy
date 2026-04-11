@@ -330,7 +330,7 @@ export class AgentExecutor {
   }
 
   /**
-   * Tool Result Compaction Guard (OpenClaw / Manus AI #13)
+   * Tool Result Compaction Guard (Native Engine / Manus AI #13)
    *
    * Before each model call, scan accumulated tool result messages.
    * If their total size exceeds an adaptive threshold (scaled to model context),
@@ -528,7 +528,7 @@ export class AgentExecutor {
         }
       }
 
-      // Apply context management + transcript repair (OpenClaw v2026.3.11)
+      // Apply context management + transcript repair (Native Engine v2026.3.11)
       const preparedMessages = repairToolCallPairs(
         this.deps.contextManager.prepareMessages(messages)
       );
@@ -626,7 +626,7 @@ export class AgentExecutor {
       if (contextWarning.warn) {
         logger.warn(contextWarning.message);
 
-        // --- OpenClaw pre-compaction memory flush (NO_REPLY pattern) ---
+        // --- Native Engine pre-compaction memory flush (NO_REPLY pattern) ---
         // Run a silent background turn to extract facts to MEMORY.md before context is compacted.
         try {
           const { getPrecompactionFlusher } = await import('../../context/precompaction-flush.js');
@@ -950,7 +950,7 @@ export class AgentExecutor {
               break;
             }
 
-            // --- Yield signal detection (OpenClaw v2026.3.14) ---
+            // --- Yield signal detection (Native Engine v2026.3.14) ---
             if (rawToolContent.includes('__SESSIONS_YIELD__')) {
               const yieldMatch = rawToolContent.match(/"id"\s*:\s*"(agent-\d+)"/);
               if (yieldMatch) {
@@ -1088,7 +1088,7 @@ export class AgentExecutor {
             } catch { /* ICM store optional */ }
           }
 
-          // Context engine afterTurn hook (OpenClaw v2026.3.7)
+          // Context engine afterTurn hook (Native Engine v2026.3.7)
           try {
             const engine = this.deps.contextManager.getContextEngine?.();
             if (engine) {
@@ -1331,7 +1331,7 @@ export class AgentExecutor {
           if (contextWarning.warn) {
             yield { type: "content", content: `\n${contextWarning.message}\n` };
 
-            // --- OpenClaw pre-compaction memory flush (streaming path) ---
+            // --- Native Engine pre-compaction memory flush (streaming path) ---
             try {
               const { getPrecompactionFlusher } = await import('../../context/precompaction-flush.js');
               const flusher = getPrecompactionFlusher();
@@ -1695,7 +1695,37 @@ export class AgentExecutor {
               break;
             }
 
-            // --- Yield signal detection (OpenClaw v2026.3.14, streaming path) ---
+            // --- Interactive Shell Handoff detection (streaming path) ---
+            if (rawStreamContent.startsWith('__INTERACTIVE_SHELL_REQUEST__')) {
+              const requestMsg = rawStreamContent.replace('__INTERACTIVE_SHELL_REQUEST__', '').trim();
+              yield { type: "content", content: `\n\n⚠️ **INTERACTIVE SHELL HANDOFF REQUESTED**\n\n${requestMsg}` };
+              yield { 
+                type: "ask_user", 
+                askUser: { 
+                  question: "Do you want to open an interactive terminal to perform this action? (Type 'exit' in the terminal when done to return control to the AI)", 
+                  options: ["Yes, open interactive shell", "No, cancel tool"] 
+                } 
+              };
+              terminateDetectedStreaming = true;
+              break;
+            }
+
+            // --- Plan Approval detection (streaming path) ---
+            if (rawStreamContent.startsWith('__PLAN_APPROVAL_REQUEST__')) {
+              const planMsg = rawStreamContent.replace('__PLAN_APPROVAL_REQUEST__', '').trim();
+              yield { type: "content", content: `\n\n⚠️ **PLAN APPROVAL REQUIRED**\n\n${planMsg}` };
+              yield { 
+                type: "ask_user", 
+                askUser: { 
+                  question: "Do you approve this plan? (Yes to execute, No to cancel, or provide feedback)", 
+                  options: ["Approve", "Reject"] 
+                } 
+              };
+              terminateDetectedStreaming = true;
+              break;
+            }
+
+            // --- Yield signal detection (Native Engine v2026.3.14, streaming path) ---
             if (rawStreamContent.includes('__SESSIONS_YIELD__')) {
               const yieldMatch = rawStreamContent.match(/"id"\s*:\s*"(agent-\d+)"/);
               if (yieldMatch) {
@@ -1775,7 +1805,7 @@ export class AgentExecutor {
             } catch { /* ICM store optional */ }
           }
 
-          // Context engine afterTurn hook (OpenClaw v2026.3.7 — streaming path)
+          // Context engine afterTurn hook (Native Engine v2026.3.7 — streaming path)
           try {
             const engine = this.deps.contextManager.getContextEngine?.();
             if (engine) {

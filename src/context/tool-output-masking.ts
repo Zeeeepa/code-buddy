@@ -243,7 +243,7 @@ export function expireOldToolResults(
 }
 
 // ============================================================================
-// Image-Only Tool Result Pruning (OpenClaw Vague 4 Phase 3)
+// Image-Only Tool Result Pruning (Native Engine Vague 4 Phase 3)
 // ============================================================================
 
 /** Number of most-recent image tool results to keep intact */

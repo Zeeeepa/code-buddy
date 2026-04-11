@@ -3,6 +3,7 @@
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete",
+    "remove": "Remove",
     "edit": "Edit",
     "add": "Add",
     "close": "Close",
@@ -112,6 +113,7 @@
   },
   "language": {
     "english": "English",
+    "french": "French",
     "chinese": "Chinese",
     "selectLanguage": "Select Language",
     "currentLanguage": "Current language"
@@ -883,8 +885,34 @@
     "openComputerUseOverlay": "Open overlay",
     "computerUseClickAt": "Click at ({{x}}, {{y}})",
     "computerUseNoScreenshot": "No screenshot available for this action",
+    "rulePreviewTitle": "Current rule decision",
+    "rulePreviewChecking": "Checking saved permission rules…",
+    "rulePreviewError": "Couldn't test saved rules right now.",
+    "rulePreview": {
+      "allow": "A saved allow rule would auto-approve this request.",
+      "ask": "No saved rule matches yet. This request still needs approval.",
+      "deny": "A saved deny rule would block this request."
+    },
+    "covered": {
+      "allow": "This request is already covered by a saved allow rule.",
+      "deny": "This request is already covered by a saved deny rule."
+    },
+    "coveredSuggestion": "A more specific rule is available if you want to refine this match: {{rule}}",
+    "suggestedRule": "Suggested scoped rule: {{rule}}",
+    "ruleDraftLabel": "Scoped rule to save",
+    "ruleDraftPlaceholder": "Edit the scoped rule before saving",
+    "ruleDraftHint": "Adjust the scoped rule if you want a narrower or broader match before saving it.",
+    "ruleDraftInvalid": "Use Tool or Tool(pattern) syntax before saving this rule.",
+    "useFolderRule": "Use folder rule",
+    "restoreSuggestedRule": "Use suggested rule",
     "alwaysAllowTarget": "Always allow this target",
+    "alwaysDenyTarget": "Always block this target",
+    "allowAndReviewRules": "Allow and review in permission rules",
+    "denyAndReviewRules": "Deny and review in permission rules",
+    "allowAndReviewSpecificRule": "Review a more specific allow rule",
+    "denyAndReviewSpecificRule": "Review a more specific deny rule",
     "rememberingTarget": "Saving rule…",
+    "rememberingDeniedTarget": "Saving block rule…",
     "deny": "Deny",
     "allow": "Allow",
     "alwaysAllow": "Always allow this tool",
@@ -1035,6 +1063,9 @@
     "allow": "Allow list",
     "deny": "Deny list",
     "empty": "No rules yet",
+    "filterTitle": "Find rules",
+    "searchPlaceholder": "Search rules…",
+    "filterAll": "All scopes",
     "add": "Add",
     "addPlaceholder": "e.g. Bash(npm *) or Edit(src/**)",
     "addThis": "Add this rule",
@@ -1277,6 +1308,8 @@
     "empty": "No reasoning traces captured yet. Traces appear here when the agent uses the reason tool.",
     "mode": "Mode",
     "nodes": "nodes",
+    "iterations": "iterations",
+    "tokens": "tokens",
     "score": "Score",
     "playback": "Playback",
     "play": "Play",
@@ -1342,6 +1375,7 @@
     "sessionFilter": "Session ID",
     "totals": "Totals",
     "runs": "runs",
+    "tokens": "tokens",
     "tools": "tools",
     "objective": "Objective",
     "status": "Status",
@@ -1355,6 +1389,16 @@
     "artifacts": "Artifacts",
     "tags": "Tags",
     "noEvents": "No events recorded"
+  },
+  "exportSession": {
+    "exportedOn": "Exported on",
+    "user": "User",
+    "assistant": "Assistant",
+    "system": "System",
+    "tool": "Tool",
+    "result": "Result",
+    "error": "Error",
+    "thinking": "Thinking"
   },
   "workspacePresets": {
     "title": "Workspace presets",
@@ -1497,6 +1541,56 @@
     "ttsOff": "Voice output is off — click to enable",
     "ttsLabelOn": "TTS on",
     "ttsLabelOff": "TTS"
+  },
+  "commandPalette": {
+    "searchPlaceholder": "Type a command…",
+    "empty": "No matching commands",
+    "newSession": "New session",
+    "newSessionDesc": "Start a new conversation",
+    "resumeSession": "Resume session",
+    "resumeSessionDesc": "Open the session resume chooser",
+    "settingsDesc": "Open settings panel",
+    "switchToLightTheme": "Switch to light theme",
+    "switchToDarkTheme": "Switch to dark theme",
+    "shortcutsDesc": "View all shortcuts",
+    "exportDesc": "Export as Markdown or JSON"
+  },
+  "fileTree": {
+    "filterPlaceholder": "Filter files…",
+    "empty": "No files found"
+  },
+  "shortcutsDialog": {
+    "title": "Keyboard shortcuts",
+    "general": "General",
+    "chat": "Chat",
+    "navigation": "Navigation",
+    "checkpoints": "Checkpoints",
+    "openCommandPalette": "Open command palette",
+    "showKeyboardShortcuts": "Show keyboard shortcuts",
+    "newSession": "New session",
+    "openSettings": "Open settings",
+    "searchMessages": "Search in messages",
+    "sendMessage": "Send message",
+    "newLine": "New line",
+    "stopGeneration": "Stop generation",
+    "toggleSidebar": "Toggle sidebar",
+    "toggleContextPanel": "Toggle context panel",
+    "undoLastChange": "Undo last change",
+    "redo": "Redo"
+  },
+  "sessionSearch": {
+    "placeholder": "Search in messages…",
+    "noResults": "No results",
+    "previous": "Previous (Shift+Enter)",
+    "next": "Next (Enter)",
+    "close": "Close (Esc)"
+  },
+  "updateNotification": {
+    "downloaded": "Update {{version}} downloaded. Restart to apply.",
+    "downloading": "Downloading update…",
+    "available": "Update {{version}} available",
+    "restart": "Restart",
+    "download": "Download"
   },
   "tabs": {
     "newTab": "New tab",

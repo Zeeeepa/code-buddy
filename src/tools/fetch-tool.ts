@@ -92,7 +92,7 @@ export class FetchTool {
         return { success: false, error: `Invalid URL: ${url}` };
       }
 
-      // Security check — full SSRF guard (OpenClaw-inspired, replaces basic isInternalUrl)
+      // Security check — full SSRF guard (Enterprise-grade, replaces basic isInternalUrl)
       const ssrfCheck = await assertSafeUrl(url);
       if (!ssrfCheck.safe) {
         return { success: false, error: `SSRF protection: ${ssrfCheck.reason}` };

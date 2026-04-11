@@ -1,6 +1,6 @@
 /**
  * Tests for Health Monitor stale event detection and restart limits
- * (OpenClaw v2026.3.11 alignment)
+ * (Native Engine v2026.3.11 alignment)
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';

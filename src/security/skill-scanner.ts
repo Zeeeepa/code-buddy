@@ -1,5 +1,5 @@
 /**
- * Skill Code Scanner (OpenClaw-inspired)
+ * Skill Code Scanner (Enterprise-grade)
  *
  * Static analysis of skill files for dangerous patterns.
  * Scans SKILL.md files and any referenced code for security issues.

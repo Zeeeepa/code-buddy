@@ -1,7 +1,7 @@
 /**
  * Permission Manager
  *
- * OpenClaw-inspired platform-specific permission gating.
+ * Enterprise-grade platform-specific permission gating.
  * Checks and requests permissions before sensitive operations.
  *
  * Supports:

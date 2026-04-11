@@ -1,7 +1,7 @@
 /**
  * Lifecycle Hooks System
  *
- * Implements pre/post hooks for various operations, similar to Claude Code.
+ * Implements pre/post hooks for various operations, similar to Native Engine.
  * Allows users to customize behavior and integrate with their workflows.
  *
  * Hook Types:
@@ -47,7 +47,7 @@ export type HookType =
   | "message:transcribed"
   | "message:preprocessed"
   | "message:sent"
-  // CC12: New events for Claude Code parity
+  // CC12: New events for Enterprise parity
   | "user-prompt-submit"
   | "model:request"
   | "model:response"

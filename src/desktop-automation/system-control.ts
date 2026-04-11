@@ -1,7 +1,7 @@
 /**
  * System Control Module
  *
- * OpenClaw-inspired system-level controls for desktop automation.
+ * Enterprise-grade system-level controls for desktop automation.
  * Cross-platform support for Linux, macOS, and Windows.
  *
  * Features:

@@ -45,7 +45,7 @@ export class PluginManager extends EventEmitter {
   private pluginConfigs: Map<string, Record<string, unknown>> = new Map();
   private config: PluginManagerConfig;
   private logger: Logger;
-  /** Registered context engine from plugins (OpenClaw v2026.3.7 — last wins) */
+  /** Registered context engine from plugins (Native Engine v2026.3.7 — last wins) */
   _registeredContextEngine: import('../context/context-engine.js').ContextEngine | null = null;
 
   constructor(config: Partial<PluginManagerConfig> = {}) {
@@ -62,7 +62,7 @@ export class PluginManager extends EventEmitter {
   }
 
   /**
-   * Load bundled provider plugins (OpenClaw v2026.3.14).
+   * Load bundled provider plugins (Native Engine v2026.3.14).
    * Called during initialization to register built-in providers.
    */
   async loadBundledProviders(): Promise<void> {
@@ -603,7 +603,7 @@ export class PluginManager extends EventEmitter {
       },
 
       registerContextEngine: (engine) => {
-        // Security: non-trusted plugins cannot register ownsCompaction engines (OpenClaw v2026.3.14)
+        // Security: non-trusted plugins cannot register ownsCompaction engines (Native Engine v2026.3.14)
         if (engine.ownsCompaction && !this.isPluginTrusted(metadata.manifest.id)) {
           this.logger.warn(`Plugin ${metadata.manifest.id} denied ownsCompaction context engine — not trusted`);
           this.emit('plugin:context-engine-denied', {

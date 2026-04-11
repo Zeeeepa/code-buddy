@@ -1,5 +1,5 @@
 /**
- * OpenClaw-inspired Tool Policy System
+ * Enterprise-grade Tool Policy System
  *
  * Implements allow/deny pattern matching with hierarchy:
  * 1. Agent-level settings (highest priority)

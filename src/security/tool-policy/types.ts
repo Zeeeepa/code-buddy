@@ -2,7 +2,7 @@
  * Tool Policy System Types
  *
  * Hierarchical tool grouping and policy management for fine-grained
- * access control. Inspired by OpenClaw's permission model.
+ * access control. Advanced enterprise architecture for permission model.
  *
  * Key concepts:
  * - ToolGroup: Hierarchical grouping (e.g., 'group:fs:write' is a subset of 'group:fs')

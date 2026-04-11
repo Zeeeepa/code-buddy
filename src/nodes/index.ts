@@ -4,7 +4,7 @@
  * Manages companion app nodes (macOS, iOS, Android) that connect
  * to the Gateway via WebSocket for device-level capabilities.
  *
- * Inspired by OpenClaw's node system:
+ * Advanced enterprise architecture for node system:
  * - macOS: menu bar control, voice wake, push-to-talk
  * - iOS: voice trigger, canvas, camera
  * - Android: camera, screen capture, location, notifications, contacts

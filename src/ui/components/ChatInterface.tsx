@@ -140,6 +140,7 @@ function ChatInterfaceWithAgent({
     commandSuggestions,
     availableModels,
     autoEditEnabled,
+    handleInputSubmit,
   } = useInputHandler({
     agent,
     chatHistory,
@@ -373,9 +374,11 @@ function ChatInterfaceWithAgent({
                     timestamp: new Date(),
                   }]);
                   setPendingQuestion(null);
+
+                  // Auto-submit the answer so the agent continues
+                  setTimeout(() => handleInputSubmit(answer), 50);
                 }
-                break;
-              case "done":
+                break;              case "done":
                 setCurrentActivity('');
                 if (streamingEntry) {
                   finalizeStreamingEntry();

@@ -43,7 +43,7 @@ import type {
  * Supported AI provider identifiers.
  * Extends the shared ProviderType with 'claude' (Code Buddy's name for Anthropic).
  */
-export type ProviderType = SharedProviderType | 'claude';
+export type ProviderType = SharedProviderType | 'claude' | 'bundled-gemma4';
 
 // ============================================================================
 // LLMMessage (keep content as string for backward compat)

@@ -5,7 +5,7 @@
  * sandboxed execution environments. These variables can be used to
  * inject code, preload libraries, or hijack build tools.
  *
- * Part of OpenClaw Phase 2: Hardening Sandbox.
+ * Part of Native Engine Phase 2: Hardening Sandbox.
  */
 
 import { logger } from '../utils/logger.js';

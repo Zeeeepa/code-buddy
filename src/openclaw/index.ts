@@ -1,7 +1,7 @@
 /**
- * OpenClaw-inspired Modules
+ * Enterprise-grade Modules
  *
- * This module exports all the advanced features inspired by OpenClaw,
+ * This module exports all the advanced features Advanced enterprise architecture for,
  * the most advanced LLM client project on GitHub.
  *
  * Features included:
@@ -188,9 +188,9 @@ export {
 };
 
 /**
- * Initialize all OpenClaw modules with default configuration
+ * Initialize all Native Engine modules with default configuration
  */
-export function initializeOpenClawModules(config: {
+export function initializeNative EngineModules(config: {
   builtInTools?: string[];
   policyHierarchy?: PolicyHierarchy;
   compactionConfig?: CompactionConfig;
@@ -223,9 +223,9 @@ export function initializeOpenClawModules(config: {
 }
 
 /**
- * Reset all OpenClaw module singletons
+ * Reset all Native Engine module singletons
  */
-export function resetAllOpenClawModules(): void {
+export function resetAllNative EngineModules(): void {
   _resetToolPolicyEngine();
   _resetToolLifecycleHooks();
   _resetSmartCompactionEngine();

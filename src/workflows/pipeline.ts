@@ -40,7 +40,7 @@ import { EventEmitter } from 'events';
 // ============================================================================
 
 /**
- * Configuration for an approval gate step (OpenClaw Lobster-inspired)
+ * Configuration for an approval gate step (Native Engine Lobster-inspired)
  */
 export interface ApprovalGateConfig {
   /** Who should approve this step (user ID, role, etc.) */
@@ -611,7 +611,7 @@ export class PipelineCompositor extends EventEmitter {
   }
 
   // ==========================================================================
-  // Approval Gates (OpenClaw Lobster-inspired)
+  // Approval Gates (Native Engine Lobster-inspired)
   // ==========================================================================
 
   /**

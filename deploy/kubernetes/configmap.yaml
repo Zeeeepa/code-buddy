@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: codebuddy-config
+data:
+  GROK_MODEL: "grok-3-latest"
+  MAX_COST: "10"
+  RATE_LIMIT_MAX: "100"
+  # Timezone override for Docker sandbox (IANA format, e.g. America/New_York)
+  # CODEBUDDY_TZ: "UTC"

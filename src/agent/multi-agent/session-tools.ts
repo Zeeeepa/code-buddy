@@ -4,7 +4,7 @@
  * Tools for multi-agent session coordination.
  * Enables agents to communicate across sessions.
  *
- * Inspired by OpenClaw's session tools:
+ * Advanced enterprise architecture for session tools:
  * - sessions_list: List active sessions
  * - sessions_history: Get session transcript
  * - sessions_send: Message another session

@@ -3,7 +3,7 @@
  *
  * Monitors authentication state across providers and channels.
  * Detects token expiration, auth failures, and credential issues.
- * Inspired by OpenClaw's automation/auth-monitoring.
+ * Advanced enterprise architecture for automation/auth-monitoring.
  */
 
 import { EventEmitter } from 'events';

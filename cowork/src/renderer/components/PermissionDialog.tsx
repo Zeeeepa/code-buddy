@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useIPC } from '../hooks/useIPC';
+import { usePermissionRuleAssist } from '../hooks/usePermissionRuleAssist';
 import type { PermissionRequest } from '../types';
 import { Shield, X, Check, AlertTriangle, Monitor } from 'lucide-react';
 import { useAppStore } from '../store';
-import { deriveScopedPermissionRule } from '../utils/permission-target-rule';
+import { PermissionRuleAssistPanel } from './PermissionRuleAssistPanel';
 
 interface PermissionDialogProps {
   permission: PermissionRequest;
@@ -14,10 +15,13 @@ export function PermissionDialog({ permission }: PermissionDialogProps) {
   const { t } = useTranslation();
   const { respondToPermission } = useIPC();
   const [pendingAlwaysAllow, setPendingAlwaysAllow] = useState(false);
-  const [rememberingTarget, setRememberingTarget] = useState(false);
   const guiActions = useAppStore((s) => s.guiActions);
   const setShowComputerUseOverlay = useAppStore((s) => s.setShowComputerUseOverlay);
   const activeProjectId = useAppStore((s) => s.activeProjectId);
+  const setShowSettings = useAppStore((s) => s.setShowSettings);
+  const setSettingsTab = useAppStore((s) => s.setSettingsTab);
+  const setPermissionRuleTestDraft = useAppStore((s) => s.setPermissionRuleTestDraft);
+  const setPermissionRuleDraft = useAppStore((s) => s.setPermissionRuleDraft);
 
   const getToolDescription = (toolName: string): string => {
     const key = `permission.toolDescriptions.${toolName}`;
@@ -69,14 +73,39 @@ export function PermissionDialog({ permission }: PermissionDialogProps) {
     return [app, target, url, text].filter(Boolean).join(' • ');
   })();
 
-  const derivedScopedRule = deriveScopedPermissionRule(
-    permission.toolName,
-    permission.input,
-    relatedGuiAction?.details
-  );
+  const {
+    derivedFolderRule,
+    derivedReviewRule,
+    derivedScopedRule,
+    handleSaveScopedRule,
+    hasCoveredSuggestionNote,
+    isScopedRuleDraftValid,
+    matchedDecision,
+    normalizedScopedRuleDraft,
+    openRulesReview,
+    rulePreview,
+    rulePreviewTone,
+    savingScopedTargetDecision,
+    scopedRuleDraft,
+    setScopedRuleDraft,
+    showRuleDraftPanel,
+    showScopedRuleSuggestion,
+  } = usePermissionRuleAssist({
+    permission,
+    relatedDetails: relatedGuiAction?.details,
+    activeProjectId,
+    setShowSettings,
+    setSettingsTab,
+    setPermissionRuleTestDraft,
+    setPermissionRuleDraft,
+    respondToPermission,
+  });
 
   return (
-    <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+    <div
+      className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in"
+      data-testid="permission-dialog"
+    >
       <div className="card w-full max-w-md p-6 m-4 shadow-elevated animate-slide-up">
         {/* Header */}
         <div className="flex items-start gap-4">
@@ -163,6 +192,28 @@ export function PermissionDialog({ permission }: PermissionDialogProps) {
           </div>
         </div>
 
+        <PermissionRuleAssistPanel
+          t={t}
+          rulePreviewTone={rulePreviewTone}
+          rulePreview={rulePreview}
+          derivedScopedRule={derivedScopedRule}
+          derivedReviewRule={derivedReviewRule}
+          derivedFolderRule={derivedFolderRule}
+          scopedRuleDraft={scopedRuleDraft}
+          normalizedScopedRuleDraft={normalizedScopedRuleDraft}
+          isScopedRuleDraftValid={isScopedRuleDraftValid}
+          showScopedRuleSuggestion={showScopedRuleSuggestion}
+          hasCoveredSuggestionNote={hasCoveredSuggestionNote}
+          showRuleDraftPanel={showRuleDraftPanel}
+          matchedDecision={matchedDecision}
+          savingScopedTargetDecision={savingScopedTargetDecision}
+          onChangeScopedRuleDraft={setScopedRuleDraft}
+          onUseFolderRule={() => setScopedRuleDraft(derivedFolderRule ?? '')}
+          onUseSuggestedRule={() => setScopedRuleDraft(derivedScopedRule ?? '')}
+          onSaveScopedRule={handleSaveScopedRule}
+          onOpenRulesReview={openRulesReview}
+        />
+
         {/* Warning */}
         {isHighRisk && (
           <div className="mt-4 p-3 bg-warning/10 border border-warning/20 rounded-xl">
@@ -178,6 +229,7 @@ export function PermissionDialog({ permission }: PermissionDialogProps) {
           <button
             onClick={() => respondToPermission(permission.toolUseId, 'deny')}
             className="flex-1 btn btn-secondary"
+            data-testid="permission-deny-button"
           >
             <X className="w-4 h-4" />
             {t('permission.deny')}
@@ -186,38 +238,12 @@ export function PermissionDialog({ permission }: PermissionDialogProps) {
           <button
             onClick={() => respondToPermission(permission.toolUseId, 'allow')}
             className="flex-1 btn btn-primary"
+            data-testid="permission-allow-button"
           >
             <Check className="w-4 h-4" />
             {t('permission.allow')}
           </button>
         </div>
-
-        {derivedScopedRule && (
-          <button
-            onClick={async () => {
-              if (!window.electronAPI?.rules?.add) return;
-              setRememberingTarget(true);
-              try {
-                const result = await window.electronAPI.rules.add(
-                  'allow',
-                  derivedScopedRule,
-                  activeProjectId ?? undefined
-                );
-                if (result.success) {
-                  respondToPermission(permission.toolUseId, 'allow');
-                }
-              } finally {
-                setRememberingTarget(false);
-              }
-            }}
-            disabled={rememberingTarget}
-            className="w-full mt-2 btn btn-ghost text-sm"
-          >
-            {rememberingTarget
-              ? t('permission.rememberingTarget', 'Saving rule…')
-              : t('permission.alwaysAllowTarget', { target: derivedScopedRule })}
-          </button>
-        )}
 
         {/* Always Allow option */}
         {!pendingAlwaysAllow ? (

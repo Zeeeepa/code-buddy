@@ -172,7 +172,7 @@ let _skillManagerDeprecationWarned = false;
 
 /**
  * Skill Manager - Auto-activating specialized abilities
- * Inspired by Claude Code's Skills system
+ * Advanced enterprise architecture for Skills system
  *
  * @deprecated Use the SKILL.md system instead (SkillRegistry from './registry.js').
  * See src/skills/MIGRATION.md for migration guide.

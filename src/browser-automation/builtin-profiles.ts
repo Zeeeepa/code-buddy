@@ -1,7 +1,7 @@
 /**
  * Built-in Browser Profiles
  *
- * OpenClaw v2026.3.13 alignment: predefined browser profiles for agent use.
+ * Native Engine v2026.3.13 alignment: predefined browser profiles for agent use.
  * - `user`: Connect to running Chrome via CDP (port 9222)
  * - `chrome-relay`: Launch Chromium with persistent user data directory
  */

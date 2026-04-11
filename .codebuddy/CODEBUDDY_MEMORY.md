@@ -4,24 +4,19 @@ This file stores persistent memory for the Code Buddy agent.
 It is automatically managed but can be manually edited.
 
 ## Project Context
-<!-- No memories in this category -->
+<!-- Key information about this project -->
 
 ## User Preferences
-<!-- No memories in this category -->
+<!-- Coding style, conventions, preferences -->
 
 ## Decisions
-<!-- No memories in this category -->
+<!-- Important architectural or design decisions -->
 
 ## Patterns
-<!-- No memories in this category -->
-
-## Context
-<!-- No memories in this category -->
+<!-- Code patterns and conventions used -->
 
 ## Custom
-- **apiKey**: secret123
-- **note**: this is a note
-- **key**: value
+<!-- User-defined memories -->
 
 ---
-*Last updated: 2026-03-06T08:16:20.866Z*
+*Last updated: 2026-03-28T21:10:41.031Z*

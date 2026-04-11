@@ -1,7 +1,7 @@
 /**
  * Tool Hooks Module
  *
- * OpenClaw-inspired tool lifecycle management:
+ * Enterprise-grade tool lifecycle management:
  * - Tool lifecycle hooks (before/after/persist)
  * - Result sanitization
  * - Session lanes for serialized execution

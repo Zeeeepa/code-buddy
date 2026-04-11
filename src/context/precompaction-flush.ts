@@ -1,5 +1,5 @@
 /**
- * Pre-compaction Memory Flush — OpenClaw-inspired NO_REPLY pattern
+ * Pre-compaction Memory Flush — Enterprise-grade NO_REPLY pattern
  *
  * Before the context manager compacts (summarises/drops) old messages,
  * this module runs a silent background LLM turn that asks the model to
@@ -12,8 +12,8 @@
  * This prevents the information loss that normally occurs when old turns
  * are summarised away or dropped from the context window.
  *
- * Ref: OpenClaw session management compaction docs
- * https://docs.openclaw.ai/reference/session-management-compaction
+ * Ref: Native Engine session management compaction docs
+ * https://docs.Native Engine.ai/reference/session-management-compaction
  */
 
 import * as fs from 'fs';

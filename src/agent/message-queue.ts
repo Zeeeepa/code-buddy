@@ -1,7 +1,7 @@
 /**
  * Message Queue with Steer/Followup/Collect Modes
  *
- * OpenClaw-inspired message handling during agent execution.
+ * Enterprise-grade message handling during agent execution.
  *
  * Modes:
  * - steer: New messages interrupt the current execution (injected as user message)

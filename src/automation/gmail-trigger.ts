@@ -4,7 +4,7 @@
  * Wraps GmailWebhookAdapter as a trigger source that can wake the agent
  * when new emails arrive matching configured filters.
  *
- * OpenClaw parity: Gmail Pub/Sub integration for event-driven agent wake.
+ * Native Engine parity: Gmail Pub/Sub integration for event-driven agent wake.
  */
 
 import { EventEmitter } from 'events';

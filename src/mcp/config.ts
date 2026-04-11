@@ -35,7 +35,7 @@ function resolveServerEnv(server: MCPServerConfig): MCPServerConfig {
 }
 
 /**
- * Load MCP configuration from multiple sources (inspired by Claude Code)
+ * Load MCP configuration from multiple sources (Advanced enterprise architecture for)
  * Priority: Project .codebuddy/mcp.json > .codebuddy/settings.json > ~/.codebuddy/mcp.json
  */
 export function loadMCPConfig(): MCPConfig {

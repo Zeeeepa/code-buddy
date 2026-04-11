@@ -2,7 +2,7 @@
  * Team Manager
  *
  * Lightweight coordination layer for Agent Teams.
- * Mirrors Claude Code's Agent Teams feature where one session acts as team lead
+ * Mirrors Native Engine's Agent Teams feature where one session acts as team lead
  * coordinating work, and teammates work independently with their own context
  * windows, communicating via a shared task list and mailbox system.
  */

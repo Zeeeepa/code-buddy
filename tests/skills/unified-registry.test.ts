@@ -29,7 +29,7 @@ function createMockSkillMd(name: string, overrides: Partial<Skill> = {}): Skill 
       name,
       description: `${name} description`,
       tags: ['test'],
-      openclaw: {
+      Native Engine: {
         priority: 5,
         triggers: [`trigger-${name}`],
       },
@@ -96,7 +96,7 @@ describe('SkillRegistry - Unified Methods', () => {
       expect(retrieved!.metadata.description).toBe('typescript-expert legacy description');
     });
 
-    it('should convert legacy triggers to openclaw triggers', () => {
+    it('should convert legacy triggers to Native Engine triggers', () => {
       const legacy = createMockLegacySkill('react-specialist', {
         triggers: ['react', 'component', 'hook'],
       });
@@ -104,7 +104,7 @@ describe('SkillRegistry - Unified Methods', () => {
       registry.registerLegacySkill(legacy);
 
       const retrieved = registry.get('react-specialist');
-      expect(retrieved!.metadata.openclaw?.triggers).toEqual(['react', 'component', 'hook']);
+      expect(retrieved!.metadata.Native Engine?.triggers).toEqual(['react', 'component', 'hook']);
     });
 
     it('should convert legacy tools to requirements', () => {

@@ -120,7 +120,7 @@ export function initializeToolRegistry(): void {
   registerGroup(CANVAS_TOOLS);
   registerGroup(AGENT_TOOLS);
 
-  // Firecrawl tools — gated by API key (OpenClaw v2026.3.14)
+  // Firecrawl tools — gated by API key (Native Engine v2026.3.14)
   registerGroup(FIRECRAWL_TOOLS, () => !!process.env.FIRECRAWL_API_KEY);
 
   // LSP rename/refactor tools

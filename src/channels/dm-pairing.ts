@@ -1,7 +1,7 @@
 /**
  * DM Pairing System
  *
- * OpenClaw-inspired access control for personal AI assistants exposed
+ * Enterprise-grade access control for personal AI assistants exposed
  * to messaging platforms.
  *
  * When pairing mode is enabled:
@@ -436,7 +436,7 @@ export class DMPairingManager extends EventEmitter {
 
     await fs.mkdir(this.config.allowlistPath, { recursive: true });
 
-    // Group by channel type (like OpenClaw: <channel>-allowFrom.json)
+    // Group by channel type (like Native Engine: <channel>-allowFrom.json)
     const byChannel: Record<string, ApprovedSender[]> = {};
     for (const sender of this.allowlist.values()) {
       if (!byChannel[sender.channelType]) {

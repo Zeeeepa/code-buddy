@@ -44,7 +44,7 @@ const PLAN_MODE_ALLOWED_TOOLS = new Set([
   // Think
   'reason', 'think',
   // Plan
-  'plan',
+  'plan', 'submit_plan',
   // Communicate
   'ask_human',
   // Knowledge

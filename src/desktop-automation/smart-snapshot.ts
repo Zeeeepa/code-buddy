@@ -1,7 +1,7 @@
 /**
  * Smart Snapshot System
  *
- * OpenClaw-inspired UI element referencing system.
+ * Enterprise-grade UI element referencing system.
  * Assigns numeric references [1], [2], [3] to interactive elements
  * instead of using brittle CSS selectors or coordinates.
  *

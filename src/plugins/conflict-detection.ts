@@ -1,5 +1,5 @@
 /**
- * OpenClaw-inspired Plugin Conflict Detection System
+ * Enterprise-grade Plugin Conflict Detection System
  *
  * Features:
  * - Conflict detection between plugin IDs and tool names

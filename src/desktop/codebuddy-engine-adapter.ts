@@ -100,6 +100,25 @@ export class CodeBuddyEngineAdapter implements EngineAdapter {
       const abortController = new AbortController();
       this.abortControllers.set(sessionId, abortController);
 
+      // Intercept /ultraplan
+      if (lastMessage.content.trim().startsWith('/ultraplan')) {
+          const { handleUltraplan } = await import('../commands/handlers/ultraplan-handler.js');
+          const args = lastMessage.content.trim().replace('/ultraplan', '').trim().split(' ');
+          
+          await handleUltraplan(args, (msg: string) => {
+              // Strip ANSI escape codes for cleaner UI display
+              const cleanMsg = msg.replace(/\x1b\[[0-9;]*m/g, '');
+              fullContent += cleanMsg;
+              onEvent({ type: 'content', content: cleanMsg });
+          });
+
+          return {
+            content: fullContent,
+            tokenCount: totalTokens,
+            toolCallCount,
+          };
+      }
+
       // Stream the response
       const stream = agent.processUserMessageStream(lastMessage.content);
 

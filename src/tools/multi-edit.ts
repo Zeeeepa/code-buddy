@@ -1,7 +1,7 @@
 /**
  * MultiEdit Tool -- Apply multiple edits to a single file atomically.
  *
- * Like Claude Code's MultiEdit: takes a file path and an array of
+ * natively MultiEdit: takes a file path and an array of
  * {old_string, new_string} pairs, applies them all in sequence.
  * If any edit fails to find its old_string, the entire operation is
  * rolled back (atomic).
@@ -103,7 +103,7 @@ export class MultiEditTool {
         };
       }
 
-      // Replace only the first occurrence (like Claude Code's Edit tool)
+      // Replace only the first occurrence (natively Edit tool)
       content = content.replace(old_string, new_string);
     }
 

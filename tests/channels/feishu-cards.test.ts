@@ -1,6 +1,6 @@
 /**
  * Tests for Feishu Interactive Cards + Reasoning Streams
- * (OpenClaw v2026.3.11 alignment)
+ * (Native Engine v2026.3.11 alignment)
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';

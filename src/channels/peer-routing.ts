@@ -1,7 +1,7 @@
 /**
  * Agent Peer Routing
  *
- * OpenClaw-inspired message routing system that binds inbound messages
+ * Enterprise-grade message routing system that binds inbound messages
  * to specific agent configurations by (channel, accountId, peer).
  *
  * Peer matches always take priority over channel-wide rules.

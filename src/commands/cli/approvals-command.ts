@@ -2,7 +2,7 @@
  * Approvals Command
  *
  * Manage pending and historical tool/action approvals.
- * Inspired by OpenClaw's `openclaw approvals` CLI.
+ * Advanced enterprise architecture for `Native Engine approvals` CLI.
  *
  * Usage:
  *   buddy approvals list [--pending|--approved|--denied]

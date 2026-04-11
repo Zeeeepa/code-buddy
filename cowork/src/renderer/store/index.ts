@@ -51,6 +51,18 @@ export interface ScheduleDraft {
   nonce: number;
 }
 
+export interface PermissionRuleTestDraft {
+  toolName: string;
+  testArg: string;
+  nonce: number;
+}
+
+export interface PermissionRuleDraft {
+  bucket: 'allow' | 'deny';
+  rule: string;
+  nonce: number;
+}
+
 export interface FocusedMessageTarget {
   sessionId: string;
   messageId: string;
@@ -112,6 +124,8 @@ interface AppState {
   showSettings: boolean;
   settingsTab: string | null;
   scheduleDraft: ScheduleDraft | null;
+  permissionRuleTestDraft: PermissionRuleTestDraft | null;
+  permissionRuleDraft: PermissionRuleDraft | null;
   focusedMessageTarget: FocusedMessageTarget | null;
 
   // Permission
@@ -261,6 +275,10 @@ interface AppState {
   setSettingsTab: (tab: string | null) => void;
   setScheduleDraft: (draft: Omit<ScheduleDraft, 'nonce'> | null) => void;
   clearScheduleDraft: () => void;
+  setPermissionRuleTestDraft: (draft: Omit<PermissionRuleTestDraft, 'nonce'> | null) => void;
+  clearPermissionRuleTestDraft: () => void;
+  setPermissionRuleDraft: (draft: Omit<PermissionRuleDraft, 'nonce'> | null) => void;
+  clearPermissionRuleDraft: () => void;
   setFocusedMessageTarget: (target: FocusedMessageTarget | null) => void;
   clearFocusedMessageTarget: () => void;
 
@@ -422,6 +440,8 @@ export const useAppStore = create<AppState>((set) => ({
   showSettings: false,
   settingsTab: null,
   scheduleDraft: null,
+  permissionRuleTestDraft: null,
+  permissionRuleDraft: null,
   focusedMessageTarget: null,
   pendingPermission: null,
   pendingSudoPassword: null,
@@ -813,6 +833,16 @@ export const useAppStore = create<AppState>((set) => ({
       scheduleDraft: draft ? { ...draft, nonce: Date.now() } : null,
     }),
   clearScheduleDraft: () => set({ scheduleDraft: null }),
+  setPermissionRuleTestDraft: (draft) =>
+    set({
+      permissionRuleTestDraft: draft ? { ...draft, nonce: Date.now() } : null,
+    }),
+  clearPermissionRuleTestDraft: () => set({ permissionRuleTestDraft: null }),
+  setPermissionRuleDraft: (draft) =>
+    set({
+      permissionRuleDraft: draft ? { ...draft, nonce: Date.now() } : null,
+    }),
+  clearPermissionRuleDraft: () => set({ permissionRuleDraft: null }),
   setFocusedMessageTarget: (target) => set({ focusedMessageTarget: target }),
   clearFocusedMessageTarget: () => set({ focusedMessageTarget: null }),
 
@@ -1127,6 +1157,7 @@ if (typeof window !== 'undefined') {
     return {
       showSettings: !!s.showSettings,
       activeSessionId: s.activeSessionId || null,
+      activeProjectId: s.activeProjectId || null,
       sessionCount: (s.sessions || []).length,
     };
   };
@@ -1146,6 +1177,45 @@ if (typeof window !== 'undefined') {
       store.setShowSettings(false);
       store.setActiveSession(sessionId);
     }
+    return true;
+  };
+
+  w.__injectPermissionRequest = (
+    permission: {
+      toolUseId: string;
+      toolName: string;
+      input: Record<string, unknown>;
+      sessionId: string;
+    },
+    guiAction?: {
+      projectId?: string | null;
+      sessionId?: string;
+      toolUseId?: string;
+      action?: string;
+      toolName?: string;
+      screenshot?: string;
+      click?: { x: number; y: number };
+      details?: Record<string, unknown>;
+    }
+  ) => {
+    const store = useAppStore.getState();
+    store.setShowSettings(false);
+    if (guiAction?.projectId !== undefined) {
+      store.setActiveProjectId(guiAction.projectId);
+    }
+    if (guiAction) {
+      store.appendGuiAction({
+        sessionId: guiAction.sessionId || permission.sessionId,
+        toolUseId: guiAction.toolUseId || permission.toolUseId,
+        action: guiAction.action || 'test.permission',
+        toolName: guiAction.toolName || permission.toolName,
+        screenshot: guiAction.screenshot,
+        click: guiAction.click,
+        details: guiAction.details,
+        timestamp: Date.now(),
+      });
+    }
+    store.setPendingPermission(permission);
     return true;
   };
 }

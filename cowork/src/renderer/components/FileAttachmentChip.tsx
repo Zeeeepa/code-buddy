@@ -7,6 +7,7 @@
  * so the user can inspect it before sending.
  */
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   X,
   FileText,
@@ -74,6 +75,7 @@ export const FileAttachmentChip: React.FC<FileAttachmentChipProps> = ({
   onRemove,
   onPreview,
 }) => {
+  const { t } = useTranslation();
   const handleClick = (ev: React.MouseEvent<HTMLButtonElement>) => {
     ev.preventDefault();
     onPreview?.(file);
@@ -101,7 +103,7 @@ export const FileAttachmentChip: React.FC<FileAttachmentChipProps> = ({
           onRemove();
         }}
         className="w-4 h-4 rounded-full bg-error/10 hover:bg-error/20 text-error flex items-center justify-center opacity-60 group-hover:opacity-100 transition-opacity"
-        aria-label="Remove"
+        aria-label={t('common.remove', 'Remove')}
       >
         <X className="w-2.5 h-2.5" />
       </button>

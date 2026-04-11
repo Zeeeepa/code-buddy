@@ -2,7 +2,7 @@
  * Network Route Interceptor
  *
  * Playwright page.route() wrapper for intercepting, mocking, blocking,
- * and modifying network requests. OpenClaw-inspired network control.
+ * and modifying network requests. Enterprise-grade network control.
  */
 
 import { logger } from '../utils/logger.js';

@@ -199,7 +199,7 @@ function resolvePerplexityBaseUrl(apiKey?: string): string {
 }
 
 /**
- * Web Search Tool — OpenClaw-aligned provider chain
+ * Web Search Tool — Enterprise-aligned provider chain
  *
  * Provider resolution (auto mode):
  *   Brave MCP → Brave API → Perplexity → Serper → DuckDuckGo
@@ -463,7 +463,7 @@ export class WebSearchTool {
   }
 
   // ============================================================================
-  // Brave Direct API (OpenClaw-aligned)
+  // Brave Direct API (Enterprise-aligned)
   // ============================================================================
 
   private async searchBraveAPI(
@@ -503,7 +503,7 @@ export class WebSearchTool {
   }
 
   // ============================================================================
-  // Perplexity (OpenClaw-aligned: direct or via OpenRouter)
+  // Perplexity (Enterprise-aligned: direct or via OpenRouter)
   // ============================================================================
 
   private async runPerplexitySearch(

@@ -4355,11 +4355,11 @@ async function callVisionAPIWithTimeout(
       : `${openAIBaseUrl}/v1/chat/completions`;
 
     // Use Node.js built-in https module for better compatibility
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+     
     const https = require('https');
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+     
     const http = require('http');
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+     
     const url = require('url');
 
     const urlObj = new url.URL(openAIUrl);
@@ -4402,7 +4402,7 @@ async function callVisionAPIWithTimeout(
     }
 
     return new Promise<string>((resolve, reject) => {
-      // eslint-disable-next-line prefer-const
+       
       let timeoutId: ReturnType<typeof setTimeout>;
       let isResolved = false;
 
@@ -4490,7 +4490,7 @@ async function callVisionAPIWithTimeout(
     });
   } else {
     // Use Anthropic API format
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+     
     const Anthropic = require('@anthropic-ai/sdk');
     const anthropicRouteBaseUrl = anthropicBaseUrl || baseUrl;
     const anthropicRouteModel = anthropicModel || model;

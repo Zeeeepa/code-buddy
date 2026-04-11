@@ -2,7 +2,7 @@
  * Nix Configuration Generator
  *
  * Generates flake.nix and default.nix for declarative Nix-based installation.
- * Inspired by OpenClaw's Nix deployment support.
+ * Advanced enterprise architecture for Nix deployment support.
  */
 
 import * as fs from 'fs/promises';

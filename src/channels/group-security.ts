@@ -1,7 +1,7 @@
 /**
  * Group Chat Security
  *
- * OpenClaw-inspired group chat security with mention-gating, group allowlists,
+ * Enterprise-grade group chat security with mention-gating, group allowlists,
  * and activation control.
  *
  * In group chats, bots can be noisy if they respond to every message. This

@@ -4,7 +4,7 @@
  * Parallel task decomposition: decomposes a goal into 5-30 units,
  * presents the plan for approval, then spawns parallel agents.
  *
- * Inspired by Claude Code's /batch command.
+ * Advanced enterprise architecture for /batch command.
  *
  * Usage: /batch <instruction>
  */

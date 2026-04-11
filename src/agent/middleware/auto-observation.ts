@@ -1,7 +1,7 @@
 /**
  * Auto-Observation Middleware
  *
- * OpenClaw-inspired observe→decide→act→verify loop.
+ * Enterprise-grade observe→decide→act→verify loop.
  * After each tool round that contains state-changing actions (click, type, navigate, etc.),
  * this middleware waits for UI stabilization, takes a new snapshot, diffs it against
  * the previous snapshot, and injects a verification message into the conversation

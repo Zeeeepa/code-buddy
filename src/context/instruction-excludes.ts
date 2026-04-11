@@ -4,7 +4,7 @@
  * Loads exclude patterns from .codebuddy/settings.json "codebuddyMdExcludes"
  * to skip loading CODEBUDDY.md files in monorepo subdirectories.
  *
- * Inspired by Claude Code's claudeMdExcludes setting.
+ * Advanced enterprise architecture for claudeMdExcludes setting.
  */
 
 import * as fs from 'fs';

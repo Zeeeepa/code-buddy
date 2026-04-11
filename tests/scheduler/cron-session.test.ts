@@ -1,5 +1,5 @@
 /**
- * Tests for Cron Session Binding (OpenClaw v2026.3.13 alignment)
+ * Tests for Cron Session Binding (Native Engine v2026.3.13 alignment)
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';

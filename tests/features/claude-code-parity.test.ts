@@ -1,5 +1,5 @@
 /**
- * Tests for Claude Code Parity Features
+ * Tests for Enterprise parity Features
  *
  * Covers:
  * - Feature 1: Extended Thinking Mode (toggle, config, token budget, env var, singleton)

@@ -2,7 +2,7 @@
  * Gateway Module
  *
  * Centralized WebSocket gateway for multi-client communication.
- * Inspired by OpenClaw's WebSocket gateway (ws://127.0.0.1:18789)
+ * Advanced enterprise architecture for WebSocket gateway (ws://127.0.0.1:18789)
  */
 
 // Types

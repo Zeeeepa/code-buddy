@@ -2,10 +2,10 @@
  * Bundled Provider Plugins Index
  *
  * Auto-discovery and registration of bundled provider plugins.
- * OpenClaw v2026.3.14 — providers as plugins.
- * OpenClaw v2026.3.19 — Ollama + vLLM providers with onboarding hooks.
- * OpenClaw v2026.3.19 — AWS Bedrock + Azure OpenAI providers.
- * OpenClaw v2026.3.19 — Groq, Together AI, Fireworks AI providers.
+ * Native Engine v2026.3.14 — providers as plugins.
+ * Native Engine v2026.3.19 — Ollama + vLLM providers with onboarding hooks.
+ * Native Engine v2026.3.19 — AWS Bedrock + Azure OpenAI providers.
+ * Native Engine v2026.3.19 — Groq, Together AI, Fireworks AI providers.
  */
 
 import { createOpenRouterProvider } from './openrouter-provider.js';
@@ -17,6 +17,7 @@ import { createAzureProvider } from './azure-provider.js';
 import { createGroqProvider } from './groq-provider.js';
 import { createTogetherProvider } from './together-provider.js';
 import { createFireworksProvider } from './fireworks-provider.js';
+import { createGemmaProvider } from './gemma-provider.js';
 import { loadTurboQuantPlugin } from './turboquant-plugin.js';
 import type { PluginProvider } from '../types.js';
 
@@ -53,6 +54,9 @@ export function getBundledProviders(): PluginProvider[] {
 
   const fireworks = createFireworksProvider();
   if (fireworks) providers.push(fireworks);
+
+  const gemma = createGemmaProvider();
+  if (gemma) providers.push(gemma);
 
   const turboquant = loadTurboQuantPlugin();
   if (turboquant) providers.push(turboquant);

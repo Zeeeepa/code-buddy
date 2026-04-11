@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tools Module</title>
+<style>
+
+:root {
+  --accent: #1D9E75;
+  --accent-hover: #178a64;
+  --bg: #ffffff;
+  --bg-secondary: #f5f7fa;
+  --bg-code: #f0f2f5;
+  --text: #1a1a2e;
+  --text-secondary: #555;
+  --border: #e0e0e0;
+  --sidebar-bg: #fafbfc;
+  --sidebar-width: 260px;
+  --toc-width: 220px;
+}
+
+[data-theme="dark"] {
+  --bg: #1a1a2e;
+  --bg-secondary: #22223a;
+  --bg-code: #2a2a42;
+  --text: #e0e0e0;
+  --text-secondary: #aaa;
+  --border: #333;
+  --sidebar-bg: #16162a;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  display: flex;
+  min-height: 100vh;
+  line-height: 1.65;
+}
+
+/* ---- Sidebar ---- */
+.sidebar {
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.logo {
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--accent);
+}
+
+.theme-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 16px;
+  color: var(--text);
+}
+
+[data-theme="light"] .icon-moon { display: none; }
+[data-theme="dark"] .icon-sun { display: none; }
+
+.sidebar-search {
+  padding: 10px 14px;
+}
+
+.sidebar-search input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+}
+
+.sidebar-search input:focus {
+  border-color: var(--accent);
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 6px 0;
+  overflow-y: auto;
+}
+
+.sidebar-nav a {
+  display: block;
+  padding: 8px 18px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 13px;
+  border-left: 3px solid transparent;
+  transition: all 0.15s;
+}
+
+.sidebar-nav a:hover {
+  background: var(--bg-secondary);
+  color: var(--text);
+}
+
+.sidebar-nav a.active {
+  border-left-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+  background: var(--bg-secondary);
+}
+
+.sidebar-nav a[hidden] { display: none; }
+
+.nav-title { display: block; }
+
+.cohesion-bar {
+  display: block;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-top: 4px;
+}
+
+.cohesion-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+/* ---- Content ---- */
+.content {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  margin-right: var(--toc-width);
+  padding: 40px 48px;
+  max-width: 900px;
+  min-width: 0;
+}
+
+.menu-btn {
+  display: none;
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 200;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.article h1 {
+  font-size: 28px;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.meta {
+  display: flex;
+  gap: 20px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.article h2 {
+  font-size: 22px;
+  margin: 36px 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.article h3 {
+  font-size: 18px;
+  margin: 28px 0 8px;
+  color: var(--text);
+}
+
+.article h4 {
+  font-size: 15px;
+  margin: 20px 0 6px;
+  color: var(--text-secondary);
+}
+
+.article p { margin: 10px 0; }
+
+.article a { color: var(--accent); text-decoration: none; }
+.article a:hover { text-decoration: underline; }
+
+.article code {
+  background: var(--bg-code);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+.article pre {
+  background: var(--bg-code);
+  padding: 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 14px 0;
+  border: 1px solid var(--border);
+}
+
+.article pre code {
+  background: none;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.hl-kw { color: #c678dd; font-weight: 600; }
+.hl-str { color: #98c379; }
+.hl-cmt { color: #7f848e; font-style: italic; }
+.hl-num { color: #d19a66; }
+
+[data-theme="light"] .hl-kw { color: #8b3dba; }
+[data-theme="light"] .hl-str { color: #2e7d32; }
+[data-theme="light"] .hl-cmt { color: #9e9e9e; }
+[data-theme="light"] .hl-num { color: #b5651d; }
+
+.article table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 14px 0;
+  font-size: 14px;
+}
+
+.article th, .article td {
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.article th {
+  background: var(--bg-secondary);
+  font-weight: 600;
+}
+
+.article blockquote {
+  border-left: 4px solid var(--accent);
+  padding: 8px 16px;
+  margin: 12px 0;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border-radius: 0 6px 6px 0;
+}
+
+.article ul, .article ol {
+  padding-left: 24px;
+  margin: 10px 0;
+}
+
+.article li { margin: 4px 0; }
+
+.article hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 24px 0;
+}
+
+/* ---- TOC ---- */
+.toc {
+  width: var(--toc-width);
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  padding: 24px 14px;
+  overflow-y: auto;
+  border-left: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.toc-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.toc a {
+  display: block;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  transition: all 0.15s;
+}
+
+.toc a:hover { color: var(--text); }
+
+.toc a.active {
+  color: var(--accent);
+  border-left-color: var(--accent);
+  font-weight: 600;
+}
+
+.toc a.toc-sub { padding-left: 20px; font-size: 11px; }
+
+/* ---- Responsive ---- */
+@media (max-width: 1200px) {
+  .toc { display: none; }
+  .content { margin-right: 0; }
+}
+
+@media (max-width: 900px) {
+  .sidebar { transform: translateX(-100%); transition: transform 0.25s; }
+  .sidebar.open { transform: translateX(0); }
+  .content { margin-left: 0; padding: 24px 20px; }
+  .menu-btn { display: block; }
+}
+
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <span class="logo">Docs</span>
+    <button class="theme-toggle" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
+      <span class="icon-sun">&#9728;</span>
+      <span class="icon-moon">&#9790;</span>
+    </button>
+  </div>
+  <div class="sidebar-search">
+    <input type="text" id="searchBox" placeholder="Search modules..." aria-label="Search modules">
+  </div>
+  <nav class="sidebar-nav" id="sidebarNav">
+    <a href="agent.html" data-title="agent module">
+      <span class="nav-title">Agent Module</span>
+      <span class="cohesion-bar"><span class="cohesion-fill" style="width:85%"></span></span>
+    </a>
+    <a href="security.html" data-title="security module">
+      <span class="nav-title">Security Module</span>
+      <span class="cohesion-bar"><span class="cohesion-fill" style="width:85%"></span></span>
+    </a>
+    <a href="tools.html" class="active" data-title="tools module">
+      <span class="nav-title">Tools Module</span>
+      <span class="cohesion-bar"><span class="cohesion-fill" style="width:85%"></span></span>
+    </a>
+  </nav>
+</aside>
+<main class="content">
+  <button class="menu-btn" id="menuBtn" aria-label="Toggle sidebar">&#9776;</button>
+  <article class="article">
+    <h1>Tools Module</h1>
+    <div class="meta">
+      <span>Module: <code>tools</code></span>
+      <span>Cohesion: <strong>0.85</strong></span>
+      <span>Members: <strong>1</strong></span>
+    </div>
+    <p>
+The tool system in this project is designed for modularity and efficient tool selection. Here's a breakdown of its key components and functionalities.
+</p>
+<h3 id="tool-registration">Tool Registration</h3>
+<p>
+Tools are defined and managed through a centralized system. The <code>src/codebuddy/tools.ts</code> file appears to be the main entry point for tool definitions and management, importing various modular tool definitions from <code>./tool-definitions/index.js</code>.
+</p>
+<p>
+The <code>TOOL_METADATA</code> constant in <code>src/tools/metadata.ts</code> plays a crucial role in registering tools. It's an array of <code>ToolMetadata</code> objects, each containing:
+</p>
+<ul>
+<p>
+<li><code>name</code>: The unique name of the tool (e.g., <code>view_file</code>, <code>create_file</code>).</li>
+<li><code>category</code>: The category the tool belongs to (e.g., <code>file_read</code>, <code>file_write</code>).</li>
+<li><code>keywords</code>: A list of keywords associated with the tool, used for RAG selection.</li>
+<li><code>priority</code>: A numerical value indicating the tool's priority.</li>
+<li><code>description</code>: A brief description of what the tool does.</li>
+</p>
+</ul>
+<p>
+This metadata provides essential information for tool discovery and selection. The <code>getToolRegistry()</code> function (imported in <code>src/codebuddy/tools.ts</code>) is likely responsible for compiling and managing these registered tools.
+</p>
+<h3 id="tool-categories">Tool Categories</h3>
+<p>
+The tool system categorizes tools to facilitate better organization and selection. From the <code>src/tools/metadata.ts</code> file, we can infer several categories, including:
+</p>
+<ul>
+<p>
+<li><code>file_read</code>: For tools that read file contents or list directories (e.g., <code>view_file</code>, <code>list_directory</code>).</li>
+<li><code>file_write</code>: For tools that create, modify, or delete files (e.g., <code>create_file</code>, <code>str_replace_editor</code>, <code>edit_file</code>, <code>multi_edit</code>).</li>
+<li><code>search</code>: For tools that perform various search operations (e.g., <code>search</code>, <code>grep</code>, <code>web_search</code>, <code>search_multi</code>).</li>
+<li><code>code_analysis</code>: For tools that analyze code (e.g., <code>bug_finder</code>).</li>
+</p>
+</ul>
+<p>
+The <code>src/codebuddy/tools.ts</code> file also imports various tool groups like <code>CORE_TOOLS</code>, <code>SEARCH_TOOLS</code>, <code>TODO_TOOLS</code>, <code>WEB_TOOLS</code>, <code>ADVANCED_TOOLS</code>, <code>BATCH_TOOLS</code>, and <code>GRAPH_TOOLS</code>, suggesting a broader categorization scheme.
+</p>
+<h3 id="rag-selection-retrieval-augmented-generation">RAG Selection (Retrieval-Augmented Generation)</h3>
+<p>
+Tool selection is a critical part of the system, enabling the agent to choose the most relevant tools for a given user query. The <code>src/codebuddy/tools.ts</code> file imports functions like <code>getToolSelector()</code> and <code>selectRelevantTools()</code> from <code>../tools/tool-selector.js</code>. This indicates a RAG-based approach where:
+</p>
+<ol>
+<p>
+<li><strong>Query Classification:</strong> User queries are likely classified to understand their intent and identify relevant tool categories.</li>
+<li><strong>Keyword Matching:</strong> The <code>keywords</code> defined in <code>TOOL_METADATA</code> are used to match against the classified query.</li>
+<li><strong>Tool Filtering:</strong> <code>applyToolFilter()</code> (also imported in <code>src/codebuddy/tools.ts</code>) is used to refine the selection based on various criteria.</li>
+<li><strong>Priority:</strong> The <code>priority</code> field in <code>TOOL_METADATA</code> helps in ranking tools when multiple tools match a query.</li>
+</p>
+</ol>
+<p>
+This process ensures that the agent efficiently retrieves and selects the most appropriate tools to address the user's request.
+</p>
+<h3 id="batch-execution">Batch Execution</h3>
+<p>
+The <code>src/tools/batch-tool.ts</code> file describes a mechanism for executing multiple read-only tool calls in parallel. This significantly improves efficiency for operations that don't modify the codebase.
+</p>
+<p>
+Key aspects of batch execution include:
+</p>
+<ul>
+<p>
+<li><strong>Parallel Execution:</strong> Tools are executed concurrently using <code>Promise.allSettled()</code>.</li>
+<li><strong>Read-Only Tools:</strong> A <code>READ_ONLY_TOOLS</code> set explicitly lists tools considered safe for parallel execution (e.g., <code>view_file</code>, <code>search</code>, <code>list_directory</code>, <code>web_search</code>, <code>codebase_map</code>, <code>code_graph</code>).</li>
+<li><strong>Destructive Tool Blocking:</strong> A <code>DESTRUCTIVE_TOOLS</code> set lists tools that modify the codebase (e.g., <code>bash</code>, <code>create_file</code>, <code>edit_file</code>, <code>multi_edit</code>). These tools are blocked in non-YOLO (non-destructive) batch mode to prevent unintended changes.</li>
+<li><strong>Maximum Batch Size:</strong> <code>MAX_BATCH_SIZE</code> is set to 25, limiting the number of tool calls in a single batch to prevent overwhelming the system.</li>
+<li><strong>Prevention of Recursive Batch Calls:</strong> The system prevents nested batch calls to maintain control and avoid potential deadlocks or infinite loops.</li>
+</p>
+</ul>
+<p>
+This batch execution mechanism allows for faster processing of information-gathering tasks while maintaining safeguards against unintended modifications.
+</p>
+<h3 id="bug-finder-tool">Bug Finder Tool</h3>
+<p>
+The <code>src/tools/bug-finder-tool.ts</code> file introduces a static analysis tool for detecting common bug patterns. This tool uses a regex-based approach across multiple languages (TypeScript, JavaScript, Python, Go, Rust, Java).
+</p>
+<p>
+Key features of the Bug Finder Tool:
+</p>
+<ul>
+<p>
+<li><strong>Pattern-Based Detection:</strong> It relies on <code>BugPattern</code> definitions, which include a <code>RegExp</code>, <code>severity</code> (critical, high, medium, low), <code>category</code> (e.g., null-access, unchecked-error, security, dead-code), <code>message</code>, <code>suggestion</code>, and <code>languages</code> it applies to.</li>
+<li><strong>Language Detection:</strong> The <code>detectLanguage</code> function identifies the programming language based on file extensions.</li>
+<li><strong>Bug Reporting:</strong> It generates <code>BugReport</code> objects, detailing the file, line number, severity, category, message, and a suggestion for remediation.</li>
+</p>
+</ul>
+<p>
+This tool demonstrates a specific application of the tool system for code quality and static analysis.
+</p>
+  </article>
+</main>
+<aside class="toc" id="toc">
+  <div class="toc-title">On this page</div>
+  <nav>
+    <a href="#tool-registration" class="toc-sub" data-target="tool-registration">Tool Registration</a>
+    <a href="#tool-categories" class="toc-sub" data-target="tool-categories">Tool Categories</a>
+    <a href="#rag-selection-retrieval-augmented-generation" class="toc-sub" data-target="rag-selection-retrieval-augmented-generation">RAG Selection (Retrieval-Augmented Generation)</a>
+    <a href="#batch-execution" class="toc-sub" data-target="batch-execution">Batch Execution</a>
+    <a href="#bug-finder-tool" class="toc-sub" data-target="bug-finder-tool">Bug Finder Tool</a>
+  </nav>
+</aside>
+<script>
+
+(function() {
+  // Theme toggle
+  var html = document.documentElement;
+  var saved = localStorage.getItem('docs-theme');
+  if (saved) html.setAttribute('data-theme', saved);
+  else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    html.setAttribute('data-theme', 'dark');
+  }
+
+  document.getElementById('themeToggle').addEventListener('click', function() {
+    var current = html.getAttribute('data-theme');
+    var next = current === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    localStorage.setItem('docs-theme', next);
+  });
+
+  // Sidebar search
+  var searchBox = document.getElementById('searchBox');
+  var navLinks = document.querySelectorAll('#sidebarNav a');
+  searchBox.addEventListener('input', function() {
+    var q = this.value.toLowerCase();
+    navLinks.forEach(function(link) {
+      var title = link.getAttribute('data-title') || '';
+      link.hidden = q && title.indexOf(q) === -1;
+    });
+  });
+
+  // Mobile menu
+  var menuBtn = document.getElementById('menuBtn');
+  var sidebar = document.getElementById('sidebar');
+  menuBtn.addEventListener('click', function() {
+    sidebar.classList.toggle('open');
+  });
+
+  // TOC scroll spy
+  var tocLinks = document.querySelectorAll('#toc a[data-target]');
+  if (tocLinks.length > 0) {
+    var headingEls = [];
+    tocLinks.forEach(function(link) {
+      var el = document.getElementById(link.getAttribute('data-target'));
+      if (el) headingEls.push({ el: el, link: link });
+    });
+
+    function updateToc() {
+      var scrollY = window.scrollY + 80;
+      var active = null;
+      for (var i = headingEls.length - 1; i >= 0; i--) {
+        if (headingEls[i].el.offsetTop <= scrollY) { active = headingEls[i]; break; }
+      }
+      tocLinks.forEach(function(l) { l.classList.remove('active'); });
+      if (active) active.link.classList.add('active');
+    }
+
+    window.addEventListener('scroll', updateToc, { passive: true });
+    updateToc();
+  }
+})();
+
+</script>
+</body>
+</html>

@@ -2,7 +2,7 @@
  * Message Preprocessing Pipeline
  *
  * Processes inbound messages before they reach the agent.
- * Inspired by OpenClaw's message:received → transcribed → preprocessed pipeline.
+ * Advanced enterprise architecture for message:received → transcribed → preprocessed pipeline.
  *
  * Stages:
  * 1. Media detection — identify images, audio, video, files

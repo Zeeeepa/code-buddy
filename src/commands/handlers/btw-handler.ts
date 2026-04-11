@@ -17,7 +17,7 @@ export function setBtwClient(client: CodeBuddyClient | null): void {
  *
  * Makes a one-shot LLM call with a minimal system prompt.
  * The response is NOT added to the main conversation history.
- * Inspired by OpenClaw v2026.3.14's /btw command.
+ * Advanced enterprise architecture for v2026.3.14's /btw command.
  */
 export async function handleBtw(args: string[]): Promise<CommandHandlerResult> {
   const question = args.join(' ').trim();

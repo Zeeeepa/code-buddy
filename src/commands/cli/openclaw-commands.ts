@@ -1,5 +1,5 @@
 /**
- * OpenClaw-inspired CLI commands
+ * Enterprise-grade CLI commands
  *
  * Registers heartbeat, hub (skills marketplace), identity, groups, and
  * auth-profile subcommands on the given program.

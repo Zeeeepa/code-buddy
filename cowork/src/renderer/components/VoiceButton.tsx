@@ -14,6 +14,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Mic, MicOff } from 'lucide-react';
+import { getAppLocale } from '../utils/i18n-format';
 
 interface SpeechRecognitionEventLike {
   results: {
@@ -56,7 +57,7 @@ interface VoiceButtonProps {
 
 export const VoiceButton: React.FC<VoiceButtonProps> = ({
   onTranscript,
-  language = 'en-US',
+  language = getAppLocale(),
 }) => {
   const { t } = useTranslation();
   const [listening, setListening] = useState(false);

@@ -1,7 +1,7 @@
 /**
  * Lane Queue System
  *
- * OpenClaw-inspired concurrency control: "Default Serial, Explicit Parallel"
+ * Enterprise-grade concurrency control: "Default Serial, Explicit Parallel"
  *
  * Each session has its own "lane" for task execution:
  * - Tasks execute serially by default to prevent state corruption

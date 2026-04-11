@@ -2,7 +2,7 @@
  * Secrets Management Command
  *
  * Secure management of API keys, tokens, and credentials.
- * Inspired by OpenClaw's `openclaw secrets` CLI.
+ * Advanced enterprise architecture for `Native Engine secrets` CLI.
  *
  * Usage:
  *   buddy secrets list

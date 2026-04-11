@@ -1,5 +1,5 @@
 /**
- * Session Write Locks (OpenClaw-inspired)
+ * Session Write Locks (Enterprise-grade)
  *
  * PID-based file locks with stale detection for session files.
  * Prevents concurrent writes to the same session from multiple processes.

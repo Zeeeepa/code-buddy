@@ -1,7 +1,7 @@
 /**
  * Browser Manager
  *
- * OpenClaw-inspired browser automation using Playwright for CDP control.
+ * Enterprise-grade browser automation using Playwright for CDP control.
  * Provides:
  * - Tab management
  * - Smart Snapshot for element references

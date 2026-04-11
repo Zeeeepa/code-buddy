@@ -2,6 +2,7 @@
  * KeyboardShortcutsDialog — Modal showing all keyboard shortcuts
  */
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 
 interface KeyboardShortcutsDialogProps {
@@ -21,42 +22,43 @@ interface ShortcutSection {
 const isMac = typeof navigator !== 'undefined' && /Mac/.test(navigator.userAgent);
 const mod = isMac ? '\u2318' : 'Ctrl';
 
-const sections: ShortcutSection[] = [
-  {
-    title: 'General',
-    shortcuts: [
-      { keys: `${mod}+K`, description: 'Open command palette' },
-      { keys: `${mod}+/`, description: 'Show keyboard shortcuts' },
-      { keys: `${mod}+N`, description: 'New session' },
-      { keys: `${mod}+,`, description: 'Open settings' },
-      { keys: `${mod}+F`, description: 'Search in messages' },
-    ],
-  },
-  {
-    title: 'Chat',
-    shortcuts: [
-      { keys: 'Enter', description: 'Send message' },
-      { keys: 'Shift+Enter', description: 'New line' },
-      { keys: 'Escape', description: 'Stop generation' },
-    ],
-  },
-  {
-    title: 'Navigation',
-    shortcuts: [
-      { keys: `${mod}+B`, description: 'Toggle sidebar' },
-      { keys: `${mod}+.`, description: 'Toggle context panel' },
-    ],
-  },
-  {
-    title: 'Checkpoints',
-    shortcuts: [
-      { keys: `${mod}+Z`, description: 'Undo last change' },
-      { keys: `${mod}+Shift+Z`, description: 'Redo' },
-    ],
-  },
-];
-
 export const KeyboardShortcutsDialog: React.FC<KeyboardShortcutsDialogProps> = ({ onClose }) => {
+  const { t } = useTranslation();
+  const sections: ShortcutSection[] = [
+    {
+      title: t('shortcutsDialog.general', 'General'),
+      shortcuts: [
+        { keys: `${mod}+K`, description: t('shortcutsDialog.openCommandPalette', 'Open command palette') },
+        { keys: `${mod}+/`, description: t('shortcutsDialog.showKeyboardShortcuts', 'Show keyboard shortcuts') },
+        { keys: `${mod}+N`, description: t('shortcutsDialog.newSession', 'New session') },
+        { keys: `${mod}+,`, description: t('shortcutsDialog.openSettings', 'Open settings') },
+        { keys: `${mod}+F`, description: t('shortcutsDialog.searchMessages', 'Search in messages') },
+      ],
+    },
+    {
+      title: t('shortcutsDialog.chat', 'Chat'),
+      shortcuts: [
+        { keys: 'Enter', description: t('shortcutsDialog.sendMessage', 'Send message') },
+        { keys: 'Shift+Enter', description: t('shortcutsDialog.newLine', 'New line') },
+        { keys: 'Escape', description: t('shortcutsDialog.stopGeneration', 'Stop generation') },
+      ],
+    },
+    {
+      title: t('shortcutsDialog.navigation', 'Navigation'),
+      shortcuts: [
+        { keys: `${mod}+B`, description: t('shortcutsDialog.toggleSidebar', 'Toggle sidebar') },
+        { keys: `${mod}+.`, description: t('shortcutsDialog.toggleContextPanel', 'Toggle context panel') },
+      ],
+    },
+    {
+      title: t('shortcutsDialog.checkpoints', 'Checkpoints'),
+      shortcuts: [
+        { keys: `${mod}+Z`, description: t('shortcutsDialog.undoLastChange', 'Undo last change') },
+        { keys: `${mod}+Shift+Z`, description: t('shortcutsDialog.redo', 'Redo') },
+      ],
+    },
+  ];
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div
@@ -65,7 +67,9 @@ export const KeyboardShortcutsDialog: React.FC<KeyboardShortcutsDialogProps> = (
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
-          <h2 className="text-sm font-medium text-zinc-200">Keyboard Shortcuts</h2>
+          <h2 className="text-sm font-medium text-zinc-200">
+            {t('shortcutsDialog.title', 'Keyboard shortcuts')}
+          </h2>
           <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 transition-colors">
             <X size={16} />
           </button>

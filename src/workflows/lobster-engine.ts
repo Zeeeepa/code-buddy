@@ -2,9 +2,9 @@
  * Lobster Typed Workflow Engine
  * DAG-based workflow definition, validation, and execution ordering.
  *
- * Compatible with OpenClaw's Lobster workflow format:
+ * Compatible with Native Engine's Lobster workflow format:
  * - Explicit dependencies via `dependsOn` (Code Buddy native)
- * - Implicit dependencies via `stdin: $step.stdout` (OpenClaw native)
+ * - Implicit dependencies via `stdin: $step.stdout` (Native)
  * - Approval gates via `approval: 'required'` field OR `command: 'approve'`
  * - Conditional execution via `condition` field
  * - Environment variables via `env` (alias for `variables`)
@@ -20,11 +20,11 @@ export interface LobsterStep {
   outputs?: string[];
   dependsOn?: string[];
   timeout?: number;
-  /** OpenClaw: pipe prior step output as stdin — creates implicit dependency */
+  /** Native Engine: pipe prior step output as stdin — creates implicit dependency */
   stdin?: string;
-  /** OpenClaw: conditional execution (e.g. '$step.approved', evaluated against context) */
+  /** Native Engine: conditional execution (e.g. '$step.approved', evaluated against context) */
   condition?: string;
-  /** OpenClaw: mark step as an approval checkpoint ('required' | 'optional') */
+  /** Native Engine: mark step as an approval checkpoint ('required' | 'optional') */
   approval?: 'required' | 'optional';
 }
 
@@ -33,9 +33,9 @@ export interface LobsterWorkflow {
   version: string;
   steps: LobsterStep[];
   variables?: Record<string, string>;
-  /** OpenClaw alias for variables */
+  /** Native Engine alias for variables */
   env?: Record<string, string>;
-  /** OpenClaw: workflow-level args with defaults */
+  /** Native Engine: workflow-level args with defaults */
   args?: Record<string, { default?: string }>;
 }
 
@@ -101,20 +101,20 @@ export class LobsterEngine {
       }
     }
 
-    // Normalize OpenClaw format
-    this.normalizeOpenClawFormat(workflow);
+    // Normalize Standard format
+    this.normalizeNative EngineFormat(workflow);
 
     logger.debug(`Parsed workflow: ${workflow.name} v${workflow.version}`);
     return workflow;
   }
 
   /**
-   * Normalize OpenClaw-specific fields into the unified internal format.
+   * Normalize Native Engine-specific fields into the unified internal format.
    * - Merge `env` into `variables`
    * - Resolve `args` defaults into `variables`
    * - Infer implicit `dependsOn` from `stdin` references
    */
-  normalizeOpenClawFormat(workflow: LobsterWorkflow): void {
+  normalizeNative EngineFormat(workflow: LobsterWorkflow): void {
     // Merge env → variables
     if (workflow.env) {
       workflow.variables = { ...workflow.env, ...workflow.variables };
@@ -346,7 +346,7 @@ export class LobsterEngine {
 
       const resolvedCommand = this.resolveVariables(step.command, runContext);
 
-      // Check if this is an approval gate (OpenClaw `approval` field OR command-based)
+      // Check if this is an approval gate (Native Engine `approval` field OR command-based)
       const isApprovalGate =
         step.approval === 'required' ||
         step.approval === 'optional' ||

@@ -4,7 +4,7 @@
  * Based on research from:
  * - OWASP LLM Prompt Injection Prevention Cheat Sheet
  * - "The Prompt Report" (arXiv:2406.06608)
- * - Claude Code system prompts patterns
+ * - Native Engine system prompts patterns
  * - awesome-ai-system-prompts collection
  *
  * Key patterns applied:

@@ -3,6 +3,7 @@
     "save": "保存",
     "cancel": "取消",
     "delete": "删除",
+    "remove": "移除",
     "edit": "编辑",
     "add": "添加",
     "close": "关闭",
@@ -112,6 +113,7 @@
   },
   "language": {
     "english": "English",
+    "french": "Français",
     "chinese": "中文",
     "selectLanguage": "选择语言",
     "currentLanguage": "当前语言"
@@ -883,8 +885,34 @@
     "openComputerUseOverlay": "打开覆盖层",
     "computerUseClickAt": "点击位置 ({{x}}, {{y}})",
     "computerUseNoScreenshot": "该操作没有可用截图",
+    "rulePreviewTitle": "当前规则决策",
+    "rulePreviewChecking": "正在检查已保存的权限规则…",
+    "rulePreviewError": "暂时无法测试已保存规则。",
+    "rulePreview": {
+      "allow": "已有允许规则会自动批准这次请求。",
+      "ask": "当前还没有匹配的已保存规则，此请求仍需要确认。",
+      "deny": "已有拒绝规则会阻止这次请求。"
+    },
+    "covered": {
+      "allow": "此请求已被已保存的允许规则覆盖。",
+      "deny": "此请求已被已保存的拒绝规则覆盖。"
+    },
+    "coveredSuggestion": "如果你想把这次匹配收窄到更具体的规则，可以使用：{{rule}}",
+    "suggestedRule": "建议的范围规则：{{rule}}",
+    "ruleDraftLabel": "待保存的范围规则",
+    "ruleDraftPlaceholder": "保存前可先编辑这条范围规则",
+    "ruleDraftHint": "如果你希望匹配范围更窄或更宽，可以先调整这条规则再保存。",
+    "ruleDraftInvalid": "保存前请使用 Tool 或 Tool(pattern) 语法。",
+    "useFolderRule": "改用文件夹规则",
+    "restoreSuggestedRule": "恢复建议规则",
     "alwaysAllowTarget": "始终允许此目标",
+    "alwaysDenyTarget": "始终阻止此目标",
+    "allowAndReviewRules": "允许并在权限规则中检查",
+    "denyAndReviewRules": "拒绝并在权限规则中检查",
+    "allowAndReviewSpecificRule": "检查更具体的允许规则",
+    "denyAndReviewSpecificRule": "检查更具体的拒绝规则",
     "rememberingTarget": "正在保存规则…",
+    "rememberingDeniedTarget": "正在保存阻止规则…",
     "deny": "拒绝",
     "allow": "允许",
     "alwaysAllow": "始终允许此工具",
@@ -1033,6 +1061,9 @@
     "allow": "允许列表",
     "deny": "拒绝列表",
     "empty": "暂无规则",
+    "filterTitle": "查找规则",
+    "searchPlaceholder": "搜索规则…",
+    "filterAll": "全部范围",
     "add": "添加",
     "addPlaceholder": "例如 Bash(npm *) 或 Edit(src/**)",
     "addThis": "添加此规则",
@@ -1275,6 +1306,8 @@
     "empty": "尚未捕获推理轨迹。当智能体调用 reason 工具时，此处会显示轨迹。",
     "mode": "模式",
     "nodes": "节点",
+    "iterations": "轮次",
+    "tokens": "令牌",
     "score": "分数",
     "playback": "回放",
     "play": "播放",
@@ -1340,6 +1373,7 @@
     "sessionFilter": "会话 ID",
     "totals": "合计",
     "runs": "运行",
+    "tokens": "令牌",
     "tools": "工具",
     "objective": "目标",
     "status": "状态",
@@ -1353,6 +1387,16 @@
     "artifacts": "产物",
     "tags": "标签",
     "noEvents": "无事件记录"
+  },
+  "exportSession": {
+    "exportedOn": "导出于",
+    "user": "用户",
+    "assistant": "助手",
+    "system": "系统",
+    "tool": "工具",
+    "result": "结果",
+    "error": "错误",
+    "thinking": "思考"
   },
   "workspacePresets": {
     "title": "工作区预设",
@@ -1495,6 +1539,56 @@
     "ttsOff": "语音输出已关闭 — 点击以开启",
     "ttsLabelOn": "TTS 开",
     "ttsLabelOff": "TTS"
+  },
+  "commandPalette": {
+    "searchPlaceholder": "输入命令…",
+    "empty": "没有匹配的命令",
+    "newSession": "新建会话",
+    "newSessionDesc": "开始新的对话",
+    "resumeSession": "恢复会话",
+    "resumeSessionDesc": "打开会话恢复选择器",
+    "settingsDesc": "打开设置面板",
+    "switchToLightTheme": "切换到浅色主题",
+    "switchToDarkTheme": "切换到深色主题",
+    "shortcutsDesc": "查看所有快捷键",
+    "exportDesc": "导出为 Markdown 或 JSON"
+  },
+  "fileTree": {
+    "filterPlaceholder": "筛选文件…",
+    "empty": "未找到文件"
+  },
+  "shortcutsDialog": {
+    "title": "键盘快捷键",
+    "general": "通用",
+    "chat": "聊天",
+    "navigation": "导航",
+    "checkpoints": "检查点",
+    "openCommandPalette": "打开命令面板",
+    "showKeyboardShortcuts": "显示键盘快捷键",
+    "newSession": "新建会话",
+    "openSettings": "打开设置",
+    "searchMessages": "在消息中搜索",
+    "sendMessage": "发送消息",
+    "newLine": "换行",
+    "stopGeneration": "停止生成",
+    "toggleSidebar": "切换侧边栏",
+    "toggleContextPanel": "切换上下文面板",
+    "undoLastChange": "撤销上一次更改",
+    "redo": "重做"
+  },
+  "sessionSearch": {
+    "placeholder": "在消息中搜索…",
+    "noResults": "无结果",
+    "previous": "上一个（Shift+Enter）",
+    "next": "下一个（Enter）",
+    "close": "关闭（Esc）"
+  },
+  "updateNotification": {
+    "downloaded": "更新 {{version}} 已下载。请重启以应用。",
+    "downloading": "正在下载更新…",
+    "available": "更新 {{version}} 可用",
+    "restart": "重启",
+    "download": "下载"
   },
   "tabs": {
     "newTab": "新建标签",

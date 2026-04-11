@@ -646,7 +646,7 @@ export function ContextPanel() {
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'files' && currentWorkingDir && <FileTree rootPath={currentWorkingDir} />}
         {activeTab === 'files' && !currentWorkingDir && (
-          <div className="px-4 py-4 text-xs text-text-muted">No working directory</div>
+          <div className="px-4 py-4 text-xs text-text-muted">{t('git.noWorkingDir')}</div>
         )}
 
         {activeTab === 'git' && <GitStatusPanel />}

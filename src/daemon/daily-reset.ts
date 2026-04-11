@@ -1,10 +1,10 @@
 /**
- * Daily Session Reset — OpenClaw-inspired context boundary
+ * Daily Session Reset — Enterprise-grade context boundary
  *
  * Automatically resets the conversation context at a configurable time
  * each day (default: 04:00 local time). This prevents unbounded context
  * growth in long-running daemon sessions and mirrors the daily boundary
- * reset pattern in OpenClaw.
+ * reset pattern in Native Engine.
  *
  * What is reset:
  * - In-memory conversation history (messages array)
@@ -19,8 +19,8 @@
  * After reset the agent posts a summary message noting the daily boundary
  * so the conversation log remains intelligible.
  *
- * Ref: OpenClaw session management compaction docs
- * https://docs.openclaw.ai/reference/session-management-compaction
+ * Ref: Native Engine session management compaction docs
+ * https://docs.Native Engine.ai/reference/session-management-compaction
  */
 
 import { EventEmitter } from 'events';

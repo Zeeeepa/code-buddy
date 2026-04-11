@@ -26,6 +26,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useAppStore } from '../store';
+import { formatAppDate, formatAppTime } from '../utils/i18n-format';
 
 interface ActivityEntry {
   id: number;
@@ -61,8 +62,7 @@ const TYPE_ICONS: Record<string, LucideIcon> = {
 function groupByDay(entries: ActivityEntry[]): Array<[string, ActivityEntry[]]> {
   const groups = new Map<string, ActivityEntry[]>();
   for (const entry of entries) {
-    const date = new Date(entry.timestamp);
-    const key = date.toLocaleDateString(undefined, {
+    const key = formatAppDate(entry.timestamp, {
       weekday: 'long',
       month: 'short',
       day: 'numeric',
@@ -74,7 +74,7 @@ function groupByDay(entries: ActivityEntry[]): Array<[string, ActivityEntry[]]> 
 }
 
 export const ActivityFeed: React.FC<ActivityFeedProps> = ({ open, onClose }) => {
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
   const [entries, setEntries] = useState<ActivityEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const setActiveSession = useAppStore((s) => s.setActiveSession);
@@ -111,7 +111,7 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ open, onClose }) => 
     return () => window.removeEventListener('keydown', handler);
   }, [open, onClose]);
 
-  const grouped = useMemo(() => groupByDay(entries), [entries]);
+  const grouped = useMemo(() => groupByDay(entries), [entries, i18n.resolvedLanguage]);
 
   const handleClick = (entry: ActivityEntry) => {
     if (entry.projectId) setActiveProjectId(entry.projectId);
@@ -186,10 +186,7 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ open, onClose }) => 
               </div>
               {dayEntries.map((entry) => {
                 const Icon = TYPE_ICONS[entry.type] ?? Activity;
-                const time = new Date(entry.timestamp).toLocaleTimeString(undefined, {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                });
+                const time = formatAppTime(entry.timestamp);
                 return (
                   <button
                     key={entry.id}

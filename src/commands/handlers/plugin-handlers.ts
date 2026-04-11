@@ -176,7 +176,7 @@ export async function handlePlugins(args: string[]): Promise<CommandHandlerResul
 /**
  * /plugin — Owner-gated singular alias for /plugins.
  * Only available in local terminal sessions (not remote channels).
- * OpenClaw v2026.3.14 alignment.
+ * Native Engine v2026.3.14 alignment.
  */
 export async function handlePlugin(args: string[]): Promise<CommandHandlerResult> {
   // Owner gate: only allow in local (non-channel) sessions

@@ -1,5 +1,5 @@
 /**
- * Tests for OpenClaw-inspired CLI Commands
+ * Tests for Enterprise-grade CLI Commands
  *
  * Tests covering all 5 command groups:
  * - registerHeartbeatCommands (start, stop, status, tick)
@@ -16,7 +16,7 @@ import {
   registerIdentityCommands,
   registerGroupCommands,
   registerAuthProfileCommands,
-} from '../../src/commands/cli/openclaw-commands';
+} from '../../src/commands/cli/Native Engine-commands';
 import { getHeartbeatEngine } from '../../src/daemon/heartbeat.js';
 import { resetAuthProfileManager } from '../../src/auth/profile-manager.js';
 
@@ -115,7 +115,7 @@ function getErrorOutput(): string {
 // Tests
 // ============================================================================
 
-describe('OpenClaw CLI Commands', () => {
+describe('Native Engine CLI Commands', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(function() {});

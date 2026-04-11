@@ -1,7 +1,7 @@
 /**
  * Auth Profile Manager
  *
- * OpenClaw-inspired profile manager with round-robin rotation and
+ * Enterprise-grade profile manager with round-robin rotation and
  * session stickiness. Manages authentication profiles across multiple
  * providers with exponential backoff cooldowns, billing-aware failure
  * handling, and persistent state.

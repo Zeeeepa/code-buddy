@@ -1,5 +1,5 @@
 /**
- * Tests for permissions-handlers (Claude Code-style tool permissions)
+ * Tests for permissions-handlers (Standard tool permissions)
  */
 
 import { handlePermissions } from '../../src/commands/handlers/permissions-handlers';

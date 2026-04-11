@@ -1,0 +1,856 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1775249556957,
+  "projectRoot": "D:\\CascadeProjects\\grok-cli",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": ">=18.0.0",
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "express",
+        "version": "5.1.0",
+        "category": "backend"
+      },
+      {
+        "name": "react",
+        "version": "18.3.1",
+        "category": "frontend"
+      },
+      {
+        "name": "vitest",
+        "version": "4.0.18",
+        "category": "testing"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": "Node.js 18.0.0"
+  },
+  "build": {
+    "buildCommand": "npm run build",
+    "testCommand": "npm test",
+    "lintCommand": "npm run lint",
+    "devCommand": "npm run dev",
+    "scripts": {
+      "build": "tsc",
+      "build:bun": "bun run tsc",
+      "build:watch": "tsc --watch",
+      "clean": "rm -rf dist coverage .nyc_output *.tsbuildinfo",
+      "dev": "bun run src/index.ts",
+      "dev:node": "tsx src/index.ts",
+      "start": "node dist/index.js",
+      "start:bun": "bun run dist/index.js",
+      "test": "vitest run",
+      "test:watch": "vitest",
+      "test:coverage": "vitest run --coverage",
+      "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+      "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
+      "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,md}\"",
+      "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,md}\"",
+      "typecheck": "tsc --noEmit",
+      "typecheck:watch": "tsc --noEmit --watch",
+      "check:circular": "npx tsx scripts/check-circular-deps.ts",
+      "validate": "npm run lint && npm run typecheck && npm test",
+      "install:bun": "bun install",
+      "docs": "typedoc",
+      "docs:watch": "typedoc --watch",
+      "bench": "npm run bench:startup && npm run bench:tools",
+      "bench:startup": "npx tsx benchmarks/startup.bench.ts",
+      "bench:tools": "npx tsx benchmarks/tools.bench.ts",
+      "perf": "PERF_TIMING=true npm start -- --help",
+      "perf:verbose": "PERF_TIMING=true VERBOSE=true npm start -- --help"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": "*.test.ts",
+    "fileOrganization": "feature-based"
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "assets",
+      "docs",
+      "examples",
+      "scripts",
+      "src",
+      "tests"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "${APPDATA}": {
+      "path": "${APPDATA}",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1775249556919,
+      "keyFiles": []
+    },
+    "apps": {
+      "path": "apps",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1775249556919,
+      "keyFiles": []
+    },
+    "assets": {
+      "path": "assets",
+      "purpose": "Static assets",
+      "fileCount": 0,
+      "lastAccessed": 1775249556919,
+      "keyFiles": []
+    },
+    "benchmarks": {
+      "path": "benchmarks",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1775249556920,
+      "keyFiles": [
+        "startup.bench.ts",
+        "tools.bench.ts"
+      ]
+    },
+    "CUserspatri.geminitmpopenclaw_test": {
+      "path": "CUserspatri.geminitmpopenclaw_test",
+      "purpose": null,
+      "fileCount": 27,
+      "lastAccessed": 1775249556920,
+      "keyFiles": [
+        "AGENTS.md",
+        "appcast.xml",
+        "CHANGELOG.md",
+        "CONTRIBUTING.md",
+        "Dockerfile"
+      ]
+    },
+    "CUserspatri.geminitmpopenclaw_test_2": {
+      "path": "CUserspatri.geminitmpopenclaw_test_2",
+      "purpose": null,
+      "fileCount": 27,
+      "lastAccessed": 1775249556920,
+      "keyFiles": [
+        "AGENTS.md",
+        "appcast.xml",
+        "CHANGELOG.md",
+        "CONTRIBUTING.md",
+        "Dockerfile"
+      ]
+    },
+    "database": {
+      "path": "database",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1775249556920,
+      "keyFiles": []
+    },
+    "deep_research": {
+      "path": "deep_research",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1775249556921,
+      "keyFiles": []
+    },
+    "deploy": {
+      "path": "deploy",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1775249556921,
+      "keyFiles": []
+    },
+    "dist": {
+      "path": "dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 3,
+      "lastAccessed": 1775249556922,
+      "keyFiles": [
+        "index.d.ts",
+        "index.js",
+        "index.js.map"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 12,
+      "lastAccessed": 1775249556922,
+      "keyFiles": [
+        "agents.md",
+        "channels.md",
+        "commands.md",
+        "configuration.md",
+        "context-engine.md"
+      ]
+    },
+    "docs-generated": {
+      "path": "docs-generated",
+      "purpose": null,
+      "fileCount": 13,
+      "lastAccessed": 1775249556922,
+      "keyFiles": [
+        "agent-module.md",
+        "agent.html",
+        "agent.json",
+        "agent.md",
+        "README.md"
+      ]
+    },
+    "docs-generated-full": {
+      "path": "docs-generated-full",
+      "purpose": null,
+      "fileCount": 793,
+      "lastAccessed": 1775249556924,
+      "keyFiles": [
+        "appdata.html",
+        "appdata.json",
+        "appdata.md",
+        "apps-cb-fix-check.html",
+        "apps-cb-fix-check.json"
+      ]
+    },
+    "examples": {
+      "path": "examples",
+      "purpose": "Example code",
+      "fileCount": 3,
+      "lastAccessed": 1775249556925,
+      "keyFiles": [
+        "CODEBUDDY.md",
+        "README.md",
+        "user-settings.json"
+      ]
+    },
+    "extensions": {
+      "path": "extensions",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1775249556925,
+      "keyFiles": []
+    },
+    "homebrew": {
+      "path": "homebrew",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1775249556925,
+      "keyFiles": [
+        "code-buddy.rb"
+      ]
+    },
+    "jetbrains-plugin": {
+      "path": "jetbrains-plugin",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1775249556925,
+      "keyFiles": [
+        "build.gradle.kts",
+        "gradle.properties",
+        "settings.gradle.kts"
+      ]
+    },
+    "openclaw": {
+      "path": "openclaw",
+      "purpose": null,
+      "fileCount": 27,
+      "lastAccessed": 1775249556926,
+      "keyFiles": [
+        "AGENTS.md",
+        "appcast.xml",
+        "CHANGELOG.md",
+        "CONTRIBUTING.md",
+        "Dockerfile"
+      ]
+    },
+    "packaging": {
+      "path": "packaging",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1775249556926,
+      "keyFiles": []
+    },
+    "prompts": {
+      "path": "prompts",
+      "purpose": null,
+      "fileCount": 5,
+      "lastAccessed": 1775249556927,
+      "keyFiles": [
+        "architect.md",
+        "code-reviewer.md",
+        "default.md",
+        "minimal.md",
+        "secure.md"
+      ]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 27,
+      "lastAccessed": 1775249556935,
+      "keyFiles": [
+        "build-book.sh",
+        "check-circular-deps.ts",
+        "check-raw.ts",
+        "codebuddy-real-app-campaign.mjs",
+        "fetch-models-snapshot.ts"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 1,
+      "lastAccessed": 1775249556935,
+      "keyFiles": [
+        "index.ts"
+      ]
+    },
+    "src-sidecar": {
+      "path": "src-sidecar",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1775249556936,
+      "keyFiles": [
+        "Cargo.lock",
+        "Cargo.toml"
+      ]
+    },
+    "test-app": {
+      "path": "test-app",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1775249556936,
+      "keyFiles": [
+        "package-lock.json",
+        "package.json",
+        "server.js",
+        "test.js"
+      ]
+    },
+    "test-scripts": {
+      "path": "test-scripts",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1775249556937,
+      "keyFiles": [
+        "fcs-style.bs",
+        "file-test.bs",
+        "hello.bs"
+      ]
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 65,
+      "lastAccessed": 1775249556937,
+      "keyFiles": [
+        "advanced-parallel-executor.test.ts",
+        "ai-integration-tests.test.ts",
+        "analytics-dashboard.test.ts",
+        "approval-modes.test.ts",
+        "architect-mode.test.ts"
+      ]
+    },
+    "tmp": {
+      "path": "tmp",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1775249556937,
+      "keyFiles": [
+        "live-audit.json",
+        "test-computer-audit.json"
+      ]
+    },
+    "tmp_gemini_burnin": {
+      "path": "tmp_gemini_burnin",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1775249556939,
+      "keyFiles": [
+        "index.js"
+      ]
+    },
+    "tmp_gemini_burnin_long": {
+      "path": "tmp_gemini_burnin_long",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1775249556939,
+      "keyFiles": [
+        "index.js"
+      ]
+    },
+    "tmp_repro_repo_2": {
+      "path": "tmp_repro_repo_2",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1775249556940,
+      "keyFiles": [
+        "index.js"
+      ]
+    },
+    "vscode-extension": {
+      "path": "vscode-extension",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1775249556941,
+      "keyFiles": [
+        "package-lock.json",
+        "package.json",
+        "README.md",
+        "tsconfig.json"
+      ]
+    },
+    "wiki": {
+      "path": "wiki",
+      "purpose": null,
+      "fileCount": 31,
+      "lastAccessed": 1775249556941,
+      "keyFiles": [
+        "cloud.md",
+        "codebase-rag.md",
+        "compaction.md",
+        "context.md",
+        "desktop-automation.md"
+      ]
+    },
+    "_test-full-init-output": {
+      "path": "_test-full-init-output",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1775249556941,
+      "keyFiles": []
+    },
+    "database\\migrations": {
+      "path": "database\\migrations",
+      "purpose": "Database migrations",
+      "fileCount": 1,
+      "lastAccessed": 1775249556943,
+      "keyFiles": [
+        "0006_test_migration.json"
+      ]
+    },
+    "dist\\api": {
+      "path": "dist\\api",
+      "purpose": "API routes",
+      "fileCount": 6,
+      "lastAccessed": 1775249556944,
+      "keyFiles": [
+        "rest-server.d.ts",
+        "rest-server.js",
+        "rest-server.js.map"
+      ]
+    },
+    "dist\\app": {
+      "path": "dist\\app",
+      "purpose": "Application code",
+      "fileCount": 9,
+      "lastAccessed": 1775249556945,
+      "keyFiles": [
+        "application-factory.d.ts",
+        "application-factory.js",
+        "application-factory.js.map"
+      ]
+    },
+    "docs\\api": {
+      "path": "docs\\api",
+      "purpose": "API routes",
+      "fileCount": 0,
+      "lastAccessed": 1775249556945,
+      "keyFiles": []
+    },
+    "jetbrains-plugin\\src": {
+      "path": "jetbrains-plugin\\src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1775249556946,
+      "keyFiles": []
+    },
+    "src\\api": {
+      "path": "src\\api",
+      "purpose": "API routes",
+      "fileCount": 2,
+      "lastAccessed": 1775249556947,
+      "keyFiles": [
+        "rest-server.ts",
+        "webhooks.ts"
+      ]
+    },
+    "src\\app": {
+      "path": "src\\app",
+      "purpose": "Application code",
+      "fileCount": 3,
+      "lastAccessed": 1775249556947,
+      "keyFiles": [
+        "application-factory.ts",
+        "index.ts",
+        "types.ts"
+      ]
+    },
+    "src-sidecar\\src": {
+      "path": "src-sidecar\\src",
+      "purpose": "Source code",
+      "fileCount": 3,
+      "lastAccessed": 1775249556948,
+      "keyFiles": [
+        "desktop.rs",
+        "main.rs",
+        "stt.rs"
+      ]
+    },
+    "test-app\\node_modules": {
+      "path": "test-app\\node_modules",
+      "purpose": "Dependencies",
+      "fileCount": 1,
+      "lastAccessed": 1775249556948,
+      "keyFiles": []
+    },
+    "vscode-extension\\node_modules": {
+      "path": "vscode-extension\\node_modules",
+      "purpose": "Dependencies",
+      "fileCount": 1,
+      "lastAccessed": 1775249556950,
+      "keyFiles": []
+    },
+    "vscode-extension\\out": {
+      "path": "vscode-extension\\out",
+      "purpose": "Build output",
+      "fileCount": 52,
+      "lastAccessed": 1775249556951,
+      "keyFiles": [
+        "ai-client.d.ts",
+        "ai-client.d.ts.map",
+        "ai-client.js"
+      ]
+    },
+    "vscode-extension\\src": {
+      "path": "vscode-extension\\src",
+      "purpose": "Source code",
+      "fileCount": 13,
+      "lastAccessed": 1775249556951,
+      "keyFiles": [
+        "ai-client.ts",
+        "diff-manager.ts",
+        "extension.ts"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "src\\agent\\execution\\agent-executor.ts",
+      "accessCount": 18,
+      "lastAccessed": 1775266013577,
+      "type": "file"
+    },
+    {
+      "path": "src\\agent\\codebuddy-agent.ts",
+      "accessCount": 13,
+      "lastAccessed": 1775266005966,
+      "type": "file"
+    },
+    {
+      "path": "src\\tools\\registry\\index.ts",
+      "accessCount": 11,
+      "lastAccessed": 1775261534571,
+      "type": "file"
+    },
+    {
+      "path": "src\\agent\\multi-agent\\agent-tools.ts",
+      "accessCount": 10,
+      "lastAccessed": 1775258160639,
+      "type": "directory"
+    },
+    {
+      "path": "src\\commands\\enhanced-command-handler.ts",
+      "accessCount": 6,
+      "lastAccessed": 1775249994207,
+      "type": "file"
+    },
+    {
+      "path": "src\\commands\\slash\\builtin-commands.ts",
+      "accessCount": 6,
+      "lastAccessed": 1775250010092,
+      "type": "file"
+    },
+    {
+      "path": "tests\\hooks\\user-hooks.test.ts",
+      "accessCount": 6,
+      "lastAccessed": 1775258515268,
+      "type": "file"
+    },
+    {
+      "path": "src\\agent\\tool-handler.ts",
+      "accessCount": 6,
+      "lastAccessed": 1775260477513,
+      "type": "file"
+    },
+    {
+      "path": "tsconfig.json",
+      "accessCount": 5,
+      "lastAccessed": 1775265986592,
+      "type": "directory"
+    },
+    {
+      "path": "",
+      "accessCount": 5,
+      "lastAccessed": 1775266016078,
+      "type": "directory"
+    },
+    {
+      "path": "src\\inference\\inference-optimizer.ts",
+      "accessCount": 4,
+      "lastAccessed": 1775249955563,
+      "type": "file"
+    },
+    {
+      "path": "src\\utils\\config-validation\\schema.ts",
+      "accessCount": 4,
+      "lastAccessed": 1775250022240,
+      "type": "file"
+    },
+    {
+      "path": "src",
+      "accessCount": 4,
+      "lastAccessed": 1775266102392,
+      "type": "directory"
+    },
+    {
+      "path": "src\\plugins\\bundled\\index.ts",
+      "accessCount": 3,
+      "lastAccessed": 1775249981185,
+      "type": "file"
+    },
+    {
+      "path": "src\\hooks\\lifecycle-hooks.ts",
+      "accessCount": 3,
+      "lastAccessed": 1775258078396,
+      "type": "directory"
+    },
+    {
+      "path": "src\\action\\index.ts",
+      "accessCount": 3,
+      "lastAccessed": 1775258691589,
+      "type": "file"
+    },
+    {
+      "path": "src\\codebuddy\\client.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775249726655,
+      "type": "file"
+    },
+    {
+      "path": "src\\inference\\index.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775249850624,
+      "type": "file"
+    },
+    {
+      "path": "src\\plugins\\bundled\\turboquant-plugin.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775249888847,
+      "type": "file"
+    },
+    {
+      "path": "tests\\inference\\inference-optimizer.test.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775249962973,
+      "type": "file"
+    },
+    {
+      "path": "src\\commands\\handlers\\index.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775249986017,
+      "type": "file"
+    },
+    {
+      "path": "action.yml",
+      "accessCount": 2,
+      "lastAccessed": 1775258030861,
+      "type": "file"
+    },
+    {
+      "path": "tests\\tools\\firecrawl-tool.test.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775260382863,
+      "type": "file"
+    },
+    {
+      "path": "src\\tools\\firecrawl-tool.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775260383911,
+      "type": "file"
+    },
+    {
+      "path": "src\\codebuddy\\tool-definitions\\index.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775261343927,
+      "type": "file"
+    },
+    {
+      "path": "src\\utils\\logger.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775249703808,
+      "type": "file"
+    },
+    {
+      "path": "CLAUDE.md",
+      "accessCount": 1,
+      "lastAccessed": 1775249704130,
+      "type": "file"
+    },
+    {
+      "path": "src\\inference\\kv-cache-config.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775249718907,
+      "type": "file"
+    },
+    {
+      "path": "src\\inference\\speculative-decoding.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775249719383,
+      "type": "file"
+    },
+    {
+      "path": "src\\plugins\\plugin-manager.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775249727204,
+      "type": "file"
+    },
+    {
+      "path": "src\\plugins\\bundled\\vllm-provider.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775249738443,
+      "type": "file"
+    },
+    {
+      "path": "src\\plugins\\bundled\\ollama-provider.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775249738815,
+      "type": "file"
+    },
+    {
+      "path": "src\\commands\\handlers\\backup-handlers.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775249743981,
+      "type": "file"
+    },
+    {
+      "path": "src\\providers\\turboquant-provider.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775249836855,
+      "type": "file"
+    },
+    {
+      "path": "src\\inference\\health-monitor.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775249846342,
+      "type": "file"
+    },
+    {
+      "path": "src\\commands\\handlers\\infra-handlers.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775249918445,
+      "type": "file"
+    },
+    {
+      "path": "tests\\providers\\turboquant-provider.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775249968541,
+      "type": "file"
+    },
+    {
+      "path": "src\\hooks\\hook-runner.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775258091469,
+      "type": "file"
+    },
+    {
+      "path": "src\\hooks\\hook-types.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775258096269,
+      "type": "file"
+    },
+    {
+      "path": "tests\\hooks\\lifecycle-hooks.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775258104041,
+      "type": "file"
+    },
+    {
+      "path": "tests\\agent\\multi-agent\\sessions-yield.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775258123635,
+      "type": "file"
+    },
+    {
+      "path": "src\\hooks\\user-hooks.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775258181756,
+      "type": "file"
+    },
+    {
+      "path": "tests\\agent\\multi-agent\\worktree-isolation.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775258196448,
+      "type": "file"
+    },
+    {
+      "path": "src\\agent\\base-agent.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775258283796,
+      "type": "directory"
+    },
+    {
+      "path": "__dbg_hook.mjs",
+      "accessCount": 1,
+      "lastAccessed": 1775258483736,
+      "type": "file"
+    },
+    {
+      "path": "cowork\\readme.md",
+      "accessCount": 1,
+      "lastAccessed": 1775260179120,
+      "type": "file"
+    },
+    {
+      "path": "src\\tools\\bug-finder-tool.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775260327290,
+      "type": "file"
+    },
+    {
+      "path": "src\\codebuddy\\tool-definitions\\advanced-tools.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775260327790,
+      "type": "file"
+    },
+    {
+      "path": "src\\desktop-automation\\smart-snapshot.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775260343696,
+      "type": "file"
+    },
+    {
+      "path": "src\\tools\\computer-control-tool.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775260344205,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

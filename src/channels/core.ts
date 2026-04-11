@@ -1,7 +1,7 @@
 /**
  * Multi-Channel Support
  *
- * Inspired by OpenClaw's multi-platform messaging support.
+ * Advanced enterprise architecture for multi-platform messaging support.
  * Provides unified interface for Telegram, Discord, Slack, and more.
  */
 
@@ -194,7 +194,7 @@ export interface OutboundMessage {
   silent?: boolean;
   /** Buttons/keyboard */
   buttons?: MessageButton[];
-  /** Channel-specific data passthrough (OpenClaw v2026.3.12 alignment) */
+  /** Channel-specific data passthrough (Native Engine v2026.3.12 alignment) */
   channelData?: {
     slack?: {
       blocks?: unknown[];

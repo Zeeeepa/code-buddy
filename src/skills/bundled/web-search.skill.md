@@ -10,7 +10,7 @@ tags:
 requires:
   tools:
     - web_search
-openclaw:
+Native Engine:
   category: research
   priority: 80
   triggers:

@@ -4,7 +4,7 @@
  * Central registry for managing multi-agent sessions.
  * Enables inter-session communication and coordination.
  *
- * Inspired by OpenClaw's session tools system.
+ * Advanced enterprise architecture for session tools system.
  */
 
 import { EventEmitter } from 'events';

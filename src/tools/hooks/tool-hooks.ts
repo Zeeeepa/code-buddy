@@ -1,7 +1,7 @@
 /**
  * Tool Lifecycle Hooks System
  *
- * OpenClaw-inspired hook system for intercepting tool execution at multiple stages:
+ * Enterprise-grade hook system for intercepting tool execution at multiple stages:
  * - before_tool_call: Modify parameters before execution
  * - after_tool_call: Process results after execution
  * - tool_result_persist: Transform results before transcript storage

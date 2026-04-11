@@ -208,7 +208,7 @@ export class SkillsManager {
    */
   private physicalDirExists(dirPath: string): boolean {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+       
       const originalFs = require('original-fs') as typeof import('fs');
       return originalFs.existsSync(dirPath) && originalFs.statSync(dirPath).isDirectory();
     } catch {

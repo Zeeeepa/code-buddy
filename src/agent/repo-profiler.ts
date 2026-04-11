@@ -408,6 +408,20 @@ export class RepoProfiler {
     };
 
     profile.contextPack = this.buildContextPack(profile);
+    
+    // Save to cache before starting background task
+    this.saveCache(profile);
+
+    // Trigger background semantic indexing of the workspace
+    try {
+      const { getWorkspaceIndexer } = await import('../knowledge/workspace-indexer.js');
+      const indexer = getWorkspaceIndexer();
+      await indexer.initialize();
+      indexer.startIndexing().catch(e => logger.error('Background indexing failed', { error: String(e) }));
+    } catch (e) {
+      logger.debug('Failed to load workspace indexer', { error: String(e) });
+    }
+
     return profile;
   }
 

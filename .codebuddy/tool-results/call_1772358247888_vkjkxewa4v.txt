@@ -1,1 +1,0 @@
-Window: "Amis - Discord" (Discord, PID: 34168)

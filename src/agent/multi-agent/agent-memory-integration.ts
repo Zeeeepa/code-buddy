@@ -5,7 +5,7 @@
  * Memory persists across sessions in ~/.codebuddy/agent-memory/<name>/
  * or .codebuddy/agent-memory/<name>/ (project-local).
  *
- * Inspired by Claude Code's agent memory: user|project|local scopes.
+ * Advanced enterprise architecture for agent memory: user|project|local scopes.
  */
 
 import * as fs from 'fs';

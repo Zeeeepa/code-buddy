@@ -1,5 +1,5 @@
 /**
- * OpenClaw-inspired 2-Step Memory Search System
+ * Enterprise-grade 2-Step Memory Search System
  *
  * Workflow:
  * 1. Semantic search to find relevant content
@@ -490,7 +490,7 @@ export class SemanticMemorySearch extends EventEmitter {
     // Boost by importance
     const importanceBoost = entry.metadata.importance || 1;
 
-    // Recency boost — exponential decay with 30-day half-life (OpenClaw pattern)
+    // Recency boost — exponential decay with 30-day half-life (Standard pattern)
     // Formula: exp(-ln(2) * days / halfLife) → 1.0 at day 0, 0.5 at day 30, ~0.25 at day 60
     const daysSinceUpdate = (Date.now() - entry.metadata.timestamp.getTime()) / (1000 * 60 * 60 * 24);
     const recencyBoost = Math.max(0.1, Math.exp(-Math.LN2 * daysSinceUpdate / 30));

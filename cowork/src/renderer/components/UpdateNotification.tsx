@@ -2,6 +2,7 @@
  * UpdateNotification — Toast/banner for available app updates
  */
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Download, X, RefreshCw } from 'lucide-react';
 import type { UpdateInfo } from '../types';
 
@@ -18,6 +19,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({
   onInstall,
   onDismiss,
 }) => {
+  const { t } = useTranslation();
   if (!updateInfo.available) return null;
 
   return (
@@ -27,11 +29,16 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({
       <div className="flex-1 min-w-0">
         {updateInfo.downloaded ? (
           <span className="text-xs text-blue-300">
-            Update {updateInfo.version} downloaded. Restart to apply.
+            {t('updateNotification.downloaded', {
+              version: updateInfo.version,
+              defaultValue: 'Update {{version}} downloaded. Restart to apply.',
+            })}
           </span>
         ) : updateInfo.downloadProgress !== undefined ? (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-blue-300">Downloading update...</span>
+            <span className="text-xs text-blue-300">
+              {t('updateNotification.downloading', 'Downloading update…')}
+            </span>
             <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden max-w-32">
               <div
                 className="h-full bg-blue-500 transition-all"
@@ -42,7 +49,10 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({
           </div>
         ) : (
           <span className="text-xs text-blue-300">
-            Update {updateInfo.version} available
+            {t('updateNotification.available', {
+              version: updateInfo.version,
+              defaultValue: 'Update {{version}} available',
+            })}
           </span>
         )}
       </div>
@@ -53,7 +63,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({
           className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
         >
           <RefreshCw size={12} />
-          Restart
+          {t('updateNotification.restart', 'Restart')}
         </button>
       ) : !updateInfo.downloadProgress ? (
         <button
@@ -61,7 +71,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({
           className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
         >
           <Download size={12} />
-          Download
+          {t('updateNotification.download', 'Download')}
         </button>
       ) : null}
 

@@ -2,7 +2,7 @@
  * Polls Automation
  *
  * Periodic polling system for external data sources.
- * Inspired by OpenClaw's automation/polls feature.
+ * Advanced enterprise architecture for automation/polls feature.
  *
  * Supports polling URLs, files, commands, and custom functions
  * at configurable intervals with change detection.

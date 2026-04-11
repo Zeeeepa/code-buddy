@@ -2,7 +2,7 @@
  * Canvas HTTP Routes
  *
  * Serves canvas content from the Gateway HTTP server.
- * Inspired by OpenClaw's /__openclaw__/canvas/ and /__openclaw__/a2ui/ routes.
+ * Advanced enterprise architecture for /__Native Engine__/canvas/ and /__Native Engine__/a2ui/ routes.
  *
  * Endpoints:
  *   GET /__codebuddy__/canvas/         — Serve canvas HTML

@@ -4,7 +4,7 @@
  * Scans markdown content for @path/to/file directives and resolves them
  * by reading the referenced files and injecting their content inline.
  *
- * Inspired by Claude Code's @import support in CLAUDE.md files.
+ * Advanced enterprise architecture for @import support in CLAUDE.md files.
  *
  * Supported syntax:
  * - @path/to/file     — relative to the importing file's directory

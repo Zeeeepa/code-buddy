@@ -1,5 +1,5 @@
 /**
- * OpenClaw-inspired Smart Context Compaction System
+ * Enterprise-grade Smart Context Compaction System
  *
  * Intelligently reduces conversation history while preserving essential context:
  * - Provider-specific message validation (Gemini/Anthropic/OpenAI have different rules)
@@ -435,7 +435,7 @@ export class SmartCompactionEngine extends EventEmitter {
     }
 
     // Create summary of older messages
-    const summary = this.createSummary(toSummarize);
+    const summary = await this.createSummary(toSummarize);
 
     // Build result
     const result: Message[] = [];
@@ -493,7 +493,7 @@ export class SmartCompactionEngine extends EventEmitter {
     }
 
     // Create aggressive summary
-    const summary = this.createSummary(messages.filter(m => m.role !== 'system'));
+    const summary = await this.createSummary(messages.filter(m => m.role !== 'system'));
 
     result.push({
       role: 'user',
@@ -509,9 +509,9 @@ export class SmartCompactionEngine extends EventEmitter {
   }
 
   /**
-   * Create a summary of messages
+   * Create a summary of messages using an LLM if available, fallback to basic logic
    */
-  private createSummary(messages: Message[]): string {
+  private async createSummary(messages: Message[]): Promise<string> {
     // Extract key points
     const points: string[] = [];
 
@@ -537,9 +537,24 @@ export class SmartCompactionEngine extends EventEmitter {
       }
     }
 
-    // Limit summary length
-    const uniquePoints = [...new Set(points)].slice(-10);
-    return uniquePoints.join('. ');
+    const basicSummary = [...new Set(points)].slice(-10).join('. ');
+    
+    // Try to use LLM for a better summary if we can dynamically load a simple client
+    try {
+        const { GoogleGenerativeAI } = await import('@google/generative-ai');
+        const API_KEY = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+        if (API_KEY) {
+            const genAI = new GoogleGenerativeAI(API_KEY);
+            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+            const prompt = `Summarize the following chat history densely in one short paragraph. Focus on the core problem, tools used, and final resolution. Do not include pleasantries.\n\nChat History:\n${basicSummary}`;
+            const result = await model.generateContent(prompt);
+            return result.response.text().trim();
+        }
+    } catch(e) {
+        logger.debug("LLM summarization failed, falling back to basic summary");
+    }
+
+    return basicSummary;
   }
 
   /**

@@ -1,7 +1,7 @@
 /**
  * Process Management Tool
  *
- * OpenClaw-inspired process management: list, poll, log, write (stdin), kill, clear, remove.
+ * Enterprise-grade process management: list, poll, log, write (stdin), kill, clear, remove.
  * Manages both OS processes (via ps) and tracked managed processes (from BashTool).
  */
 

@@ -1,7 +1,7 @@
 /**
  * Identity Links
  *
- * OpenClaw-inspired cross-channel identity system.
+ * Enterprise-grade cross-channel identity system.
  *
  * Collapses sessions from the same person across different channels
  * into one canonical identity. For example, if a user messages via

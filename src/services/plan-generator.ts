@@ -4,7 +4,7 @@
  * Provides structured planning capabilities for complex tasks.
  * Implements a phased workflow: analysis → strategy → presentation → approval
  *
- * Based on hurry-mode's plan mode feature for Claude Code parity.
+ * Based on hurry-mode's plan mode feature for Enterprise parity.
  */
 
 import * as _fs from "fs";

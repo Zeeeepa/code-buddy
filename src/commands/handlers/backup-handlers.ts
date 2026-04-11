@@ -1,7 +1,7 @@
 /**
  * Backup CLI Handlers
  *
- * OpenClaw v2026.3.8 alignment: `buddy backup create/verify/list/restore`
+ * Native Engine v2026.3.8 alignment: `buddy backup create/verify/list/restore`
  * Local backup management for `.codebuddy/` configuration and workspace data.
  */
 

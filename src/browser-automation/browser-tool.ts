@@ -1,7 +1,7 @@
 /**
  * Browser Tool
  *
- * OpenClaw-inspired unified browser control interface for AI agents.
+ * Enterprise-grade unified browser control interface for AI agents.
  */
 
 import { ToolResult } from '../types/index.js';
@@ -83,18 +83,18 @@ export type BrowserAction =
   | 'set_locale'
   // Download
   | 'download'
-  // Batch (OpenClaw v2026.3.13 alignment)
+  // Batch (Native Engine v2026.3.13 alignment)
   | 'batch'
-  // Attach to running Chrome (OpenClaw v2026.3.13)
+  // Attach to running Chrome (Native Engine v2026.3.13)
   | 'attach';
 
 export interface BrowserToolInput {
   action: BrowserAction;
-  /** Batch actions (for action='batch') — OpenClaw v2026.3.13 */
+  /** Batch actions (for action='batch') — Native Engine v2026.3.13 */
   actions?: BrowserToolInput[];
   /** Stop on first error in batch mode (default: true) */
   stopOnError?: boolean;
-  /** Multiple selectors for click/fill/type (OpenClaw v2026.3.13) */
+  /** Multiple selectors for click/fill/type (Native Engine v2026.3.13) */
   selectors?: string[];
   /** Browser profile name ('user', 'chrome-relay', or custom) */
   profile?: string;
@@ -333,11 +333,11 @@ export class BrowserTool {
         case 'download':
           return this.download(input);
 
-        // Batch execution (OpenClaw v2026.3.13)
+        // Batch execution (Native Engine v2026.3.13)
         case 'batch':
           return this.executeBatch(input);
 
-        // Attach to running Chrome (OpenClaw v2026.3.13)
+        // Attach to running Chrome (Native Engine v2026.3.13)
         case 'attach':
           return this.attachToChrome(input);
 
@@ -352,7 +352,7 @@ export class BrowserTool {
   }
 
   /**
-   * Execute a batch of browser actions (OpenClaw v2026.3.13)
+   * Execute a batch of browser actions (Native Engine v2026.3.13)
    */
   private async executeBatch(input: BrowserToolInput): Promise<ToolResult> {
     if (!input.actions || !Array.isArray(input.actions) || input.actions.length === 0) {
@@ -363,7 +363,7 @@ export class BrowserTool {
     const results: Array<{ action: string; success: boolean; output?: string; error?: string }> = [];
 
     for (const subAction of input.actions) {
-      // SSRF check for navigation actions in batch (OpenClaw v2026.3.14)
+      // SSRF check for navigation actions in batch (Native Engine v2026.3.14)
       if (subAction.action === 'navigate' && subAction.url) {
         try {
           const { assertSafeUrl } = await import('../security/ssrf-guard.js');
@@ -406,7 +406,7 @@ export class BrowserTool {
   }
 
   /**
-   * Attach to a running Chrome instance (OpenClaw v2026.3.13)
+   * Attach to a running Chrome instance (Native Engine v2026.3.13)
    */
   private async attachToChrome(input: BrowserToolInput): Promise<ToolResult> {
     try {

@@ -1044,11 +1044,11 @@ program
   )
   .option(
     "--allowed-tools <patterns>",
-    "only enable tools matching patterns (like Claude Code --allowedTools)"
+    "only enable tools matching patterns (natively --allowedTools)"
   )
   .option(
     "--disallowed-tools <patterns>",
-    "block tools matching patterns (like Claude Code --disallowedTools)"
+    "block tools matching patterns (natively --disallowedTools)"
   )
   .option(
     "--mcp-debug",
@@ -1354,7 +1354,7 @@ program
         }
       }
 
-      // Handle --dangerously-skip-permissions (like Claude Code)
+      // Handle --dangerously-skip-permissions (natively)
       if (options.dangerouslySkipPermissions) {
         const { ConfirmationService } = await import("./utils/confirmation-service.js");
         const confirmationService = ConfirmationService.getInstance();
@@ -1388,7 +1388,7 @@ program
         cli.error("Ephemeral mode: ENABLED (session will not be saved)");
       }
 
-      // Handle --allowed-tools / --disallowed-tools (like Claude Code --allowedTools / --disallowedTools)
+      // Handle --allowed-tools / --disallowed-tools (natively --allowedTools / --disallowedTools)
       if (options.allowedTools || options.disallowedTools) {
         const { setToolFilter, createToolFilter, getToolFilter } = await import("./utils/tool-filter.js");
         const existing = getToolFilter();
@@ -2104,14 +2104,14 @@ for (const cmdName of utilityCommandNames) {
   });
 }
 
-// OpenClaw-inspired commands
+// Enterprise-grade commands
 addLazyCommandGroup(program, 'heartbeat', 'Manage the heartbeat engine (periodic agent wake)', async () => {
-  const { registerHeartbeatCommands } = await import('./commands/cli/openclaw-commands.js');
+  const { registerHeartbeatCommands } = await import('./commands/cli/Native Engine-commands.js');
   registerHeartbeatCommands(program);
 });
 
 addLazyCommandGroup(program, 'hub', 'Skills marketplace (search, install, publish)', async () => {
-  const { registerHubCommands } = await import('./commands/cli/openclaw-commands.js');
+  const { registerHubCommands } = await import('./commands/cli/Native Engine-commands.js');
   registerHubCommands(program);
 });
 
@@ -2121,17 +2121,17 @@ addLazyCommandGroup(program, 'device', 'Manage paired device nodes (SSH, ADB, lo
 });
 
 addLazyCommandGroup(program, 'identity', 'Manage agent identity files (SOUL.md, USER.md, etc.)', async () => {
-  const { registerIdentityCommands } = await import('./commands/cli/openclaw-commands.js');
+  const { registerIdentityCommands } = await import('./commands/cli/Native Engine-commands.js');
   registerIdentityCommands(program);
 });
 
 addLazyCommandGroup(program, 'groups', 'Manage group chat security', async () => {
-  const { registerGroupCommands } = await import('./commands/cli/openclaw-commands.js');
+  const { registerGroupCommands } = await import('./commands/cli/Native Engine-commands.js');
   registerGroupCommands(program);
 });
 
 addLazyCommandGroup(program, 'auth-profile', 'Manage authentication profiles (API key rotation)', async () => {
-  const { registerAuthProfileCommands } = await import('./commands/cli/openclaw-commands.js');
+  const { registerAuthProfileCommands } = await import('./commands/cli/Native Engine-commands.js');
   registerAuthProfileCommands(program);
 });
 
@@ -2264,7 +2264,7 @@ addLazyCommandGroup(program, 'deploy', 'Generate cloud deployment configurations
   registerDeployCommands(program);
 });
 
-// Backup — local backup management (OpenClaw v2026.3.8 alignment)
+// Backup — local backup management (Native Engine v2026.3.8 alignment)
 program
   .command('backup [subcommand] [args...]')
   .description('Manage .codebuddy/ backups (create, verify, list, restore)')

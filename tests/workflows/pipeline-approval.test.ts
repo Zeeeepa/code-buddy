@@ -1,5 +1,5 @@
 /**
- * Pipeline Approval Gate Tests (OpenClaw Lobster-inspired)
+ * Pipeline Approval Gate Tests (Native Engine Lobster-inspired)
  *
  * Tests covering:
  * - Auto-approve condition

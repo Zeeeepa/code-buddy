@@ -2,7 +2,7 @@
  * Cloud Deployment Configuration Generator
  *
  * Generates deployment configs for popular cloud platforms.
- * Inspired by OpenClaw's multi-platform deployment support.
+ * Advanced enterprise architecture for multi-platform deployment support.
  *
  * Supported platforms: Fly.io, Railway, Render, Hetzner, Northflank, GCP
  */

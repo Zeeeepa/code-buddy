@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Module</title>
+<style>
+
+:root {
+  --accent: #1D9E75;
+  --accent-hover: #178a64;
+  --bg: #ffffff;
+  --bg-secondary: #f5f7fa;
+  --bg-code: #f0f2f5;
+  --text: #1a1a2e;
+  --text-secondary: #555;
+  --border: #e0e0e0;
+  --sidebar-bg: #fafbfc;
+  --sidebar-width: 260px;
+  --toc-width: 220px;
+}
+
+[data-theme="dark"] {
+  --bg: #1a1a2e;
+  --bg-secondary: #22223a;
+  --bg-code: #2a2a42;
+  --text: #e0e0e0;
+  --text-secondary: #aaa;
+  --border: #333;
+  --sidebar-bg: #16162a;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  display: flex;
+  min-height: 100vh;
+  line-height: 1.65;
+}
+
+/* ---- Sidebar ---- */
+.sidebar {
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.logo {
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--accent);
+}
+
+.theme-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 16px;
+  color: var(--text);
+}
+
+[data-theme="light"] .icon-moon { display: none; }
+[data-theme="dark"] .icon-sun { display: none; }
+
+.sidebar-search {
+  padding: 10px 14px;
+}
+
+.sidebar-search input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+}
+
+.sidebar-search input:focus {
+  border-color: var(--accent);
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 6px 0;
+  overflow-y: auto;
+}
+
+.sidebar-nav a {
+  display: block;
+  padding: 8px 18px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 13px;
+  border-left: 3px solid transparent;
+  transition: all 0.15s;
+}
+
+.sidebar-nav a:hover {
+  background: var(--bg-secondary);
+  color: var(--text);
+}
+
+.sidebar-nav a.active {
+  border-left-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+  background: var(--bg-secondary);
+}
+
+.sidebar-nav a[hidden] { display: none; }
+
+.nav-title { display: block; }
+
+.cohesion-bar {
+  display: block;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-top: 4px;
+}
+
+.cohesion-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+/* ---- Content ---- */
+.content {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  margin-right: var(--toc-width);
+  padding: 40px 48px;
+  max-width: 900px;
+  min-width: 0;
+}
+
+.menu-btn {
+  display: none;
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 200;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.article h1 {
+  font-size: 28px;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.meta {
+  display: flex;
+  gap: 20px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.article h2 {
+  font-size: 22px;
+  margin: 36px 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.article h3 {
+  font-size: 18px;
+  margin: 28px 0 8px;
+  color: var(--text);
+}
+
+.article h4 {
+  font-size: 15px;
+  margin: 20px 0 6px;
+  color: var(--text-secondary);
+}
+
+.article p { margin: 10px 0; }
+
+.article a { color: var(--accent); text-decoration: none; }
+.article a:hover { text-decoration: underline; }
+
+.article code {
+  background: var(--bg-code);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+.article pre {
+  background: var(--bg-code);
+  padding: 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 14px 0;
+  border: 1px solid var(--border);
+}
+
+.article pre code {
+  background: none;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.hl-kw { color: #c678dd; font-weight: 600; }
+.hl-str { color: #98c379; }
+.hl-cmt { color: #7f848e; font-style: italic; }
+.hl-num { color: #d19a66; }
+
+[data-theme="light"] .hl-kw { color: #8b3dba; }
+[data-theme="light"] .hl-str { color: #2e7d32; }
+[data-theme="light"] .hl-cmt { color: #9e9e9e; }
+[data-theme="light"] .hl-num { color: #b5651d; }
+
+.article table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 14px 0;
+  font-size: 14px;
+}
+
+.article th, .article td {
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.article th {
+  background: var(--bg-secondary);
+  font-weight: 600;
+}
+
+.article blockquote {
+  border-left: 4px solid var(--accent);
+  padding: 8px 16px;
+  margin: 12px 0;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border-radius: 0 6px 6px 0;
+}
+
+.article ul, .article ol {
+  padding-left: 24px;
+  margin: 10px 0;
+}
+
+.article li { margin: 4px 0; }
+
+.article hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 24px 0;
+}
+
+/* ---- TOC ---- */
+.toc {
+  width: var(--toc-width);
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  padding: 24px 14px;
+  overflow-y: auto;
+  border-left: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.toc-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.toc a {
+  display: block;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  transition: all 0.15s;
+}
+
+.toc a:hover { color: var(--text); }
+
+.toc a.active {
+  color: var(--accent);
+  border-left-color: var(--accent);
+  font-weight: 600;
+}
+
+.toc a.toc-sub { padding-left: 20px; font-size: 11px; }
+
+/* ---- Responsive ---- */
+@media (max-width: 1200px) {
+  .toc { display: none; }
+  .content { margin-right: 0; }
+}
+
+@media (max-width: 900px) {
+  .sidebar { transform: translateX(-100%); transition: transform 0.25s; }
+  .sidebar.open { transform: translateX(0); }
+  .content { margin-left: 0; padding: 24px 20px; }
+  .menu-btn { display: block; }
+}
+
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <span class="logo">Docs</span>
+    <button class="theme-toggle" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
+      <span class="icon-sun">&#9728;</span>
+      <span class="icon-moon">&#9790;</span>
+    </button>
+  </div>
+  <div class="sidebar-search">
+    <input type="text" id="searchBox" placeholder="Search modules..." aria-label="Search modules">
+  </div>
+  <nav class="sidebar-nav" id="sidebarNav">
+    <a href="agent.html" class="active" data-title="agent module">
+      <span class="nav-title">Agent Module</span>
+      <span class="cohesion-bar"><span class="cohesion-fill" style="width:85%"></span></span>
+    </a>
+    <a href="security.html" data-title="security module">
+      <span class="nav-title">Security Module</span>
+      <span class="cohesion-bar"><span class="cohesion-fill" style="width:85%"></span></span>
+    </a>
+    <a href="tools.html" data-title="tools module">
+      <span class="nav-title">Tools Module</span>
+      <span class="cohesion-bar"><span class="cohesion-fill" style="width:85%"></span></span>
+    </a>
+  </nav>
+</aside>
+<main class="content">
+  <button class="menu-btn" id="menuBtn" aria-label="Toggle sidebar">&#9776;</button>
+  <article class="article">
+    <h1>Agent Module</h1>
+    <div class="meta">
+      <span>Module: <code>agent</code></span>
+      <span>Cohesion: <strong>0.85</strong></span>
+      <span>Members: <strong>1</strong></span>
+    </div>
+    <h1 id="agent-module-documentation">Agent Module Documentation</h1>
+<p>
+This document provides a comprehensive technical overview of the core agent modules: <code>codebuddy-agent.ts</code>, <code>agent-executor.ts</code>, and <code>tool-handler.ts</code>. It covers their purpose, key classes, public APIs, configuration, the agentic loop, and the tool execution flow.
+</p>
+<h2 id="1-src-agent-codebuddy-agent-ts">1. <code>src/agent/codebuddy-agent.ts</code></h2>
+<h3 id="module-purpose">Module Purpose</h3>
+<p>
+The <code>codebuddy-agent.ts</code> module defines the main <code>CodeBuddyAgent</code> class, which serves as the orchestrator for conversations with the CodeBuddy AI and manages the execution of various tools. It acts as the primary entry point for interacting with the CodeBuddy system.
+</p>
+<h3 id="key-classes">Key Classes</h3>
+<h4 id="codebuddyagent"><code>CodeBuddyAgent</code></h4>
+<p>
+This is the central class responsible for:
+</p>
+<ul>
+<p>
+<li>Initializing the agent with an API key, base URL, and optional model.</li>
+<li>Managing infrastructure dependencies such as <code>CodeBuddyClient</code>, <code>ToolHandler</code>, <code>PromptBuilder</code>, <code>StreamingHandler</code>, and <code>AgentExecutor</code>.</li>
+<li>Handling different tool selection strategies (e.g., RAG-based).</li>
+<li>Managing message queues for various interaction modes (steer, followup, collect).</li>
+<li>Integrating with cost prediction and budget alert management systems.</li>
+<li>Determining the AI model to use based on saved settings or fallback defaults.</li>
+<li>Configuring "YOLO mode" for autonomous execution based on environment variables and explicit settings.</li>
+</p>
+</ul>
+<h3 id="public-api">Public API</h3>
+<h4 id="constructor-apikey-string-baseurl-string-model-string-maxtoolrounds-number-useragtoolselection-boolean-true-systempromptid-string"><code>constructor(apiKey: string, baseURL?: string, model?: string, maxToolRounds?: number, useRAGToolSelection: boolean = true, systemPromptId?: string)</code></h4>
+<ul>
+<p>
+<li><strong><code>apiKey</code></strong>: Required API key for authentication with the CodeBuddy AI.</li>
+<li><strong><code>baseURL</code></strong>: Optional base URL for the CodeBuddy API endpoint.</li>
+<li><strong><code>model</code></strong>: Optional model name to use (defaults to saved settings or <code>grok-code-fast-1</code>).</li>
+<li><strong><code>maxToolRounds</code></strong>: Optional maximum number of tool execution rounds (default depends on YOLO mode).</li>
+<li><strong><code>useRAGToolSelection</code></strong>: Boolean to enable RAG-based tool selection (defaults to <code>true</code>).</li>
+<li><strong><code>systemPromptId</code></strong>: An optional ID for an external system prompt (e.g., 'default', 'minimal', 'secure').</li>
+</p>
+</ul>
+<h4 id="processusermessagestream-message-string-asyncgenerator-streamingchunk-example-usage"><code>processUserMessageStream(message: string): AsyncGenerator<StreamingChunk></code> (Example Usage)</h4>
+<p>
+This method, though not fully shown in the provided lines, is indicated by the usage example in the class JSDoc. It's the primary way to process a user message and receive streaming chunks of responses from the agent.
+</p>
+<h4 id="dispose-void-example-usage"><code>dispose(): void</code> (Example Usage)</h4>
+<p>
+Cleans up resources held by the agent.
+</p>
+<h3 id="configuration">Configuration</h3>
+<ul>
+<p>
+<li><strong>API Key</strong>: Provided during agent instantiation.</li>
+<li><strong>Base URL</strong>: Configurable during instantiation.</li>
+<li><strong>AI Model</strong>: Can be specified during instantiation, otherwise defaults to a saved model or <code>FALLBACK_MODEL</code> (<code>grok-code-fast-1</code>).</li>
+<li><strong><code>maxToolRounds</code></strong>: Configures the maximum number of tool execution iterations.</li>
+<li><strong><code>useRAGToolSelection</code></strong>: Toggles RAG-based tool selection.</li>
+<li><strong><code>YOLO_MODE</code></strong>: Enabled if the <code>YOLO_MODE</code> environment variable is set to "true" AND the <code>autonomyManager</code> confirms YOLO mode is enabled. This likely influences agent autonomy and <code>maxToolRounds</code>.</li>
+<li><strong><code>systemPromptId</code></strong>: Allows for selecting different system prompts for the agent.</li>
+</p>
+</ul>
+<h2 id="2-src-agent-execution-agent-executor-ts">2. <code>src/agent/execution/agent-executor.ts</code></h2>
+<h3 id="module-purpose">Module Purpose</h3>
+<p>
+The <code>agent-executor.ts</code> module implements the core agentic loop. Its primary responsibility is to process user messages, manage sequential and streaming responses, orchestrate tool execution rounds, track token usage and costs, and handle various aspects of context management.
+</p>
+<h3 id="key-classes">Key Classes</h3>
+<h4 id="agentexecutor"><code>AgentExecutor</code></h4>
+<p>
+This class encapsulates the core logic of the agentic loop. It is responsible for:
+</p>
+<ul>
+<p>
+<li>Receiving and processing user messages.</li>
+<li>Managing the interaction with the <code>CodeBuddyClient</code> for AI model communication.</li>
+<li>Utilizing the <code>ToolHandler</code> for executing selected tools.</li>
+<li>Employing a <code>ToolSelectionStrategy</code> to determine which tools to use.</li>
+<li>Handling streaming responses via <code>StreamingHandler</code>.</li>
+<li>Managing conversational context and history using <code>ContextManagerV2</code>.</li>
+<li>Tracking token usage and estimating costs with <code>TokenCounter</code>.</li>
+<li>Applying middleware pipelines for message processing.</li>
+<li>Implementing mechanisms for transcript repair and proactive context compaction.</li>
+<li>Integrating with <code>TodoTracker</code>, <code>LessonsTracker</code>, and <code>ResponseConstraintStack</code>.</li>
+<li>Lazy-loading workspace context to avoid performance bottlenecks.</li>
+</p>
+</ul>
+<h3 id="the-agentic-loop">The Agentic Loop</h3>
+<p>
+While the full implementation isn't shown, the module purpose statement outlines the core agentic loop:
+</p>
+<ol>
+<p>
+<li><strong>Process User Messages</strong>: The executor receives a user message.</li>
+<li><strong>Tool Execution Rounds</strong>: It iterates through rounds of tool selection and execution.</li>
+<li><strong>Token Counting & Cost Tracking</strong>: Monitors and tracks token usage and estimates costs throughout the process.</li>
+<li><strong>Context Management</strong>: Dynamically manages the conversational context, including history, observations, and constraints.</li>
+<li><strong>Streaming Responses</strong>: If configured, provides responses in a streaming fashion.</li>
+</p>
+</ol>
+<h3 id="context-providers">Context Providers</h3>
+<p>
+The <code>agent-executor.ts</code> file also exports several functions to set context providers for various aspects:
+</p>
+<ul>
+<p>
+<li><code>setDecisionContextProvider</code></li>
+<li><code>setICMBridgeProvider</code></li>
+<li><code>setCodeGraphContextProvider</code></li>
+<li><code>setDocsContextProvider</code></li>
+</p>
+</ul>
+<p>
+These functions likely allow external modules to inject their specific context management logic into the <code>AgentExecutor</code>.
+</p>
+<h2 id="3-src-agent-tool-handler-ts">3. <code>src/agent/tool-handler.ts</code></h2>
+<h3 id="module-purpose">Module Purpose</h3>
+<p>
+The <code>tool-handler.ts</code> module acts as the central dispatcher for all tool execution within the CodeBuddy agent. It implements the Tool Registry pattern to provide a clean and maintainable way to manage and execute various tools.
+</p>
+<h3 id="key-features">Key Features</h3>
+<ul>
+<p>
+<li><strong>FormalToolRegistry</strong>: Utilizes a type-safe tool registry to avoid <code>switch-case</code> statements for tool dispatch, promoting better code organization and maintainability.</li>
+<li><strong>Checkpoint System</strong>: Ensures file operation safety by integrating with a checkpoint system.</li>
+<li><strong>Lifecycle Hooks</strong>: Supports <code>pre/post edit</code> and <code>pre/post bash</code> hooks, allowing for custom logic to be executed before and after specific tool operations.</li>
+<li><strong>Auto-repair for failed bash commands</strong>: Implies built-in mechanisms to attempt recovery or provide feedback for unsuccessful bash executions.</li>
+<li><strong>MCP (Model Context Protocol) External Tools</strong>: Supports integration with external tools that adhere to the Model Context Protocol.</li>
+<li><strong>Plugin Marketplace Tools</strong>: Designed to accommodate tools from a plugin marketplace.</li>
+<li><strong>Lazy-loading of Tool Instances</strong>: Tool instances are loaded only on their first access, optimizing startup time.</li>
+</p>
+</ul>
+<h3 id="key-classes">Key Classes</h3>
+<h4 id="toolhandler"><code>ToolHandler</code></h4>
+<p>
+This class is responsible for:
+</p>
+<ul>
+<p>
+<li>Registering various tools using <code>getFormalToolRegistry</code>.</li>
+<li>Dispatching tool calls based on the tool selection made by the agent.</li>
+<li>Orchestrating the execution of tools, including handling their inputs and outputs.</li>
+<li>Integrating with the checkpoint system for safe file operations.</li>
+<li>Potentially managing the lifecycle of tools and their resources.</li>
+</p>
+</ul>
+<h3 id="tool-execution-flow">Tool Execution Flow</h3>
+<p>
+The <code>ToolHandler</code> orchestrates tool execution as follows:
+</p>
+<ol>
+<p>
+<li><strong>Tool Registration</strong>: At initialization, various tool categories (TextEditor, MorphEditor, Image, Bash, Ls, Search, Web, Todo, Docker, Kubernetes, Git, Misc, Browser, Process, Vision, Script, Plan, Knowledge, Memory, Parallel, Attention, Lessons, Alias, Multimodal, Advanced, Canvas) are registered with the <code>FormalToolRegistry</code>.</li>
+<li><strong>Tool Call</strong>: When the <code>AgentExecutor</code> determines a tool needs to be called, it sends a tool call request to the <code>ToolHandler</code>.</li>
+<li><strong>Dispatch</strong>: The <code>ToolHandler</code> uses the <code>FormalToolRegistry</code> to locate and dispatch the correct tool instance based on the tool call.</li>
+<li><strong>Execution</strong>: The selected tool's logic is executed. This might involve interacting with the file system (via TextEditor, MorphEditor), running shell commands (BashTool), performing web searches, etc.</li>
+<li><strong>Lifecycle Hooks</strong>: <code>pre/post edit</code> and <code>pre/post bash</code> hooks are triggered at appropriate points during execution.</li>
+<li><strong>Result Handling</strong>: The result of the tool execution is returned, potentially including auto-repair logic for failures.</li>
+<li><strong>Checkpoint Integration</strong>: File operations are likely guarded by the checkpoint system for atomicity and safety.</li>
+</p>
+</ol>
+<p>
+This modular design ensures that new tools can be easily added and managed without significantly altering the core agent logic.
+</p>
+  </article>
+</main>
+<aside class="toc" id="toc">
+  <div class="toc-title">On this page</div>
+  <nav>
+    <a href="#1-src-agent-codebuddy-agent-ts" data-target="1-src-agent-codebuddy-agent-ts">1. `src/agent/codebuddy-agent.ts`</a>
+    <a href="#module-purpose" class="toc-sub" data-target="module-purpose">Module Purpose</a>
+    <a href="#key-classes" class="toc-sub" data-target="key-classes">Key Classes</a>
+    <a href="#public-api" class="toc-sub" data-target="public-api">Public API</a>
+    <a href="#configuration" class="toc-sub" data-target="configuration">Configuration</a>
+    <a href="#2-src-agent-execution-agent-executor-ts" data-target="2-src-agent-execution-agent-executor-ts">2. `src/agent/execution/agent-executor.ts`</a>
+    <a href="#module-purpose" class="toc-sub" data-target="module-purpose">Module Purpose</a>
+    <a href="#key-classes" class="toc-sub" data-target="key-classes">Key Classes</a>
+    <a href="#the-agentic-loop" class="toc-sub" data-target="the-agentic-loop">The Agentic Loop</a>
+    <a href="#context-providers" class="toc-sub" data-target="context-providers">Context Providers</a>
+    <a href="#3-src-agent-tool-handler-ts" data-target="3-src-agent-tool-handler-ts">3. `src/agent/tool-handler.ts`</a>
+    <a href="#module-purpose" class="toc-sub" data-target="module-purpose">Module Purpose</a>
+    <a href="#key-features" class="toc-sub" data-target="key-features">Key Features</a>
+    <a href="#key-classes" class="toc-sub" data-target="key-classes">Key Classes</a>
+    <a href="#tool-execution-flow" class="toc-sub" data-target="tool-execution-flow">Tool Execution Flow</a>
+  </nav>
+</aside>
+<script>
+
+(function() {
+  // Theme toggle
+  var html = document.documentElement;
+  var saved = localStorage.getItem('docs-theme');
+  if (saved) html.setAttribute('data-theme', saved);
+  else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    html.setAttribute('data-theme', 'dark');
+  }
+
+  document.getElementById('themeToggle').addEventListener('click', function() {
+    var current = html.getAttribute('data-theme');
+    var next = current === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    localStorage.setItem('docs-theme', next);
+  });
+
+  // Sidebar search
+  var searchBox = document.getElementById('searchBox');
+  var navLinks = document.querySelectorAll('#sidebarNav a');
+  searchBox.addEventListener('input', function() {
+    var q = this.value.toLowerCase();
+    navLinks.forEach(function(link) {
+      var title = link.getAttribute('data-title') || '';
+      link.hidden = q && title.indexOf(q) === -1;
+    });
+  });
+
+  // Mobile menu
+  var menuBtn = document.getElementById('menuBtn');
+  var sidebar = document.getElementById('sidebar');
+  menuBtn.addEventListener('click', function() {
+    sidebar.classList.toggle('open');
+  });
+
+  // TOC scroll spy
+  var tocLinks = document.querySelectorAll('#toc a[data-target]');
+  if (tocLinks.length > 0) {
+    var headingEls = [];
+    tocLinks.forEach(function(link) {
+      var el = document.getElementById(link.getAttribute('data-target'));
+      if (el) headingEls.push({ el: el, link: link });
+    });
+
+    function updateToc() {
+      var scrollY = window.scrollY + 80;
+      var active = null;
+      for (var i = headingEls.length - 1; i >= 0; i--) {
+        if (headingEls[i].el.offsetTop <= scrollY) { active = headingEls[i]; break; }
+      }
+      tocLinks.forEach(function(l) { l.classList.remove('active'); });
+      if (active) active.link.classList.add('active');
+    }
+
+    window.addEventListener('scroll', updateToc, { passive: true });
+    updateToc();
+  }
+})();
+
+</script>
+</body>
+</html>

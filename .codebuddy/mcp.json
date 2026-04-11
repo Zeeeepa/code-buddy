@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "MCP server configuration. This file can be committed to share MCP servers with your team.",
+  "mcpServers": {
+    "filesystem": {
+      "name": "filesystem",
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@anthropic-ai/mcp-server-filesystem",
+        "."
+      ],
+      "enabled": false,
+      "description": "File system access MCP server"
+    },
+    "github": {
+      "name": "github",
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@anthropic-ai/mcp-github"
+      ],
+      "env": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+      },
+      "enabled": false,
+      "description": "GitHub integration MCP server"
+    }
+  }
+}

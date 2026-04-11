@@ -9,6 +9,7 @@ import type { LucideIcon } from 'lucide-react';
 import { useAppStore } from '../store';
 import { useNotifications, useShowNotificationCenter } from '../store/selectors';
 import type { NotificationEntry, NotificationPriority } from '../types';
+import { formatAppTime } from '../utils/i18n-format';
 
 const PRIORITY_ICONS: Record<NotificationPriority, LucideIcon> = {
   low: Info,
@@ -25,8 +26,7 @@ const PRIORITY_COLORS: Record<NotificationPriority, string> = {
 };
 
 function formatTime(timestamp: number): string {
-  const date = new Date(timestamp);
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return formatAppTime(timestamp);
 }
 
 interface NotificationRowProps {
@@ -94,7 +94,7 @@ const NotificationRow: React.FC<NotificationRowProps> = ({
 };
 
 export const NotificationCenter: React.FC = () => {
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
   const show = useShowNotificationCenter();
   const notifications = useNotifications();
   const setShow = useAppStore((s) => s.setShowNotificationCenter);
@@ -123,8 +123,7 @@ export const NotificationCenter: React.FC = () => {
       groups.get(key)!.push(n);
     }
     return Array.from(groups.entries());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notifications]);
+  }, [notifications, i18n.resolvedLanguage]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 

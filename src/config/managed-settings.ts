@@ -11,7 +11,7 @@
  *   macOS:    /Library/Application Support/CodeBuddy/managed-settings.json
  *   Linux:    /etc/codebuddy/managed-settings.json
  *
- * Inspired by Claude Code's managed enterprise settings.
+ * Advanced enterprise architecture for managed enterprise settings.
  */
 
 import * as fs from 'fs';

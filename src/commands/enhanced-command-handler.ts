@@ -46,6 +46,7 @@ import {
   handleModelRouter,
   handleSkill,
   handleSaveConversation,
+  handleUltraplan,
   // Export handlers
   handleExport,
   handleExportList,
@@ -63,9 +64,9 @@ import {
   handleTools,
   handleVimMode,
   handleConfig,
-  // Permissions handlers (Claude Code-inspired)
+  // Permissions handlers (Enterprise-grade)
   handlePermissions,
-  // Worktree handlers (Claude Code-inspired)
+  // Worktree handlers (Enterprise-grade)
   handleWorktree,
   // Script handlers (FileCommander Enhanced-inspired)
   handleScript,
@@ -100,9 +101,9 @@ import {
   handleBatchCommand,
   // Starter pack handler
   handleStarter,
-  // Fast mode handler (OpenClaw-aligned)
+  // Fast mode handler (Enterprise-aligned)
   handleFastMode,
-  // BTW handler (OpenClaw v2026.3.14 alignment)
+  // BTW handler (Native Engine v2026.3.14 alignment)
   handleBtw,
   setBtwClient,
   // Clipboard handler
@@ -370,7 +371,7 @@ export class EnhancedCommandHandler {
     ['__VIM_MODE__', (args) => handleVimMode(args)],
     ['__CONFIG__', (args) => handleConfig(args)],
 
-    // Permissions & Worktree (Claude Code-inspired)
+    // Permissions & Worktree (Enterprise-grade)
     ['__PERMISSIONS__', (args) => handlePermissions(args)],
     ['__WORKTREE__', (args) => handleWorktree(args)],
 
@@ -424,8 +425,10 @@ export class EnhancedCommandHandler {
     ['__CLEAR_CHAT__', () => handleClearChat()],
     ['__CHANGE_MODEL__', (args) => handleChangeModel(args)],
     ['__CHANGE_MODE__', (args) => handleChangeMode(args)],
+    ['__PLAN_MODE__', () => handleChangeMode(['plan'])],
     ['__STATUS__', () => handleStatus()],
     ['__NEW__', (args) => handleNew(args)],
+    ['__ULTRAPLAN__', (args) => handleUltraplan(args)],
     ['__LIST_CHECKPOINTS__', (args) => handleListCheckpoints(args)],
     ['__RESTORE_CHECKPOINT__', (args) => handleRestoreCheckpoint(args)],
     ['__INIT_GROK__', () => handleInitGrok()],
@@ -451,10 +454,10 @@ export class EnhancedCommandHandler {
     // Starter packs
     ['__STARTER__', (args) => handleStarter(args)],
 
-    // Fast mode (OpenClaw-aligned)
+    // Fast mode (Enterprise-aligned)
     ['__FAST_MODE__', (args) => handleFastMode(args)],
 
-    // BTW side-question (OpenClaw v2026.3.14 alignment)
+    // BTW side-question (Native Engine v2026.3.14 alignment)
     ['__BTW__', (args) => handleBtw(args)],
 
     // Clipboard (copy last response, code block, or text)

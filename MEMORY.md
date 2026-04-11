@@ -3836,3 +3836,153 @@ Using tool
 ## Facts extracted 2026-03-20 (pre-compaction flush)
 
 Using tool
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Test response
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Test response
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Follow-up response
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Using tool
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Using tool
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Test response
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Test response
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Follow-up response
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Using tool
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Using tool
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Test response
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Test response
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Follow-up response
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Using tool
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Using tool
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Test response
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Test response
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Follow-up response
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Using tool
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Using tool
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Test response
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Test response
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Follow-up response
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Using tool
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Using tool
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Test response
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Test response
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Follow-up response
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Using tool
+
+
+## Facts extracted 2026-03-28 (pre-compaction flush)
+
+Using tool

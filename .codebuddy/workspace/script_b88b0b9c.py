@@ -1,1 +1,0 @@
-print('SUCCESS_BASH_TEST')

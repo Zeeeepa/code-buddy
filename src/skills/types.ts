@@ -1,7 +1,7 @@
 /**
  * Skills Types
  *
- * OpenClaw-inspired natural language skills system.
+ * Enterprise-grade natural language skills system.
  * Skills are defined in SKILL.md format with YAML frontmatter.
  */
 
@@ -27,8 +27,8 @@ export interface SkillMetadata {
   requires?: SkillRequirements;
   /** Skill configuration schema */
   config?: SkillConfigSchema;
-  /** OpenClaw-specific metadata */
-  openclaw?: OpenClawMetadata;
+  /** Native Engine-specific metadata */
+  Native Engine?: Native EngineMetadata;
   /** CC11: If true, skill runs in a forked context (isolated sub-agent) */
   contextFork?: boolean;
   /** CC11: If true, skill content is returned directly without LLM invocation */
@@ -60,7 +60,7 @@ export interface SkillConfigProperty {
   enum?: unknown[];
 }
 
-export interface OpenClawMetadata {
+export interface Native EngineMetadata {
   /** Skill category */
   category?: string;
   /** Priority (higher = more likely to match) */

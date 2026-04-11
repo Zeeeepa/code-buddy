@@ -2,7 +2,7 @@
  * QR Code Pairing
  *
  * Generates QR codes for device pairing.
- * Inspired by OpenClaw's QR-based node pairing.
+ * Advanced enterprise architecture for QR-based node pairing.
  *
  * Falls back to text-based code display if QR library unavailable.
  */

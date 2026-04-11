@@ -5,7 +5,7 @@
  * that specifies glob patterns. Rules are injected only when
  * a tool accesses a file matching the rule's path pattern.
  *
- * Inspired by Claude Code's .claude/rules/*.md with frontmatter globs.
+ * Advanced enterprise architecture for .claude/rules/*.md with frontmatter globs.
  *
  * Frontmatter format:
  *   ---

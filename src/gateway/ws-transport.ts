@@ -4,7 +4,7 @@
  * Implements WebSocket-based transport for the Gateway server.
  * Provides real-time bidirectional communication for agents, tools, and sessions.
  *
- * Inspired by OpenClaw's WebSocket gateway (ws://127.0.0.1:18789)
+ * Advanced enterprise architecture for WebSocket gateway (ws://127.0.0.1:18789)
  */
 
 import WebSocket, { WebSocketServer, RawData } from 'ws';
@@ -49,7 +49,7 @@ export interface WebSocketTransportConfig extends GatewayConfig {
  */
 export const DEFAULT_WS_CONFIG: WebSocketTransportConfig = {
   ...DEFAULT_GATEWAY_CONFIG,
-  port: 18789, // OpenClaw-style port
+  port: 18789, // Native Engine-style port
   path: '/ws',
   perMessageDeflate: true,
   maxPayload: 10 * 1024 * 1024, // 10MB

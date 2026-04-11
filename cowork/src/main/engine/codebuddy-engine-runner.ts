@@ -272,6 +272,43 @@ export class CodeBuddyEngineRunner {
               }
               break;
 
+            case 'ask_user':
+              if (event.askUser) {
+                const stepId = `ask_user_${Date.now()}`;
+                const inputData = { 
+                  questions: [ 
+                    { 
+                      question: event.askUser.question, 
+                      options: event.askUser.options?.map(o => ({ label: o })) 
+                    } 
+                  ] 
+                };
+
+                sendToRenderer({
+                  type: 'trace.step',
+                  payload: { 
+                    sessionId: session.id, 
+                    step: {
+                        id: stepId,
+                        type: 'tool_call',
+                        status: 'completed',
+                        title: 'AskUserQuestion',
+                        toolName: 'AskUserQuestion',
+                        toolInput: inputData,
+                        timestamp: Date.now()
+                    }
+                  },
+                } as any);
+
+                contentBlocks.push({
+                  type: 'tool_use',
+                  id: stepId,
+                  name: 'AskUserQuestion',
+                  input: inputData,
+                } as any);
+              }
+              break;
+
             case 'diff_preview':
               if (event.diffPreview) {
                 sendToRenderer({

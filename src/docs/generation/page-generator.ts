@@ -314,7 +314,7 @@ RULES:
 
   // Build inspired-by instruction if relevant features exist
   const inspiredInstruction = profile.readmeContext?.inspiredFeatures?.length
-    ? `\nIMPORTANT: If the context data lists "Inspired-by features", you MUST include a dedicated "## Inspired-By Architecture" section describing them. These features (like OpenClaw, Codex, OpenManus patterns) are a core differentiator of the project.`
+    ? `\nIMPORTANT: If the context data lists "Inspired-by features", you MUST include a dedicated "## Inspired-By Architecture" section describing them. These features (like Native Engine, Codex, OpenManus patterns) are a core differentiator of the project.`
     : '';
 
   const userPrompt = `${template}${inspiredInstruction}
@@ -426,7 +426,7 @@ function rawOverview(p: ProjectProfile): string {
   if (p.framework) lines.push(`- Framework: ${p.framework}`);
   lines.push(`- Dependencies: ${p.dependencies.length}`);
 
-  // Inspired-by features (OpenClaw, Codex, OpenManus)
+  // Inspired-by features (Native Engine, Codex, OpenManus)
   if (p.readmeContext?.inspiredFeatures && p.readmeContext.inspiredFeatures.length > 0) {
     lines.push('', '## Inspired-By Architecture', '');
     for (const f of p.readmeContext.inspiredFeatures) {
@@ -963,7 +963,7 @@ function buildPageContext(
       if (profile.readmeContext.subsystemTable) {
         contextParts.push(`\nKey subsystems:\n${profile.readmeContext.subsystemTable.substring(0, 2000)}`);
       }
-      // Inspired-by features (OpenClaw, Codex, etc.)
+      // Inspired-by features (Native Engine, Codex, etc.)
       if (profile.readmeContext.inspiredFeatures.length > 0) {
         contextParts.push('\nInspired-by features (important — MENTION these in the page):');
         for (const f of profile.readmeContext.inspiredFeatures) {

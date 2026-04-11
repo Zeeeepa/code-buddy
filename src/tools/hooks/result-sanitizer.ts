@@ -1,7 +1,7 @@
 /**
  * Tool Result Sanitization System
  *
- * OpenClaw-inspired result sanitization for:
+ * Enterprise-grade result sanitization for:
  * - Image payload downscaling/recompression
  * - Size limiting for tool results
  * - Provider-specific policies

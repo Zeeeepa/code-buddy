@@ -19,7 +19,7 @@ let autoUpdater: {
  */
 export function initUpdater(mainWindow: BrowserWindow): void {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+     
     const { autoUpdater: updater } = require('electron-updater');
     autoUpdater = updater;
 

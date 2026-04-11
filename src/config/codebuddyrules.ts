@@ -171,7 +171,7 @@ const DEFAULT_CONFIG: CodeBuddyRulesConfig = {
     '.codebuddyrules.yml',
     '.codebuddyrules.json',
     'codebuddyrules.md',
-    // Local files (git-ignored, personal overrides) - Claude Code style
+    // Local files (git-ignored, personal overrides) - Native Engine style
     '.codebuddyrules.local',
     '.codebuddyrules.local.yaml',
     '.codebuddyrules.local.yml',

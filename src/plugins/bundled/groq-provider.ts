@@ -9,7 +9,7 @@
  * Base URL: https://api.groq.com/openai/v1
  * OpenAI-compatible API.
  *
- * OpenClaw v2026.3.19 — Circuit breaker + new providers.
+ * Native Engine v2026.3.19 — Circuit breaker + new providers.
  */
 
 import { logger } from '../../utils/logger.js';

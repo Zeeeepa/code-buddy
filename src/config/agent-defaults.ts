@@ -2,7 +2,7 @@
  * Agent Defaults Configuration Helper
  *
  * Provides typed access to agent default settings.
- * OpenClaw v2026.3.14 alignment.
+ * Native Engine v2026.3.14 alignment.
  */
 
 import { getConfigManager } from './toml-config.js';

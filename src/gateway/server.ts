@@ -208,7 +208,7 @@ export class GatewayServer extends EventEmitter {
       const payload = message.payload as ConnectPayload;
       const client = this.clients.get(clientId);
 
-      // TLS local pairing skip (OpenClaw v2026.3.11)
+      // TLS local pairing skip (Native Engine v2026.3.11)
       const clientIp = client?.metadata?.remoteAddress as string || '';
       const isLocal = clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === '';
       const skipPairing = this.config.tlsEnabled && this.config.skipLocalPairing && isLocal;

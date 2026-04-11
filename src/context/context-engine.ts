@@ -1,7 +1,7 @@
 /**
  * ContextEngine — Pluggable context pipeline interface
  *
- * OpenClaw v2026.3.7 alignment: plugins can replace the entire context pipeline
+ * Native Engine v2026.3.7 alignment: plugins can replace the entire context pipeline
  * via `plugins.slots.contextEngine`. Defines 6 lifecycle hooks.
  */
 
@@ -39,7 +39,7 @@ export interface AssembleResult {
  * Plugins implement this interface to replace or wrap the default context pipeline.
  * Only one engine can be active at a time (last-registered wins).
  *
- * OpenClaw v2026.3.13-1 alignment: added onSubagentEnded (7th hook) and ownsCompaction flag.
+ * Native Engine v2026.3.13-1 alignment: added onSubagentEnded (7th hook) and ownsCompaction flag.
  */
 export interface ContextEngine {
   /** Unique identifier for this engine */
@@ -50,7 +50,7 @@ export interface ContextEngine {
    * entirely to this engine's compact() hook. Without this, the runtime's
    * prepareMessagesRaw() would overwrite plugin-managed compaction.
    *
-   * OpenClaw v2026.3.13-1 alignment.
+   * Native Engine v2026.3.13-1 alignment.
    */
   readonly ownsCompaction?: boolean;
 
@@ -96,7 +96,7 @@ export interface ContextEngine {
    * Called from completeAgent() and closeAgent() in agent-tools.
    * Opportunity to merge sub-agent findings, release caches, etc.
    *
-   * OpenClaw v2026.3.13-1 alignment (7th lifecycle hook).
+   * Native Engine v2026.3.13-1 alignment (7th lifecycle hook).
    */
   onSubagentEnded?(agentId: string, messages: CodeBuddyMessage[], result?: string): void;
 }

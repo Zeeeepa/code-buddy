@@ -2,7 +2,7 @@
  * Sandbox Backend Interface
  *
  * Common interface for all sandbox execution backends.
- * OpenClaw v2026.3.14 — pluggable sandbox architecture.
+ * Native Engine v2026.3.14 — pluggable sandbox architecture.
  */
 
 // ============================================================================

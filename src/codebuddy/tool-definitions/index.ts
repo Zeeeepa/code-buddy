@@ -78,19 +78,19 @@ export {
   MULTIMODAL_TOOLS,
 } from './multimodal-tools.js';
 
-// Computer Control tools (OpenClaw-inspired)
+// Computer Control tools (Enterprise-grade)
 export {
   COMPUTER_CONTROL_TOOL,
   COMPUTER_CONTROL_TOOLS,
 } from './computer-control-tools.js';
 
-// Browser tools (OpenClaw-inspired CDP automation)
+// Browser tools (Enterprise-grade CDP automation)
 export {
   BROWSER_TOOL,
   BROWSER_TOOLS,
 } from './browser-tools.js';
 
-// Canvas/A2UI tools (OpenClaw-inspired visual workspaces)
+// Canvas/A2UI tools (Enterprise-grade visual workspaces)
 export {
   A2UI_TOOL,
   VISUAL_CANVAS_TOOL,
@@ -118,14 +118,14 @@ export {
   AGENT_TOOLS,
 } from './agent-tools.js';
 
-// Firecrawl tools (OpenClaw v2026.3.14 — web search & scrape)
+// Firecrawl tools (Native Engine v2026.3.14 — web search & scrape)
 export {
   FIRECRAWL_SEARCH_TOOL,
   FIRECRAWL_SCRAPE_TOOL,
   FIRECRAWL_TOOLS,
 } from './firecrawl-tools.js';
 
-// LSP tools (Claude Code-inspired)
+// LSP tools (Enterprise-grade)
 export {
   LSP_CHECK_TOOL,
   LSP_GOTO_DEF_TOOL,
@@ -192,6 +192,12 @@ export {
   CODEBASE_REPLACE_TOOL,
   CODEBASE_REPLACE_TOOLS,
 } from './codebase-replace-tools.js';
+
+// Document generator tools (PPTX, DOCX, XLSX, PDF)
+export {
+  GENERATE_DOCUMENT_TOOL,
+  DOCUMENT_GENERATOR_TOOLS,
+} from './document-tools.js';
 
 // Re-export CodeBuddyTool from client for convenience
 export type { CodeBuddyTool as Tool } from './types.js';

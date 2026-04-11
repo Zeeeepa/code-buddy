@@ -179,7 +179,7 @@ export interface PluginContext {
   registerProvider(provider: PluginProvider): void;
 
   /**
-   * Register a custom context engine (OpenClaw v2026.3.7 alignment).
+   * Register a custom context engine (Native Engine v2026.3.7 alignment).
    * Replaces the default context pipeline. Only one engine can be active (last wins).
    */
   registerContextEngine(engine: ContextEngine): void;

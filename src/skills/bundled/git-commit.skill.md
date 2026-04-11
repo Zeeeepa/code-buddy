@@ -10,7 +10,7 @@ tags:
 requires:
   tools:
     - bash
-openclaw:
+Native Engine:
   category: development
   priority: 85
   triggers:

@@ -1,5 +1,5 @@
 /**
- * Cache Trace Debugging (OpenClaw-inspired)
+ * Cache Trace Debugging (Enterprise-grade)
  *
  * Logs every stage of prompt construction for debugging
  * cache hit/miss issues and context building.

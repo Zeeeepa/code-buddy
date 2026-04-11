@@ -326,6 +326,8 @@ export class CreateSkillExecuteTool implements ITool {
   }
 }
 
+import { SemanticSearchTool } from '../semantic-search.js';
+
 // ============================================================================
 // Factory
 // ============================================================================
@@ -336,5 +338,6 @@ export function createKnowledgeTools(): ITool[] {
     new KnowledgeAddTool(),
     new AskHumanExecuteTool(),
     new CreateSkillExecuteTool(),
+    new SemanticSearchTool()
   ];
 }

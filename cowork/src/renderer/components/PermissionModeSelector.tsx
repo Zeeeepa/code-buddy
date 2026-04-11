@@ -1,7 +1,7 @@
 /**
  * PermissionModeSelector — Dropdown to switch between permission modes
  *
- * Matches Claude Code's Default/AcceptEdits/Plan/DontAsk modes.
+ * Matches Native Engine's Default/AcceptEdits/Plan/DontAsk modes.
  */
 import React, { useState, useRef, useEffect } from 'react';
 import { Shield, ShieldCheck, ShieldOff, Eye, Zap } from 'lucide-react';

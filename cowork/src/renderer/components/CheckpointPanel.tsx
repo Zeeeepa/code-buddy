@@ -17,6 +17,7 @@ import {
   Activity,
 } from 'lucide-react';
 import type { CheckpointTimeline } from '../types';
+import { formatAppTime } from '../utils/i18n-format';
 
 interface CheckpointPanelProps {
   timeline: CheckpointTimeline | null;
@@ -28,8 +29,11 @@ interface CheckpointPanelProps {
 }
 
 function formatTime(ts: number): string {
-  const d = new Date(ts);
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return formatAppTime(ts, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
 }
 
 type Mode = 'list' | 'timeline';

@@ -54,7 +54,7 @@ export interface HookContext {
 }
 
 /**
- * Hook System - Inspired by Claude Code
+ * Hook System - Advanced enterprise architecture for
  * Allows automatic actions at specific points like pre-commit, post-edit, etc.
  */
 export class HookSystem extends EventEmitter {

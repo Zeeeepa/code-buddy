@@ -1,7 +1,7 @@
 /**
  * Bootstrap File Injection
  *
- * OpenClaw-inspired workspace context injection at session start.
+ * Enterprise-grade workspace context injection at session start.
  * Automatically loads BOOTSTRAP.md, AGENTS.md, SOUL.md, etc.
  * from .codebuddy/ (project) or ~/.codebuddy/ (global).
  *

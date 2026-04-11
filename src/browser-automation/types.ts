@@ -1,7 +1,7 @@
 /**
  * Browser Automation Types
  *
- * OpenClaw-inspired browser control via CDP (Chrome DevTools Protocol).
+ * Enterprise-grade browser control via CDP (Chrome DevTools Protocol).
  */
 
 // ============================================================================

@@ -1,7 +1,7 @@
 /**
  * Skills Hub
  *
- * OpenClaw ClawHub-inspired Skills Hub for searching, installing,
+ * Native Engine ClawHub-inspired Skills Hub for searching, installing,
  * publishing, and syncing skills from a remote registry.
  *
  * Provides lockfile-based integrity management, SHA-256 checksums,

@@ -2,6 +2,7 @@
  * FileTree — Recursive file tree browser for the workspace
  */
 import React, { useState, useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronRight, ChevronDown, File, Folder, FolderOpen, Search } from 'lucide-react';
 import { useAppStore } from '../store';
 
@@ -108,6 +109,7 @@ const TreeNode: React.FC<TreeNodeProps> = React.memo(({ entry, depth, onFileClic
 TreeNode.displayName = 'TreeNode';
 
 export const FileTree: React.FC<FileTreeProps> = ({ rootPath }) => {
+  const { t } = useTranslation();
   const [rootEntries, setRootEntries] = useState<FileEntry[]>([]);
   const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(false);
@@ -163,7 +165,7 @@ export const FileTree: React.FC<FileTreeProps> = ({ rootPath }) => {
           type="text"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder="Filter files..."
+          placeholder={t('fileTree.filterPlaceholder', 'Filter files…')}
           className="w-full pl-6 pr-2 py-1 text-xs bg-zinc-800 border border-zinc-700 rounded text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500"
         />
       </div>
@@ -171,9 +173,11 @@ export const FileTree: React.FC<FileTreeProps> = ({ rootPath }) => {
       {/* Tree */}
       <div className="max-h-64 overflow-y-auto">
         {loading ? (
-          <div className="text-xs text-zinc-500 px-3 py-2">Loading...</div>
+          <div className="text-xs text-zinc-500 px-3 py-2">{t('common.loading')}</div>
         ) : filtered.length === 0 ? (
-          <div className="text-xs text-zinc-500 px-3 py-2">No files found</div>
+          <div className="text-xs text-zinc-500 px-3 py-2">
+            {t('fileTree.empty', 'No files found')}
+          </div>
         ) : (
           filtered.map((entry) => (
             <TreeNode

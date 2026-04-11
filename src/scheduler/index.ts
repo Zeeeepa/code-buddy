@@ -5,7 +5,7 @@
 export * from './types.js';
 export * from './scheduler.js';
 
-// Cron Scheduler (OpenClaw-inspired)
+// Cron Scheduler (Enterprise-grade)
 export type {
   ScheduleType,
   JobStatus,

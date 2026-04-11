@@ -2,7 +2,7 @@
  * Firecrawl Tool Definitions
  *
  * OpenAI function-calling schemas for Firecrawl search and scrape tools.
- * OpenClaw v2026.3.14 alignment.
+ * Native Engine v2026.3.14 alignment.
  */
 
 import type { CodeBuddyTool } from './types.js';

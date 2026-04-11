@@ -281,7 +281,7 @@ export async function autoCommitChanges(
 export function getAutoCommitConfig(): AutoCommitConfig {
   try {
     // Lazy-load to avoid circular dependency
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+     
     const { getTomlConfig } = require('../config/toml-config.js') as { getTomlConfig: () => Record<string, unknown> };
     const config = getTomlConfig();
     const agent = config.agent as Record<string, unknown> | undefined;

@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "savedAt": "2026-03-28T20:46:38.640Z",
+  "entities": [
+    {
+      "id": "e_1_1774730793627",
+      "type": "user",
+      "name": "user",
+      "properties": {},
+      "confidence": 1,
+      "mentions": 1,
+      "createdAt": "2026-03-28T20:46:33.627Z",
+      "updatedAt": "2026-03-28T20:46:33.627Z"
+    }
+  ],
+  "relations": [],
+  "categories": [],
+  "contentHashes": []
+}

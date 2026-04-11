@@ -1,7 +1,7 @@
 /**
  * Chrome Discovery
  *
- * OpenClaw v2026.3.13 alignment: detect running Chrome instances with
+ * Native Engine v2026.3.13 alignment: detect running Chrome instances with
  * remote debugging enabled. Cross-platform support (macOS/Linux/Windows).
  */
 

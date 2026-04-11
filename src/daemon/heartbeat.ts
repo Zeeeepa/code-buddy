@@ -1,7 +1,7 @@
 /**
  * Heartbeat Engine
  *
- * OpenClaw-inspired periodic wake system that reads a HEARTBEAT.md checklist
+ * Enterprise-grade periodic wake system that reads a HEARTBEAT.md checklist
  * and surfaces important items via agent review. Integrates with the existing
  * CronAgentBridge pattern to create agent instances for checklist evaluation.
  *

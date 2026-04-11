@@ -4,7 +4,7 @@
  * ITool-compliant adapters for BrowserTool (accessibility-based),
  * ComputerControlTool, ScreenshotTool, and ReasoningTool.
  *
- * BrowserExecuteTool is wired to src/browser-automation/ (OpenClaw-inspired
+ * BrowserExecuteTool is wired to src/browser-automation/ (Enterprise-grade
  * accessibility tree + ref numbering) instead of the old CSS-selector-only
  * src/tools/browser-tool.ts.
  */

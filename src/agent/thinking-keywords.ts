@@ -1,7 +1,7 @@
 /**
  * Thinking Keywords System
  *
- * Inspired by Claude Code's extended thinking triggers:
+ * Advanced enterprise architecture for extended thinking triggers:
  * - "think" -> Standard thinking (4K tokens)
  * - "think harder" / "megathink" -> Deep thinking (10K tokens)
  * - "think even harder" / "ultrathink" -> Exhaustive thinking (32K tokens)

@@ -88,7 +88,7 @@ export function useInputHandler({
   const DOUBLE_ESCAPE_THRESHOLD = 500; // ms
 
   /**
-   * Save instruction to .codebuddyrules file (Claude Code-style # capture)
+   * Save instruction to .codebuddyrules file (Standard # capture)
    */
   const saveInstructionToCodeBuddyRules = async (instruction: string): Promise<string> => {
     const codebuddyrulesPath = path.join(process.cwd(), '.codebuddyrules');
@@ -154,7 +154,7 @@ export function useInputHandler({
       return true;
     }
 
-    // Double-escape detection for checkpoint rewind (like Claude Code's Esc+Esc)
+    // Double-escape detection for checkpoint rewind (natively Esc+Esc)
     const now = Date.now();
     const timeSinceLastEscape = now - lastEscapeTimeRef.current;
     lastEscapeTimeRef.current = now;
@@ -374,7 +374,7 @@ export function useInputHandler({
       const historyManager = getHistoryManager();
       historyManager.add(userInput);
 
-      // Handle # instruction capture - save to .codebuddyrules (Claude Code-style)
+      // Handle # instruction capture - save to .codebuddyrules (Standard)
       if (userInput.startsWith("#")) {
         const instruction = userInput.slice(1).trim();
         if (instruction) {
@@ -805,5 +805,6 @@ export function useInputHandler({
     availableModels,
     agent,
     autoEditEnabled,
+    handleInputSubmit,
   };
 }

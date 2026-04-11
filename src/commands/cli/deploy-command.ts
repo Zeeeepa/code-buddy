@@ -2,7 +2,7 @@
  * Deploy Command
  *
  * Generate deployment configurations for cloud platforms.
- * Inspired by OpenClaw's multi-platform deployment support.
+ * Advanced enterprise architecture for multi-platform deployment support.
  *
  * Usage:
  *   buddy deploy init <platform>     # Generate deployment config

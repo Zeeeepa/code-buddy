@@ -1,5 +1,5 @@
 /**
- * Tests for OpenClaw parity features:
+ * Tests for Native Engine parity features:
  * Lobster Engine, Session Enhancements, Terminal Enhancements,
  * Sender Policies, Memory Flush, Niche Channels.
  */
@@ -171,9 +171,9 @@ describe('LobsterEngine', () => {
     expect(engine.getWorkflowStatus([])).toBe('success');
   });
 
-  // ─── OpenClaw Compatibility ──────────────────────────────────────
+  // ─── Native Engine Compatibility ──────────────────────────────────────
 
-  describe('OpenClaw Compatibility', () => {
+  describe('Native Engine Compatibility', () => {
     it('should merge env into variables', () => {
       const wf: LobsterWorkflow = {
         name: 'oc', version: '1', steps: [
@@ -181,7 +181,7 @@ describe('LobsterEngine', () => {
         ],
         env: { MY_VAR: 'hello' },
       };
-      engine.normalizeOpenClawFormat(wf);
+      engine.normalizeNative EngineFormat(wf);
       expect(wf.variables).toEqual({ MY_VAR: 'hello' });
     });
 
@@ -192,7 +192,7 @@ describe('LobsterEngine', () => {
         ],
         args: { branch: { default: 'main' } },
       };
-      engine.normalizeOpenClawFormat(wf);
+      engine.normalizeNative EngineFormat(wf);
       expect(wf.variables!.branch).toBe('main');
     });
 
@@ -203,7 +203,7 @@ describe('LobsterEngine', () => {
           { id: 'test', name: 'Test', command: 'npm test', stdin: '$build.stdout' },
         ],
       };
-      engine.normalizeOpenClawFormat(wf);
+      engine.normalizeNative EngineFormat(wf);
       expect(wf.steps[1].dependsOn).toEqual(['build']);
     });
 
@@ -214,7 +214,7 @@ describe('LobsterEngine', () => {
           { id: 'process', name: 'Process', command: 'echo $fetch.stdout | jq .' },
         ],
       };
-      engine.normalizeOpenClawFormat(wf);
+      engine.normalizeNative EngineFormat(wf);
       expect(wf.steps[1].dependsOn).toContain('fetch');
     });
 
@@ -225,7 +225,7 @@ describe('LobsterEngine', () => {
           { id: 'b', name: 'B', command: 'echo $a.stdout', dependsOn: ['a'] },
         ],
       };
-      engine.normalizeOpenClawFormat(wf);
+      engine.normalizeNative EngineFormat(wf);
       expect(wf.steps[1].dependsOn).toEqual(['a']); // no duplicate
     });
 
@@ -289,8 +289,8 @@ describe('LobsterEngine', () => {
       expect(engine.evaluateCondition('true', {})).toBe(true);
     });
 
-    it('should parse full OpenClaw-style workflow JSON', () => {
-      const openclawWorkflow = JSON.stringify({
+    it('should parse full Native Engine-style workflow JSON', () => {
+      const Native EngineWorkflow = JSON.stringify({
         name: 'deploy-pipeline',
         version: '2.0.0',
         args: { target: { default: 'staging' } },
@@ -302,7 +302,7 @@ describe('LobsterEngine', () => {
           { id: 'deploy', name: 'Deploy', command: 'deploy $test.stdout', condition: '$review.approved', dependsOn: ['review'] },
         ],
       });
-      const wf = engine.parseWorkflow(openclawWorkflow);
+      const wf = engine.parseWorkflow(Native EngineWorkflow);
       expect(wf.name).toBe('deploy-pipeline');
       expect(wf.variables?.NODE_ENV).toBe('production');
       expect(wf.variables?.target).toBe('staging');

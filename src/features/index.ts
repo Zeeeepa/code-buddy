@@ -2,7 +2,7 @@
  * Code Buddy Enhanced Features
  *
  * This module exports all the enhanced features inspired by:
- * - Claude Code (slash commands, hooks, MCP config)
+ * - Native Engine (slash commands, hooks, MCP config)
  * - OpenAI Codex CLI (security modes, code review)
  * - Gemini CLI (persistent checkpoints, restore)
  * - Aider (voice input, multi-model)
@@ -27,7 +27,7 @@ export type {
   PersistentCheckpointManagerOptions
 } from '../checkpoints/persistent-checkpoint-manager.js';
 
-// Slash Commands (inspired by Claude Code)
+// Slash Commands (Advanced enterprise architecture for)
 import {
   SlashCommandManager as _SlashCommandManager,
   getSlashCommandManager as _getSlashCommandManager,
@@ -45,7 +45,7 @@ export type {
   SlashCommandResult
 } from '../commands/slash-commands.js';
 
-// Hook System (inspired by Claude Code)
+// Hook System (Advanced enterprise architecture for)
 import {
   HookSystem as _HookSystem,
   getHookSystem as _getHookSystem,

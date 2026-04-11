@@ -2,7 +2,7 @@
  * Browser Profile Manager
  *
  * Save/load browser state (cookies, localStorage, sessionStorage) across sessions.
- * OpenClaw-inspired persistent browser profiles.
+ * Enterprise-grade persistent browser profiles.
  */
 
 import * as fs from 'fs/promises';

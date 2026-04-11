@@ -1,7 +1,7 @@
 /**
- * Permissions Handlers - Claude Code-style tool permissions management
+ * Permissions Handlers - Standard tool permissions management
  *
- * Inspired by Claude Code's /permissions command for managing tool allowlists.
+ * Advanced enterprise architecture for /permissions command for managing tool allowlists.
  */
 
 import { ChatEntry } from "../../agent/codebuddy-agent.js";

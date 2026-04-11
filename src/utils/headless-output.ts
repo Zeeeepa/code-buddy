@@ -1,5 +1,5 @@
 /**
- * Enhanced Headless Output - Inspired by Claude Code
+ * Enhanced Headless Output - Advanced enterprise architecture for
  * Supports multiple output formats for CI/CD and automation
  */
 

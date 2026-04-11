@@ -1,5 +1,5 @@
 /**
- * Per-Channel Streaming Policies — OpenClaw-inspired channel adaptation
+ * Per-Channel Streaming Policies — Enterprise-grade channel adaptation
  *
  * Different messaging channels have different UX constraints:
  * - Telegram: 4096-char message limit, supports MarkdownV2, rate-limited

@@ -1,7 +1,7 @@
 /**
  * Declarative Permission Rules
  *
- * Claude Code-style declarative rules: Bash(npm *), Edit(src/**), Read, Glob
+ * Standard declarative rules: Bash(npm *), Edit(src/**), Read, Glob
  * Stored in .codebuddy/settings.json under permissions.allow/deny
  *
  * Pattern syntax:

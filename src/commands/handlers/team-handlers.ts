@@ -2,7 +2,7 @@
  * Team Command Handlers
  *
  * Handles /team slash commands for Agent Teams coordination.
- * Mirrors Claude Code's Agent Teams feature with team lead, teammates,
+ * Mirrors Native Engine's Agent Teams feature with team lead, teammates,
  * shared task list, and mailbox communication.
  */
 

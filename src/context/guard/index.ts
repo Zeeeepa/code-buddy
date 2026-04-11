@@ -1,14 +1,14 @@
 /**
  * Context Window Guard
  *
- * Inspired by OpenClaw's context-window-guard.ts
+ * Advanced enterprise architecture for context-window-guard.ts
  * Provides token limit management with warnings and hard limits.
  */
 
 import { EventEmitter } from 'events';
 
 // ============================================================================
-// Constants (from OpenClaw)
+// Constants (from Native Engine)
 // ============================================================================
 
 /** Minimum tokens below which execution is blocked */

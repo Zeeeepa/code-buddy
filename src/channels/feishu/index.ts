@@ -5,7 +5,7 @@
  * Supports text, rich text, interactive cards, file uploads,
  * interactive approval cards, and reasoning stream hooks.
  *
- * OpenClaw v2026.3.11 alignment: approval cards, reasoning streams,
+ * Native Engine v2026.3.11 alignment: approval cards, reasoning streams,
  * identity-aware headers, full thread context.
  */
 
@@ -149,7 +149,7 @@ export class FeishuAdapter {
   }
 
   // ============================================================================
-  // Interactive Cards (OpenClaw v2026.3.11)
+  // Interactive Cards (Native Engine v2026.3.11)
   // ============================================================================
 
   /**
@@ -216,7 +216,7 @@ export class FeishuAdapter {
   }
 
   // ============================================================================
-  // Reasoning Streams (OpenClaw v2026.3.11)
+  // Reasoning Streams (Native Engine v2026.3.11)
   // ============================================================================
 
   private reasoningStreamHandlers: ReasoningStreamHandler[] = [];
@@ -263,7 +263,7 @@ export class FeishuAdapter {
   }
 
   // ============================================================================
-  // Thread Context (OpenClaw v2026.3.11)
+  // Thread Context (Native Engine v2026.3.11)
   // ============================================================================
 
   /**

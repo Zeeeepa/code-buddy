@@ -1,5 +1,5 @@
 /**
- * Prompt Cache Breakpoints — Manus AI / OpenClaw KV-cache optimization
+ * Prompt Cache Breakpoints — Manus AI / Native Engine KV-cache optimization
  *
  * Without explicit breakpoints, Anthropic Claude caching only activates when
  * the entire prompt is identical — which never happens if the time or todos

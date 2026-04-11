@@ -1,1 +1,0 @@
-Active window: "Windows PowerShell" (WindowsTerminal, PID: 21572)

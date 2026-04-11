@@ -1,7 +1,7 @@
 /**
  * Session Isolation
  *
- * OpenClaw-inspired session scoping for multi-channel DM handling.
+ * Enterprise-grade session scoping for multi-channel DM handling.
  *
  * Session scopes:
  * - per-channel-peer: Separate session per (channel, peer) pair

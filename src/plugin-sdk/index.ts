@@ -45,7 +45,7 @@ export type {
   DefinePluginConfig,
 } from './core.js';
 
-// Context Engine (OpenClaw v2026.3.7 alignment, ownsCompaction v2026.3.13-1)
+// Context Engine (Native Engine v2026.3.7 alignment, ownsCompaction v2026.3.13-1)
 export type {
   ContextEngine,
   ContextMeta,
@@ -61,7 +61,7 @@ export type {
  * This function is a no-op sentinel — exists for documentation
  * and future runtime hooks.
  *
- * OpenClaw v2026.3.13-1 alignment.
+ * Native Engine v2026.3.13-1 alignment.
  */
 export function delegateCompactionToRuntime(): { ownsCompaction: false } {
   return { ownsCompaction: false };

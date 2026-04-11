@@ -2,7 +2,7 @@
  * Additional Model Provider Configurations
  *
  * Extends the model provider ecosystem with support for providers
- * that OpenClaw supports but Code Buddy was missing.
+ * that Native Engine supports but Code Buddy was missing.
  *
  * Providers: Mistral, Deepgram, MiniMax, Moonshot, Venice AI, Z.AI
  *
@@ -35,7 +35,7 @@ export interface ProviderConfig {
 // ============================================================================
 
 /**
- * @deprecated Providers are being migrated to bundled plugins (OpenClaw v2026.3.14).
+ * @deprecated Providers are being migrated to bundled plugins (Native Engine v2026.3.14).
  * See src/plugins/bundled/ for the new plugin-based providers.
  */
 export const ADDITIONAL_PROVIDERS: ProviderConfig[] = [

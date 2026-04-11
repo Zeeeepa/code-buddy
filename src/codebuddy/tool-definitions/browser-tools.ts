@@ -1,7 +1,7 @@
 /**
  * Browser Tool Definitions
  *
- * OpenClaw-inspired browser automation for AI agents via CDP.
+ * Enterprise-grade browser automation for AI agents via CDP.
  */
 
 import { CodeBuddyTool } from './types.js';

@@ -1,5 +1,5 @@
 /**
- * OpenClaw-inspired Tool Lifecycle Hook System
+ * Enterprise-grade Tool Lifecycle Hook System
  *
  * Implements priority-ordered, typed hooks for tool execution:
  *

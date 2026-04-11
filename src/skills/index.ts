@@ -3,7 +3,7 @@
  *
  * Unified skill system that bridges two underlying implementations:
  * 1. Legacy JSON-based skills (skill-manager, skill-loader)
- * 2. OpenClaw-inspired SKILL.md natural language skills (registry, executor)
+ * 2. Enterprise-grade SKILL.md natural language skills (registry, executor)
  *
  * The UnifiedSkill type and adapters provide a single interface over both.
  * The SKILL.md system uses YAML frontmatter + Markdown for natural language
@@ -17,7 +17,7 @@ export * from "./skill-manager.js";
 export * from "./skill-loader.js";
 export * from "./eligibility.js";
 
-// SKILL.md natural language system (OpenClaw-inspired)
+// SKILL.md natural language system (Enterprise-grade)
 // Re-export with "Md" suffix to avoid conflicts with legacy types
 export type {
   SkillMetadata as SkillMdMetadata,

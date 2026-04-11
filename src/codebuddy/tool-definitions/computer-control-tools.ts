@@ -1,7 +1,7 @@
 /**
  * Computer Control Tool Definitions
  *
- * OpenClaw-inspired unified computer control for AI agents.
+ * Enterprise-grade unified computer control for AI agents.
  */
 
 import { CodeBuddyTool } from './types.js';

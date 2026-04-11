@@ -1,5 +1,5 @@
 /**
- * OpenClaw API Routes Tests
+ * Native Engine API Routes Tests
  *
  * Tests for the heartbeat, hub, identity, groups, and auth-profiles
  * API routes registered in src/server/index.ts.
@@ -378,7 +378,7 @@ beforeEach(() => {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('OpenClaw API Routes', () => {
+describe('Native Engine API Routes', () => {
   // -----------------------------------------------------------------------
   // Heartbeat Routes
   // -----------------------------------------------------------------------

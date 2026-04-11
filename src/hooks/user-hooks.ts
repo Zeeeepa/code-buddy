@@ -361,7 +361,7 @@ export class UserHooksManager {
             feedback: parsed?.reason,
           });
         } else if (code === 2) {
-          // Exit 2 = BLOCK (Claude Code convention)
+          // Exit 2 = BLOCK (Standard convention)
           const feedback = stderr.trim() || stdout.trim() || 'Blocked by hook';
           logger.debug(`[user-hooks] command handler blocked action: ${feedback}`);
           resolve({ allowed: false, feedback });
@@ -427,7 +427,7 @@ export class UserHooksManager {
           additionalContext: parsed?.additionalContext,
         };
       } else if (response.status === 403) {
-        // 403 = block (Claude Code convention for HTTP hooks)
+        // 403 = block (Standard convention for HTTP hooks)
         return { allowed: false, feedback: body || 'Blocked by HTTP hook' };
       } else {
         logger.warn(`[user-hooks] HTTP hook ${handler.url} returned ${response.status}`);

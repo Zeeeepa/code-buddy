@@ -6,7 +6,7 @@
  * Auth via AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY or default credential chain.
  * Includes onboarding hooks for auth, discovery, and model picking.
  *
- * OpenClaw v2026.3.19 — AWS Bedrock provider plugin.
+ * Native Engine v2026.3.19 — AWS Bedrock provider plugin.
  */
 
 import { logger } from '../../utils/logger.js';

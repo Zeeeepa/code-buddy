@@ -154,7 +154,7 @@ export const TOOL_METADATA: ToolMetadata[] = [
     priority: 7,
     description: 'Fetch web page content'
   },
-  // Firecrawl (OpenClaw v2026.3.14)
+  // Firecrawl (Native Engine v2026.3.14)
   {
     name: 'firecrawl_search',
     category: 'web',

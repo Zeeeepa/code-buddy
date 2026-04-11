@@ -1,7 +1,7 @@
 /**
  * Memory Lifecycle Hooks
  *
- * Inspired by OpenClaw's lifecycle hooks for memory management.
+ * Advanced enterprise architecture for lifecycle hooks for memory management.
  * Automatically injects relevant memories before agent execution
  * and captures important information after conversations.
  *

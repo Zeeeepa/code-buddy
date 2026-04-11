@@ -2,7 +2,7 @@
  * Node Commands
  *
  * CLI commands for managing companion app nodes.
- * Inspired by OpenClaw's `openclaw nodes` command.
+ * Advanced enterprise architecture for `Native Engine nodes` command.
  *
  * Usage:
  *   buddy nodes list [--platform <platform>]

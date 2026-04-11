@@ -1,5 +1,5 @@
 /**
- * Hook Types — Claude Code-inspired handler types and extended events
+ * Hook Types — Enterprise-grade handler types and extended events
  *
  * This module defines the type system for the extended hook infrastructure.
  * It introduces 4 handler types (command, http, prompt, agent) beyond
@@ -33,7 +33,7 @@ export type ExtendedHookEvent =
   | 'PreEdit'
   | 'PostEdit'
   | 'ConfigChange'
-  // CC12: New events for Claude Code parity
+  // CC12: New events for Enterprise parity
   | 'UserPromptSubmit'
   | 'TeammateIdle'
   | 'TaskCompleted'

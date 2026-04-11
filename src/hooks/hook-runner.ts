@@ -1,5 +1,5 @@
 /**
- * Hook Runner — Claude Code-inspired multi-handler hook execution
+ * Hook Runner — Enterprise-grade multi-handler hook execution
  *
  * Supports 4 handler types: command, http, prompt, agent.
  * Integrates with the existing HookManager for backward compatibility
@@ -198,7 +198,7 @@ export class HookRunner {
    *
    * Exit code protocol:
    * - 0 = success (stdout parsed as JSON if possible for updatedInput/permissionDecision)
-   * - 2 = block the operation (Claude Code convention)
+   * - 2 = block the operation (Standard convention)
    * - other = error
    */
   private async runCommand(
@@ -267,7 +267,7 @@ export class HookRunner {
               | undefined,
           });
         } else if (code === 2) {
-          // Exit code 2 = block (Claude Code convention)
+          // Exit code 2 = block (Standard convention)
           resolve({
             success: false,
             blocked: true,

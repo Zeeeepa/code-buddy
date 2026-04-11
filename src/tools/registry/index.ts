@@ -277,6 +277,9 @@ export {
   resetGuiToolInstance,
 } from './gui-tools.js';
 
+// Tool Adapters - PTY Interactive Shell
+export { InteractiveShellTool } from '../interactive-shell-tool.js';
+
 // Tool Prefix Naming Convention — Codex-inspired canonical aliases
 export {
   createAliasTools,
@@ -350,6 +353,11 @@ export async function createAllToolsAsync(): Promise<ITool[]> {
   const { createLogAnalyzerTools } = await import('./log-analyzer-tools.js');
   const { createOpenAPITools } = await import('./openapi-tools.js');
   const { createLicenseScannerTools } = await import('./license-scanner-tools.js');
+  
+  // Await MCP Manager initialization before registering its tools
+  const { getMcpManager } = await import('../mcp/mcp-manager.js');
+  await getMcpManager().initialize();
+  const { createMcpTools } = await import('./mcp-tools.js');
 
   const primaryTools: ITool[] = [
     ...createTextEditorTools(),
@@ -383,6 +391,7 @@ export async function createAllToolsAsync(): Promise<ITool[]> {
     ...createLogAnalyzerTools(),
     ...createOpenAPITools(),
     ...createLicenseScannerTools(),
+    ...createMcpTools(),
   ];
 
   // Register backward-compat canonical-prefix aliases (shell_exec, file_read, etc.)

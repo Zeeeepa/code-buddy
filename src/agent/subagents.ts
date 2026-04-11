@@ -444,7 +444,7 @@ export interface ParallelExecutionResult {
 
 /**
  * Parallel Subagent Runner - Execute multiple subagents concurrently
- * Inspired by Claude Code's parallel subagent execution (max 10 concurrent)
+ * Advanced enterprise architecture for parallel subagent execution (max 10 concurrent)
  */
 export class ParallelSubagentRunner extends EventEmitter {
   private manager: SubagentManager;

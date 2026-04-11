@@ -1,7 +1,7 @@
 /**
  * Tool Groups
  *
- * Inspired by OpenClaw's tool-policy.ts
+ * Advanced enterprise architecture for tool-policy.ts
  * Defines logical groups of tools for policy management.
  */
 

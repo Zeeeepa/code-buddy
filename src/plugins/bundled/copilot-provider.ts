@@ -4,7 +4,7 @@
  * Wraps GitHub Copilot as a plugin-based LLM provider.
  * Gated by GITHUB_COPILOT_TOKEN environment variable.
  *
- * OpenClaw v2026.3.14 — provider-bundled plugins.
+ * Native Engine v2026.3.14 — provider-bundled plugins.
  */
 
 import { logger } from '../../utils/logger.js';

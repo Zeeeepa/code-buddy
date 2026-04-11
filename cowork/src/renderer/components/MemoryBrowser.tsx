@@ -6,6 +6,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Brain, Search, Clock, Tag, RefreshCw, FileText } from 'lucide-react';
 import { useActiveProjectId } from '../store/selectors';
+import { formatAppDate } from '../utils/i18n-format';
 
 interface MemoryEntry {
   category: 'preference' | 'pattern' | 'context' | 'decision' | string;
@@ -184,7 +185,7 @@ export const MemoryBrowser: React.FC = () => {
                 )}
                 <div className="ml-auto flex items-center gap-1 text-[10px] text-text-muted">
                   <Clock size={10} />
-                  {new Date(entry.timestamp).toLocaleDateString()}
+                  {formatAppDate(entry.timestamp, { dateStyle: 'medium' })}
                 </div>
               </div>
               <p className="text-xs text-text-secondary leading-relaxed">{entry.content}</p>

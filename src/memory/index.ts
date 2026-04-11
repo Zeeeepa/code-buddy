@@ -53,7 +53,7 @@ export {
   type ProspectiveMemoryConfig,
 } from "./prospective-memory.js";
 
-// Auto-Capture (OpenClaw-inspired pattern detection)
+// Auto-Capture (Enterprise-grade pattern detection)
 export {
   AutoCaptureManager,
   getAutoCaptureManager,

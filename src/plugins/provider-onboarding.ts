@@ -11,7 +11,7 @@
  * Phases that are not implemented by the provider are silently skipped.
  * An auth failure short-circuits the entire pipeline.
  *
- * OpenClaw v2026.3.19 — Provider Plugin Onboarding Architecture.
+ * Native Engine v2026.3.19 — Provider Plugin Onboarding Architecture.
  */
 
 import { logger } from '../utils/logger.js';

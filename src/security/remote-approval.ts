@@ -3,7 +3,7 @@
  *
  * Forward tool execution approval requests to messaging channels
  * (Telegram, Discord, Slack) for remote /approve or /deny.
- * OpenClaw-inspired remote authorization flow.
+ * Enterprise-grade remote authorization flow.
  */
 
 import { EventEmitter } from 'events';

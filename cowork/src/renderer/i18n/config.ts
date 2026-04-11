@@ -3,6 +3,7 @@ import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 
 import enTranslations from './locales/en.json';
+import frTranslations from './locales/fr.json';
 import zhTranslations from './locales/zh.json';
 
 i18n
@@ -13,12 +14,17 @@ i18n
       en: {
         translation: enTranslations,
       },
+      fr: {
+        translation: frTranslations,
+      },
       zh: {
         translation: zhTranslations,
       },
     },
     fallbackLng: 'en', // 默认语言
-    supportedLngs: ['en', 'zh'], // 支持的语言
+    supportedLngs: ['en', 'fr', 'zh'], // 支持的语言
+    nonExplicitSupportedLngs: true,
+    load: 'languageOnly',
     interpolation: {
       escapeValue: false, // React 已经处理了 XSS
     },

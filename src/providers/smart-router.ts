@@ -1,7 +1,7 @@
 /**
  * Smart Model Router
  *
- * OpenClaw-inspired unified routing layer that integrates:
+ * Enterprise-grade unified routing layer that integrates:
  * - Model tier selection (complexity-based)
  * - Provider fallback (health-based circuit breaker)
  * - Cost optimization (budget tracking)

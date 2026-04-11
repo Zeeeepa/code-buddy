@@ -1,6 +1,6 @@
 /**
  * Tests for Transcript Repair — Post-compaction validation
- * (OpenClaw v2026.3.11 alignment)
+ * (Native Engine v2026.3.11 alignment)
  */
 
 import { describe, it, expect, vi } from 'vitest';

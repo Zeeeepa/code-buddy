@@ -2,7 +2,7 @@
  * Modular Rules Loader
  *
  * Loads project and user-global rules from `.codebuddy/rules/*.md` files
- * and injects them into the system prompt. This mirrors Claude Code's
+ * and injects them into the system prompt. This mirrors Native Engine's
  * `.claude/rules/` feature, allowing users to split project instructions
  * into focused, composable Markdown files.
  *

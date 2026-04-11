@@ -165,7 +165,7 @@ export class CustomCommandLoader {
 
     // Replace argument placeholders
     if (args) {
-      // Replace $ARGUMENTS with the full argument string (Claude Code style)
+      // Replace $ARGUMENTS with the full argument string (Native Engine style)
       expandedPrompt = expandedPrompt.replace(/\$ARGUMENTS/g, args);
 
       // Replace $ARGS and {{args}} with the full argument string

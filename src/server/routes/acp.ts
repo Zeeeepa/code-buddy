@@ -113,7 +113,7 @@ export function createACPRoutes(): Router {
   /**
    * POST /api/acp/send — Send a message to an agent
    *
-   * Extended (OpenClaw v2026.3.12 alignment):
+   * Extended (Native Engine v2026.3.12 alignment):
    * - `resumeSessionId` — copy context from a previous session
    * - `fireAndForget` — return 202 immediately
    * - Prompt queue — if a task is active, queue the prompt (returns 202 with queuePosition)
@@ -493,7 +493,7 @@ export function createACPRoutes(): Router {
   });
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Advanced Session Operations (OpenClaw v2026.3.12)
+  // Advanced Session Operations (Native Engine v2026.3.12)
   // ──────────────────────────────────────────────────────────────────────────
 
   /**

@@ -14,6 +14,7 @@ import { ConnectionConfigStep } from './remote/ConnectionConfigStep';
 import { AdvancedConfigStep } from './remote/AdvancedConfigStep';
 import { AuthorizedUsersSection } from './remote/AuthorizedUsersSection';
 import { QuickStartGuide } from './remote/QuickStartGuide';
+import { getAppListSeparator } from '../utils/i18n-format';
 import type {
   GatewayStatus,
   PairedUser,
@@ -216,7 +217,7 @@ export function RemoteControlPanel({ isActive }: { isActive: boolean }) {
   const isFeishuConfigured = !!(feishuAppId && feishuAppSecret);
   const isConnectionConfigured =
     useLongConnection || (tunnelEnabled && !!ngrokAuthToken) || !!tunnelStatus?.connected;
-  const permissionSeparator = i18n.language.startsWith('zh') ? '、' : ', ';
+  const permissionSeparator = getAppListSeparator(i18n.language);
   const permissionScopes = [
     'im:resource',
     'im:message',

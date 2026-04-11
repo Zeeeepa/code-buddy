@@ -42,7 +42,7 @@ It provides a sandboxed workspace where AI can manage files, generate profession
 |               | MCP & Skills | Remote Control | GUI Operation |
 | ------------- | ------------ | -------------- | ------------- |
 | Claude Cowork | ✓            | ✗              | ✗             |
-| OpenClaw      | ✓            | ✓              | ✗             |
+| Native Engine      | ✓            | ✓              | ✗             |
 | CodeBuddyCowork    | ✓            | ✓              | ✓             |
 
 - **One-Click Install, Ready to Use**: Pre-built installers for Windows and macOS, no environment setup needed—just download and start using.

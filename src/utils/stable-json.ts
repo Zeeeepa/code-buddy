@@ -1,5 +1,5 @@
 /**
- * Stable JSON Serialization — Manus AI / OpenClaw KV-cache preservation
+ * Stable JSON Serialization — Manus AI / Native Engine KV-cache preservation
  *
  * A single-token difference anywhere in the prompt prefix invalidates the
  * KV-cache from that point forward (autoregressive transformer property).

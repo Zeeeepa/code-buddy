@@ -105,7 +105,7 @@ export {
   type RedactionConfig,
 } from './data-redaction.js';
 
-// Security Audit (OpenClaw-inspired)
+// Security Audit (Enterprise-grade)
 export type {
   AuditSeverity,
   AuditCategory,

@@ -11,7 +11,7 @@
  * HALF_OPEN and allows `halfOpenMaxAttempts` test calls.
  * If test calls succeed, circuit closes; if they fail, it reopens.
  *
- * OpenClaw v2026.3.19 — Circuit breaker for provider resilience.
+ * Native Engine v2026.3.19 — Circuit breaker for provider resilience.
  */
 
 import { EventEmitter } from 'events';

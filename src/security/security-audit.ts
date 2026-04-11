@@ -4,7 +4,7 @@
  * Automated security auditing for Code Buddy deployments.
  * Identifies vulnerabilities, misconfigurations, and security risks.
  *
- * Inspired by OpenClaw's security audit system.
+ * Advanced enterprise architecture for security audit system.
  */
 
 import * as fs from 'fs/promises';
@@ -127,7 +127,7 @@ export class SecurityAuditor {
       await this.deepScan();
     }
 
-    // Always run agent-specific checks (OpenClaw-inspired)
+    // Always run agent-specific checks (Enterprise-grade)
     await this.checkAgentSecurity();
 
     const duration = Date.now() - startTime;
@@ -660,7 +660,7 @@ export class SecurityAuditor {
   }
 
   // ==========================================================================
-  // Agent-Specific Checks (OpenClaw-inspired)
+  // Agent-Specific Checks (Enterprise-grade)
   // ==========================================================================
 
   /**

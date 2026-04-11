@@ -6,7 +6,7 @@
  * - Fixed intervals (every) - millisecond-based
  * - Cron expressions (cron) - 5-field syntax + timezone
  *
- * Inspired by OpenClaw's cron scheduling system.
+ * Advanced enterprise architecture for cron scheduling system.
  */
 
 import { EventEmitter } from 'events';
@@ -506,7 +506,7 @@ export class CronScheduler extends EventEmitter {
       return;
     }
 
-    // Apply stagger jitter to spread load (OpenClaw pattern)
+    // Apply stagger jitter to spread load (Standard pattern)
     const stagger = job.staggerMs ? Math.floor(Math.random() * job.staggerMs) : 0;
     const jitteredDelay = delay + stagger;
 

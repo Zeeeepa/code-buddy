@@ -5,7 +5,7 @@
  * These adapters wrap the firecrawl-tool methods to conform to the formal
  * ITool interface for use with the FormalToolRegistry.
  *
- * OpenClaw v2026.3.14 alignment.
+ * Native Engine v2026.3.14 alignment.
  */
 
 import type { ToolResult } from '../../types/index.js';

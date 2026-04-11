@@ -144,7 +144,7 @@ export function processCommandPrompt(command: CustomCommand, args: string[]): st
     return args[idx] || '';
   });
 
-  // Replace $ARGUMENTS with full argument string (Claude Code style)
+  // Replace $ARGUMENTS with full argument string (Native Engine style)
   prompt = prompt.replace(/\$ARGUMENTS/g, argsString);
 
   // Replace {{0}}, {{1}}, etc. placeholders

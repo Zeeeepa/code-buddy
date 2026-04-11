@@ -5,7 +5,7 @@
  * - mirror: Local workspace mounted into the sandbox (development mode)
  * - remote: Remote workspace via API (cloud execution mode)
  *
- * OpenClaw v2026.3.14 alignment.
+ * Native Engine v2026.3.14 alignment.
  */
 
 import { logger } from '../utils/logger.js';

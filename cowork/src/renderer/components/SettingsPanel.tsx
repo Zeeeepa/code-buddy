@@ -420,7 +420,7 @@ export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProp
                 {viewedTabs.has('cost') && <SettingsCostDashboard />}
               </div>
               <div className={activeTab === 'rules' ? '' : 'hidden'}>
-                {viewedTabs.has('rules') && <SettingsPermissionRules />}
+                {viewedTabs.has('rules') && <SettingsPermissionRules isActive={activeTab === 'rules'} />}
               </div>
               <div className={activeTab === 'mcpMarketplace' ? '' : 'hidden'}>
                 {viewedTabs.has('mcpMarketplace') && <SettingsMCPMarketplace />}

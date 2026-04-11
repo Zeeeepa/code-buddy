@@ -521,7 +521,7 @@ export class SlackChannel extends BaseChannel {
         params.thread_ts = message.replyTo;
       }
 
-      // Passthrough channelData.slack.blocks (OpenClaw v2026.3.12 alignment)
+      // Passthrough channelData.slack.blocks (Native Engine v2026.3.12 alignment)
       if (message.channelData?.slack?.blocks && Array.isArray(message.channelData.slack.blocks)) {
         params.blocks = message.channelData.slack.blocks;
       } else {

@@ -83,6 +83,28 @@ function parseMetadata(yamlContent: string, sourcePath: string): SkillMetadata {
       throw new Error('Skill description is required');
     }
 
+    // Parse allowed-tools (Standard compatibility)
+    let allowedTools = parsed['allowed-tools'];
+    if (typeof allowedTools === 'string') {
+      // Native Engine uses comma separated values like: Bash(gitnexus *), Read, Grep, Glob
+      const toolsList = allowedTools.split(',').map(t => t.trim());
+
+      const mappedTools: string[] = [];
+      for (const t of toolsList) {
+         if (t.startsWith('Bash(')) mappedTools.push('run_shell_command');
+         else if (t.toLowerCase() === 'read') mappedTools.push('read_file');
+         else if (t.toLowerCase() === 'grep') mappedTools.push('grep_search');
+         else if (t.toLowerCase() === 'glob') mappedTools.push('glob_search');
+         else if (t.toLowerCase() === 'replace') mappedTools.push('edit_file_lines');
+         else mappedTools.push(t);
+      }
+
+      // Dedup and set in requires
+      const dedupedTools = [...new Set(mappedTools)];
+      if (!parsed.requires) parsed.requires = {};
+      (parsed.requires as any).tools = dedupedTools;
+    }
+
     return {
       name: parsed.name,
       description: parsed.description,
@@ -91,12 +113,11 @@ function parseMetadata(yamlContent: string, sourcePath: string): SkillMetadata {
       tags: parsed.tags as string[] | undefined,
       requires: parsed.requires as SkillMetadata['requires'],
       config: parsed.config as SkillMetadata['config'],
-      openclaw: parsed.openclaw as SkillMetadata['openclaw'],
+      Native Engine: parsed.Native Engine as SkillMetadata['Native Engine'],
       // CC11: context fork and disable-model-invocation
       contextFork: parsed.context === 'fork' || parsed.contextFork === true,
       disableModelInvocation: parsed['disable-model-invocation'] === true || parsed.disableModelInvocation === true,
-    };
-  } catch (error) {
+    };  } catch (error) {
     throw new Error(
       `Failed to parse YAML frontmatter in ${sourcePath}: ${error instanceof Error ? error.message : String(error)}`
     );

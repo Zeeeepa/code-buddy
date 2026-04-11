@@ -2,6 +2,7 @@
  * CommandPalette — Cmd+K command palette with fuzzy search
  */
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Search,
   MessageSquare,
@@ -41,6 +42,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   onShowShortcuts,
   isDark,
 }) => {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -49,52 +51,54 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     () => [
       {
         id: 'new-session',
-        label: 'New Session',
-        description: 'Start a new conversation',
+        label: t('commandPalette.newSession', 'New session'),
+        description: t('commandPalette.newSessionDesc', 'Start a new conversation'),
         icon: <MessageSquare size={14} />,
         action: onNewSession,
         shortcut: 'Ctrl+N',
       },
       {
         id: 'resume-session',
-        label: 'Resume Session',
-        description: 'Open the session resume chooser',
+        label: t('commandPalette.resumeSession', 'Resume session'),
+        description: t('commandPalette.resumeSessionDesc', 'Open the session resume chooser'),
         icon: <Clock3 size={14} />,
         action: onResumeSession,
       },
       {
         id: 'settings',
-        label: 'Settings',
-        description: 'Open settings panel',
+        label: t('settings.title', 'Settings'),
+        description: t('commandPalette.settingsDesc', 'Open settings panel'),
         icon: <Settings size={14} />,
         action: onOpenSettings,
         shortcut: 'Ctrl+,',
       },
       {
         id: 'theme',
-        label: isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme',
+        label: isDark
+          ? t('commandPalette.switchToLightTheme', 'Switch to light theme')
+          : t('commandPalette.switchToDarkTheme', 'Switch to dark theme'),
         icon: isDark ? <Sun size={14} /> : <Moon size={14} />,
         action: onToggleTheme,
       },
       {
         id: 'shortcuts',
-        label: 'Keyboard Shortcuts',
-        description: 'View all shortcuts',
+        label: t('shortcutsDialog.title', 'Keyboard shortcuts'),
+        description: t('commandPalette.shortcutsDesc', 'View all shortcuts'),
         icon: <Keyboard size={14} />,
         action: onShowShortcuts,
         shortcut: 'Ctrl+/',
       },
       {
         id: 'export',
-        label: 'Export Session',
-        description: 'Export as Markdown or JSON',
+        label: t('exportDialog.title', 'Export session'),
+        description: t('commandPalette.exportDesc', 'Export as Markdown or JSON'),
         icon: <Download size={14} />,
         action: () => {
           /* handled by sidebar */
         },
       },
     ],
-    [onNewSession, onResumeSession, onOpenSettings, onToggleTheme, onShowShortcuts, isDark]
+    [onNewSession, onResumeSession, onOpenSettings, onToggleTheme, onShowShortcuts, isDark, t]
   );
 
   const filtered = useMemo(() => {
@@ -143,7 +147,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a command..."
+            placeholder={t('commandPalette.searchPlaceholder', 'Type a command…')}
             className="flex-1 bg-transparent text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none"
           />
         </div>
@@ -151,7 +155,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         {/* Results */}
         <div className="max-h-64 overflow-y-auto py-1">
           {filtered.length === 0 ? (
-            <div className="px-4 py-3 text-sm text-zinc-500">No matching commands</div>
+            <div className="px-4 py-3 text-sm text-zinc-500">
+              {t('commandPalette.empty', 'No matching commands')}
+            </div>
           ) : (
             filtered.map((cmd, i) => (
               <button

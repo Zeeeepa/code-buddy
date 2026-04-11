@@ -109,7 +109,7 @@ export interface AppConfig {
   activeConfigSetId: ConfigSetId;
   configSets: ApiConfigSet[];
 
-  // Optional: Claude Code CLI path override
+  // Optional: Native Engine CLI path override
   claudeCodePath?: string;
 
   // Optional: Default working directory

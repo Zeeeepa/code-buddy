@@ -1,5 +1,5 @@
 /**
- * CreateSkill Tool (OpenClaw self-authoring inspired)
+ * CreateSkill Tool (Native Engine self-authoring inspired)
  *
  * Allows the agent to write new SKILL.md files to the workspace
  * skills directory at runtime. The SkillRegistry's hot-reload watcher

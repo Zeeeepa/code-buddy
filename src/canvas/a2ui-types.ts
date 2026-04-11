@@ -1,7 +1,7 @@
 /**
  * A2UI Protocol v0.8 Types
  *
- * OpenClaw-inspired Agent-to-UI protocol for visual workspaces.
+ * Enterprise-grade Agent-to-UI protocol for visual workspaces.
  * Uses adjacency list model for components (flat structure with ID references).
  *
  * Message Types:

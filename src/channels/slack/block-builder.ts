@@ -1,7 +1,7 @@
 /**
  * Slack Block Kit Builder
  *
- * OpenClaw v2026.3.12 alignment: fluent API for building Block Kit messages.
+ * Native Engine v2026.3.12 alignment: fluent API for building Block Kit messages.
  * Supports `channelData.slack.blocks` passthrough and markdown auto-formatting.
  */
 

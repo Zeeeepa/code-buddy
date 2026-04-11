@@ -1,1 +1,0 @@
-Window found: "Amis - Discord" (Discord, PID: 34168)

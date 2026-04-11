@@ -81,11 +81,11 @@ export class MCPManager {
    * Returns the path to the bundled node/npx binaries
    */
   private getBundledNodePath(): { node: string; npx: string } | null {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+     
     const path = require('path');
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+     
     const fs = require('fs');
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+     
     const os = require('os');
 
     const platform = os.platform();
@@ -451,7 +451,7 @@ export class MCPManager {
    * Get the path to a MCP server file in the mcp directory
    */
   private getMcpServerPath(filename: string): string {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+     
     const fs = require('fs');
 
     // In development: __dirname points to dist-electron/main
@@ -1062,7 +1062,7 @@ export class MCPManager {
    * Chrome 136+ requires --user-data-dir for remote debugging to work properly
    */
   private getChromeUserDataDir(): string {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+     
     const path = require('path');
     // Use userData so the debug profile survives reboots and isn't wiped by OS temp-dir cleanup
     return path.join(app.getPath('userData'), 'chrome-mcp-debug');
@@ -1102,7 +1102,7 @@ export class MCPManager {
     if (platform === 'darwin') {
       chromePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
     } else if (platform === 'win32') {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+       
       const fs = require('fs');
       // Chrome can be installed in per-user (%LOCALAPPDATA%) or system-wide locations
       const candidates = [

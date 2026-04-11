@@ -123,7 +123,7 @@ export class ContextManagerV2 {
   private sessionId: string;
   /** Lazy-loaded importance scorer for sliding window decisions */
   private _importanceScorer: ImportanceScorer | null = null;
-  /** Pluggable context engine (OpenClaw v2026.3.7 alignment) */
+  /** Pluggable context engine (Native Engine v2026.3.7 alignment) */
   private contextEngine: ContextEngine | null = null;
 
   // Memory metrics for monitoring
@@ -181,7 +181,7 @@ export class ContextManagerV2 {
   }
 
   /**
-   * Register a pluggable context engine (OpenClaw v2026.3.7 alignment).
+   * Register a pluggable context engine (Native Engine v2026.3.7 alignment).
    * When set, prepareMessages() delegates to engine.assemble().
    */
   setContextEngine(engine: ContextEngine): void {
@@ -360,10 +360,10 @@ export class ContextManagerV2 {
    * Now supports enhanced compression with key info preservation
    */
   prepareMessages(messages: CodeBuddyMessage[]): CodeBuddyMessage[] {
-    // Delegate to pluggable context engine if registered (OpenClaw v2026.3.7)
+    // Delegate to pluggable context engine if registered (Native Engine v2026.3.7)
     if (this.contextEngine) {
       // ownsCompaction: engine controls compaction — skip built-in auto-compact,
-      // delegate directly to engine.assemble() (OpenClaw v2026.3.13-1)
+      // delegate directly to engine.assemble() (Native Engine v2026.3.13-1)
       if (this.contextEngine.ownsCompaction) {
         const result = this.contextEngine.assemble(messages, this.effectiveLimit);
         this.lastTokenCount = result.tokenCount;

@@ -1,7 +1,7 @@
 /**
  * Session Lanes for Tool Execution
  *
- * OpenClaw-inspired serialized execution system to prevent race conditions:
+ * Enterprise-grade serialized execution system to prevent race conditions:
  * - Per-session lane serialization
  * - Global lane for cross-session operations
  * - Timeout handling with configurable limits
@@ -95,8 +95,8 @@ export interface SessionLanesConfig {
  * Default configuration
  */
 export const DEFAULT_SESSION_LANES_CONFIG: SessionLanesConfig = {
-  defaultTimeoutMs: 600_000, // 10 minutes (OpenClaw default)
-  defaultWaitTimeoutMs: 30_000, // 30 seconds (OpenClaw default)
+  defaultTimeoutMs: 600_000, // 10 minutes (Native Engine default)
+  defaultWaitTimeoutMs: 30_000, // 30 seconds (Native Engine default)
   maxQueueSize: 100,
   laneIdleTimeoutMs: 300_000, // 5 minutes
   enableMetrics: true,
@@ -463,7 +463,7 @@ export class SessionLanesManager extends EventEmitter {
   }
 
   /**
-   * Wait for a condition with timeout (like agent.wait in OpenClaw)
+   * Wait for a condition with timeout (like agent.wait in Native Engine)
    */
   async wait<T>(
     sessionId: string,

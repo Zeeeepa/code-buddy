@@ -275,7 +275,7 @@ ${error instanceof Error ? error.message : String(error)}`,
 
 /**
  * Security Review - Comprehensive security analysis command
- * Inspired by Claude Code's /security-review
+ * Advanced enterprise architecture for /security-review
  */
 export async function handleSecurityReview(args: string[]): Promise<CommandHandlerResult> {
   const knownActions = new Set([
@@ -720,7 +720,7 @@ Supported channels: ${VALID_PAIRING_CHANNELS.join(', ')}`;
 }
 
 // ============================================================================
-// Elevated Mode Handler (OpenClaw-inspired /elevated on|off|status)
+// Elevated Mode Handler (Enterprise-grade /elevated on|off|status)
 // ============================================================================
 
 export function handleElevated(args: string[]): CommandHandlerResult {

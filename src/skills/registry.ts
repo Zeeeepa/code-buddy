@@ -345,9 +345,9 @@ export class SkillRegistry extends EventEmitter {
       }
     }
 
-    // Check triggers (OpenClaw metadata) — query must contain trigger, not reverse
-    if (skill.metadata.openclaw?.triggers) {
-      for (const trigger of skill.metadata.openclaw.triggers) {
+    // Check triggers (Standard metadata) — query must contain trigger, not reverse
+    if (skill.metadata.Native Engine?.triggers) {
+      for (const trigger of skill.metadata.Native Engine.triggers) {
         const triggerLower = trigger.toLowerCase();
         if (query.includes(triggerLower)) {
           score += 0.4;
@@ -388,8 +388,8 @@ export class SkillRegistry extends EventEmitter {
     }
 
     // Apply priority boost
-    if (skill.metadata.openclaw?.priority) {
-      score *= 1 + (skill.metadata.openclaw.priority / 100);
+    if (skill.metadata.Native Engine?.priority) {
+      score *= 1 + (skill.metadata.Native Engine.priority / 100);
     }
 
     // Normalize to 0-1
@@ -437,7 +437,7 @@ export class SkillRegistry extends EventEmitter {
         description: legacySkill.description || '',
         tags: legacySkill.triggers ? legacySkill.triggers.slice(0, 10) : undefined,
         requires: legacySkill.tools ? { tools: legacySkill.tools } : undefined,
-        openclaw: {
+        Native Engine: {
           priority: legacySkill.priority,
           triggers: legacySkill.triggers ? [...legacySkill.triggers] : undefined,
         },

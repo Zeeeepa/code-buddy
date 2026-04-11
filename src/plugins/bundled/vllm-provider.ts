@@ -5,7 +5,7 @@
  * Gated by VLLM_BASE_URL environment variable.
  * Includes onboarding hooks for auth, discovery, and model picking.
  *
- * OpenClaw v2026.3.19 — Provider Plugin Onboarding Architecture.
+ * Native Engine v2026.3.19 — Provider Plugin Onboarding Architecture.
  */
 
 import { logger } from '../../utils/logger.js';

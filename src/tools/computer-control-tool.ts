@@ -1,7 +1,7 @@
 /**
  * Computer Control Tool
  *
- * OpenClaw-inspired unified interface for AI agents to control the computer.
+ * Enterprise-grade unified interface for AI agents to control the computer.
  * Integrates:
  * - Smart Snapshot for element detection
  * - Mouse/keyboard automation
@@ -1450,7 +1450,7 @@ export class ComputerControlTool {
   }
 
   /**
-   * Translate technical errors into AI-friendly messages (OpenClaw-inspired)
+   * Translate technical errors into AI-friendly messages (Enterprise-grade)
    */
   private toAIFriendlyError(error: string, action: ComputerAction): string {
     const lower = error.toLowerCase();

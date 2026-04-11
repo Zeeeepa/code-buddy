@@ -5,7 +5,7 @@
  * the agent loop in headless mode (no Ink UI). Streams results via SSE
  * or polling. Saves results to disk (.codebuddy/runs/).
  *
- * Closes the gap with Cursor Background Agents, Codex CLI, and Claude Code.
+ * Closes the gap with Cursor Background Agents, Codex CLI, and Native Engine.
  */
 
 import { randomBytes } from 'crypto';

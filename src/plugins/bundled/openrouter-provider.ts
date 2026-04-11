@@ -4,7 +4,7 @@
  * Wraps OpenRouter as a plugin-based LLM provider.
  * Gated by OPENROUTER_API_KEY environment variable.
  *
- * OpenClaw v2026.3.14 — provider-bundled plugins.
+ * Native Engine v2026.3.14 — provider-bundled plugins.
  */
 
 import { logger } from '../../utils/logger.js';

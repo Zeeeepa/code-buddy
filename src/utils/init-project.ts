@@ -421,7 +421,7 @@ ${claudeNote}
 
 /**
  * Initialize .codebuddy directory with templates and configurations.
- * Similar to Claude Code's project initialization.
+ * Similar to Native Engine's project initialization.
  */
 export async function initCodeBuddyProject(
   workingDirectory: string = process.cwd(),

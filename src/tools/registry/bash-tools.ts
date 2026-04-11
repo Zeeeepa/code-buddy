@@ -125,11 +125,14 @@ export class BashExecuteTool implements ITool {
 // Factory Function
 // ============================================================================
 
+import { InteractiveShellTool } from '../interactive-shell-tool.js';
+
 /**
  * Create all bash tool instances
  */
 export function createBashTools(): ITool[] {
   return [
     new BashExecuteTool(),
+    new InteractiveShellTool()
   ];
 }

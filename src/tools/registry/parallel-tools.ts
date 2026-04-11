@@ -2,7 +2,7 @@
  * Parallel Agent Tool
  * 
  * Allows the agent to spawn multiple sub-agents in parallel to handle
- * independent sub-tasks concurrently. Inspired by Claude Code.
+ * independent sub-tasks concurrently. Advanced enterprise architecture for.
  */
 
 import { ITool, ToolSchema, IToolMetadata, IValidationResult, ToolCategoryType } from './types.js';

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../store';
 import type { Message, TraceStep } from '../types';
+import { formatAppDateTime } from '../utils/i18n-format';
 
 interface SessionInsightSummary {
   sessionId: string;
@@ -443,7 +444,7 @@ export const SessionInsightsPanel: React.FC<SessionInsightsPanelProps> = ({ open
                             className="text-text-muted hover:text-text-primary transition-colors"
                             title={t('sessionInsights.jumpToMessage', 'Open this message in Chat')}
                           >
-                            {new Date(message.timestamp).toLocaleString()}
+                            {formatAppDateTime(message.timestamp)}
                           </button>
                         </div>
                         <div className="px-3 py-2 text-xs text-text-secondary whitespace-pre-wrap break-words">

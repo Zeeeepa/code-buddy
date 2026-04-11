@@ -1,547 +1,176 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code when working in this repo. Keep this file short — it should capture what you *can't* derive by reading the source.
 
-## Build & Development Commands
-
-```bash
-npm install          # Install dependencies
-npm run dev          # Development mode with Bun
-npm run dev:node     # Development mode with tsx (Node.js)
-npm run build        # Build with TypeScript
-npm start            # Run built CLI
-npm run typecheck    # TypeScript type checking only
-npm run lint         # ESLint only
-npm run validate     # Run lint + typecheck + test (use before committing)
-npm run build:gui    # Build Cowork desktop GUI
-npm run dev:gui      # Dev mode for Cowork GUI (hot reload)
-npm run build:all    # Build engine + GUI
-buddy gui            # Launch desktop GUI (requires buddy install-gui first)
-buddy install-gui    # Install Electron + build GUI
-```
-
-## Testing
+## Build, Test, Lint
 
 ```bash
-npm test                           # Run all tests
-npm test -- path/to/file.test.ts   # Run a single test file
-npm run test:watch                 # Watch mode
-npm run test:coverage              # Coverage report
+npm install
+npm run dev            # Bun dev mode
+npm run dev:node       # tsx dev mode
+npm run build          # TypeScript build
+npm run typecheck
+npm run lint
+npm run validate       # lint + typecheck + test — run before committing
+npm test               # Vitest
+npm test -- path/to/file.test.ts
+npm run build:gui      # Cowork Electron GUI
+buddy install-gui && buddy gui
 ```
 
-Tests are in `tests/` (and in-source `src/**/*.test.ts`) using **Vitest** with happy-dom. `vitest.setup.ts` shims `globalThis.jest` → `vi`, so legacy `jest.fn()` / `jest.spyOn()` calls work in tests.
+Tests live in `tests/` and in-source `src/**/*.test.ts`. Vitest + happy-dom. `vitest.setup.ts` shims `globalThis.jest` → `vi` so legacy `jest.fn()` works.
 
-**Testing gotchas:**
-- `BashTool` tests require `ConfirmationService.setSessionFlag('bashCommands', true)`
-- `BashTool` unit tests must mock all transitive imports (`safe-binaries`, `auto-sandbox`, `shell-env-policy`, `bash-parser`, `checkpoint-manager`, `audit-logger`, `command-validator`, `streaming-executor`) — the `execute()` method has async pre-spawn logic so mock process events must be deferred with `setImmediate()`, not emitted synchronously
-- The project is ESM (`"type": "module"`) — use `import.meta.url` with `fileURLToPath` for `__dirname` equivalents in source; `@` alias maps to `./src` (configured in `vitest.config.ts`)
-- CLI command tests: use Commander `parseAsync()` + `exitOverride()`, mock `console.log`/`process.exit`
-- Mock dynamic imports via virtual modules for channel adapter tests
-- Channel adapter tests (iMessage, etc.) must mock `global.fetch` for health checks and API calls
-- `DeviceNodeManager` tests must mock transport modules (`ssh-transport`, `adb-transport`, `local-transport`) and `fs` (to prevent `devices.json` persistence across tests). `pairDevice()` is async — don't call synchronously
-- Use `logger` (from `src/utils/logger.js`) not `console.warn/error` in production code — tests spy on `logger.warn` not `console.warn`
-- The `AgentRegistry` has 8 built-in agents (PDF, Excel, DataAnalysis, SQL, Archive, CodeGuardian, SecurityReview, SWE)
+## Testing Gotchas
 
-## Architecture Overview
+- ESM project (`"type": "module"`). Use `import.meta.url` + `fileURLToPath` for `__dirname`. `@` alias → `./src` (see `vitest.config.ts`). Source imports need `.js` extensions even for `.ts` files.
+- Use `logger` (`src/utils/logger.js`) not `console.*` in production — tests spy on `logger.warn`.
+- `BashTool` tests: call `ConfirmationService.setSessionFlag('bashCommands', true)` first, and mock every transitive import (`safe-binaries`, `auto-sandbox`, `shell-env-policy`, `bash-parser`, `checkpoint-manager`, `audit-logger`, `command-validator`, `streaming-executor`). `execute()` has async pre-spawn logic, so defer mock process events with `setImmediate()` — don't emit synchronously.
+- CLI command tests: Commander `parseAsync()` + `exitOverride()`, mock `console.log` / `process.exit`.
+- Channel adapter tests: mock `global.fetch` for health checks, mock dynamic imports via virtual modules.
+- `DeviceNodeManager` tests: mock `ssh-transport` / `adb-transport` / `local-transport` and `fs` (prevents `devices.json` bleed between tests). `pairDevice()` is async.
+- `AgentRegistry` ships 8 built-in agents: PDF, Excel, DataAnalysis, SQL, Archive, CodeGuardian, SecurityReview, SWE.
 
-Code Buddy is a terminal-based multi-provider AI coding agent. Supports Grok, Claude, ChatGPT, Gemini, Ollama, LM Studio via OpenAI-compatible APIs. The core is an **agentic loop** where the AI autonomously calls tools.
+## Architecture
 
-### Core Flow
+Terminal multi-provider AI coding agent (Grok / Claude / GPT / Gemini / Ollama / LM Studio, all via OpenAI-compatible routing). Core is an agentic loop where the LLM autonomously calls tools.
 
 ```
-User Input → ChatInterface (Ink/React) → CodeBuddyAgent → LLM Provider
-                                                │
-                                       Tool Calls (max 50/400 rounds)
-                                                │
-                                      Tool Execution + Confirmation
-                                                │
-                                         Results → API (loop)
+User → ChatInterface (Ink/React) → CodeBuddyAgent → LLM provider
+                                         │
+                                Tool calls (max 50, YOLO 400)
+                                         │
+                              Execute + confirm → results → loop
 ```
 
-### Facade Architecture
+### Facades (`src/agent/facades/`)
 
-`CodeBuddyAgent` delegates to specialized facades:
-
-```
-CodeBuddyAgent
-  ├── AgentContextFacade       src/agent/facades/agent-context-facade.ts
-  │     Token counting, ContextManagerV2 compression, memory retrieval
-  ├── SessionFacade            src/agent/facades/session-facade.ts
-  │     Save/load sessions, checkpoints, rewind
-  ├── ModelRoutingFacade       src/agent/facades/model-routing-facade.ts
-  │     Model selection, cost tracking, usage stats
-  ├── InfrastructureFacade     src/agent/facades/infrastructure-facade.ts
-  │     MCP servers, sandbox, hooks, plugins
-  └── MessageHistoryManager    src/agent/facades/message-history-manager.ts
-        Message storage, history truncation, export
-```
+`CodeBuddyAgent` delegates to:
+- `AgentContextFacade` — token counting, `ContextManagerV2` compression, memory retrieval
+- `SessionFacade` — save/load sessions, checkpoints, rewind
+- `ModelRoutingFacade` — model selection, cost tracking, usage stats
+- `InfrastructureFacade` — MCP servers, sandbox, hooks, plugins
+- `MessageHistoryManager` — message storage, history truncation, export
 
 ### Key Entry Points
 
 - `src/index.ts` — CLI entry (Commander), lazy-loaded commands, `--profile` flag
-- `src/agent/codebuddy-agent.ts` — Main agentic loop, `executePlan()`, `needsOrchestration()`
-- `src/agent/execution/agent-executor.ts` — Middleware pipeline, reasoning, tool streaming (both sequential + streaming paths)
-- `src/codebuddy/client.ts` — LLM API client (multi-provider); `defaultMaxTokens` read from `getModelToolConfig(model).maxOutputTokens`
-- `src/services/prompt-builder.ts` — **Real** system prompt builder (NOT `src/agent/system-prompt-builder.ts` which was deleted); calls `getSystemPromptForMode()`, applies model-aware token budget truncation
-- `src/codebuddy/tools.ts` — Tool definitions + RAG selection (~110 tools total)
+- `src/agent/codebuddy-agent.ts` — main agentic loop, `executePlan()`
+- `src/agent/execution/agent-executor.ts` — middleware pipeline, reasoning, tool streaming. **Both sequential and streaming paths exist — changes usually need to be applied in both.**
+- `src/codebuddy/client.ts` — multi-provider LLM client; `defaultMaxTokens` comes from `getModelToolConfig(model).maxOutputTokens`
+- `src/services/prompt-builder.ts` — **real** system prompt builder (not the deleted `src/agent/system-prompt-builder.ts`). Applies model-aware token-budget truncation.
+- `src/codebuddy/tools.ts` — ~110 tool definitions + RAG selection
 - `src/ui/components/ChatInterface.tsx` — React/Ink terminal UI
 
-### Key Architecture Decisions
+### Non-obvious Architecture Decisions
 
-1. **Lazy Loading** — Heavy modules loaded on-demand via getters in `CodeBuddyAgent` and lazy imports in `src/index.ts`. Enable profiling with `PERF_TIMING=true`.
+1. **Lazy loading** — Heavy modules are loaded via getters in `CodeBuddyAgent` and lazy imports in `src/index.ts`. Profile with `PERF_TIMING=true`.
+2. **Model-aware limits** — `src/config/model-tools.ts` holds per-model capabilities (contextWindow, maxOutputTokens, patchFormat) with glob matching (`grok-3*`, `claude-*`). Start here for any model-specific behavior. System prompt is truncated to `(contextWindow − maxOutputTokens) × 50%`.
+3. **RAG tool selection** — `src/codebuddy/tools.ts` filters tools per query via embeddings to reduce prompt tokens; cached after first round.
+4. **Context compression** — `ContextManagerV2` (`src/context/context-manager-v2.ts`) uses sliding window + summarization; budget from `getModelToolConfig(model).contextWindow`.
+5. **Middleware pipeline** — `src/agent/middleware/` has composable before/after hooks. Priorities matter: reasoning = 42, workflow-guard = 45. Register in `codebuddy-agent.ts` constructor.
+6. **Confirmation service** — Singleton. Check order: permission mode → declarative rules → session flags → Guardian Agent.
+7. **Per-turn context injection** — Each LLM turn appends `<lessons_context>` (before) and `<todo_context>` (after). Must be applied in both agent-executor paths.
+8. **Pluggable ContextEngine** — Plugins can register a custom context pipeline via `PluginContext.registerContextEngine()`. If `ownsCompaction` is set, built-in auto-compact is skipped. Trust check blocks non-trusted plugins from owning compaction.
 
-2. **Model-Aware Limits** — `src/config/model-tools.ts` defines per-model capabilities (contextWindow, maxOutputTokens, patchFormat) with glob matching (`grok-3*`, `claude-*`). Used by `client.ts` (response size) and `context-manager-v2.ts` (context budget). System prompt is truncated to `(contextWindow - maxOutputTokens) × 50%`.
+### Reasoning
 
-3. **RAG Tool Selection** — `src/codebuddy/tools.ts` filters tools per query via RAG embedding to reduce prompt tokens. Tools are cached after first selection round.
+Two systems coexist:
+- **Extended Thinking** (`src/agent/thinking/`) — provider-level (Grok `budget_tokens`). Levels: `off`/`minimal`/`low`/`medium`/`high`/`xhigh`.
+- **ToT + MCTS** (`src/agent/reasoning/`) — modes `shallow`/`medium`/`deep`/`exhaustive`. MCTSr Q-value: `Q(a) = 0.5 * (min(R) + mean(R))`. Entry point: `reasoning-facade.ts`. User-facing: `/think` command and the `reason` tool. Reasoning middleware (priority 42) auto-detects complex queries and injects `<reasoning_guidance>`.
 
-4. **Context Compression** — `ContextManagerV2` (`src/context/context-manager-v2.ts`) uses sliding window + summarization when nearing limits. Uses `getModelToolConfig(model).contextWindow` for the budget.
+## Adding a Tool
 
-5. **Middleware Pipeline** — `src/agent/middleware/` has composable before/after turn hooks (cost-limit, context-warning, turn-limit, reasoning at priority 42, workflow-guard at priority 45). Register via `codebuddy-agent.ts` constructor.
+1. Create class in `src/tools/` returning `Promise<ToolResult>` (`{ success, output?, error? }`).
+2. Add OpenAI function definition in `src/codebuddy/tools.ts`.
+3. Add execution case in `CodeBuddyAgent.executeTool()`.
+4. Register in `src/tools/registry/` via the right factory.
+5. Add metadata in `src/tools/metadata.ts` (keywords + priority — used by RAG selection and BM25 `tool_search`).
 
-6. **Confirmation Service** — Singleton for destructive operations. Use `ConfirmationService.getInstance()` for file/bash operations needing approval. Checks permission mode → declarative rules → session flags → Guardian Agent, in that order.
+Codex-style aliases (`shell_exec`, `file_read`, `browser_search`, …) live in `src/tools/registry/tool-aliases.ts`.
 
-7. **Checkpoints** — File operations create automatic snapshots via `CheckpointManager` for undo/restore.
+## Edit Tool Matching
 
-8. **Per-Turn Context Injection** — Each LLM turn appends: `<lessons_context>` (before) → `<todo_context>` (after). Injected in both agent-executor paths.
+`str_replace` tries 5 strategies in cascade: **exact** → **flexible** (trim-normalized, preserves indent) → **regex** (tokenized on `():[]{}<>=,;`, joined with `\s*`) → **fuzzy** (Levenshtein, 10% threshold) → **LCS fallback** (90% similarity). Before any write/edit, content is scanned for omission placeholders (`// ... rest of code`, `// remaining methods ...`) — if present in `new_string` but not `old_string`, the edit is blocked.
 
-### Reasoning Engines
+## JIT Context
 
-Two systems coexist in `src/agent/thinking/` and `src/agent/reasoning/`:
+When a tool touches a path, the system walks upward to the project root loading any `CODEBUDDY.md` / `CONTEXT.md` / `INSTRUCTIONS.md` / `AGENTS.md` / `README.md` (and in `.codebuddy/` or `.claude/` subdirs). Max 4KB per discovery. `.codebuddy/settings.json → codebuddyMdExcludes` takes glob patterns to skip. CODEBUDDY.md supports `@path/to/file` imports (relative, `@~/…`, `@//…`), recursive to 5 levels.
 
-**Extended Thinking** (`src/agent/thinking/extended-thinking.ts`):
-- Provider-level thinking (Grok `budget_tokens`). Levels: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`
+## Config Files
 
-**Tree-of-Thought + MCTS** (`src/agent/reasoning/`):
-- Modes: `shallow` (CoT single-pass), `medium` (ToT BFS), `deep` (MCTS), `exhaustive` (full MCTS + progressive deepening)
-- MCTSr Q-value: `Q(a) = 0.5 * (min(R) + mean(R))` (arXiv 2406.07394)
-- BFS beam search, token budget tracking, progressive deepening auto-escalation
-
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| Tree-of-Thought | `src/agent/reasoning/tree-of-thought.ts` | Thought generation, evaluation, `solve()` + `solveStreaming()` |
-| MCTS | `src/agent/reasoning/mcts.ts` | MCTSr search with BFS/MCTS/progressive modes |
-| Reasoning Facade | `src/agent/reasoning/reasoning-facade.ts` | Unified entry point, auto-mode selection, auto-escalation |
-| Reasoning Middleware | `src/agent/middleware/reasoning-middleware.ts` | Priority 42, auto-detects complex queries (score 0-15), injects `<reasoning_guidance>` |
-| `/think` handler | `src/commands/handlers/think-handlers.ts` | `/think off\|shallow\|medium\|deep\|exhaustive\|status\|<problem>` |
-| `reason` tool | `src/tools/reasoning-tool.ts` + `src/codebuddy/tool-definitions/advanced-tools.ts` | LLM-callable tool for structured problem solving |
-
-Streaming: `reason` tool yields MCTS progress events via `tool_stream` in agent-executor (alongside `bash`).
-
-### Specialized Agents (`src/agent/specialized/`)
-
-| Agent | Files | Purpose |
-|-------|-------|---------|
-| Code Guardian | `code-guardian/` | Architecture review, refactoring suggestions, patch planning |
-| Security Review | `security-review/` | Vulnerability detection, compliance checks; `SecurityReviewSpecializedAgent` wraps inner `SecurityReviewAgent` with delegation methods |
-| SQL Agent | `sql-agent.ts` | Schema analysis, query optimization |
-| Archive Agent | `archive-agent.ts` | ZIP/TAR archive extraction and analysis |
-| PDF/Excel/Data | `pdf-agent.ts`, `excel-agent.ts`, `data-analysis-agent.ts` | Domain-specific processing |
-| SWE Agent | `swe-agent.ts`, `swe-agent-adapter.ts` | OpenManus-compatible code editing/debugging with think-act loop, stuck detection, terminate tool |
-
-Managed by `agent-registry.ts` (8 built-in agents). Multi-agent coordination in `src/agent/multi-agent/` with roles: orchestrator, coder, reviewer, tester.
-
-### OpenManus Architecture (`src/agent/state-machine.ts`, `src/agent/flow/`, `src/protocols/a2a/`)
-
-OpenManus-compatible agent framework with 5 subsystems:
-
-```
-BaseAgent (state machine) → ReActAgent (think-act loop) → SWEAgent (code editing)
-                                                        → BrowserAgent (web tasks)
-PlanningFlow: plan → parallel/sequential execute → synthesize
-A2A Protocol: AgentCard discovery + Task lifecycle (submit/cancel/status)
-```
-
-| Component | File | Key Types |
-|-----------|------|-----------|
-| State Machine | `src/agent/state-machine.ts` | `AgentStatus` enum (IDLE→RUNNING→THINKING→ACTING→FINISHED/ERROR), `AgentStateMachine` class with stuck detection (3 duplicate threshold), perturbation recovery |
-| Terminate Tool | `src/tools/terminate-tool.ts` | `TERMINATE_SIGNAL` (`__AGENT_TERMINATE__`), detected in `agent-executor.ts` both sequential + streaming paths |
-| SWE Agent | `src/agent/specialized/swe-agent.ts` | Think-act loop with bash + str_replace_editor + terminate tools, max-step limit, output truncation |
-| Planning Flow | `src/agent/flow/planning-flow.ts` | `PlanningFlow` class, `PlanStepStatus` enum, dependency-ordered execution, retry, `FlowType.PLANNING` factory |
-| A2A Protocol | `src/protocols/a2a/index.ts` | `A2AAgentServer` (executor callback), `A2AAgentClient` (registry + skill discovery), `AgentCard`, `Task`, `TaskStatus` |
-
-CLI: `buddy flow "<goal>"` — HTTP: `GET /api/a2a/.well-known/agent.json`, `POST /api/a2a/tasks/send`
-
-### Repair System (`src/agent/repair/`)
-
-Automatic error correction pipeline: `repair-engine.ts` → `fault-localization.ts` (AST-based, 15KB) → `iterative-repair.ts` (multi-pass, 27KB) → `repair-templates.ts`.
-
-### CodeAct Workflow
-
-For complex tasks: **PLAN → THINK → CODE → OBSERVE → UPDATE**
-
-- `src/tools/plan-tool.ts` — PLAN.md with checkbox status: `[ ]` pending, `[/]` in-progress, `[x]` done, `[-]` skipped
-- `src/tools/run-script-tool.ts` — Python/TS/shell scripts in Docker sandbox
-- `src/agent/middleware/workflow-guard.ts` — Priority-45: 3+ action verbs in first message + no PLAN.md → suggests plan init
-
-### Tool Implementation Pattern
-
-```typescript
-// src/tools/ — each tool returns Promise<ToolResult>
-interface ToolResult {
-  success: boolean;
-  output?: string;
-  error?: string;
-}
-```
-
-To add a new tool:
-1. Create class in `src/tools/`
-2. Add definition in `src/codebuddy/tools.ts` (OpenAI function calling format)
-3. Add execution case in `CodeBuddyAgent.executeTool()`
-4. Register in `src/tools/registry/` via the appropriate factory
-5. Add metadata in `src/tools/metadata.ts` (keywords, priority for RAG selection)
-
-Tool aliases (Codex-style): `shell_exec`, `file_read`, `browser_search`, etc. — defined in `src/tools/registry/tool-aliases.ts`.
-
-### Key Subsystems Quick Reference
-
-| Subsystem | Location | Notes |
-|-----------|----------|-------|
-| Daemon + cron | `src/daemon/` | PID file, health monitor, heartbeat engine, daily reset at 04:00, idle timeout, session maintenance (prune/rotate/cap), cross-platform service installer (launchd/systemd/schtasks) |
-| Channels | `src/channels/` | Telegram, Discord, Slack, WhatsApp, Signal, Teams, Matrix, WebChat, IRC, Feishu/Lark, Synology Chat, LINE, Nostr, Zalo, Mattermost, Nextcloud Talk, Twilio Voice, iMessage, Twitch, Gmail |
-| Pro channel features | `src/channels/pro/` | Lazy-loaded: scoped auth, diff-first, CI watcher, run tracker |
-| Skills | `src/skills/` | Registry + hub marketplace; 40 bundled SKILL.md files; `$ARGUMENTS[N]` variable resolution, `!`cmd`` bash injection, `context: fork`, `disable-model-invocation` frontmatter |
-| Starter Packs | `src/skills/starter-packs.ts` | 34 bundled SKILL.md guides; `/starter` command; empty-project detection in workflow-guard |
-| Identity | `src/identity/` | SOUL.md/USER.md/AGENTS.md, hot-reload, prompt injection |
-| Knowledge | `src/knowledge/` | Knowledge.md loading, injected as `<knowledge>` block |
-| Lessons | `src/agent/lessons-tracker.ts` | PATTERN/RULE/CONTEXT/INSIGHT, project + global `.codebuddy/lessons.md` |
-| Todo tracking | `src/agent/todo-tracker.ts` | Manus-style attention bias, injected at END of each turn |
-| Security | `src/security/` | write-policy, SSRF guard, bash-parser, shell-env-policy, skill-scanner, guardian-agent, policy-amendments; declarative rules support gitignore syntax: `Read(~/Documents/*.pdf)`, `Edit(src/**,!src/tests/**)` |
-| Guardian Agent | `src/security/guardian-agent.ts` | AI-powered automatic approval reviewer; risk scoring 0-100; auto-approves < 80, denies >= 90; 90s timeout, fail-closed |
-| Policy Amendments | `src/security/policy-amendments.ts` | Suggests allow rules when commands are blocked; persists to `.codebuddy/rules/`; command canonicalization (strips shell wrappers) |
-| Ghost Snapshots | `src/checkpoints/ghost-snapshot.ts` | Git-based undo: auto-commits workspace before each turn; shadow refs in `refs/codebuddy/ghost/`; max 50 snapshots |
-| Permission Requests | `src/tools/request-permissions-tool.ts` | Dynamic permission escalation mid-session; turn-scoped or session-scoped grants; least-privilege model |
-| BM25 Tool Search | `src/tools/tool-search.ts` | BM25/TF-IDF search over tool metadata; `tool_search` tool for discovering relevant tools from large MCP sets |
-| apply_patch | `src/tools/apply-patch.ts` | Codex-style `*** Begin Patch` format; 4-pass seek_sequence (exact→trim→full-trim→Unicode); Add/Delete/Update/Move file ops |
-| Multi-Agent Tools | `src/agent/multi-agent/agent-tools.ts` | 5-tool LLM-callable surface: spawn/send_input/wait/close/resume; depth limits (max 3), nickname pool, completion watchers; `memory` option for persistent agent memory |
-| Agent Memory | `src/agent/multi-agent/agent-memory-integration.ts` | Persistent filesystem memory for sub-agents; scopes: `user` (~/.codebuddy/), `project` (.codebuddy/), `local`; auto-loaded on spawn, auto-saved on completion |
-| Batch Decomposition | `src/commands/handlers/batch-handlers.ts` | `/batch <goal>`: LLM decomposes into parallel units, dependency-ordered execution, plan approval |
-| Tmux Teams | `src/agent/teams/tmux-manager.ts` | Tmux session management for Agent Teams; `InProcessTeamSession` fallback when tmux unavailable |
-| Agent Roles | `src/agent/multi-agent/agent-roles.ts` | explorer (read-only, fast), worker (execution, ownership), default; TOML config layering; custom roles via `.codebuddy/roles/` |
-| Memory Consolidation | `src/memory/memory-consolidation.ts` | Two-phase: extract memories from messages → consolidate into progressive-disclosure folder (summary.md, MEMORY.md, rollout_summaries/) |
-| Code Exec | `src/tools/code-exec-tool.ts` | JS runtime with tool bridge; `tools.<name>(args)` for multi-tool orchestration; store/load persistence; vm.runInContext isolation |
-| Observability | `src/observability/` | JSONL RunStore per run, `.codebuddy/runs/`, 30-run auto-prune; `tracing.ts` — OpenTelemetry via `OTEL_EXPORTER_OTLP_ENDPOINT`; Sentry via `SENTRY_DSN` |
-| Browser automation | `src/tools/browser/`, `src/tools/registry/browser-tools.ts` | Real Playwright impl (`BrowserTool`); adapters: `browser_launch`, `browser_navigate`, `browser_action` |
-| Vision / OCR | `src/tools/vision/`, `src/tools/registry/vision-tools.ts` | Tesseract.js OCR (`ocr_extract`), Sharp image processor (`image_process`) |
-| Sandbox | `src/sandbox/` | Docker + OS sandbox; `SandboxMode` enum |
-| MCP | `src/mcp/` | Predefined servers (ICM, etc.) |
-| Plugins | `src/plugins/` | Worker thread isolation (`isolated-plugin-runner.ts`), conflict detection |
-| Personas | `src/personas/` | Hot-reload FSWatcher, trait bars, `/persona` slash command |
-| i18n | `src/i18n/` | 6 locales (en, de, es, ja, zh, fr); categories: common, cli, tools, errors, help |
-| Services | `src/services/` | `prompt-builder.ts`, `plan-generator.ts`, `codebase-explorer.ts`, VFS router |
-| Voice/TTS | `src/talk-mode/`, `src/input/`, `src/voice/` | Two separate TTS systems (don't conflate) |
-| Reasoning | `src/agent/reasoning/` | ToT + MCTS engines, facade, `/think` command, `reason` tool |
-| Gateway | `src/gateway/` | WebSocket server, connect/hello-ok handshake, device identity, presence tracking, session patching, auth (token/password/none), bind modes (loopback/all/tailscale) |
-| Workflows | `src/workflows/` | Lobster typed DAG engine, approval gates with pause/resume tokens, variable resolution, cycle detection |
-| Send Policy | `src/channels/send-policy.ts` | Rule-based deny/allow per channel, chatType, keyPrefix, peerId; runtime overrides via `/send on\|off\|inherit` |
-| Msg Preprocessing | `src/channels/message-preprocessing.ts` | 4-stage pipeline: media detection → audio transcription → link extraction → content enrichment |
-| Nodes | `src/nodes/` | Companion app management, device pairing (short codes), platform capability maps (20+ capabilities), remote invocation |
-| Omission Detection | `src/tools/omission-placeholder-detector.ts` | Detects `// ... rest of code` patterns before file writes, prevents silent code deletion |
-| Multi-Strategy Match | `src/utils/multi-strategy-match.ts` | Edit matching cascade: exact → flexible (whitespace-normalized) → regex (tokenized) → fuzzy (Levenshtein) |
-| JIT Context | `src/context/jit-context.ts` | Dynamically loads `.codebuddy/` context files when tools access subdirectories; lazy growth vs upfront loading |
-| Tool Output Masking | `src/context/tool-output-masking.ts` | Backward-scanned FIFO: protects newest 50K tokens of tool outputs, replaces older with head/tail previews |
-| Loop Detection | `src/agent/loop-detection.ts` | 3-tier: tool call repetition (5×), content chanting (50-char chunks), LLM-based diagnosis (after 30 turns) |
-| Plan Mode | `src/agent/plan-mode.ts` | Read-only research mode: restricts tools to Read/Search/Think/Plan, blocks Execute/Edit on source files |
-| Code Graph Integration | `src/knowledge/code-graph-context-provider.ts` | Graph-aware context (PageRank, grouped relations, multi-entity), wired into workflow guard, reasoning, SWE agent, repair, plan tool |
-| Secrets Vault | `src/commands/cli/secrets-command.ts` | AES-256-GCM encrypted vault with scrypt KDF, key rotation, env import, audit trail |
-| Deploy | `src/deploy/` | Cloud config generators (Fly.io, Railway, Render, Hetzner, Northflank, GCP), Nix flake support |
-| Canvas | `src/server/routes/canvas.ts` | HTTP serving at `/__codebuddy__/canvas/` and `/__codebuddy__/a2ui/`, push/get/list content |
-| Desktop GUI | `src/desktop/`, `cowork/` | Electron desktop app (Cowork); `buddy gui` launches; `EngineAdapter` bridges CodeBuddyAgent in-process; `buddy install-gui` installs Electron |
-| Providers (extra) | `src/providers/additional-providers.ts` | Mistral, Deepgram, MiniMax, Moonshot, Venice AI, Z.AI via OpenAI-compatible routing |
-| Automation | `src/automation/` | `PollManager` (URL/file/command polling with change detection), `AuthMonitor` (credential state tracking across providers/channels) |
-| Docs V2 | `src/docs/` | DeepWiki-style 4-phase pipeline: discover→plan→generate→link. `DocsContextProvider` injects into agent executor + system prompt. `/docs-generate` command. `docs_search` tool. JIT auto-discovery. Knowledge manager integration. Mermaid diagrams in raw mode. Incremental regeneration via manifest. Combined single-file export |
-| Commands | `src/commands/` | `EnhancedCommandHandler` (Map-based O(1) dispatch), `ClientCommandDispatcher` (UI delegation), `SlashCommandManager` |
-| State Machine | `src/agent/state-machine.ts` | OpenManus-compatible agent states (IDLE/RUNNING/THINKING/ACTING/FINISHED/ERROR), stuck detection, perturbation recovery |
-| Terminate Tool | `src/tools/terminate-tool.ts` | Explicit `__AGENT_TERMINATE__` signal for loop exit, detected in agent-executor sequential + streaming paths |
-| Planning Flow | `src/agent/flow/planning-flow.ts` | Multi-agent plan → execute → synthesize, dependency ordering, retry, parallel steps; CLI: `buddy flow` |
-| A2A Protocol | `src/protocols/a2a/index.ts` | Google Agent-to-Agent spec: AgentCard discovery, Task lifecycle, client/server; HTTP: `/api/a2a/` |
-| Context Engine | `src/context/context-engine.ts`, `src/context/default-context-engine.ts` | Pluggable context pipeline: 7 lifecycle hooks (bootstrap, ingest, assemble, compact, afterTurn, prepareSubagentSpawn, onSubagentEnded). `ownsCompaction` flag lets plugins control compaction. Plugins register via `PluginContext.registerContextEngine()`. DefaultContextEngine wraps ContextManagerV2 |
-| ACPX Sessions | `src/server/routes/acp.ts` | Advanced ACP sessions: prompt queue (202 w/ queuePosition), cancel (`/sessions/:name/cancel`), soft-close (`/sessions/:name/close`), `resumeSessionId`, `fireAndForget` |
-| Browser Batch | `src/browser-automation/browser-tool.ts` | Batch actions (`action: 'batch'`, `actions[]`, `stopOnError`), Chrome discovery (`chrome-discovery.ts`), built-in profiles (`builtin-profiles.ts`: user/chrome-relay), `attach` action |
-| Slack Block Kit | `src/channels/slack/block-builder.ts` | `SlackBlockBuilder` fluent API, `formatResponseAsBlocks()` markdown→Block Kit, `channelData.slack.blocks` passthrough in `OutboundMessage` |
-| Gateway TLS | `src/gateway/types.ts`, `src/gateway/server.ts` | TLS config (`tlsEnabled`, `tlsCert`, `tlsKey`, `tlsCa`), `skipLocalPairing` for localhost TLS connections |
-| Backup CLI | `src/commands/handlers/backup-handlers.ts` | `buddy backup create\|verify\|list\|restore` with `--only-config`, `--no-include-workspace`, `--output` flags |
-| Docker TZ | `src/sandbox/docker-sandbox.ts` | `CODEBUDDY_TZ` env or `timezone` config → `-e TZ=<tz>` in Docker args, IANA format validation |
-| Env Blocklist | `src/security/env-blocklist.ts` | Blocks dangerous env vars (`LD_PRELOAD`, `_JAVA_OPTIONS`, `GLIBC_TUNABLES`, `GIT_*`, `NPM_CONFIG_*`, etc.) from sandbox child processes |
-| Transcript Repair | `src/context/transcript-repair.ts` | Post-compaction: removes orphaned tool results, injects synthetic results for lost tool_call pairs |
-| Cron Session Binding | `src/scheduler/cron-scheduler.ts` | `sessionTarget: 'current'\|'new'\|<id>` binds cron jobs to sessions; resolved at creation time |
-| Feishu Cards | `src/channels/feishu/index.ts` | Interactive approval/launcher cards, reasoning stream hooks, identity-aware headers, full thread context |
-| BTW Side-Question | `src/commands/handlers/btw-handler.ts` | `/btw <question>` — one-shot LLM call without tools or history modification |
-| Sessions Yield | `src/agent/multi-agent/agent-tools.ts` | `yield: true` on `spawn_agent` — parent suspends until sub-agent completes (`YIELD_SIGNAL`), detected in agent-executor |
-| Firecrawl | `src/tools/firecrawl-tool.ts`, `src/codebuddy/tool-definitions/firecrawl-tools.ts` | `firecrawl_search` + `firecrawl_scrape` tools; gated by `FIRECRAWL_API_KEY`; JS rendering, clean markdown |
-| Sandbox Registry | `src/sandbox/sandbox-registry.ts`, `src/sandbox/sandbox-backend.ts` | Pluggable Strategy pattern for sandbox backends; priority-ordered, cached selection |
-| OpenShell Backend | `src/sandbox/openshell-backend.ts` | NVIDIA OpenShell-compatible sandbox; `mirror` (local mount) and `remote` (HTTP API) workspace modes |
-| Bundled Providers | `src/plugins/bundled/` | Plugin-based providers: OpenRouter (`OPENROUTER_API_KEY`), GitHub Copilot (`GITHUB_COPILOT_TOKEN`), Ollama (`OLLAMA_HOST`), vLLM (`VLLM_BASE_URL`); `loadBundledProviders()` in PluginManager |
-| Provider Onboarding | `src/plugins/provider-onboarding.ts` | 5-phase lifecycle: auth → wizard.onboarding → discovery.run → wizard.modelPicker → onModelSelected; `runProviderOnboarding()` |
-| Agent Defaults | `src/config/agent-defaults.ts` | `agent_defaults.imageGenerationModel` TOML config field; per-agent params via `agent_defaults.agents.<id>` (temperature, maxTokens, model); `getImageGenerationModel()`, `getAgentParams()` |
-| Config Mutator | `src/config/config-mutator.ts` | `/config set <key> <value>` with dot-notation, SecretRef resolution, dry-run mode, batch JSON; `setConfigValue()`, `setConfigBatch()` |
-| Output Sanitizer | `src/utils/output-sanitizer.ts` | Strips model control tokens: GLM-5 (full-width), DeepSeek (`<think>`), ChatML (`<\|im_start\|>`), LLaMA (`[INST]`, `<<SYS>>`), zero-width chars; wired into agent-executor |
-| Image Pruning | `src/context/tool-output-masking.ts` | `pruneImageContent()` — prunes base64 image tool results keeping 2 most recent; saves ~75K tokens per screenshot |
-| Gateway WS Hardening | `src/gateway/ws-transport.ts` | GHSA-5wcw-8jjv-m286 fix: default `corsOrigins` localhost-only, `trustedProxies` config, proxy header validation |
-| Doctor --fix | `src/doctor/index.ts` | `buddy doctor --fix` auto-migration: creates `.codebuddy/`, removes stale locks, repairs settings.json, schema migration |
-| CODEBUDDY_CLI Env | `src/index.ts` | `CODEBUDDY_CLI=1`, `CODEBUDDY_CLI_VERSION`, `CODEBUDDY_CLI_DEPTH` in child processes and sub-agents |
-| Update --tag | `src/commands/update.ts` | `buddy update --tag main` / `--from-source` — install from GitHub HEAD |
-| Plugin Singular | `src/commands/handlers/plugin-handlers.ts` | `/plugin` owner-gated alias for `/plugins`; local terminal only |
-| PR Creation | `src/commands/handlers/pr-handlers.ts` | `/pr [title] [--draft]` — create GitHub/GitLab PR via `gh`/`glab` CLI; auto-detects base branch, generates title/description from commits |
-| Multi-Lang Linter | `src/tools/lint-runner.ts` | Auto-detect + run linters: eslint, ruff, clippy, golangci-lint, rubocop, phpstan; `/lint run\|fix\|detect` |
-| Model Pairs | `src/config/toml-config.ts`, `src/agent/facades/model-routing-facade.ts` | `[model_pairs]` TOML config: `architect`/`editor` model split; intent-based routing (planning→architect, editing→editor) |
-| Model Switch | `src/commands/handlers/switch-handler.ts` | `/switch <model>` mid-conversation model switching; `/switch auto` reverts to default |
-| Streaming Adapter | `src/tools/streaming-adapter.ts` | Extended tool streaming for `view_file`, `search`, `grep`, `web_fetch`, `list_files`, `tree`; line-based chunking |
-| Circuit Breaker | `src/providers/circuit-breaker.ts` | 3-state (CLOSED/OPEN/HALF_OPEN) per-provider circuit breaker; `failureThreshold` 5, `resetTimeoutMs` 30s; opt-in via `circuitBreaker: true` in ChatOptions |
-| Cloud Providers | `src/plugins/bundled/` | AWS Bedrock (`AWS_BEDROCK_REGION`), Azure OpenAI (`AZURE_OPENAI_ENDPOINT`), Groq (`GROQ_API_KEY`), Together (`TOGETHER_API_KEY`), Fireworks (`FIREWORKS_API_KEY`) |
-| LSP Rename | `src/tools/lsp-rename-tool.ts` | `lsp_rename` + `lsp_code_action` tools; multi-file rename via LSP, code action suggestions |
-| Jupyter Execution | `src/tools/notebook-tool.ts` | `execute_cell`, `execute_all`, `kernel_start`, `kernel_stop` actions via `jupyter nbconvert --execute` |
-| Proactive Compaction | `src/context/proactive-compaction.ts` | `shouldCompactBeforeToolExec()` — heuristic token estimation per tool, triggers compaction before context overflow |
-| Log Rotation | `src/utils/logger.ts` | Max 10MB per file (`LOG_MAX_SIZE`), 5 rotated files (`LOG_MAX_FILES`), checks every 100 writes |
-| JSON Mode | `src/codebuddy/client.ts` | `responseFormat: 'json'` in ChatOptions; OpenAI/Grok `response_format`, Gemini `responseMimeType`, Anthropic system prompt injection |
-| Bug Finder | `src/tools/bug-finder-tool.ts` | `find_bugs` tool; regex-based static analysis for TS/JS/Python/Go/Rust/Java; 25+ patterns, 8 categories |
-| Prompt Cache Stats | `src/codebuddy/client.ts` | `getPromptCacheStats()` — tracks OpenAI/xAI cached_tokens; hit ratio logging |
-
-### Edit Tool — Multi-Strategy Matching
-
-The `str_replace` operation tries 4 matching strategies in cascade (inspired by Gemini CLI):
-
-1. **Exact** — literal `String.includes()` (fastest, confidence 1.0)
-2. **Flexible** — line-by-line with `trim()` normalization; preserves original indentation (confidence 0.95)
-3. **Regex** — splits on delimiters `():[]{}<>=,;`, joins with `\s*` pattern (confidence 0.85)
-4. **Fuzzy** — Levenshtein distance with whitespace penalty factor 0.1, threshold 10% (confidence 0.9+)
-5. **LCS fallback** — original `findBestFuzzyMatch()` at 90% similarity threshold
-
-**Omission Placeholder Detection**: Before any write/edit, content is scanned for `// ... rest of code`, `// remaining methods ...`, etc. If detected in `new_string` but not in `old_string`, the edit is blocked with an explicit error.
-
-### JIT Context Discovery
-
-When a tool accesses a file path (read, write, grep, glob), the system walks upward from that path to the project root, loading any `CODEBUDDY.md`, `CONTEXT.md`, `INSTRUCTIONS.md`, `AGENTS.md`, or `README.md` files found in the path or `.codebuddy/`/`.claude/` subdirectories. Already-loaded files are tracked to avoid duplication. Max 4KB per discovery.
-
-**Instruction Excludes**: `codebuddyMdExcludes` in `.codebuddy/settings.json` takes an array of glob patterns (e.g., `["packages/legacy/**"]`) to skip loading instruction files in monorepo subdirectories. Implemented in `src/context/instruction-excludes.ts`.
-
-**@import Directives**: CODEBUDDY.md files support `@path/to/file` directives (one per line) that inline the referenced file's content. Supports relative paths, `@~/...` (home dir), `@//...` (absolute). Recursive to 5 levels with cycle detection. Parser: `src/context/import-directive-parser.ts`.
-
-**Shared Glob Utils**: `src/utils/glob-utils.ts` provides `globToRegex()`, `matchGlob()`, `matchGlobPatterns()` (with negation `!` and brace expansion `{ts,tsx}`), `resolvePathPattern()` (handles `~/`, `//`, `/` prefixes). Used by rules-loader, instruction-excludes, and declarative-rules.
-
-### Tool Output Masking (Hybrid Backward-Scanned FIFO)
-
-Before each model call, tool result messages are scanned backward. The newest ~50K tokens of outputs are protected. Older outputs are replaced with head/tail previews (10 lines each). Masking only triggers when total prunable content exceeds ~30K tokens. Exempt tools: `ask_human`, `plan`, `reason`, `terminate`.
-
-### Loop Detection (3-Tier)
-
-| Tier | Mechanism | Threshold | Confidence |
-|------|-----------|-----------|------------|
-| 1 | Tool call repetition (hash of name+args) | 5 consecutive identical calls | 0.95 |
-| 2 | Content chanting (50-char chunk hashing) | 10 repeats within 250 chars | 0.85 |
-| 3 | LLM diagnostic (separate model) | After 30 turns, every 10 turns | 0.90 required |
-
-### Plan Mode
-
-`/plan` enters read-only research mode. Available tools: Read, Search, Think, Plan, Communicate. Write tools have descriptions modified to restrict to `.md` plan files only. System prompt injection: `<plan_mode>` block. Mode state managed in `src/agent/plan-mode.ts`.
-
-### Guardian Sub-Agent (Codex-inspired)
-
-AI-powered automatic approval reviewer in `src/security/guardian-agent.ts`. Risk scoring 0-100: auto-approves < 80, prompts 80-90, denies >= 90. Always-safe set (no LLM needed): `read_file`, `grep`, `glob`, `plan`, `reason`. Always-denied patterns: `rm -rf /`, fork bombs, `drop database`. Timeout 90s, fail-closed.
-
-### Policy Amendments + Command Canonicalization
-
-`src/security/policy-amendments.ts` — suggests allow rules when commands are blocked. Rules persisted to `.codebuddy/rules/allow-rules.json`. Banned prefixes never suggested (interpreters, shells, `sudo`). Command canonicalization: `/bin/bash -c "npm test"` → `npm test`.
-
-### Ghost Snapshots (Codex-inspired)
-
-`src/checkpoints/ghost-snapshot.ts` — auto Git commits before each turn via shadow refs (`refs/codebuddy/ghost/`). Max 50 snapshots. Undo restores latest ghost commit.
-
-### Dynamic Permission Requests
-
-`src/tools/request-permissions-tool.ts` — AI requests additional permissions mid-session. Grants scoped to `turn` or `session`. Types: `filesystem`, `network`, `execute`.
-
-### BM25 Tool Search
-
-`src/tools/tool-search.ts` — BM25 ranking (k1=1.2, b=0.75) over tool metadata. `tool_search` tool discovers relevant tools from large MCP sets.
-
-### apply_patch Format (Codex-inspired)
-
-`src/tools/apply-patch.ts` — Custom patch format simpler than unified diff:
-```
-*** Begin Patch
-*** Update File: src/main.ts
-@@
- context line
--old line
-+new line
-*** End Patch
-```
-Operations: `Add File`, `Delete File`, `Update File` (with `Move to`). `seek_sequence` algorithm tries 4 passes: exact → trailing-trim → full-trim → Unicode normalization.
-
-### Multi-Agent 5-Tool Surface (Codex-inspired)
-
-`src/agent/multi-agent/agent-tools.ts` — Five LLM-callable tools for agent orchestration:
-
-| Tool | Purpose |
-|------|---------|
-| `spawn_agent` | Create sub-agent with role, depth limit (max 3), nickname |
-| `send_input` | Send message to agent (with optional interrupt) |
-| `wait_agent` | Wait for agents to complete (with timeout) |
-| `close_agent` | Shutdown agent, release slot |
-| `resume_agent` | Resurrect closed agent |
-
-Max 10 concurrent agents. Completion watchers auto-notify parents. Nickname pool (24 names) with generation suffixes.
-
-### Agent Roles
-
-`src/agent/multi-agent/agent-roles.ts` — Three built-in roles:
-- **explorer**: Read-only, fast codebase Q&A. Only search/read tools. No spawning.
-- **worker**: Execution focus, file ownership. All tools except spawn. Sequential.
-- **default**: Full capabilities.
-
-Custom roles via `.codebuddy/roles/<name>.json`. Roles checked via `isToolAllowedForRole()`.
-
-### Code Exec (Codex-inspired)
-
-`src/tools/code-exec-tool.ts` — JS sandbox with tool bridge. The LLM writes JavaScript that calls `await tools.<name>(args)`. Helpers: `text()`, `store(key,val)`, `load(key)`, `yield_control()`. Runs in `vm.createContext` with no process/require access. 30s timeout.
-
-### Memory Consolidation (Codex-inspired)
-
-`src/memory/memory-consolidation.ts` — Two-phase pipeline:
-- **Phase 1**: Extract memories from user messages (preference/pattern/context/decision signals)
-- **Phase 2**: Consolidate into `.codebuddy/memory/` folder (memory_summary.md, MEMORY.md, rollout_summaries/)
-
-Deduplication by normalized substring. Auto-prunes to 30 rollout summaries.
-
-### Context Engineering Patterns
-
-Applied in `agent-executor.ts` (both sequential and streaming paths):
-
-- **Pre-compaction flush** (`src/context/precompaction-flush.ts`) — Silent LLM turn saves facts to MEMORY.md before compaction
-- **Restorable compression** (`src/context/restorable-compression.ts`) — Extracts file/URL identifiers; tool results persisted to `.codebuddy/tool-results/<callId>.txt`
-- **Observation variator** (`src/context/observation-variator.ts`) — Rotates 3 presentation templates per turn (anti-repetition)
-- **Tool result compaction** — Pre-model check compresses oldest tool results when total > 70K chars
-
-### Config Files
-
-- `src/config/model-tools.ts` — Per-model capabilities with glob matching (**start here** for model-specific behavior)
+- `src/config/model-tools.ts` — **start here for model-specific behavior**. Per-model caps with glob matching.
 - `src/config/constants.ts` — `SUPPORTED_MODELS`, `TOKEN_LIMITS`
-- `src/config/toml-config.ts` — Config profiles: `[profiles.<name>]` deep-merged; `buddy --profile <name>`
-- `src/config/advanced-config.ts` — Effort levels (low/medium/high) with temperature + token params
+- `src/config/toml-config.ts` — config profiles (`[profiles.<name>]` deep-merged; `buddy --profile <name>`). Also `[model_pairs]` for architect/editor split.
+- `src/config/advanced-config.ts` — effort levels (low/medium/high) → temperature + token params
 
 ## Coding Conventions
 
-- TypeScript strict mode, avoid `any`
+- TypeScript strict, avoid `any`
 - Single quotes, semicolons, 2-space indent
-- Files: kebab-case (`text-editor.ts`), components: PascalCase (`ChatInterface.tsx`)
-- Commit messages: Conventional Commits (`feat(scope): description`)
-- ESM imports require `.js` extension even for `.ts` source files
+- Files kebab-case (`text-editor.ts`); React components PascalCase (`ChatInterface.tsx`)
+- Conventional Commits (`feat(scope): description`)
+- ESM — imports need `.js` extension even from `.ts` sources
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|:---------|:------------|:--------|
-| `GROK_API_KEY` | Required API key from x.ai | — |
-| `CODEBUDDY_MAX_TOKENS` | Override response token limit | model's `maxOutputTokens` |
-| `MORPH_API_KEY` | Enables fast file editing | — |
-| `YOLO_MODE` | Full autonomy mode (requires `/yolo on`) | `false` |
-| `MAX_COST` | Session cost limit in dollars | `$10` (YOLO: `$100`) |
-| `GROK_BASE_URL` | Custom API endpoint | — |
-| `GROK_MODEL` | Default model to use | — |
-| `JWT_SECRET` | Secret for API server auth | Required in production |
-| `PICOVOICE_ACCESS_KEY` | Porcupine wake word (text-match fallback if absent) | Optional |
-| `BRAVE_API_KEY` | Brave Search for MCP web search | Optional |
-| `EXA_API_KEY` | Exa neural search for MCP | Optional |
-| `PERPLEXITY_API_KEY` | Perplexity AI (or via OpenRouter) | Optional |
-| `OPENROUTER_API_KEY` | OpenRouter key | Optional |
-| `CODEBUDDY_AUTOCOMPACT_PCT` | Auto-compact threshold as % of context window (overrides absolute threshold) | — |
-| `CACHE_TRACE` | Debug prompt construction | `false` |
-| `PERF_TIMING` | Startup phase profiling | `false` |
-| `VERBOSE` | Verbose output | `false` |
-| `SENTRY_DSN` | Sentry error reporting DSN | Optional |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | OpenTelemetry OTLP endpoint for distributed tracing | Optional |
-| `FIRECRAWL_API_KEY` | Firecrawl API key for `firecrawl_search`/`firecrawl_scrape` tools | Optional |
-| `GITHUB_COPILOT_TOKEN` | GitHub Copilot token for bundled provider plugin | Optional |
+| Variable | Purpose |
+|----------|---------|
+| `GROK_API_KEY` | Required API key from x.ai |
+| `GROK_BASE_URL` / `GROK_MODEL` | Custom endpoint / default model |
+| `CODEBUDDY_MAX_TOKENS` | Override response token limit |
+| `CODEBUDDY_AUTOCOMPACT_PCT` | Auto-compact threshold as % of context window |
+| `MORPH_API_KEY` | Enables fast file editing |
+| `YOLO_MODE` / `MAX_COST` | Full autonomy ($10 default, $100 YOLO) |
+| `JWT_SECRET` | Required in production for API server |
+| `MCP` / search keys | `BRAVE_API_KEY`, `EXA_API_KEY`, `PERPLEXITY_API_KEY`, `OPENROUTER_API_KEY`, `FIRECRAWL_API_KEY` |
+| `PICOVOICE_ACCESS_KEY` | Porcupine wake word (text-match fallback if absent) |
+| `SENTRY_DSN`, `OTEL_EXPORTER_OTLP_ENDPOINT` | Observability |
+| `PERF_TIMING`, `CACHE_TRACE`, `VERBOSE` | Debug flags |
 
 ## Special Modes
 
-- **YOLO Mode** — 400 tool rounds, $100 limit, auto-approve with guardrails. Key: `src/utils/autonomy-manager.ts`. Commands: `/yolo on|off|safe|status|allow|deny`
-- **Agent Modes** — `plan`, `code`, `ask`, `architect` — each restricts available tools
-- **Permission Modes** — `default`, `plan`, `acceptEdits`, `dontAsk`, `bypassPermissions`. Set via `--permission-mode <mode>` CLI flag. Wired into `ConfirmationService` which checks `PermissionModeManager` before every approval prompt. `src/security/permission-modes.ts`
-- **Security Modes** — `suggest` (confirm all), `auto-edit`, `full-auto`
-- **Write Policy** — `src/security/write-policy.ts`: `strict` (forces `apply_patch`), `confirm`, `off`
+- **YOLO** — 400 tool rounds, $100 cap, auto-approve with guardrails. `src/utils/autonomy-manager.ts`. `/yolo on|off|safe|status|allow|deny`.
+- **Agent modes** — `plan`, `code`, `ask`, `architect` — each restricts available tools.
+- **Permission modes** — `default`, `plan`, `acceptEdits`, `dontAsk`, `bypassPermissions`. CLI: `--permission-mode <mode>`. Checked by `ConfirmationService` before every approval. `src/security/permission-modes.ts`.
+- **Security modes** — `suggest` / `auto-edit` / `full-auto`.
+- **Write policy** — `strict` (forces `apply_patch`) / `confirm` / `off`. `src/security/write-policy.ts`.
+- **Plan mode** — `/plan` enters read-only research mode; write tools restricted to `.md` plan files.
 
-## CLI Commands Reference
+## CLI & Slash Commands
+
+Full list: `buddy --help` and `/tools` in-session. The ones most worth knowing:
 
 ```bash
-# Core
-buddy                          # Start interactive chat
-buddy --profile <name>         # Use named config profile
-buddy onboard                  # Interactive setup wizard
-buddy doctor                   # Environment diagnostics
-
-# Dev workflows
-buddy dev plan|run|pr|fix-ci   # Golden-path workflows (enforces WritePolicy.strict)
-buddy run list|show|tail|replay # Run observability
-
-# Agents & orchestration
-buddy research "<topic>"        # Wide research (--workers N --rounds N --output file)
-buddy flow "<goal>"             # Planning flow (--max-retries N --verbose)
-buddy pairing status|list|approve|add|revoke
-
-# Data management
-buddy knowledge list|show|search|add|remove
-buddy lessons list|add|search|stats|export|decay
-buddy todo list|add|done|update|remove
-
-# Infrastructure
-buddy daemon start|stop|restart|status|logs
-buddy trigger list|add|remove
-buddy hub search|install|publish|sync
-buddy identity show|get|set|prompt
-buddy groups status|list|block|unblock
-buddy auth-profile list|add|remove|reset
-buddy execpolicy check|list|add-prefix|dashboard
-buddy pairing status|approve <code>
-
-# New commands (OpenClaw parity)
-buddy update [--channel stable|beta|dev] [--check] [--force]
-buddy nodes list|pair|approve|describe|remove|invoke|pending
-buddy secrets list|set|get|remove|rotate|audit|import-env
-buddy approvals list|approve|deny|policy
-buddy deploy platforms|init|nix
+buddy                       # Interactive chat
+buddy --profile <name>      # Named config profile
+buddy onboard               # Setup wizard
+buddy doctor [--fix]        # Environment diagnostics + auto-migration
+buddy dev plan|run|pr|fix-ci  # Golden-path workflows (forces WritePolicy.strict)
+buddy run list|show|tail|replay  # Observability
+buddy research "<topic>"    # Wide research
+buddy flow "<goal>"         # Planning flow (plan → execute → synthesize)
+buddy backup create|verify|list|restore
+buddy update [--channel …] [--tag main] [--from-source]
 ```
 
-### Slash Commands (interactive session)
-
+In-session slash commands (not exhaustive):
 ```
-/think off|shallow|medium|deep|exhaustive  # Set reasoning depth
-/think status                               # Show reasoning config & last result
-/think <problem>                            # Run Tree-of-Thought on a problem
-/batch <instruction>                        # Decompose goal into parallel units, spawn agents
-/team start|add|status|stop|task|send|inbox # Agent Teams coordination
-/persona list|use|info|reset               # Manage AI personas
-/lessons list|add|search|stats             # Lessons management
-/compact [level]                            # Compress conversation context
-/config [key] [value]                       # View/set configuration
-/tools [list|info]                          # List available tools
-/btw <question>                             # Side question without tools/history
-/pr [title] [--draft]                      # Create GitHub/GitLab PR from current branch
-/switch <model|auto>                       # Mid-conversation model switching
-/lint [run|fix|detect]                     # Auto-detect and run project linters
-/plugin <action>                            # Owner-gated singular plugin management
+/think off|shallow|medium|deep|exhaustive|status|<problem>
+/batch <goal>                # Decompose into parallel sub-agents
+/team start|add|status|...   # Agent Teams coordination
+/compact [level]
+/config [set] <key> <value>  # Dot-notation, SecretRef, --dry-run, batch JSON
+/switch <model|auto>         # Mid-conversation model switch
+/btw <question>              # One-shot, no tools, no history mutation
+/pr [title] [--draft]
+/lint run|fix|detect
+/plan                        # Read-only research mode
 ```
 
 ## HTTP Server (`src/server/`)
 
-Key endpoints:
-- `GET /api/health`, `GET /api/metrics`
-- `POST /api/chat`, `POST /api/chat/completions` (OpenAI-compatible)
-- `GET/POST /api/sessions`, `GET/POST /api/memory`
-- `GET /api/daemon/status|health`, `GET/POST /api/cron/jobs`
-- `GET /api/hub/search|installed`, `POST /api/hub/install`
-- `GET /api/identity`, `PUT /api/identity/:name`
-- `GET/POST /api/groups`, `GET/POST/DELETE /api/auth-profiles`
-- `GET/POST /api/heartbeat/status|start|stop|tick`
-- `GET /__codebuddy__/canvas/:id` — Canvas content serving
-- `GET /__codebuddy__/a2ui/` — A2UI host page
-- `POST /__codebuddy__/a2ui/eval` — A2UI eval endpoint
-- `GET /api/a2a/.well-known/agent.json` — A2A agent card discovery
-- `GET /api/a2a/agents`, `POST /api/a2a/tasks/send`, `GET /api/a2a/tasks/:id`, `POST /api/a2a/tasks/:id/cancel`
+Default ports: **3000** HTTP, **3001** Gateway WS. CORS enabled, rate-limit 100 req/min, JWT required in production.
 
-WebSocket events: `authenticate`, `chat_stream`, `tool_execute`, `ping/pong`
+Routes worth knowing: `/api/health`, `/api/chat`, `/api/chat/completions` (OpenAI-compatible), `/api/sessions`, `/api/memory`, `/api/a2a/*` (Google A2A: AgentCard discovery + task lifecycle), `/__codebuddy__/canvas/:id`, `/__codebuddy__/a2ui/`.
 
-Gateway WebSocket (port 3001): `connect`, `hello_ok`, `auth`, `chat`, `session_create`, `session_join`, `session_leave`, `session_patch`, `presence`, `ping/pong`
-
-Default: port 3000 (HTTP), port 3001 (Gateway WS), CORS enabled, rate-limit 100 req/min, JWT auth required in production.
+Gateway WS events: `connect` (pre-auth), `hello_ok`, `auth`, `chat`, `session_create|join|leave|patch`, `presence`. Origin-hardened (GHSA-5wcw-8jjv-m286): default `corsOrigins` is localhost-only, `trustedProxies` must be configured explicitly.

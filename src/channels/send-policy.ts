@@ -2,7 +2,7 @@
  * Session Send Policy
  *
  * Rule-based message delivery blocking.
- * Inspired by OpenClaw's session.sendPolicy with deny/allow rules.
+ * Advanced enterprise architecture for session.sendPolicy with deny/allow rules.
  *
  * Rules can match on channel, chatType (dm/group/thread), keyPrefix, and peerId.
  * Evaluated in order; first matching rule wins. Falls back to default action.

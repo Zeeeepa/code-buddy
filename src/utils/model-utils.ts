@@ -6,7 +6,7 @@ import { SUPPORTED_MODELS } from '../config/constants.js';
 import { ValidationError } from './errors.js';
 
 export type ModelName = keyof typeof SUPPORTED_MODELS;
-export type ModelProvider = 'xai' | 'anthropic' | 'google' | 'openai' | 'lmstudio' | 'ollama' | 'unknown';
+export type ModelProvider = 'xai' | 'anthropic' | 'google' | 'openai' | 'lmstudio' | 'ollama' | 'bundled-gemma4' | 'unknown';
 
 export interface ModelInfo {
   maxTokens: number;

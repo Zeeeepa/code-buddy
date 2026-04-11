@@ -205,7 +205,7 @@ export interface IntegrationsConfig {
 }
 
 /**
- * Per-agent parameter overrides (OpenClaw v2026.3.11)
+ * Per-agent parameter overrides (Native Engine v2026.3.11)
  */
 export interface AgentParamsOverride {
   /** Temperature for LLM calls (0.0–2.0) */
@@ -217,7 +217,7 @@ export interface AgentParamsOverride {
 }
 
 /**
- * Agent defaults configuration (OpenClaw v2026.3.14)
+ * Agent defaults configuration (Native Engine v2026.3.14)
  */
 export interface AgentDefaultsConfig {
   /** Model to use for image generation (e.g., 'dall-e-3', 'stable-diffusion-xl') */
@@ -286,7 +286,7 @@ export interface CodeBuddyConfig {
   integrations: IntegrationsConfig;
   /** Model pairs for architect/editor split */
   model_pairs?: ModelPairsConfig;
-  /** Agent defaults (model preferences) — OpenClaw v2026.3.14 */
+  /** Agent defaults (model preferences) — Native Engine v2026.3.14 */
   agent_defaults?: AgentDefaultsConfig;
   /** LSP server settings (AI completions, etc.) */
   lsp?: LSPConfig;

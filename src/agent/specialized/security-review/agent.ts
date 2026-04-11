@@ -2,7 +2,7 @@
  * Security Review Agent
  *
  * Comprehensive security analysis agent for codebase auditing.
- * Inspired by Claude Code's /security-review command.
+ * Advanced enterprise architecture for /security-review command.
  *
  * Features:
  * - OWASP Top 10 vulnerability detection

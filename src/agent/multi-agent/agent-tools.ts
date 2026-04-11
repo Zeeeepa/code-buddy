@@ -47,7 +47,7 @@ export interface SpawnOptions {
   parentId?: string;
   /** CC14: Persistent memory scope for the agent */
   memory?: 'user' | 'project' | 'local';
-  /** OpenClaw v2026.3.14: Parent yields turn until sub-agent completes */
+  /** Native Engine v2026.3.14: Parent yields turn until sub-agent completes */
   yield?: boolean;
   /** Worktree isolation: each sub-agent gets its own git worktree */
   isolation?: 'worktree';
@@ -104,7 +104,7 @@ const waitCallbacks = new Map<string, Array<(thread: AgentThread) => void>>();
 
 let nextId = 1;
 
-/** Context engine provider for prepareSubagentSpawn hook (OpenClaw v2026.3.7) */
+/** Context engine provider for prepareSubagentSpawn hook (Native Engine v2026.3.7) */
 let contextEngineProvider: (() => ContextEngine | null) | null = null;
 
 /**
@@ -191,7 +191,7 @@ export function spawnAgent(options: SpawnOptions): AgentThread | (AgentThread & 
     }
   }
 
-  // Context engine prepareSubagentSpawn hook (OpenClaw v2026.3.7)
+  // Context engine prepareSubagentSpawn hook (Native Engine v2026.3.7)
   if (contextEngineProvider) {
     try {
       const engine = contextEngineProvider();
@@ -205,7 +205,7 @@ export function spawnAgent(options: SpawnOptions): AgentThread | (AgentThread & 
   logger.debug(`Agent spawned: ${thread.nickname} (${id}), role=${thread.role}, depth=${thread.depth}`);
   agentEvents.emit('spawn', thread);
 
-  // OpenClaw v2026.3.14: If yield=true, return a yield signal for agent-executor to suspend
+  // Native Engine v2026.3.14: If yield=true, return a yield signal for agent-executor to suspend
   if (options.yield) {
     return { ...thread, __yield: true };
   }
@@ -361,7 +361,7 @@ export function completeAgent(agentId: string, result?: string): boolean {
     }
   }
 
-  // ContextEngine.onSubagentEnded hook (OpenClaw v2026.3.13-1 — 7th lifecycle hook)
+  // ContextEngine.onSubagentEnded hook (Native Engine v2026.3.13-1 — 7th lifecycle hook)
   if (contextEngineProvider) {
     try {
       const engine = contextEngineProvider();
@@ -390,7 +390,7 @@ export function closeAgent(agentId: string): boolean {
   thread.status = 'closed';
   messageQueues.delete(agentId);
 
-  // ContextEngine.onSubagentEnded hook (OpenClaw v2026.3.13-1 — 7th lifecycle hook)
+  // ContextEngine.onSubagentEnded hook (Native Engine v2026.3.13-1 — 7th lifecycle hook)
   if (contextEngineProvider) {
     try {
       const engine = contextEngineProvider();

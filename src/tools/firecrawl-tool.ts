@@ -4,7 +4,7 @@
  * Provides web search and scraping via the Firecrawl API.
  * Gated by FIRECRAWL_API_KEY environment variable.
  *
- * OpenClaw v2026.3.14 alignment — firecrawl_search + firecrawl_scrape.
+ * Native Engine v2026.3.14 alignment — firecrawl_search + firecrawl_scrape.
  */
 
 import { logger } from '../utils/logger.js';

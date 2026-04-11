@@ -55,7 +55,7 @@ export interface ChannelPluginConfig {
 
 /**
  * Describes a message-action tool exposed by a channel plugin.
- * OpenClaw v2026.3.12 alignment — channel plugins can describe their
+ * Native Engine v2026.3.12 alignment — channel plugins can describe their
  * message tools for discovery by the tool registry.
  */
 export interface ChannelMessageToolDescription {
@@ -102,7 +102,7 @@ export interface ChannelPlugin {
   /**
    * Optional: Describe the message tool this channel exposes.
    * Used for tool discovery and registration.
-   * OpenClaw v2026.3.12 alignment.
+   * Native Engine v2026.3.12 alignment.
    */
   describeMessageTool?(): ChannelMessageToolDescription;
 }
@@ -126,7 +126,7 @@ export interface DefineChannelConfig {
   onMessage(handler: (message: InboundMessage) => void): void;
   /** Optional user authorization check */
   isUserAllowed?(userId: string): boolean;
-  /** Optional: Describe the message tool for this channel (OpenClaw v2026.3.12) */
+  /** Optional: Describe the message tool for this channel (Native Engine v2026.3.12) */
   describeMessageTool?(): ChannelMessageToolDescription;
 }
 

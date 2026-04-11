@@ -1,1 +1,0 @@
-echo SUCCESS_BASH_TEST

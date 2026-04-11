@@ -6,7 +6,7 @@
  *
  * Two lane systems available:
  * 1. SessionLane/LaneManager - Original session-based lanes
- * 2. LaneQueue (OpenClaw-inspired) - "Default Serial, Explicit Parallel" pattern
+ * 2. LaneQueue (Enterprise-grade) - "Default Serial, Explicit Parallel" pattern
  */
 
 export type {
@@ -26,7 +26,7 @@ export {
   createLanedFunction,
 } from './lanes.js';
 
-// OpenClaw-inspired Lane Queue (Default Serial, Explicit Parallel)
+// Enterprise-grade Lane Queue (Default Serial, Explicit Parallel)
 export type {
   Task,
   TaskStatus,

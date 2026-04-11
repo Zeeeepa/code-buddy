@@ -19,7 +19,7 @@
  *
  * Unlike the full multi-agent orchestrator, Wide Research is intentionally
  * flat: workers cannot spawn their own sub-workers. All decomposition
- * happens at the orchestrator level (same pattern as OpenClaw's current
+ * happens at the orchestrator level (same pattern as Native Engine's current
  * flat subagent design).
  */
 

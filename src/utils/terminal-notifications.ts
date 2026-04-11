@@ -7,7 +7,7 @@
  * - Bell character fallback
  * - Desktop notifications via node-notifier (optional)
  *
- * Inspired by Claude Code's iTerm2 notification support.
+ * Advanced enterprise architecture for iTerm2 notification support.
  */
 
 import { spawn } from 'child_process';

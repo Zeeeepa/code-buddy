@@ -4,7 +4,7 @@
  * Cross-platform desktop automation for mouse, keyboard, windows, and applications.
  * Supports multiple backends (robotjs, nut.js) with mock for testing.
  *
- * OpenClaw-inspired features:
+ * Enterprise-grade features:
  * - Smart Snapshot System for AI element references
  * - Permission Manager for platform-specific permissions
  * - System Control for volume, brightness, notifications
@@ -57,13 +57,13 @@ export {
 // Providers
 export { NutJsProvider } from './nutjs-provider.js';
 
-// Platform-Native Providers (OpenClaw-inspired)
+// Platform-Native Providers (Enterprise-grade)
 export { BaseNativeProvider } from './base-native-provider.js';
 export { LinuxNativeProvider } from './linux-native-provider.js';
 export { WindowsNativeProvider } from './windows-native-provider.js';
 export { MacOSNativeProvider } from './macos-native-provider.js';
 
-// Permission Manager (OpenClaw-inspired)
+// Permission Manager (Enterprise-grade)
 export type {
   PermissionType,
   PermissionStatus,
@@ -79,7 +79,7 @@ export {
   resetPermissionManager,
 } from './permission-manager.js';
 
-// System Control (OpenClaw-inspired)
+// System Control (Enterprise-grade)
 export type {
   VolumeInfo,
   BrightnessInfo,
@@ -98,7 +98,7 @@ export {
   resetSystemControl,
 } from './system-control.js';
 
-// Smart Snapshot System (OpenClaw-inspired)
+// Smart Snapshot System (Enterprise-grade)
 export type {
   ElementRole,
   UIElement,

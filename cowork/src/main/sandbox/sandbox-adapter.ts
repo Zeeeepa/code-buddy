@@ -390,9 +390,9 @@ export class SandboxAdapter implements SandboxExecutor {
     const result = await dialog.showMessageBox(config.mainWindow, {
       type: 'question',
       title: 'Install claude-code in WSL',
-      message: `Claude Code is not installed in ${distro}.`,
+      message: `Native Engine is not installed in ${distro}.`,
       detail:
-        'Claude Code is required for AI agent functionality. ' +
+        'Native Engine is required for AI agent functionality. ' +
         'Would you like to install it automatically?',
       buttons: ['Install', 'Skip (use native execution)'],
       defaultId: 0,
@@ -678,7 +678,7 @@ export class SandboxAdapter implements SandboxExecutor {
     return resultPath;
   }
 
-  // ==================== Claude Code Integration ====================
+  // ==================== Native Engine Integration ====================
 
   /**
    * Run claude-code in the sandbox
@@ -707,7 +707,7 @@ export class SandboxAdapter implements SandboxExecutor {
 
     // For native mode, we need to spawn claude-code directly
     // This is a simplified implementation - full streaming would be more complex
-    throw new Error('Claude Code execution is only supported in WSL/Lima mode');
+    throw new Error('Native Engine execution is only supported in WSL/Lima mode');
   }
 }
 
