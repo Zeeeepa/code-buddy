@@ -7,6 +7,17 @@
 import type Database from 'better-sqlite3';
 import type { Session, Message } from '../schema.js';
 import { getDatabaseManager } from '../database-manager.js';
+import { logger } from '../../utils/logger.js';
+
+/**
+ * Safety cap applied when callers of `getMessages()` do not provide an
+ * explicit limit (F34). Sessions with hundreds of thousands of messages
+ * would otherwise load the whole history into Node memory and OOM. The
+ * cap is large enough to cover any realistic session but small enough
+ * to survive a corrupted row count. Callers that genuinely need more
+ * should paginate explicitly.
+ */
+const DEFAULT_MESSAGES_LIMIT = 10_000;
 
 // ============================================================================
 // Types
@@ -218,19 +229,30 @@ export class SessionRepository {
   }
 
   /**
-   * Get messages for session
+   * Get messages for session.
+   *
+   * Applies a `DEFAULT_MESSAGES_LIMIT` cap when the caller omits `limit`
+   * so an accidentally huge session cannot OOM the process (F34).
+   * Logs a warning the first time the cap is hit so the caller knows
+   * it needs to paginate.
    */
   getMessages(sessionId: string, limit?: number): Message[] {
-    let sql = 'SELECT * FROM messages WHERE session_id = ? ORDER BY id ASC';
-    const params: unknown[] = [sessionId];
+    const effectiveLimit = typeof limit === 'number' && limit > 0
+      ? limit
+      : DEFAULT_MESSAGES_LIMIT;
 
-    if (limit) {
-      sql += ' LIMIT ?';
-      params.push(limit);
-    }
+    const sql = 'SELECT * FROM messages WHERE session_id = ? ORDER BY id ASC LIMIT ?';
+    const params: unknown[] = [sessionId, effectiveLimit];
 
     const stmt = this.db.prepare(sql);
     const results = stmt.all(...params) as (Message & { tool_calls: string | null; metadata: string | null })[];
+
+    if (results.length === effectiveLimit && limit === undefined) {
+      logger.warn(
+        `[session-repository] getMessages() hit the default cap of ${DEFAULT_MESSAGES_LIMIT} for session ${sessionId}. ` +
+        `Pass an explicit limit or paginate with getRecentMessages().`,
+      );
+    }
 
     return results.map(r => this.deserializeMessage(r));
   }

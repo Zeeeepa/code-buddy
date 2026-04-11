@@ -70,6 +70,17 @@ export class PersistentMemoryManager extends EventEmitter {
   private projectMemories: Map<string, Memory> = new Map();
   private userMemories: Map<string, Memory> = new Map();
   private initialized: boolean = false;
+  /**
+   * Promise gate for concurrent initialize() callers (F31).
+   *
+   * Previously `initialize()` guarded only on the `initialized` boolean,
+   * which left a window where two concurrent callers both saw
+   * `initialized === false`, both did the full `ensureMemoryFiles` +
+   * `loadMemories x 2` sequence, and both emitted `memory:initialized` —
+   * doubling I/O and firing warm-up listeners twice. Storing the init
+   * promise and returning it to every caller ensures a single run.
+   */
+  private initPromise: Promise<void> | null = null;
 
   constructor(config: Partial<MemoryConfig> = {}) {
     super();
@@ -77,17 +88,29 @@ export class PersistentMemoryManager extends EventEmitter {
   }
 
   /**
-   * Initialize memory system, loading existing memories
+   * Initialize memory system, loading existing memories.
+   * Concurrent calls share the same in-flight promise (see F31 above).
    */
   async initialize(): Promise<void> {
     if (this.initialized) return;
+    if (this.initPromise) return this.initPromise;
 
-    await this.ensureMemoryFiles();
-    await this.loadMemories("project");
-    await this.loadMemories("user");
+    this.initPromise = (async () => {
+      await this.ensureMemoryFiles();
+      await this.loadMemories("project");
+      await this.loadMemories("user");
+      this.initialized = true;
+      this.emit("memory:initialized");
+    })();
 
-    this.initialized = true;
-    this.emit("memory:initialized");
+    try {
+      await this.initPromise;
+    } catch (err) {
+      // Reset so a later caller can retry after a transient failure
+      // (e.g. disk full during ensureMemoryFiles).
+      this.initPromise = null;
+      throw err;
+    }
   }
 
   private async ensureMemoryFiles(): Promise<void> {

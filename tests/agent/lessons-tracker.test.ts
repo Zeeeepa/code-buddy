@@ -235,13 +235,16 @@ describe('LessonsTracker', () => {
   // --------------------------------------------------------------------------
 
   describe('persistence', () => {
-    it('should persist lessons to disk and reload on a new instance', () => {
+    it('should persist lessons to disk and reload on a new instance', async () => {
       const persistDir = path.join(tmpDir, 'persist-test');
       fs.mkdirSync(persistDir, { recursive: true });
 
       const tracker1 = new LessonsTracker(persistDir);
       tracker1.add('CONTEXT', 'persist this lesson across sessions', 'manual');
-      tracker1.save();
+      // save() is now async (F33 serializes writes through an internal
+      // queue) — await it so the file has been flushed before the
+      // second tracker reads it.
+      await tracker1.save();
 
       // New instance reads from disk
       const tracker2 = new LessonsTracker(persistDir);

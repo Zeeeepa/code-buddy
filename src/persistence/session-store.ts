@@ -6,6 +6,7 @@ import type { ChatEntry } from '../agent/types.js';
 import { getSessionRepository, SessionRepository } from '../database/repositories/session-repository.js';
 import type { Message as DBMessage } from '../database/schema.js';
 import { withSessionLock } from './session-lock.js';
+import { logger } from '../utils/logger.js';
 
 /** Metadata for chat sessions */
 export interface SessionMetadata {
@@ -193,7 +194,15 @@ export class SessionStore {
   }
 
   /**
-   * Load a session from disk
+   * Load a session from disk.
+   *
+   * Validates the parsed JSON shape before returning (F32). The previous
+   * implementation blindly spread `data` into the return value, so a
+   * corrupted file with `messages: undefined` or a missing `createdAt`
+   * produced a Session whose dates were `Invalid Date` and whose
+   * messages iterator threw later in unrelated code paths. We now
+   * return `null` (and log a warning) for any shape we don't recognise,
+   * matching the "missing file" behaviour so callers keep working.
    */
   async loadSession(sessionId: string): Promise<Session | null> {
     const filePath = this.getSessionFilePath(sessionId);
@@ -202,10 +211,26 @@ export class SessionStore {
       await fsPromises.access(filePath);
       const content = await fsPromises.readFile(filePath, 'utf-8');
       const data = JSON.parse(content);
+
+      if (typeof data !== 'object' || data === null) {
+        logger.warn(`[session-store] invalid session file (not an object): ${sessionId}`);
+        return null;
+      }
+      if (!Array.isArray(data.messages)) {
+        logger.warn(`[session-store] invalid session file (messages is not an array): ${sessionId}`);
+        return null;
+      }
+      const createdAt = new Date(data.createdAt);
+      const lastAccessedAt = new Date(data.lastAccessedAt);
+      if (isNaN(createdAt.getTime()) || isNaN(lastAccessedAt.getTime())) {
+        logger.warn(`[session-store] invalid session file (bad timestamps): ${sessionId}`);
+        return null;
+      }
+
       return {
         ...data,
-        createdAt: new Date(data.createdAt),
-        lastAccessedAt: new Date(data.lastAccessedAt)
+        createdAt,
+        lastAccessedAt,
       };
     } catch (_error) {
       return null;

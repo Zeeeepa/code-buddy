@@ -7,6 +7,16 @@
 import type Database from 'better-sqlite3';
 import type { CodeEmbedding } from '../schema.js';
 import { getDatabaseManager } from '../database-manager.js';
+import { logger } from '../../utils/logger.js';
+
+/**
+ * Safety cap applied when `find()` is called without an explicit
+ * `limit` by a caller that is about to score every candidate for
+ * cosine similarity (F34). Without this, `searchSimilar()` pulled
+ * the entire embeddings table into JS memory and ran O(N) cosine
+ * on projects with tens of thousands of chunks.
+ */
+const DEFAULT_EMBEDDINGS_LIMIT = 5_000;
 
 // ============================================================================
 // Types
@@ -162,10 +172,21 @@ export class EmbeddingRepository {
       params.push(filter.language);
     }
 
-    sql += ' ORDER BY file_path, chunk_index';
+    // F34: always apply a SQL-level LIMIT so `searchSimilar()` cannot
+    // accidentally load the entire embeddings table into JS memory.
+    // Callers that want to see the full set should page explicitly.
+    sql += ' ORDER BY file_path, chunk_index LIMIT ?';
+    params.push(DEFAULT_EMBEDDINGS_LIMIT);
 
     const stmt = this.db.prepare(sql);
     const results = stmt.all(...params) as (CodeEmbedding & { embedding: Buffer })[];
+
+    if (results.length === DEFAULT_EMBEDDINGS_LIMIT) {
+      logger.warn(
+        `[embedding-repository] find() hit the default cap of ${DEFAULT_EMBEDDINGS_LIMIT} candidates. ` +
+        `Narrow the filter (projectId, filePath) or paginate to avoid missing matches.`,
+      );
+    }
 
     return results.map(r => this.deserializeEmbedding(r));
   }
@@ -178,7 +199,7 @@ export class EmbeddingRepository {
     filter: EmbeddingFilter = {},
     topK: number = 10
   ): EmbeddingSearchResult[] {
-    // Get all candidates matching filter
+    // Get candidates matching filter (now always capped by find() — F34)
     const candidates = this.find(filter);
 
     // Calculate cosine similarity for each

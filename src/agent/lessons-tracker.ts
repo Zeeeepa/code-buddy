@@ -73,11 +73,45 @@ export class LessonsTracker {
   private loaded = false;
   private _cachedBlock: string | null = null;
   private _cacheTime = 0;
+  /**
+   * Serialized write chain (F33).
+   *
+   * Previously `add()` did load → mutate `this.items` → `save()` without
+   * any lock. Two concurrent calls — realistic when a multi-agent spawn
+   * runs in parallel — both pushed their own lesson into the in-memory
+   * array and then each `save()` wrote a snapshot to disk, so the second
+   * writer's snapshot silently clobbered the first writer's lesson.
+   *
+   * The queue serializes every disk write through a chained promise so
+   * only one `fs.writeFileSync` runs at a time, and each write re-reads
+   * the canonical disk state just before writing — matching the F17
+   * SessionStore lock pattern but lighter-weight since lessons are
+   * append-only.
+   */
+  private _writeChain: Promise<void> = Promise.resolve();
 
   constructor(private workDir: string) {
     const projectDir = path.join(workDir, '.codebuddy');
     this.projectPath = path.join(projectDir, 'lessons.md');
     this.globalPath = path.join(os.homedir(), '.codebuddy', 'lessons.md');
+  }
+
+  /**
+   * Enqueue a write through the serialized chain. Errors are logged but
+   * don't break the chain so later writes can still proceed.
+   */
+  private enqueueWrite(fn: () => void): Promise<void> {
+    this._writeChain = this._writeChain
+      .then(() => {
+        try {
+          fn();
+        } catch (err) {
+          logger.warn('[lessons] write failed', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      });
+    return this._writeChain;
   }
 
   // --------------------------------------------------------------------------
@@ -101,18 +135,23 @@ export class LessonsTracker {
     this.items = Array.from(byId.values());
   }
 
-  save(): void {
+  /**
+   * Save to project path only (global is managed manually or via
+   * `lessons_add --global`). Routed through the serialized write queue
+   * so concurrent add/remove calls cannot clobber each other (F33).
+   *
+   * The fire-and-forget nature is preserved — callers that want to
+   * observe write completion can `await tracker.save()` explicitly.
+   */
+  save(): Promise<void> {
     this.load();
-    // Save to project path only (global is managed manually or by `lessons_add --global`)
-    try {
+    return this.enqueueWrite(() => {
       const dir = path.dirname(this.projectPath);
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
       fs.writeFileSync(this.projectPath, this.serialise(), 'utf-8');
-    } catch {
-      // non-fatal
-    }
+    });
   }
 
   add(

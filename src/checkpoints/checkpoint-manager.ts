@@ -125,7 +125,31 @@ export class CheckpointManager extends EventEmitter {
   }
 
   /**
-   * Rewind to a specific checkpoint
+   * Rewind to a specific checkpoint.
+   *
+   * Two-phase atomic restore (F30):
+   *
+   *   Phase 1 — Stage
+   *     For every snapshot, write its content to a sibling temp file
+   *     (`<target>.restore-<uuid>.tmp`) or pre-check that the target
+   *     can be deleted. We do NOT touch the real project files yet.
+   *     If any stage step throws, we abort BEFORE any destructive
+   *     change lands, and the repo is left exactly as it was before
+   *     the call.
+   *
+   *   Phase 2 — Commit
+   *     Rename every staged temp file into place (near-atomic on POSIX,
+   *     best-effort atomic on Windows) and delete the "did-not-exist"
+   *     targets. Errors here are reported but no longer abort, because
+   *     the project is already in a mixed state.
+   *
+   * This replaces the previous implementation which iterated through
+   * the snapshots and wrote them one by one, so a write failure at
+   * file 10/30 left the project in a half-restored state AND truncated
+   * `this.checkpoints` in memory, making any manual recovery impossible.
+   *
+   * The in-memory `this.checkpoints` slice is now only applied when the
+   * restore is fully successful.
    */
   rewindTo(checkpointId: string): { success: boolean; restored: string[]; errors: string[] } {
     const checkpoint = this.checkpoints.find(cp => cp.id === checkpointId);
@@ -141,32 +165,87 @@ export class CheckpointManager extends EventEmitter {
     const restored: string[] = [];
     const errors: string[] = [];
 
+    // ------------------------------------------------------------------
+    // Phase 1 — Stage every write/delete into a temp file or a plan.
+    // ------------------------------------------------------------------
+    type Staged =
+      | { kind: 'write'; target: string; tmpPath: string }
+      | { kind: 'delete'; target: string };
+
+    const staged: Staged[] = [];
+    const stagingErrors: string[] = [];
+
     for (const snapshot of checkpoint.files) {
       try {
         if (snapshot.existed) {
-          // Restore file content
           const dir = path.dirname(snapshot.path);
           if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
           }
-          fs.writeFileSync(snapshot.path, snapshot.content);
-          restored.push(snapshot.path);
+          // Stage content in a sibling temp file so Phase 2 only has
+          // to do a rename — much harder to fail partway through.
+          const tmpPath = `${snapshot.path}.restore-${this.generateId()}.tmp`;
+          fs.writeFileSync(tmpPath, snapshot.content);
+          staged.push({ kind: 'write', target: snapshot.path, tmpPath });
         } else {
-          // File didn't exist, delete it if it exists now
-          if (fs.existsSync(snapshot.path)) {
-            fs.unlinkSync(snapshot.path);
-            restored.push(`Deleted: ${snapshot.path}`);
-          }
+          // Nothing to stage for a delete; we only need to know the target.
+          staged.push({ kind: 'delete', target: snapshot.path });
         }
       } catch (error) {
-        errors.push(`Failed to restore ${snapshot.path}: ${getErrorMessage(error)}`);
+        stagingErrors.push(`Failed to stage ${snapshot.path}: ${getErrorMessage(error)}`);
       }
     }
 
-    // Remove checkpoints created after this one
-    const checkpointIndex = this.checkpoints.indexOf(checkpoint);
-    if (checkpointIndex >= 0) {
-      this.checkpoints = this.checkpoints.slice(0, checkpointIndex + 1);
+    if (stagingErrors.length > 0) {
+      // Abort: clean up any temp files we managed to create so we
+      // don't leave `.restore-*.tmp` litter in the working tree.
+      for (const op of staged) {
+        if (op.kind === 'write') {
+          try { fs.unlinkSync(op.tmpPath); } catch { /* ignore */ }
+        }
+      }
+      this.emit('rewind', checkpoint, [], stagingErrors);
+      return {
+        success: false,
+        restored: [],
+        errors: stagingErrors,
+      };
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 2 — Commit every staged change. Errors here do not abort
+    // (the project is already being modified) but are reported so the
+    // caller knows the final state is mixed.
+    // ------------------------------------------------------------------
+    for (const op of staged) {
+      try {
+        if (op.kind === 'write') {
+          fs.renameSync(op.tmpPath, op.target);
+          restored.push(op.target);
+        } else {
+          if (fs.existsSync(op.target)) {
+            fs.unlinkSync(op.target);
+            restored.push(`Deleted: ${op.target}`);
+          }
+        }
+      } catch (error) {
+        errors.push(`Failed to commit ${op.target}: ${getErrorMessage(error)}`);
+        // If the commit rename failed, the temp file is still on disk —
+        // try to clean it so we don't leave half-staged artifacts.
+        if (op.kind === 'write') {
+          try { fs.unlinkSync(op.tmpPath); } catch { /* ignore */ }
+        }
+      }
+    }
+
+    // Only discard the newer checkpoints when the restore was fully
+    // successful. The previous code truncated unconditionally, which
+    // destroyed the user's ability to recover after a partial failure.
+    if (errors.length === 0) {
+      const checkpointIndex = this.checkpoints.indexOf(checkpoint);
+      if (checkpointIndex >= 0) {
+        this.checkpoints = this.checkpoints.slice(0, checkpointIndex + 1);
+      }
     }
 
     this.emit('rewind', checkpoint, restored, errors);

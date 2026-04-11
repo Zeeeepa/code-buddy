@@ -109,6 +109,19 @@ export class DatabaseManager extends TypedEventEmitter<DatabaseEvents> {
       this.db.pragma('cache_size = 10000');
       this.db.pragma('temp_store = MEMORY');
 
+      // Integrity & concurrency (F29):
+      //   foreign_keys = ON — SQLite ships with FK enforcement OFF by
+      //     default, which silently breaks every `REFERENCES … ON DELETE
+      //     CASCADE` declared in the schema (orphans accumulate when a
+      //     session is removed, etc.). Must be set per connection.
+      //   busy_timeout = 5000 — under WAL, a concurrent writer from the
+      //     same user (two CLI processes, a background sync, a test
+      //     runner fork) can otherwise hit SQLITE_BUSY immediately
+      //     instead of waiting up to 5 s for the current writer to
+      //     commit.
+      this.db.pragma('foreign_keys = ON');
+      this.db.pragma('busy_timeout = 5000');
+
       // Run migrations
       await this.runMigrations();
 
