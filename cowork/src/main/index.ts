@@ -17,16 +17,21 @@ import { join, resolve, dirname, isAbsolute, basename } from 'path';
 import * as fs from 'fs';
 import { execFileSync } from 'child_process';
 import { config } from 'dotenv';
+import { registerProjectIpcHandlers } from './ipc/project-ipc';
+import { registerSubAgentIpcHandlers } from './ipc/subagent-ipc';
+import { registerOrchestratorIpcHandlers } from './ipc/orchestrator-ipc';
+import { registerMentionIpcHandlers } from './ipc/mention-ipc';
+import { registerCommandIpcHandlers } from './ipc/command-ipc';
+import { registerSkillMdIpcHandlers } from './ipc/skill-md-ipc';
+import { registerKnowledgeIpcHandlers } from './ipc/knowledge-ipc';
 import { initDatabase, closeDatabase } from './db/database';
 import { SessionManager, type EngineAdapterLike } from './session/session-manager';
 import {
   ProjectManager,
-  type ProjectCreateInput,
-  type ProjectUpdateInput,
 } from './project/project-manager';
 import { ProjectMemoryService } from './project/project-memory';
 import { SubAgentBridge } from './agent/sub-agent-bridge';
-import { OrchestratorBridge, type OrchestratorOptions } from './agent/orchestrator-bridge';
+import { OrchestratorBridge } from './agent/orchestrator-bridge';
 import { MentionProcessor } from './input/mention-processor';
 import { SlashCommandBridge } from './commands/slash-command-bridge';
 import { SkillMdBridge } from './skills/skill-md-bridge';
@@ -52,7 +57,7 @@ import {
   type WorkspacePreset,
 } from './workspace/workspace-presets-service';
 import { ConfigExportService } from './config/config-export-service';
-import { KnowledgeService, type KnowledgeCreateInput } from './knowledge/knowledge-service';
+import { KnowledgeService } from './knowledge/knowledge-service';
 import { NotificationBridge } from './notification/notification-bridge';
 import { ICMIntegration } from './memory/icm-integration';
 import { TaskDispatch, type DispatchRequest } from './remote/task-dispatch';
@@ -78,7 +83,6 @@ import { getSandboxBootstrap } from './sandbox/sandbox-bootstrap';
 import type { MCPServerConfig } from './mcp/mcp-manager';
 import type {
   ClientEvent,
-  ServerEvent,
   ApiTestInput,
   ApiTestResult,
   DiagnosticInput,
@@ -777,111 +781,7 @@ async function startSandboxBootstrap(): Promise<void> {
   }
 }
 
-// 发送事件到渲染进程（含远程会话拦截）
-function sendToRenderer(event: ServerEvent) {
-  const payload =
-    'payload' in event
-      ? (event.payload as { sessionId?: string; [key: string]: unknown })
-      : undefined;
-  const sessionId = payload?.sessionId;
-
-  // 判断是否远程会话
-  if (sessionId && remoteManager.isRemoteSession(sessionId)) {
-    // 处理远程会话事件
-
-    // 拦截 stream.message，用于回传到远程通道
-    if (event.type === 'stream.message') {
-      const message = payload.message as {
-        role?: string;
-        content?: Array<{ type: string; text?: string }>;
-      };
-      if (message?.role === 'assistant' && message?.content) {
-        // 提取助手文本内容
-        const textContent = message.content
-          .filter((c) => c.type === 'text' && c.text)
-          .map((c) => c.text)
-          .join('\n');
-
-        if (textContent) {
-          // 发送到远程通道（带缓冲）
-          remoteManager.sendResponseToChannel(sessionId, textContent).catch((err: Error) => {
-            logError('[Remote] Failed to send response to channel:', err);
-          });
-        }
-      }
-    }
-
-    // 拦截 trace.step 作为工具进度
-    if (event.type === 'trace.step') {
-      const step = payload.step as {
-        type?: string;
-        toolName?: string;
-        status?: string;
-        title?: string;
-      };
-      if (step?.type === 'tool_call' && step?.toolName) {
-        remoteManager
-          .sendToolProgress(
-            sessionId,
-            step.toolName,
-            step.status === 'completed'
-              ? 'completed'
-              : step.status === 'error'
-                ? 'error'
-                : 'running'
-          )
-          .catch((err: Error) => {
-            logError('[Remote] Failed to send tool progress:', err);
-          });
-      }
-    }
-
-    // trace.update 预留；当前主要用 trace.step
-
-    // 拦截 session.status 用于清理
-    if (event.type === 'session.status') {
-      const status = payload.status as string;
-      if (status === 'idle' || status === 'error') {
-        // 会话结束，清空缓冲
-        remoteManager.clearSessionBuffer(sessionId).catch((err: Error) => {
-          logError('[Remote] Failed to clear session buffer:', err);
-        });
-      }
-    }
-
-    // 拦截 permission.request
-    if (event.type === 'permission.request' && payload.toolUseId && payload.toolName) {
-      log('[Remote] Intercepting permission for remote session:', sessionId);
-      remoteManager
-        .handlePermissionRequest(
-          sessionId,
-          payload.toolUseId as string,
-          payload.toolName as string,
-          (payload.input as Record<string, unknown> | undefined) ?? {}
-        )
-        .then((result) => {
-          if (result !== null && sessionManager) {
-            let permissionResult: 'allow' | 'deny' | 'allow_always';
-            if (result.allow) {
-              permissionResult = result.remember ? 'allow_always' : 'allow';
-            } else {
-              permissionResult = 'deny';
-            }
-            sessionManager.handlePermissionResponse(payload.toolUseId as string, permissionResult);
-          }
-        })
-        .catch((err) => {
-          logError('[Remote] Failed to handle permission request:', err);
-        });
-      return; // 不发送到本地 UI
-    }
-  }
-
-  // 发送到本地 UI
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('server-event', event);
-  }
-}
+import { sendToRenderer } from './ipc-main-bridge';
 
 // Initialize app
 app
@@ -1632,252 +1532,25 @@ ipcMain.handle('config.switchModel', async (_event, model: string) => {
 });
 
 // ── Project IPC handlers (Claude Cowork parity) ──────────────────────
-ipcMain.handle('project.list', async () => {
-  if (!projectManager) return { projects: [] };
-  return { projects: projectManager.list() };
-});
-
-ipcMain.handle('project.get', async (_event, id: string) => {
-  if (!projectManager) return null;
-  return projectManager.get(id);
-});
-
-ipcMain.handle('project.create', async (_event, input: ProjectCreateInput) => {
-  if (!projectManager) throw new Error('ProjectManager not initialized');
-  const project = projectManager.create(input);
-  sendToRenderer({ type: 'project.created', payload: { project } });
-  activityFeed?.record({
-    type: 'project.created',
-    title: `Project created: ${project.name}`,
-    description: project.description,
-    projectId: project.id,
-  });
-  return project;
-});
-
-ipcMain.handle('project.update', async (_event, id: string, updates: ProjectUpdateInput) => {
-  if (!projectManager) return null;
-  const project = projectManager.update(id, updates);
-  if (project) {
-    sendToRenderer({ type: 'project.updated', payload: { project } });
-  }
-  return project;
-});
-
-ipcMain.handle('project.delete', async (_event, id: string) => {
-  if (!projectManager) return false;
-  const ok = projectManager.delete(id);
-  if (ok) {
-    sendToRenderer({ type: 'project.deleted', payload: { projectId: id } });
-    activityFeed?.record({
-      type: 'project.deleted',
-      title: `Project deleted`,
-      projectId: id,
-    });
-  }
-  return ok;
-});
-
-ipcMain.handle('project.setActive', async (_event, id: string | null) => {
-  if (!projectManager) return null;
-  return projectManager.setActive(id);
-});
-
-ipcMain.handle('project.getActive', async () => {
-  if (!projectManager) return null;
-  return projectManager.getActive();
-});
+registerProjectIpcHandlers(projectManager, activityFeed);
 
 // ── Sub-agent IPC handlers (Claude Cowork parity) ────────────────────
-ipcMain.handle('subagent.list', async () => {
-  if (!subAgentBridge) return [];
-  return subAgentBridge.list();
-});
-
-ipcMain.handle(
-  'subagent.spawn',
-  async (
-    _event,
-    options: {
-      sessionId: string;
-      prompt: string;
-      role?: string;
-      forkContext?: boolean;
-      parentId?: string;
-    }
-  ) => {
-    if (!subAgentBridge) return { error: 'SubAgentBridge not initialized' };
-    return subAgentBridge.spawn(options);
-  }
-);
-
-ipcMain.handle(
-  'subagent.sendInput',
-  async (_event, agentId: string, message: string, interrupt?: boolean) => {
-    if (!subAgentBridge) return false;
-    return subAgentBridge.sendInput(agentId, message, interrupt);
-  }
-);
-
-ipcMain.handle('subagent.close', async (_event, agentId: string) => {
-  if (!subAgentBridge) return false;
-  return subAgentBridge.close(agentId);
-});
-
-ipcMain.handle('subagent.resume', async (_event, agentId: string, prompt?: string) => {
-  if (!subAgentBridge) return false;
-  return subAgentBridge.resume(agentId, prompt);
-});
-
-ipcMain.handle('subagent.wait', async (_event, agentIds: string[], timeoutMs?: number) => {
-  if (!subAgentBridge) return [];
-  return subAgentBridge.wait(agentIds, timeoutMs);
-});
+registerSubAgentIpcHandlers(subAgentBridge);
 
 // ── Orchestrator IPC handlers ────────────────────────────────────────
-ipcMain.handle(
-  'orchestrator.run',
-  async (_event, sessionId: string, goal: string, options?: OrchestratorOptions) => {
-    if (!orchestratorBridge)
-      return {
-        success: false,
-        summary: 'Orchestrator not initialized',
-        artifacts: {},
-        agentResults: [],
-        duration: 0,
-        errors: ['not initialized'],
-      };
-    return orchestratorBridge.run(sessionId, goal, options);
-  }
-);
-
-ipcMain.handle('orchestrator.isComplex', async (_event, goal: string) => {
-  if (!orchestratorBridge) return false;
-  return orchestratorBridge.isComplexGoal(goal);
-});
+registerOrchestratorIpcHandlers(orchestratorBridge);
 
 // ── Mention IPC handlers (Claude Cowork parity) ──────────────────────
-ipcMain.handle('mention.process', async (_event, text: string, cwd?: string) => {
-  if (!mentionProcessor) return { cleanedText: text, contextBlocks: [] };
-  return mentionProcessor.process(text, cwd);
-});
-
-ipcMain.handle(
-  'mention.autocomplete',
-  async (_event, prefix: string, cwd?: string, limit?: number) => {
-    if (!mentionProcessor) return [];
-    return mentionProcessor.autocomplete(prefix, cwd, limit);
-  }
-);
+registerMentionIpcHandlers(mentionProcessor);
 
 // ── Slash command IPC handlers (Claude Cowork parity Phase 2) ────────
-ipcMain.handle('command.list', async () => {
-  if (!slashCommandBridge) return [];
-  return slashCommandBridge.listCommands();
-});
-
-ipcMain.handle('command.autocomplete', async (_event, prefix: string, limit?: number) => {
-  if (!slashCommandBridge) return [];
-  return slashCommandBridge.autocomplete(prefix, limit);
-});
-
-ipcMain.handle(
-  'command.execute',
-  async (_event, name: string, args: string[], sessionId?: string) => {
-    if (!slashCommandBridge) {
-      return { success: false, error: 'Slash command bridge unavailable' };
-    }
-    return slashCommandBridge.execute(name, args, sessionId);
-  }
-);
+registerCommandIpcHandlers(slashCommandBridge);
 
 // ── SKILL.md bridge IPC handlers (Claude Cowork parity Phase 2) ─────
-ipcMain.handle('skillMd.list', async () => {
-  if (!skillMdBridge) return [];
-  return skillMdBridge.list();
-});
-
-ipcMain.handle('skillMd.search', async (_event, query: string, limit?: number) => {
-  if (!skillMdBridge) return [];
-  return skillMdBridge.search(query, limit);
-});
-
-ipcMain.handle('skillMd.findBest', async (_event, request: string) => {
-  if (!skillMdBridge) return null;
-  return skillMdBridge.findBest(request);
-});
-
-ipcMain.handle(
-  'skillMd.execute',
-  async (
-    _event,
-    skillName: string,
-    context: { userInput?: string; workspaceRoot?: string; sessionId?: string }
-  ) => {
-    if (!skillMdBridge) {
-      return { success: false, error: 'Skill bridge unavailable' };
-    }
-    return skillMdBridge.execute(skillName, context);
-  }
-);
+registerSkillMdIpcHandlers(skillMdBridge);
 
 // ── Knowledge IPC handlers (Claude Cowork parity) ────────────────────
-function resolveKnowledgeWorkspace(projectId?: string): string | null {
-  if (!projectManager) return null;
-  const project = projectId ? projectManager.get(projectId) : projectManager.getActive();
-  return project?.workspacePath ?? null;
-}
-
-ipcMain.handle('knowledge.list', async (_event, projectId?: string) => {
-  if (!knowledgeService) return [];
-  const workspace = resolveKnowledgeWorkspace(projectId);
-  if (!workspace) return [];
-  return knowledgeService.list(workspace);
-});
-
-ipcMain.handle('knowledge.get', async (_event, id: string, projectId?: string) => {
-  if (!knowledgeService) return null;
-  const workspace = resolveKnowledgeWorkspace(projectId);
-  if (!workspace) return null;
-  return knowledgeService.get(workspace, id);
-});
-
-ipcMain.handle(
-  'knowledge.create',
-  async (_event, input: KnowledgeCreateInput, projectId?: string) => {
-    if (!knowledgeService) throw new Error('KnowledgeService not initialized');
-    const workspace = resolveKnowledgeWorkspace(projectId);
-    if (!workspace) throw new Error('No active project workspace');
-    return knowledgeService.create(workspace, input);
-  }
-);
-
-ipcMain.handle(
-  'knowledge.update',
-  async (_event, id: string, updates: Partial<KnowledgeCreateInput>, projectId?: string) => {
-    if (!knowledgeService) return null;
-    const workspace = resolveKnowledgeWorkspace(projectId);
-    if (!workspace) return null;
-    return knowledgeService.update(workspace, id, updates);
-  }
-);
-
-ipcMain.handle('knowledge.delete', async (_event, id: string, projectId?: string) => {
-  if (!knowledgeService) return false;
-  const workspace = resolveKnowledgeWorkspace(projectId);
-  if (!workspace) return false;
-  return knowledgeService.delete(workspace, id);
-});
-
-ipcMain.handle(
-  'knowledge.search',
-  async (_event, query: string, projectId?: string, limit?: number) => {
-    if (!knowledgeService) return [];
-    const workspace = resolveKnowledgeWorkspace(projectId);
-    if (!workspace) return [];
-    return knowledgeService.search(workspace, query, limit);
-  }
-);
+registerKnowledgeIpcHandlers(knowledgeService, projectManager);
 
 // ── Task dispatch IPC (mobile/remote → background session) ───────────
 ipcMain.handle('dispatch.task', async (_event, request: DispatchRequest) => {
