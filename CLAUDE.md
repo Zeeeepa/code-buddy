@@ -12,8 +12,9 @@ npm run build          # TypeScript build
 npm run typecheck
 npm run lint
 npm run validate       # lint + typecheck + test — run before committing
-npm test               # Vitest
+npm test               # Vitest — full suite is ~26K tests, slow. Prefer a path filter.
 npm test -- path/to/file.test.ts
+npm run test:run       # one-shot (no watch)
 npm run build:gui      # Cowork Electron GUI
 buddy install-gui && buddy gui
 ```
@@ -55,7 +56,7 @@ User → ChatInterface (Ink/React) → CodeBuddyAgent → LLM provider
 
 - `src/index.ts` — CLI entry (Commander), lazy-loaded commands, `--profile` flag
 - `src/agent/codebuddy-agent.ts` — main agentic loop, `executePlan()`
-- `src/agent/execution/agent-executor.ts` — middleware pipeline, reasoning, tool streaming. **Both sequential and streaming paths exist — changes usually need to be applied in both.**
+- `src/agent/execution/agent-executor.ts` — middleware pipeline, reasoning, tool streaming. **Both sequential and streaming paths exist — changes usually need to be applied in both.** Per-turn injections, transcript repair, output sanitization, and the `__SESSIONS_YIELD__` signal (sub-agent suspends parent until completion) all live in both paths.
 - `src/codebuddy/client.ts` — multi-provider LLM client; `defaultMaxTokens` comes from `getModelToolConfig(model).maxOutputTokens`
 - `src/services/prompt-builder.ts` — **real** system prompt builder (not the deleted `src/agent/system-prompt-builder.ts`). Applies model-aware token-budget truncation.
 - `src/codebuddy/tools.ts` — ~110 tool definitions + RAG selection
@@ -71,6 +72,8 @@ User → ChatInterface (Ink/React) → CodeBuddyAgent → LLM provider
 6. **Confirmation service** — Singleton. Check order: permission mode → declarative rules → session flags → Guardian Agent.
 7. **Per-turn context injection** — Each LLM turn appends `<lessons_context>` (before) and `<todo_context>` (after). Must be applied in both agent-executor paths.
 8. **Pluggable ContextEngine** — Plugins can register a custom context pipeline via `PluginContext.registerContextEngine()`. If `ownsCompaction` is set, built-in auto-compact is skipped. Trust check blocks non-trusted plugins from owning compaction.
+9. **Output sanitizer** (`src/utils/output-sanitizer.ts`) — strips model leakage tokens (`<think>`, `<|im_start|>`, `[INST]`, `<<SYS>>`, GLM-5/DeepSeek artifacts, zero-width chars) from LLM output. Wired into agent-executor + message-processor. Tests assert sanitized output, so don't bypass.
+10. **Transcript repair** (`src/context/transcript-repair.ts`) — runs at all 3 `prepareMessages()` call sites in agent-executor. Removes orphaned tool results and injects synthetic results for lost tool_call pairs. Touch this if you change message construction or compaction.
 
 ### Reasoning
 
