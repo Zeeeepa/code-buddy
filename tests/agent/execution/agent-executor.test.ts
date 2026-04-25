@@ -1539,4 +1539,96 @@ describe('AgentExecutor', () => {
       expect(ctx).toHaveProperty('abortController');
     });
   });
+
+  // =========================================================================
+  // Parity: sequential vs streaming
+  //
+  // Safety net for the agent-executor decomposition (v2 refactor / Vague 1).
+  // Both entry points share preprocessUserMessage, lessons/todo injection,
+  // output sanitization, transcript repair, and the __SESSIONS_YIELD__ signal.
+  // After the refactor (single async-iterator core consumed by both paths),
+  // these assertions stay green without modification.
+  // =========================================================================
+
+  describe('parity: sequential vs streaming', () => {
+    it('both paths produce assistant output and append to messages on a no-tool input', async () => {
+      const seqHistory: ChatEntry[] = [];
+      const seqMessages: CodeBuddyMessage[] = [];
+      const seqEntries = await executor.processUserMessage(
+        'Hello',
+        seqHistory,
+        seqMessages
+      );
+
+      const streamDeps = createMockDeps();
+      const streamConfig = createMockConfig();
+      const streamExec = new AgentExecutor(streamDeps, streamConfig);
+      const streamHistory: ChatEntry[] = [];
+      const streamMessages: CodeBuddyMessage[] = [];
+      const streamChunks = await collectChunks(
+        streamExec.processUserMessageStream(
+          'Hello',
+          streamHistory,
+          streamMessages,
+          null
+        )
+      );
+
+      expect(seqEntries.some(e => e.type === 'assistant')).toBe(true);
+      expect(streamHistory.some(e => e.type === 'assistant')).toBe(true);
+      expect(seqMessages.some(m => m.role === 'assistant')).toBe(true);
+      expect(streamMessages.some(m => m.role === 'assistant')).toBe(true);
+      expect(streamChunks.some(c => c.type === 'token_count')).toBe(true);
+      expect(streamChunks.some(c => c.type === 'done')).toBe(true);
+    });
+
+    it('both paths dispatch the same tool name and args on a single tool call', async () => {
+      const toolCall = makeToolCall('read_file', { path: '/parity.txt' }, 'parity_1');
+
+      // Sequential
+      const depsSeq = createMockDeps();
+      const configSeq = createMockConfig();
+      (depsSeq.client.chat as jest.Mock)
+        .mockResolvedValueOnce({
+          choices: [{ message: { content: 'reading', tool_calls: [toolCall] } }],
+          usage: { prompt_tokens: 10, completion_tokens: 5 },
+        })
+        .mockResolvedValueOnce({
+          choices: [{ message: { content: 'done', tool_calls: null } }],
+          usage: { prompt_tokens: 20, completion_tokens: 5 },
+        });
+      const execSeq = new AgentExecutor(depsSeq, configSeq);
+      await execSeq.processUserMessage('go', [], []);
+
+      // Streaming — pattern inherited from "should yield tool_result chunks":
+      // tool_calls live on streamingHandler.getAccumulatedMessage (round 0),
+      // extractToolCalls returns empty, chatStream yields content deltas.
+      const depsStream = createMockDeps();
+      const configStream = createMockConfig();
+      (depsStream.streamingHandler.getAccumulatedMessage as jest.Mock)
+        .mockReturnValueOnce({ content: 'reading', tool_calls: [toolCall] })
+        .mockReturnValueOnce({ content: 'done', tool_calls: undefined });
+      (depsStream.streamingHandler.extractToolCalls as jest.Mock).mockReturnValue({
+        toolCalls: [],
+        remainingContent: '',
+      });
+      (depsStream.client.chatStream as jest.Mock)
+        .mockImplementationOnce(async function* () {
+          yield { choices: [{ delta: { content: 'reading' } }] };
+        })
+        .mockImplementationOnce(async function* () {
+          yield { choices: [{ delta: { content: 'done' } }] };
+        });
+      const execStream = new AgentExecutor(depsStream, configStream);
+      await collectChunks(execStream.processUserMessageStream('go', [], [], null));
+
+      const seqCalls = (depsSeq.toolHandler.executeTool as jest.Mock).mock.calls;
+      const streamCalls = (depsStream.toolHandler.executeTool as jest.Mock).mock.calls;
+
+      expect(seqCalls.length).toBeGreaterThanOrEqual(1);
+      expect(streamCalls.length).toBeGreaterThanOrEqual(1);
+      expect(seqCalls[0][0].function.name).toBe(streamCalls[0][0].function.name);
+      expect(seqCalls[0][0].function.arguments).toBe(streamCalls[0][0].function.arguments);
+    });
+  });
 });
