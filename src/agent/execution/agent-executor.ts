@@ -37,12 +37,16 @@ import {
   INTERACTIVE_SHELL_SIGNAL,
   PLAN_APPROVAL_SIGNAL,
 } from "./turn-signals.js";
+import {
+  persistToolResult,
+  applyObservationVariator,
+  logYoloCostIfEnabled,
+} from "./post-tool-handlers.js";
 import type { LaneQueue } from "../../concurrency/lane-queue.js";
 import type { MiddlewarePipeline, MiddlewareContext } from "../middleware/index.js";
 import type { MessageQueue } from "../message-queue.js";
 import { semanticTruncate } from "../../utils/head-tail-truncation.js";
 import { getTodoTracker } from "../todo-tracker.js";
-import { getObservationVariator } from "../../context/observation-variator.js";
 import { getRestorableCompressor } from "../../context/restorable-compression.js";
 import { getResponseConstraintStack, resolveToolChoice } from "../response-constraint.js";
 import type { ICMBridge } from "../../memory/icm-bridge.js";
@@ -804,17 +808,11 @@ export class AgentExecutor {
             } catch { /* JIT context is optional */ }
 
             // --- Disk-backed tool result (Manus AI #19) ---
-            // Persist full result to .codebuddy/tool-results/<callId>.txt for durable restoration.
             const rawToolContent = sanitizeToolResult(result.success ? result.output || "Success" : result.error || "Error");
-            if (toolCall.id) {
-              getRestorableCompressor().writeToolResult(toolCall.id, rawToolContent);
-            }
+            persistToolResult(toolCall.id, rawToolContent);
 
             // --- Observation Variator (Manus AI #17) ---
-            // Rotate the presentation wrapper for this tool result to prevent repetition drift.
-            const variator = getObservationVariator();
-            variator.nextTurn();
-            const variedContent = variator.wrapToolResult(toolCall.function.name, rawToolContent);
+            const variedContent = applyObservationVariator(toolCall.function.name, rawToolContent);
 
             // Update entry with result
             const updatedEntry: ChatEntry = {
@@ -861,14 +859,7 @@ export class AgentExecutor {
             }
 
             // --- Fix 11: YOLO cost display after each tool ---
-            try {
-              const { getAutonomyManager } = await import('../../utils/autonomy-manager.js');
-              if (getAutonomyManager().isYOLOEnabled()) {
-                const sessionCost = this.config.getSessionCost();
-                const sessionCostLimit = this.config.getSessionCostLimit();
-                logger.info(`[YOLO] Cost: $${sessionCost.toFixed(4)} / $${sessionCostLimit}`);
-              }
-            } catch { /* non-critical */ }
+            await logYoloCostIfEnabled(this.config);
 
             // --- Terminate signal detection (OpenManus #5) ---
             const terminateMsg = extractTerminateMessage(rawToolContent);
@@ -1457,14 +1448,10 @@ export class AgentExecutor {
 
             // --- Disk-backed tool result (Manus AI #19) ---
             const rawStreamContent = sanitizeToolResult(result?.success ? result.output || "Success" : result?.error || "Error");
-            if (toolCall.id) {
-              getRestorableCompressor().writeToolResult(toolCall.id, rawStreamContent);
-            }
+            persistToolResult(toolCall.id, rawStreamContent);
 
             // --- Observation Variator (Manus AI #17) ---
-            const streamVariator = getObservationVariator();
-            streamVariator.nextTurn();
-            const variedStreamContent = streamVariator.wrapToolResult(toolCall.function.name, rawStreamContent);
+            const variedStreamContent = applyObservationVariator(toolCall.function.name, rawStreamContent);
 
             const toolResultEntry: ChatEntry = {
               type: "tool_result",
@@ -1505,14 +1492,7 @@ export class AgentExecutor {
             }
 
             // --- Fix 11: YOLO cost display after each tool (streaming path) ---
-            try {
-              const { getAutonomyManager } = await import('../../utils/autonomy-manager.js');
-              if (getAutonomyManager().isYOLOEnabled()) {
-                const sessionCost = this.config.getSessionCost();
-                const sessionCostLimit = this.config.getSessionCostLimit();
-                logger.info(`[YOLO] Cost: $${sessionCost.toFixed(4)} / $${sessionCostLimit}`);
-              }
-            } catch { /* non-critical */ }
+            await logYoloCostIfEnabled(this.config);
 
             // --- Terminate signal detection (OpenManus #5, streaming path) ---
             const streamTerminateMsg = extractTerminateMessage(rawStreamContent);
