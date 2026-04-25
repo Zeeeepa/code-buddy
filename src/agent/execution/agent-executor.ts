@@ -31,6 +31,12 @@ import {
   runPostToolUseHook,
   recordToolMetric,
 } from "./tool-hooks.js";
+import {
+  extractTerminateMessage,
+  extractSignalMessage,
+  INTERACTIVE_SHELL_SIGNAL,
+  PLAN_APPROVAL_SIGNAL,
+} from "./turn-signals.js";
 import type { LaneQueue } from "../../concurrency/lane-queue.js";
 import type { MiddlewarePipeline, MiddlewareContext } from "../middleware/index.js";
 import type { MessageQueue } from "../message-queue.js";
@@ -865,12 +871,11 @@ export class AgentExecutor {
             } catch { /* non-critical */ }
 
             // --- Terminate signal detection (OpenManus #5) ---
-            // If the tool result starts with the terminate sentinel, break the loop.
-            if (rawToolContent.startsWith('__AGENT_TERMINATE__')) {
-              const terminateMsg = rawToolContent.replace('__AGENT_TERMINATE__', '').trim();
+            const terminateMsg = extractTerminateMessage(rawToolContent);
+            if (terminateMsg !== null) {
               const terminateEntry: ChatEntry = {
                 type: 'assistant',
-                content: terminateMsg || 'Task completed.',
+                content: terminateMsg,
                 timestamp: new Date(),
               };
               history.push(terminateEntry);
@@ -1510,38 +1515,38 @@ export class AgentExecutor {
             } catch { /* non-critical */ }
 
             // --- Terminate signal detection (OpenManus #5, streaming path) ---
-            if (rawStreamContent.startsWith('__AGENT_TERMINATE__')) {
-              const terminateMsg = rawStreamContent.replace('__AGENT_TERMINATE__', '').trim();
-              yield { type: "content", content: `\n\n${terminateMsg || 'Task completed.'}` };
+            const streamTerminateMsg = extractTerminateMessage(rawStreamContent);
+            if (streamTerminateMsg !== null) {
+              yield { type: "content", content: `\n\n${streamTerminateMsg}` };
               terminateDetectedStreaming = true;
               break;
             }
 
             // --- Interactive Shell Handoff detection (streaming path) ---
-            if (rawStreamContent.startsWith('__INTERACTIVE_SHELL_REQUEST__')) {
-              const requestMsg = rawStreamContent.replace('__INTERACTIVE_SHELL_REQUEST__', '').trim();
-              yield { type: "content", content: `\n\n⚠️ **INTERACTIVE SHELL HANDOFF REQUESTED**\n\n${requestMsg}` };
-              yield { 
-                type: "ask_user", 
-                askUser: { 
-                  question: "Do you want to open an interactive terminal to perform this action? (Type 'exit' in the terminal when done to return control to the AI)", 
-                  options: ["Yes, open interactive shell", "No, cancel tool"] 
-                } 
+            const shellRequestMsg = extractSignalMessage(rawStreamContent, INTERACTIVE_SHELL_SIGNAL);
+            if (shellRequestMsg !== null) {
+              yield { type: "content", content: `\n\n⚠️ **INTERACTIVE SHELL HANDOFF REQUESTED**\n\n${shellRequestMsg}` };
+              yield {
+                type: "ask_user",
+                askUser: {
+                  question: "Do you want to open an interactive terminal to perform this action? (Type 'exit' in the terminal when done to return control to the AI)",
+                  options: ["Yes, open interactive shell", "No, cancel tool"]
+                }
               };
               terminateDetectedStreaming = true;
               break;
             }
 
             // --- Plan Approval detection (streaming path) ---
-            if (rawStreamContent.startsWith('__PLAN_APPROVAL_REQUEST__')) {
-              const planMsg = rawStreamContent.replace('__PLAN_APPROVAL_REQUEST__', '').trim();
+            const planMsg = extractSignalMessage(rawStreamContent, PLAN_APPROVAL_SIGNAL);
+            if (planMsg !== null) {
               yield { type: "content", content: `\n\n⚠️ **PLAN APPROVAL REQUIRED**\n\n${planMsg}` };
-              yield { 
-                type: "ask_user", 
-                askUser: { 
-                  question: "Do you approve this plan? (Yes to execute, No to cancel, or provide feedback)", 
-                  options: ["Approve", "Reject"] 
-                } 
+              yield {
+                type: "ask_user",
+                askUser: {
+                  question: "Do you approve this plan? (Yes to execute, No to cancel, or provide feedback)",
+                  options: ["Approve", "Reject"]
+                }
               };
               terminateDetectedStreaming = true;
               break;
