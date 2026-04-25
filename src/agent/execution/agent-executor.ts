@@ -24,6 +24,7 @@ import {
   injectNextRoundContext,
   sanitizeAssistantOutput,
 } from "./context-pipeline.js";
+import { extractYieldChildId, processYieldSignal } from "./yield-coordinator.js";
 import type { LaneQueue } from "../../concurrency/lane-queue.js";
 import type { MiddlewarePipeline, MiddlewareContext } from "../middleware/index.js";
 import type { MessageQueue } from "../message-queue.js";
@@ -894,26 +895,9 @@ export class AgentExecutor {
             }
 
             // --- Yield signal detection (Native Engine v2026.3.14) ---
-            if (rawToolContent.includes('__SESSIONS_YIELD__')) {
-              const yieldMatch = rawToolContent.match(/"id"\s*:\s*"(agent-\d+)"/);
-              if (yieldMatch) {
-                const childId = yieldMatch[1];
-                try {
-                  const { waitForSingleAgent } = await import('../../agent/multi-agent/agent-tools.js');
-                  const completed = await waitForSingleAgent(childId, 300_000);
-                  const yieldResult = completed.result || 'Sub-agent completed (no result).';
-                  // Inject the sub-agent result as the next context message
-                  messages.push({
-                    role: 'user',
-                    content: `[Sub-agent ${completed.nickname} completed]: ${yieldResult}`,
-                  } as CodeBuddyMessage);
-                } catch (err) {
-                  messages.push({
-                    role: 'user',
-                    content: `[Sub-agent yield timeout]: ${err instanceof Error ? err.message : String(err)}`,
-                  } as CodeBuddyMessage);
-                }
-              }
+            const yieldChildId = extractYieldChildId(rawToolContent);
+            if (yieldChildId) {
+              await processYieldSignal(yieldChildId, messages);
             }
           }
 
@@ -1597,26 +1581,10 @@ export class AgentExecutor {
             }
 
             // --- Yield signal detection (Native Engine v2026.3.14, streaming path) ---
-            if (rawStreamContent.includes('__SESSIONS_YIELD__')) {
-              const yieldMatch = rawStreamContent.match(/"id"\s*:\s*"(agent-\d+)"/);
-              if (yieldMatch) {
-                const childId = yieldMatch[1];
-                try {
-                  const { waitForSingleAgent } = await import('../../agent/multi-agent/agent-tools.js');
-                  yield { type: "content", content: `\n[Waiting for sub-agent to complete...]` };
-                  const completed = await waitForSingleAgent(childId, 300_000);
-                  const yieldResult = completed.result || 'Sub-agent completed (no result).';
-                  messages.push({
-                    role: 'user',
-                    content: `[Sub-agent ${completed.nickname} completed]: ${yieldResult}`,
-                  } as CodeBuddyMessage);
-                } catch (err) {
-                  messages.push({
-                    role: 'user',
-                    content: `[Sub-agent yield timeout]: ${err instanceof Error ? err.message : String(err)}`,
-                  } as CodeBuddyMessage);
-                }
-              }
+            const streamYieldChildId = extractYieldChildId(rawStreamContent);
+            if (streamYieldChildId) {
+              yield { type: "content", content: `\n[Waiting for sub-agent to complete...]` };
+              await processYieldSignal(streamYieldChildId, messages);
             }
           }
 
