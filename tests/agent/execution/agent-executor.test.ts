@@ -1630,5 +1630,151 @@ describe('AgentExecutor', () => {
       expect(seqCalls[0][0].function.name).toBe(streamCalls[0][0].function.name);
       expect(seqCalls[0][0].function.arguments).toBe(streamCalls[0][0].function.arguments);
     });
+
+    // Helper: build a 2-round mock setup for a sequential executor.
+    // Round 0: tool call A → tool result. Round 1: tool call B → tool result.
+    // Round 2: final assistant content.
+    function setupSequentialMultiRound(d: ExecutorDependencies) {
+      const tA = makeToolCall('read_file', { path: '/a.txt' }, 'mr_a');
+      const tB = makeToolCall('read_file', { path: '/b.txt' }, 'mr_b');
+      (d.client.chat as jest.Mock)
+        .mockResolvedValueOnce({
+          choices: [{ message: { content: 'r0', tool_calls: [tA] } }],
+          usage: { prompt_tokens: 10, completion_tokens: 5 },
+        })
+        .mockResolvedValueOnce({
+          choices: [{ message: { content: 'r1', tool_calls: [tB] } }],
+          usage: { prompt_tokens: 20, completion_tokens: 5 },
+        })
+        .mockResolvedValueOnce({
+          choices: [{ message: { content: 'final', tool_calls: null } }],
+          usage: { prompt_tokens: 30, completion_tokens: 5 },
+        });
+    }
+
+    // Helper: build a 2-round mock setup for a streaming executor.
+    function setupStreamingMultiRound(d: ExecutorDependencies) {
+      const tA = makeToolCall('read_file', { path: '/a.txt' }, 'mr_a');
+      const tB = makeToolCall('read_file', { path: '/b.txt' }, 'mr_b');
+      (d.streamingHandler.getAccumulatedMessage as jest.Mock)
+        .mockReturnValueOnce({ content: 'r0', tool_calls: [tA] })
+        .mockReturnValueOnce({ content: 'r1', tool_calls: [tB] })
+        .mockReturnValueOnce({ content: 'final', tool_calls: undefined });
+      (d.streamingHandler.extractToolCalls as jest.Mock).mockReturnValue({
+        toolCalls: [],
+        remainingContent: '',
+      });
+      (d.client.chatStream as jest.Mock)
+        .mockImplementationOnce(async function* () {
+          yield { choices: [{ delta: { content: 'r0' } }] };
+        })
+        .mockImplementationOnce(async function* () {
+          yield { choices: [{ delta: { content: 'r1' } }] };
+        })
+        .mockImplementationOnce(async function* () {
+          yield { choices: [{ delta: { content: 'final' } }] };
+        });
+    }
+
+    it('both paths call prepareMessages the same number of times across multi-round', async () => {
+      const depsSeq = createMockDeps();
+      const configSeq = createMockConfig();
+      setupSequentialMultiRound(depsSeq);
+      const execSeq = new AgentExecutor(depsSeq, configSeq);
+      await execSeq.processUserMessage('mr', [], []);
+
+      const depsStream = createMockDeps();
+      const configStream = createMockConfig();
+      setupStreamingMultiRound(depsStream);
+      const execStream = new AgentExecutor(depsStream, configStream);
+      await collectChunks(execStream.processUserMessageStream('mr', [], [], null));
+
+      const seqCalls = (depsSeq.contextManager.prepareMessages as jest.Mock).mock.calls.length;
+      const streamCalls = (depsStream.contextManager.prepareMessages as jest.Mock).mock.calls.length;
+
+      // Sequential path triggers prepareMessages at line ~528 (round 0) and line ~730 (between rounds)
+      // Streaming path triggers prepareMessages at line ~1113 (round 0) and line ~1328 (between rounds)
+      // After fusion in task #5, both must keep the same call count for transcript-repair invariant.
+      expect(seqCalls).toBeGreaterThanOrEqual(2); // at least round-0 + 1 between-round
+      expect(streamCalls).toBeGreaterThanOrEqual(2);
+      expect(seqCalls).toBe(streamCalls);
+    });
+
+    it('both paths execute the same number of tools across multi-round', async () => {
+      const depsSeq = createMockDeps();
+      const configSeq = createMockConfig();
+      setupSequentialMultiRound(depsSeq);
+      const execSeq = new AgentExecutor(depsSeq, configSeq);
+      await execSeq.processUserMessage('mr', [], []);
+
+      const depsStream = createMockDeps();
+      const configStream = createMockConfig();
+      setupStreamingMultiRound(depsStream);
+      const execStream = new AgentExecutor(depsStream, configStream);
+      await collectChunks(execStream.processUserMessageStream('mr', [], [], null));
+
+      const seqExec = (depsSeq.toolHandler.executeTool as jest.Mock).mock.calls.length;
+      const streamExec = (depsStream.toolHandler.executeTool as jest.Mock).mock.calls.length;
+
+      expect(seqExec).toBe(2);
+      expect(streamExec).toBe(2);
+      expect(seqExec).toBe(streamExec);
+    });
+
+    it('both paths record session cost exactly once at end of loop', async () => {
+      // Single-message input: ensures the "no double-count" fix from audit 2026-03-10
+      // stays applied in both paths after the fusion.
+      const depsSeq = createMockDeps();
+      const configSeq = createMockConfig();
+      const execSeq = new AgentExecutor(depsSeq, configSeq);
+      await execSeq.processUserMessage('Hello', [], []);
+
+      const depsStream = createMockDeps();
+      const configStream = createMockConfig();
+      const execStream = new AgentExecutor(depsStream, configStream);
+      await collectChunks(execStream.processUserMessageStream('Hello', [], [], null));
+
+      const seqRecordCalls = (configSeq.recordSessionCost as jest.Mock).mock.calls.length;
+      const streamRecordCalls = (configStream.recordSessionCost as jest.Mock).mock.calls.length;
+
+      expect(seqRecordCalls).toBe(1);
+      expect(streamRecordCalls).toBe(1);
+    });
+
+    it('both paths record session cost exactly once even on multi-round', async () => {
+      const depsSeq = createMockDeps();
+      const configSeq = createMockConfig();
+      setupSequentialMultiRound(depsSeq);
+      const execSeq = new AgentExecutor(depsSeq, configSeq);
+      await execSeq.processUserMessage('mr', [], []);
+
+      const depsStream = createMockDeps();
+      const configStream = createMockConfig();
+      setupStreamingMultiRound(depsStream);
+      const execStream = new AgentExecutor(depsStream, configStream);
+      await collectChunks(execStream.processUserMessageStream('mr', [], [], null));
+
+      // Cost should only be recorded ONCE at end of loop, regardless of round count.
+      // Pre-checks during the loop use estimateSessionCostLimitReached (no side effects).
+      expect((configSeq.recordSessionCost as jest.Mock).mock.calls.length).toBe(1);
+      expect((configStream.recordSessionCost as jest.Mock).mock.calls.length).toBe(1);
+    });
+
+    // TODO Task #5 — décision #4 du plan : promouvoir injectNextRoundContext au streaming.
+    // Aujourd'hui ce test échouerait : le sequential path appelle injectNextRoundContext
+    // entre les rounds (agent-executor.ts:931), le streaming path ne l'appelle nulle part.
+    // Une fois la décision #4 implémentée, retirer le `.skip` ; le test devient un filet
+    // permanent contre les régressions silencieuses sur la qualité des conversations
+    // streaming multi-round (lessons accumulées + KG + todo).
+    it.skip('TODO #4: both paths invoke between-round context injection on multi-round', async () => {
+      // Le test asserte un effet observable : sur 2 rounds, certains contextes
+      // (lessons, todo, KG) doivent réapparaître dans le messages array entre
+      // les rounds dans les deux paths.
+      // Implémentation à finaliser quand on appliquera la décision #4 :
+      // - mocker un getter de lessons context qui retourne un marker reconnaissable
+      // - asserter que ce marker apparaît dans messages[] dans les deux paths
+      //   après le tool round 1 (donc avant le LLM call du round 2).
+      expect(true).toBe(true);
+    });
   });
 });
