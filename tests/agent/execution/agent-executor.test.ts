@@ -34,6 +34,33 @@ jest.mock('../../../src/utils/sanitize.js', () => ({
   sanitizeToolResult: jest.fn().mockImplementation((text: string) => text),
 }));
 
+// Mock lessons-tracker globally so the décision #4 sentinel test can pin
+// observable injection. Other tests use trivial queries (ctxLevel.lessons = false)
+// or don't assert messages content, so the mock is safe across the suite.
+jest.mock('../../../src/agent/lessons-tracker.js', () => ({
+  getLessonsTracker: jest.fn(() => ({
+    buildContextBlock: () => 'PHASE_A_LESSONS_SENTINEL',
+  })),
+}));
+
+// Wrap injectNextRoundContext in a spy at the module boundary. Behavior is
+// preserved (the wrapped fn calls through), but inspection becomes possible.
+// The décision #4 sentinel asserts this spy is called by streaming when
+// running multi-round — fails today (streaming doesn't call it),
+// passes after décision #4 is applied.
+jest.mock('../../../src/agent/execution/context-pipeline.js', async () => {
+  const actual = await jest.requireActual<typeof import('../../../src/agent/execution/context-pipeline.js')>(
+    '../../../src/agent/execution/context-pipeline.js'
+  );
+  return {
+    ...actual,
+    injectNextRoundContext: jest.fn(actual.injectNextRoundContext),
+  };
+});
+
+// Late import so the mocked symbol is captured.
+import { injectNextRoundContext as injectNextRoundContextMock } from '../../../src/agent/execution/context-pipeline.js';
+
 // ---------------------------------------------------------------------------
 // Helpers to create mock dependencies
 // ---------------------------------------------------------------------------
@@ -1763,20 +1790,42 @@ describe('AgentExecutor', () => {
     });
 
     // TODO Task #5 — décision #4 du plan : promouvoir injectNextRoundContext au streaming.
-    // Aujourd'hui ce test échouerait : le sequential path appelle injectNextRoundContext
-    // entre les rounds (agent-executor.ts:931), le streaming path ne l'appelle nulle part.
-    // Une fois la décision #4 implémentée, retirer le `.skip` ; le test devient un filet
-    // permanent contre les régressions silencieuses sur la qualité des conversations
-    // streaming multi-round (lessons accumulées + KG + todo).
-    it.skip('TODO #4: both paths invoke between-round context injection on multi-round', async () => {
-      // Le test asserte un effet observable : sur 2 rounds, certains contextes
-      // (lessons, todo, KG) doivent réapparaître dans le messages array entre
-      // les rounds dans les deux paths.
-      // Implémentation à finaliser quand on appliquera la décision #4 :
-      // - mocker un getter de lessons context qui retourne un marker reconnaissable
-      // - asserter que ce marker apparaît dans messages[] dans les deux paths
-      //   après le tool round 1 (donc avant le LLM call du round 2).
-      expect(true).toBe(true);
+    //
+    // Aujourd'hui : sequential appelle injectNextRoundContext (agent-executor.ts:931),
+    // streaming ne l'appelle nulle part. La décision #4 alignera les deux paths.
+    //
+    // Le filet est direct : on inspecte le mock factory de context-pipeline qui
+    // wrappe injectNextRoundContext. Le test fail aujourd'hui (streaming = 0 calls)
+    // — c'est la PREUVE que c'est un vrai filet, pas un placeholder. Quand décision #4
+    // sera appliquée, retirer .skip → test passe → régression future détectable.
+    it.skip('TODO #4: both paths invoke injectNextRoundContext on multi-round', async () => {
+      const nextRoundMock = injectNextRoundContextMock as unknown as jest.Mock;
+      // Sanity check: the mock factory worked, this is a real spy.
+      expect(jest.isMockFunction(nextRoundMock)).toBe(true);
+
+      // CODE_SIGNALS match → queryComplexity === 'complex'
+      const complexMsg = 'implement multi-round fix and refactor the queue';
+
+      // Sequential — should call injectNextRoundContext between rounds.
+      nextRoundMock.mockClear();
+      const depsSeq = createMockDeps();
+      setupSequentialMultiRound(depsSeq);
+      await new AgentExecutor(depsSeq, createMockConfig()).processUserMessage(complexMsg, [], []);
+      const seqCallCount = nextRoundMock.mock.calls.length;
+      expect(seqCallCount).toBeGreaterThanOrEqual(1);
+
+      // Streaming — same invariant must hold AFTER décision #4 is applied.
+      // Today this fails (streaming has zero calls to injectNextRoundContext).
+      nextRoundMock.mockClear();
+      const depsStream = createMockDeps();
+      setupStreamingMultiRound(depsStream);
+      await collectChunks(
+        new AgentExecutor(depsStream, createMockConfig()).processUserMessageStream(
+          complexMsg, [], [], null
+        )
+      );
+      const streamCallCount = nextRoundMock.mock.calls.length;
+      expect(streamCallCount).toBeGreaterThanOrEqual(1);
     });
 
     // -------------------------------------------------------------------------
