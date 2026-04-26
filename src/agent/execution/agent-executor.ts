@@ -22,6 +22,7 @@ import {
   prepareTurnMessages,
   injectInitialContext,
   injectNextRoundContext,
+  runJitContextDiscovery,
   sanitizeAssistantOutput,
 } from "./context-pipeline.js";
 import { extractYieldChildId, processYieldSignal } from "./yield-coordinator.js";
@@ -774,20 +775,9 @@ export class AgentExecutor {
             } catch { /* file tracking is optional */ }
 
             // --- JIT context discovery: load subdirectory context files ---
-            try {
-              const fileToolsJit = new Set(['view_file', 'create_file', 'str_replace_editor', 'file_read', 'file_write', 'read_file', 'grep', 'glob']);
-              if (fileToolsJit.has(toolCall.function.name)) {
-                const args = JSON.parse(toolCall.function.arguments || '{}');
-                const filePath = args.path || args.file_path || args.target_file || args.pattern || '';
-                if (filePath) {
-                  const { discoverJitContext } = await import('../../context/jit-context.js');
-                  const jitContext = discoverJitContext(filePath);
-                  if (jitContext) {
-                    preparedMessages.push({ role: 'system', content: jitContext });
-                  }
-                }
-              }
-            } catch { /* JIT context is optional */ }
+            for (const msg of await runJitContextDiscovery(toolCall)) {
+              preparedMessages.push(msg);
+            }
 
             // --- Disk-backed tool result (Manus AI #19) ---
             const rawToolContent = sanitizeToolResult(result.success ? result.output || "Success" : result.error || "Error");
@@ -1388,6 +1378,13 @@ export class AgentExecutor {
                 }
               }
             } catch { /* file tracking is optional */ }
+
+            // --- JIT context discovery: load subdirectory context files ---
+            // Décision #2 du plan task #5 — promu du sequential vers streaming
+            // pour parité d'enrichissement après chaque tool qui touche un path.
+            for (const msg of await runJitContextDiscovery(toolCall)) {
+              preparedMessages.push(msg);
+            }
 
             // Check abort after tool execution completes
             if (abortController?.signal.aborted) {

@@ -223,3 +223,39 @@ export async function injectNextRoundContext(
 export function sanitizeAssistantOutput(raw: string): string {
   return stripInvisibleChars(sanitizeModelOutput(raw));
 }
+
+const FILE_TOOLS_JIT = new Set([
+  'view_file',
+  'create_file',
+  'str_replace_editor',
+  'file_read',
+  'file_write',
+  'read_file',
+  'grep',
+  'glob',
+]);
+
+/**
+ * JIT context discovery — load subdirectory context files (CODEBUDDY.md,
+ * CONTEXT.md, INSTRUCTIONS.md, AGENTS.md, README.md and their .codebuddy/
+ * .claude/ siblings) walking upward from the path the tool just touched.
+ *
+ * Returns the system messages to push (possibly empty). Both sequential and
+ * streaming paths consume this — keep them aligned (task #5 décision #2).
+ */
+export async function runJitContextDiscovery(toolCall: {
+  function: { name: string; arguments?: string };
+}): Promise<CodeBuddyMessage[]> {
+  if (!FILE_TOOLS_JIT.has(toolCall.function.name)) return [];
+  try {
+    const args = JSON.parse(toolCall.function.arguments || '{}');
+    const filePath = args.path || args.file_path || args.target_file || args.pattern || '';
+    if (!filePath) return [];
+    const { discoverJitContext } = await import('../../context/jit-context.js');
+    const jitContext = discoverJitContext(filePath);
+    if (!jitContext) return [];
+    return [{ role: 'system', content: jitContext }];
+  } catch {
+    return [];
+  }
+}
