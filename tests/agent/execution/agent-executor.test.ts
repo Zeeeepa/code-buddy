@@ -1798,7 +1798,7 @@ describe('AgentExecutor', () => {
     // wrappe injectNextRoundContext. Le test fail aujourd'hui (streaming = 0 calls)
     // — c'est la PREUVE que c'est un vrai filet, pas un placeholder. Quand décision #4
     // sera appliquée, retirer .skip → test passe → régression future détectable.
-    it.skip('TODO #4: both paths invoke injectNextRoundContext on multi-round', async () => {
+    it('décision #4 (applied): both paths invoke injectNextRoundContext on multi-round', async () => {
       const nextRoundMock = injectNextRoundContextMock as unknown as jest.Mock;
       // Sanity check: the mock factory worked, this is a real spy.
       expect(jest.isMockFunction(nextRoundMock)).toBe(true);

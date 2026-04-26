@@ -206,27 +206,6 @@ export interface ExecutorConfig {
 export type ExecutorEvent = StreamingChunk;
 
 /**
- * Phase B stub for the unified turn loop. Not yet wired to any caller.
- * Throws so that an accidental call surfaces immediately during testing.
- *
- * Phase C will copy the body of `processUserMessageStream` here, converting
- * each `yield X` to `yield { type: ..., ... }` events; the streaming adapter
- * becomes a thin `for await` forwarder, and the sequential adapter becomes
- * a collector that maps events to `ChatEntry[]`.
- */
-export async function* runTurnLoop(
-  _message: string,
-  _history: ChatEntry[],
-  _messages: CodeBuddyMessage[],
-  _abortController: AbortController | null,
-): AsyncGenerator<ExecutorEvent, void, unknown> {
-  throw new Error('runTurnLoop: not implemented yet (task #5 Phase C)');
-  // Unreachable yield to keep TypeScript happy about the generator signature.
-  // eslint-disable-next-line @typescript-eslint/no-unreachable
-  yield { type: 'done' } as ExecutorEvent;
-}
-
-/**
  * AgentExecutor implements the core agentic loop
  *
  * The agentic loop follows this pattern:
@@ -1072,12 +1051,37 @@ export class AgentExecutor {
    * @param abortController - Controller to cancel the operation
    * @yields Streaming chunks for UI consumption
    */
+  /**
+   * Stream user-message processing — thin adapter over `runTurnLoop`.
+   * Forwards each `ExecutorEvent` as a `StreamingChunk` (alias-compatible).
+   */
   async *processUserMessageStream(
     message: string,
     history: ChatEntry[],
     messages: CodeBuddyMessage[],
     abortController: AbortController | null
   ): AsyncGenerator<StreamingChunk, void, unknown> {
+    yield* this.runTurnLoop(message, history, messages, abortController);
+  }
+
+  /**
+   * Unified turn loop — Phase C of the task #5 fusion. Single source of
+   * truth for the agentic loop, consumed by both `processUserMessageStream`
+   * (forward as-is) and (eventually) `processUserMessage` (Phase D collector).
+   *
+   * Yield surface : `ExecutorEvent` (currently alias to `StreamingChunk`).
+   * Streaming-only events (`ask_user`, `tool_stream`, etc.) are yielded
+   * unconditionally; the sequential collector silently drops them per
+   * décision #3.
+   *
+   * Plan : ~/.claude/plans/vague1-task5-design-decisions.md
+   */
+  private async *runTurnLoop(
+    message: string,
+    history: ChatEntry[],
+    messages: CodeBuddyMessage[],
+    abortController: AbortController | null
+  ): AsyncGenerator<ExecutorEvent, void, unknown> {
     // Shared pre-processing with the sequential path (@mentions, persona
     // auto-select, knowledge graph extraction). Single source of truth in
     // preprocessUserMessage (F10).
@@ -1149,6 +1153,18 @@ export class AgentExecutor {
           codeGraphContextProvider: this.getCodeGraphContextProvider(),
           docsContextProvider: this.getDocsContextProvider(),
         });
+
+        // Décision #4 du plan task #5 — injection between-rounds promue depuis
+        // le sequential path. Lessons + KG (si complex) + todo réinjectés à
+        // chaque round > 0 pour préserver la qualité des conversations
+        // multi-round dans le streaming. Sentinel `TODO #4` couvre cet invariant.
+        if (toolRounds > 0) {
+          await injectNextRoundContext(preparedMessages, {
+            message,
+            cwd: process.cwd(),
+            queryComplexity,
+          });
+        }
 
         // Context warning — always check regardless of pipeline state
         {
