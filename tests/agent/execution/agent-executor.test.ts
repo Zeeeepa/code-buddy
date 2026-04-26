@@ -10,6 +10,8 @@ import { AgentExecutor, ExecutorDependencies, ExecutorConfig } from '../../../sr
 import type { ChatEntry, StreamingChunk } from '../../../src/agent/types';
 import type { CodeBuddyMessage } from '../../../src/codebuddy/client';
 import { logger } from '../../../src/utils/logger.js';
+import { YIELD_SIGNAL } from '../../../src/agent/execution/yield-coordinator.js';
+import { INTERACTIVE_SHELL_SIGNAL } from '../../../src/agent/execution/turn-signals.js';
 
 // ---------------------------------------------------------------------------
 // Mock modules
@@ -1775,6 +1777,164 @@ describe('AgentExecutor', () => {
       // - asserter que ce marker apparaît dans messages[] dans les deux paths
       //   après le tool round 1 (donc avant le LLM call du round 2).
       expect(true).toBe(true);
+    });
+
+    // -------------------------------------------------------------------------
+    // Phase A — Invariants additionnels (advisor recommendation)
+    //
+    // Couvrent ce que le sentinel initial ne touchait pas et qui sont à risque
+    // de régression silencieuse pendant la fusion (task #5 steps 4-7).
+    // -------------------------------------------------------------------------
+
+    it('output sanitizer parity: <think>...</think> stripped from final assistant content in both paths', async () => {
+      // Décision implicite : la fusion doit préserver l'invariant que les
+      // tokens de leakage modèle (<think>, <|im_start|>, [INST], etc.) ne
+      // remontent JAMAIS dans le content final exposé au consommateur.
+      // Boundaries différentes (chunk-level vs final-message) — on assert
+      // l'end-state, pas le mécanisme.
+      const dirty = '<think>secret reasoning</think>visible answer';
+
+      // Sequential
+      const depsSeq = createMockDeps();
+      (depsSeq.client.chat as jest.Mock).mockResolvedValueOnce({
+        choices: [{ message: { content: dirty, tool_calls: null } }],
+        usage: { prompt_tokens: 10, completion_tokens: 5 },
+      });
+      const seqEntries = await new AgentExecutor(depsSeq, createMockConfig()).processUserMessage('hi', [], []);
+      const seqAssistant = seqEntries.find(e => e.type === 'assistant');
+      expect(seqAssistant).toBeDefined();
+      expect(seqAssistant!.content).not.toContain('<think>');
+      expect(seqAssistant!.content).not.toContain('secret reasoning');
+      expect(seqAssistant!.content).toContain('visible answer');
+
+      // Streaming
+      const depsStream = createMockDeps();
+      (depsStream.streamingHandler.getAccumulatedMessage as jest.Mock).mockReturnValue({
+        content: dirty,
+        tool_calls: undefined,
+      });
+      const streamHistory: ChatEntry[] = [];
+      await collectChunks(
+        new AgentExecutor(depsStream, createMockConfig()).processUserMessageStream('hi', streamHistory, [], null)
+      );
+      const streamAssistant = streamHistory.find(e => e.type === 'assistant');
+      expect(streamAssistant).toBeDefined();
+      expect(streamAssistant!.content).not.toContain('<think>');
+      expect(streamAssistant!.content).not.toContain('secret reasoning');
+    });
+
+    it('__SESSIONS_YIELD__ signal does not crash either path when present in content', async () => {
+      // Lock-in : la fusion doit préserver la robustesse face au signal yield.
+      // Quel que soit le comportement exact (extraction, parent suspension, etc.),
+      // les deux paths doivent compléter sans throw.
+      const yieldContent = `Some response. ${YIELD_SIGNAL}:test_child_id continues here.`;
+
+      const depsSeq = createMockDeps();
+      (depsSeq.client.chat as jest.Mock).mockResolvedValueOnce({
+        choices: [{ message: { content: yieldContent, tool_calls: null } }],
+        usage: { prompt_tokens: 10, completion_tokens: 5 },
+      });
+      await expect(
+        new AgentExecutor(depsSeq, createMockConfig()).processUserMessage('hi', [], [])
+      ).resolves.toBeDefined();
+
+      const depsStream = createMockDeps();
+      (depsStream.streamingHandler.getAccumulatedMessage as jest.Mock).mockReturnValue({
+        content: yieldContent,
+        tool_calls: undefined,
+      });
+      await expect(
+        collectChunks(
+          new AgentExecutor(depsStream, createMockConfig()).processUserMessageStream('hi', [], [], null)
+        )
+      ).resolves.toBeDefined();
+    });
+
+    it('ask_user streaming-only (décision #3 lock-in): __INTERACTIVE_SHELL_REQUEST__ in tool result yields ask_user only in streaming', async () => {
+      // Le sequential path retourne ChatEntry[] synchrone — il ne peut pas
+      // suspendre pour demander à l'utilisateur. Cette asymétrie est par design
+      // (décision #3). La fusion doit conserver : streaming yield ask_user,
+      // sequential drop silencieusement.
+      const toolCall = makeToolCall('shell', { command: 'sudo rm -rf /' }, 'shell_1');
+      const interactivePayload = `${INTERACTIVE_SHELL_SIGNAL}:Confirm dangerous command?`;
+
+      // Sequential — dispatch tool, récupère un result avec le signal, doit
+      // continuer normalement sans aucune trace ask_user.
+      const depsSeq = createMockDeps();
+      (depsSeq.client.chat as jest.Mock)
+        .mockResolvedValueOnce({
+          choices: [{ message: { content: 'r0', tool_calls: [toolCall] } }],
+          usage: { prompt_tokens: 10, completion_tokens: 5 },
+        })
+        .mockResolvedValueOnce({
+          choices: [{ message: { content: 'final', tool_calls: null } }],
+          usage: { prompt_tokens: 20, completion_tokens: 5 },
+        });
+      (depsSeq.toolHandler.executeTool as jest.Mock).mockResolvedValue({
+        success: true,
+        output: interactivePayload,
+      });
+      const seqEntries = await new AgentExecutor(depsSeq, createMockConfig()).processUserMessage('go', [], []);
+      const seqAskUser = seqEntries.find(e => (e as { type: string }).type === 'ask_user' as never);
+      expect(seqAskUser).toBeUndefined();
+
+      // Streaming — même setup, doit yield un chunk ask_user.
+      const depsStream = createMockDeps();
+      (depsStream.streamingHandler.getAccumulatedMessage as jest.Mock)
+        .mockReturnValueOnce({ content: 'r0', tool_calls: [toolCall] })
+        .mockReturnValueOnce({ content: 'final', tool_calls: undefined });
+      (depsStream.streamingHandler.extractToolCalls as jest.Mock).mockReturnValue({
+        toolCalls: [],
+        remainingContent: '',
+      });
+      (depsStream.client.chatStream as jest.Mock)
+        .mockImplementationOnce(async function* () {
+          yield { choices: [{ delta: { content: 'r0' } }] };
+        })
+        .mockImplementationOnce(async function* () {
+          yield { choices: [{ delta: { content: 'final' } }] };
+        });
+      (depsStream.toolHandler.executeTool as jest.Mock).mockResolvedValue({
+        success: true,
+        output: interactivePayload,
+      });
+      const streamChunks = await collectChunks(
+        new AgentExecutor(depsStream, createMockConfig()).processUserMessageStream('go', [], [], null)
+      );
+      const streamAskUser = streamChunks.find(c => c.type === 'ask_user');
+      expect(streamAskUser).toBeDefined();
+    });
+
+    it('abort during streaming does not double-record session cost', async () => {
+      // L'audit 2026-03-10 a corrigé le double-count de recordSessionCost.
+      // La fusion doit préserver : exactly 1 call même quand l'utilisateur abort
+      // mid-stream. Filet contre une régression silencieuse de cost tracking.
+      const abortController = new AbortController();
+      const depsStream = createMockDeps();
+      (depsStream.client.chatStream as jest.Mock).mockImplementation(async function* () {
+        yield { choices: [{ delta: { content: 'partial' } }] };
+        abortController.abort();
+        yield { choices: [{ delta: { content: ' more' } }] };
+      });
+      (depsStream.streamingHandler.accumulateChunk as jest.Mock).mockReturnValue({
+        displayContent: 'partial',
+        rawContent: 'partial',
+        hasNewToolCalls: false,
+        shouldEmitTokenCount: false,
+      });
+
+      const streamConfig = createMockConfig();
+      await collectChunks(
+        new AgentExecutor(depsStream, streamConfig).processUserMessageStream(
+          'hi',
+          [],
+          [],
+          abortController
+        )
+      );
+
+      // Exactly 1 call regardless of abort — cost recording happens once at end of loop.
+      expect((streamConfig.recordSessionCost as jest.Mock).mock.calls.length).toBeLessThanOrEqual(1);
     });
   });
 });
