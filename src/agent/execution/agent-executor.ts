@@ -191,6 +191,42 @@ export interface ExecutorConfig {
 }
 
 /**
+ * Executor event — produced by the unified `runTurnLoop` async generator.
+ *
+ * Currently aliased to `StreamingChunk` to minimize friction during Phase C
+ * of the task #5 fusion (~/.claude/plans/vague1-task5-design-decisions.md).
+ * Once the dual paths collapse to a single source of truth, the streaming
+ * adapter forwards events directly and the sequential adapter maps them
+ * to ChatEntry[] (dropping streaming-only types like ask_user, tool_stream,
+ * token_count — décision #3).
+ *
+ * Future raffinement: replace alias with a proper discriminated union once
+ * we have full visibility on the streaming yield surface.
+ */
+export type ExecutorEvent = StreamingChunk;
+
+/**
+ * Phase B stub for the unified turn loop. Not yet wired to any caller.
+ * Throws so that an accidental call surfaces immediately during testing.
+ *
+ * Phase C will copy the body of `processUserMessageStream` here, converting
+ * each `yield X` to `yield { type: ..., ... }` events; the streaming adapter
+ * becomes a thin `for await` forwarder, and the sequential adapter becomes
+ * a collector that maps events to `ChatEntry[]`.
+ */
+export async function* runTurnLoop(
+  _message: string,
+  _history: ChatEntry[],
+  _messages: CodeBuddyMessage[],
+  _abortController: AbortController | null,
+): AsyncGenerator<ExecutorEvent, void, unknown> {
+  throw new Error('runTurnLoop: not implemented yet (task #5 Phase C)');
+  // Unreachable yield to keep TypeScript happy about the generator signature.
+  // eslint-disable-next-line @typescript-eslint/no-unreachable
+  yield { type: 'done' } as ExecutorEvent;
+}
+
+/**
  * AgentExecutor implements the core agentic loop
  *
  * The agentic loop follows this pattern:
