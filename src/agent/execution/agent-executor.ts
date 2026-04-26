@@ -46,7 +46,6 @@ import type { LaneQueue } from "../../concurrency/lane-queue.js";
 import type { MiddlewarePipeline, MiddlewareContext } from "../middleware/index.js";
 import type { MessageQueue } from "../message-queue.js";
 import { semanticTruncate } from "../../utils/head-tail-truncation.js";
-import { getTodoTracker } from "../todo-tracker.js";
 import { getRestorableCompressor } from "../../context/restorable-compression.js";
 import { getResponseConstraintStack, resolveToolChoice } from "../response-constraint.js";
 import type { ICMBridge } from "../../memory/icm-bridge.js";
@@ -562,25 +561,8 @@ export class AgentExecutor {
         decisionContextProvider: this.getDecisionContextProvider(),
         icmBridgeProvider: this.getICMBridgeProvider(),
         codeGraphContextProvider: this.getCodeGraphContextProvider(),
+        docsContextProvider: this.getDocsContextProvider(),
       });
-
-      // --- Documentation context: relevant doc pages for the user's query ---
-      if (ctxLevel.docs && this.getDocsContextProvider()) {
-        try {
-          const docsCtx = this.getDocsContextProvider()!(message);
-          if (docsCtx) {
-            preparedMessages.push({ role: 'system', content: `<context type="docs">\n${docsCtx}\n</context>` });
-          }
-        } catch { /* docs context optional */ }
-      }
-
-      // --- Manus AI attention bias: append todo.md context at END of messages ---
-      if (ctxLevel.todo) {
-        const todoSuffix = getTodoTracker(process.cwd()).buildContextSuffix();
-        if (todoSuffix) {
-          preparedMessages.push({ role: 'system', content: `<context type="todo">\n${todoSuffix}\n</context>` });
-        }
-      }
 
       // Check for context warnings
       const contextWarning = this.deps.contextManager.shouldWarn(preparedMessages);
@@ -1139,28 +1121,8 @@ export class AgentExecutor {
           decisionContextProvider: this.getDecisionContextProvider(),
           icmBridgeProvider: this.getICMBridgeProvider(),
           codeGraphContextProvider: this.getCodeGraphContextProvider(),
+          docsContextProvider: this.getDocsContextProvider(),
         });
-
-        // NOTE: streaming path additionally injects docs + todo at round 0;
-        // sequential path does not. Divergence preserved here pending unification.
-
-        // --- Documentation context: relevant doc pages (streaming path) ---
-        if (ctxLevel.docs && this.getDocsContextProvider()) {
-          try {
-            const docsCtxStream = this.getDocsContextProvider()!(message);
-            if (docsCtxStream) {
-              preparedMessages.push({ role: 'system', content: `<context type="docs">\n${docsCtxStream}\n</context>` });
-            }
-          } catch { /* docs context optional */ }
-        }
-
-        // --- Manus AI attention bias: append todo.md context at END of messages ---
-        if (ctxLevel.todo) {
-          const todoSuffixStream = getTodoTracker(process.cwd()).buildContextSuffix();
-          if (todoSuffixStream) {
-            preparedMessages.push({ role: 'system', content: `<context type="todo">\n${todoSuffixStream}\n</context>` });
-          }
-        }
 
         // Context warning — always check regardless of pipeline state
         {

@@ -58,6 +58,7 @@ export interface InitialContextDeps {
   decisionContextProvider: ((q: string) => Promise<string | null>) | null;
   icmBridgeProvider: (() => ICMBridgeLike | null) | null;
   codeGraphContextProvider: ((msg: string) => string | null) | null;
+  docsContextProvider?: ((msg: string) => string | null) | null;
 }
 
 /**
@@ -146,6 +147,28 @@ export async function injectInitialContext(
         });
       }
     } catch { /* code graph context optional */ }
+  }
+
+  if (deps.ctxLevel.docs && deps.docsContextProvider) {
+    try {
+      const docsCtx = deps.docsContextProvider(deps.message);
+      if (docsCtx) {
+        preparedMessages.push({
+          role: 'system',
+          content: `<context type="docs">\n${docsCtx}\n</context>`,
+        });
+      }
+    } catch { /* docs context optional */ }
+  }
+
+  if (deps.ctxLevel.todo) {
+    const todoSuffix = getTodoTracker(deps.cwd).buildContextSuffix();
+    if (todoSuffix) {
+      preparedMessages.push({
+        role: 'system',
+        content: `<context type="todo">\n${todoSuffix}\n</context>`,
+      });
+    }
   }
 }
 
