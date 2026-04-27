@@ -1111,6 +1111,10 @@ export class CodeBuddyClient {
           }
         }
       }
+      // Sync any post-payload-creation mutation of finalMessages back into the payload.
+      // The Anthropic JSON-mode hack above reassigns finalMessages to a new array;
+      // without this line, requestPayload.messages would keep pointing at the original.
+      requestPayload.messages = finalMessages;
 
       // Apply tool_choice override from options
       if (opts.tool_choice && useTools) {
