@@ -1834,4 +1834,171 @@ describe('CodeBuddyClient', () => {
       }
     });
   });
+
+  describe('Sentinel — Vague 2 Pre-Refactor Invariants', () => {
+    // These tests lock in the cross-provider invariants that must survive the
+    // strategy-pattern extraction (Vague 2). They are intentionally end-state
+    // assertions on the payload the SDK / fetch sees — not spy-on-helpers — so
+    // they remain valid if the implementation moves between client.ts and
+    // src/codebuddy/providers/.
+    const originalFetch = global.fetch;
+
+    afterEach(() => {
+      global.fetch = originalFetch;
+    });
+
+    it('dispatch parity: routes to native fetch (Gemini) when baseURL is generativelanguage.googleapis.com', async () => {
+            getModelInfo.mockReturnValue({
+        maxTokens: 8192,
+        provider: 'google',
+        isSupported: true,
+      });
+
+      const fetchMock = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          candidates: [{
+            finishReason: 'STOP',
+            content: { parts: [{ text: 'hello' }] },
+          }],
+          usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
+        }),
+      });
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      const geminiClient = new CodeBuddyClient(
+        'test-gemini-key',
+        'gemini-2.5-flash',
+        'https://generativelanguage.googleapis.com/v1beta',
+      );
+
+      await geminiClient.chat([{ role: 'user', content: 'hi' }]);
+
+      expect(fetchMock).toHaveBeenCalled();
+      expect(mockCreate).not.toHaveBeenCalled();
+      const calledUrl = fetchMock.mock.calls[0][0] as string;
+      expect(calledUrl).toContain('generativelanguage.googleapis.com');
+    });
+
+    it('dispatch parity: routes to OpenAI SDK when baseURL is not Gemini', async () => {
+      const fetchMock = jest.fn();
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      const xaiClient = new CodeBuddyClient(mockApiKey, 'grok-code-fast-1', 'https://api.x.ai/v1');
+      mockCreate.mockResolvedValueOnce({
+        choices: [{ message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+      });
+
+      await xaiClient.chat([{ role: 'user', content: 'hi' }]);
+
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+      // Gemini fetch must NOT be called for OpenAI-compat providers
+      const geminiCalls = fetchMock.mock.calls.filter(
+        (call) => typeof call[0] === 'string' && call[0].includes('generativelanguage.googleapis.com')
+      );
+      expect(geminiCalls).toHaveLength(0);
+    });
+
+    it('anthropic cache_control: last system message gets ephemeral marker on Claude provider', async () => {
+            getModelInfo.mockReturnValue({
+        maxTokens: 8192,
+        provider: 'anthropic',
+        isSupported: true,
+      });
+
+      const claudeClient = new CodeBuddyClient(mockApiKey, 'claude-3-5-sonnet', 'https://api.anthropic.com/v1');
+      mockCreate.mockResolvedValueOnce({
+        choices: [{ message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+      });
+
+      await claudeClient.chat([
+        { role: 'system', content: 'You are helpful.' },
+        { role: 'user', content: 'hi' },
+      ]);
+
+      const payload = mockCreate.mock.calls[0][0];
+      const systems = payload.messages.filter((m: CodeBuddyMessage) => m.role === 'system');
+      const lastSystem = systems[systems.length - 1] as CodeBuddyMessage & { cache_control?: { type: string } };
+      expect(lastSystem.cache_control).toEqual({ type: 'ephemeral' });
+    });
+
+    it('anthropic JSON mode: last system message gains the IMPORTANT JSON instruction', async () => {
+            getModelInfo.mockReturnValue({
+        maxTokens: 8192,
+        provider: 'anthropic',
+        isSupported: true,
+      });
+
+      const claudeClient = new CodeBuddyClient(mockApiKey, 'claude-3-5-sonnet', 'https://api.anthropic.com/v1');
+      mockCreate.mockResolvedValueOnce({
+        choices: [{ message: { role: 'assistant', content: '{"ok":true}' }, finish_reason: 'stop' }],
+      });
+
+      await claudeClient.chat(
+        [
+          { role: 'system', content: 'You are helpful.' },
+          { role: 'user', content: 'reply json' },
+        ],
+        [],
+        { responseFormat: 'json' },
+      );
+
+      const payload = mockCreate.mock.calls[0][0];
+      const systems = payload.messages.filter((m: CodeBuddyMessage) => m.role === 'system');
+      const lastSystemContent = systems[systems.length - 1].content as string;
+      expect(lastSystemContent).toContain('IMPORTANT: You must respond with valid JSON only');
+    });
+
+    it('service_tier passthrough: option appears in OpenAI-compat payload when set', async () => {
+      const xaiClient = new CodeBuddyClient(mockApiKey, 'grok-code-fast-1', 'https://api.x.ai/v1');
+      mockCreate.mockResolvedValueOnce({
+        choices: [{ message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+      });
+
+      await xaiClient.chat(
+        [{ role: 'user', content: 'hi' }],
+        [],
+        { service_tier: 'flex' },
+      );
+
+      const payload = mockCreate.mock.calls[0][0];
+      expect(payload.service_tier).toBe('flex');
+    });
+
+    it('service_tier does not leak into Gemini fetch payload', async () => {
+            getModelInfo.mockReturnValue({
+        maxTokens: 8192,
+        provider: 'google',
+        isSupported: true,
+      });
+
+      const fetchMock = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          candidates: [{
+            finishReason: 'STOP',
+            content: { parts: [{ text: 'hello' }] },
+          }],
+          usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
+        }),
+      });
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      const geminiClient = new CodeBuddyClient(
+        'test-gemini-key',
+        'gemini-2.5-flash',
+        'https://generativelanguage.googleapis.com/v1beta',
+      );
+
+      await geminiClient.chat(
+        [{ role: 'user', content: 'hi' }],
+        [],
+        { service_tier: 'flex' },
+      );
+
+      const fetchInit = fetchMock.mock.calls[0][1] as { body: string };
+      const body = JSON.parse(fetchInit.body);
+      expect(body.service_tier).toBeUndefined();
+    });
+  });
 });
