@@ -2180,5 +2180,70 @@ describe('CodeBuddyClient', () => {
       // If the chain breaks, the URL would still say gemini-2.5-flash.
       expect(calledUrl).toContain('models/gemini-3.0-pro:generateContent');
     });
+
+    // ----- Vague 2 Phase C4 — close the chatStream Anthropic asymmetry
+    // Phase A locked the chat()-side Anthropic invariants; Phase C4 closes
+    // the corresponding chatStream() gap (cache_control + IMPORTANT JSON
+    // were never emitted on streaming requests). These two assertions pin
+    // the symmetry. Without the C4 fix in provider-openai-compat.ts, both
+    // would fail.
+
+    it('chatStream() anthropic cache_control: last system message gets ephemeral marker on Claude provider', async () => {
+            getModelInfo.mockReturnValue({
+        maxTokens: 8192,
+        provider: 'anthropic',
+        isSupported: true,
+      });
+
+      const claudeClient = new CodeBuddyClient(mockApiKey, 'claude-3-5-sonnet', 'https://api.anthropic.com/v1');
+
+      async function* gen() {
+        yield { choices: [{ delta: { content: 'ok' }, index: 0, finish_reason: null }] };
+      }
+      mockCreate.mockResolvedValueOnce(gen());
+
+      for await (const _ of claudeClient.chatStream([
+        { role: 'system', content: 'You are helpful.' },
+        { role: 'user', content: 'hi' },
+      ])) {
+        // consume
+      }
+
+      const payload = mockCreate.mock.calls[0][0];
+      const systems = payload.messages.filter((m: CodeBuddyMessage) => m.role === 'system');
+      const lastSystem = systems[systems.length - 1] as CodeBuddyMessage & { cache_control?: { type: string } };
+      expect(lastSystem.cache_control).toEqual({ type: 'ephemeral' });
+    });
+
+    it('chatStream() anthropic JSON mode: last system message gains the IMPORTANT JSON instruction', async () => {
+            getModelInfo.mockReturnValue({
+        maxTokens: 8192,
+        provider: 'anthropic',
+        isSupported: true,
+      });
+
+      const claudeClient = new CodeBuddyClient(mockApiKey, 'claude-3-5-sonnet', 'https://api.anthropic.com/v1');
+
+      async function* gen() {
+        yield { choices: [{ delta: { content: '{"ok":true}' }, index: 0, finish_reason: null }] };
+      }
+      mockCreate.mockResolvedValueOnce(gen());
+
+      for await (const _ of claudeClient.chatStream(
+        [
+          { role: 'system', content: 'You are helpful.' },
+          { role: 'user', content: 'reply json' },
+        ],
+        [],
+        { responseFormat: 'json' },
+      )) {
+        // consume
+      }
+
+      const payload = mockCreate.mock.calls[0][0];
+      const systems = payload.messages.filter((m: CodeBuddyMessage) => m.role === 'system');
+      const lastSystemContent = systems[systems.length - 1].content as string;
+      expect(lastSystemContent).toContain('IMPORTANT: You must respond with valid JSON only');
+    });
   });
 });

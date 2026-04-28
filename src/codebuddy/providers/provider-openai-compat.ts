@@ -548,11 +548,22 @@ export class OpenAICompatProvider implements Provider {
       const useTools = !this.isLocalInference() && tools && tools.length > 0;
 
       // Convert tool messages for local models that don't support tool role.
-      const processedMessages = this.convertToolMessagesForLocalModels(messages);
+      let finalMessages = this.convertToolMessagesForLocalModels(messages);
+
+      // Anthropic message hooks — symmetry with chat() (Phase C4).
+      // The pre-C4 chatStream() never called these, so Claude streams missed
+      // both the cache_control breakpoint and the IMPORTANT JSON instruction.
+      const modelInfo = getModelInfo(this.currentModel);
+      if (modelInfo.provider === 'anthropic') {
+        finalMessages = injectAnthropicCacheBreakpoints(finalMessages) as CodeBuddyMessage[];
+        if (opts.responseFormat === 'json') {
+          finalMessages = injectJsonSystemPromptForAnthropic(finalMessages);
+        }
+      }
 
       const requestPayload = {
         model: opts.model || this.currentModel,
-        messages: processedMessages,
+        messages: finalMessages,
         tools: useTools ? tools : [],
         tool_choice: useTools ? 'auto' as const : undefined,
         temperature: opts.temperature ?? 0.7,
