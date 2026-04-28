@@ -2000,5 +2000,141 @@ describe('CodeBuddyClient', () => {
       const body = JSON.parse(fetchInit.body);
       expect(body.service_tier).toBeUndefined();
     });
+
+    // ----- Vague 2 Phase A — streaming-side parity additions (this session)
+    // These complete the Phase A sentinel by locking the chatStream() side of
+    // the parity matrix that the previous Phase A only checked on chat().
+    // They cover passthrough invariants that survive Phase C unification (no
+    // pinning of the chatStream() Anthropic-hack gap, which is intentional and
+    // documented to close in Phase C — see ~/.claude/plans/delightful-cuddling-rainbow.md).
+
+    it('chatStream() service_tier passthrough: option appears in OpenAI-compat streaming payload', async () => {
+      const xaiClient = new CodeBuddyClient(mockApiKey, 'grok-code-fast-1', 'https://api.x.ai/v1');
+
+      async function* gen() {
+        yield { choices: [{ delta: { content: 'ok' }, index: 0 }] };
+        yield { choices: [{ delta: {}, finish_reason: 'stop', index: 0 }] };
+      }
+      mockCreate.mockResolvedValueOnce(gen());
+
+      const chunks: unknown[] = [];
+      for await (const c of xaiClient.chatStream(
+        [{ role: 'user', content: 'hi' }],
+        [],
+        { service_tier: 'flex' },
+      )) {
+        chunks.push(c);
+      }
+
+      const payload = mockCreate.mock.calls[0][0];
+      expect(payload.service_tier).toBe('flex');
+      expect(payload.stream).toBe(true);
+    });
+
+    it('chatStream() service_tier does not leak into Gemini fetch payload', async () => {
+      (getModelInfo as jest.Mock).mockReturnValue({
+        maxTokens: 8192,
+        provider: 'google',
+        isSupported: true,
+      });
+
+      const encoder = new TextEncoder();
+      const sseLine = `data: ${JSON.stringify({
+        candidates: [
+          { content: { parts: [{ text: 'hello' }] }, finishReason: 'STOP' },
+        ],
+      })}\n\n`;
+      const reader = {
+        read: jest
+          .fn()
+          .mockResolvedValueOnce({ done: false, value: encoder.encode(sseLine) })
+          .mockResolvedValueOnce({ done: true, value: undefined }),
+      };
+      const fetchMock = jest.fn().mockResolvedValue({
+        ok: true,
+        body: { getReader: () => reader },
+      });
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      const geminiClient = new CodeBuddyClient(
+        'test-gemini-key',
+        'gemini-2.5-flash',
+        'https://generativelanguage.googleapis.com/v1beta',
+      );
+
+      for await (const _ of geminiClient.chatStream(
+        [{ role: 'user', content: 'hi' }],
+        [],
+        { service_tier: 'flex' },
+      )) {
+        // consume
+      }
+
+      const fetchInit = fetchMock.mock.calls[0][1] as { body: string };
+      const body = JSON.parse(fetchInit.body);
+      expect(body.service_tier).toBeUndefined();
+    });
+
+    it('chatStream() responseFormat=json sets response_format on OpenAI-compat streaming payload', async () => {
+      const xaiClient = new CodeBuddyClient(mockApiKey, 'grok-code-fast-1', 'https://api.x.ai/v1');
+
+      async function* gen() {
+        yield { choices: [{ delta: { content: '{}' }, index: 0 }] };
+        yield { choices: [{ delta: {}, finish_reason: 'stop', index: 0 }] };
+      }
+      mockCreate.mockResolvedValueOnce(gen());
+
+      for await (const _ of xaiClient.chatStream(
+        [{ role: 'user', content: 'reply json' }],
+        [],
+        { responseFormat: 'json' },
+      )) {
+        // consume
+      }
+
+      const payload = mockCreate.mock.calls[0][0];
+      expect(payload.response_format).toEqual({ type: 'json_object' });
+    });
+
+    it('chatStream() with Gemini provider routes to streamGenerateContent fetch, OpenAI SDK NOT called', async () => {
+      (getModelInfo as jest.Mock).mockReturnValue({
+        maxTokens: 8192,
+        provider: 'google',
+        isSupported: true,
+      });
+
+      const encoder = new TextEncoder();
+      const sseLine = `data: ${JSON.stringify({
+        candidates: [
+          { content: { parts: [{ text: 'hello' }] }, finishReason: 'STOP' },
+        ],
+      })}\n\n`;
+      const reader = {
+        read: jest
+          .fn()
+          .mockResolvedValueOnce({ done: false, value: encoder.encode(sseLine) })
+          .mockResolvedValueOnce({ done: true, value: undefined }),
+      };
+      const fetchMock = jest.fn().mockResolvedValue({
+        ok: true,
+        body: { getReader: () => reader },
+      });
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      const geminiClient = new CodeBuddyClient(
+        'test-gemini-key',
+        'gemini-2.5-flash',
+        'https://generativelanguage.googleapis.com/v1beta',
+      );
+
+      for await (const _ of geminiClient.chatStream([{ role: 'user', content: 'hi' }])) {
+        // consume
+      }
+
+      expect(fetchMock).toHaveBeenCalled();
+      const calledUrl = fetchMock.mock.calls[0][0] as string;
+      expect(calledUrl).toContain('streamGenerateContent');
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
   });
 });
