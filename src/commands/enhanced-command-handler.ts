@@ -156,7 +156,7 @@ import {
   handleInfra,
 } from "./handlers/index.js";
 
-import { handleLessonsCommand } from "./handlers/lessons-handler.js";
+import { handleLessonsCommand } from "./handlers/index.js";
 import { handleContextStats } from "./handlers/extra-handlers.js";
 import { handlePromptCommand as handlePromptCommandRaw } from "./slash/prompt-commands.js";
 import {

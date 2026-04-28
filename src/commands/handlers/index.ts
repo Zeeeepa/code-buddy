@@ -147,10 +147,10 @@ export {
   handleModelRouter as handleModelRouterCommand,
 } from './research-handlers.js';
 
-// Track handlers (Conductor-inspired)
+// Track handlers (Conductor-inspired) — consolidated into lightweight.ts (V3.C)
 export {
   handleTrack,
-} from './track-handlers.js';
+} from './lightweight.js';
 
 // Plugin handlers
 export {
@@ -270,10 +270,10 @@ export {
   handleConflicts,
 } from './conflicts-handler.js';
 
-// Vulns handler (dependency vulnerability scanner)
+// Vulns handler (dependency vulnerability scanner) — consolidated into lightweight.ts (V3.C)
 export {
   handleVulns,
-} from './vulns-handler.js';
+} from './lightweight.js';
 
 // Bug handler (static analysis bug scanner)
 export {
@@ -285,25 +285,30 @@ export {
   handleSuggest,
 } from './suggest-handler.js';
 
-// Telemetry handler (opt-in/opt-out toggle)
+// Telemetry handler (opt-in/opt-out toggle) — consolidated into lightweight.ts (V3.C)
 export {
   handleTelemetry,
-} from './telemetry-handler.js';
+} from './lightweight.js';
 
-// Quota handler (rate limit display)
+// Quota handler (rate limit display) — consolidated into lightweight.ts (V3.C)
 export {
   handleQuota,
-} from './quota-handler.js';
+} from './lightweight.js';
 
 // Voice-code handler (voice-to-code pipeline)
 export {
   handleVoiceCode,
 } from './voice-code-handler.js';
 
-// Coverage handler (coverage target checking)
+// Coverage handler (coverage target checking) — consolidated into lightweight.ts (V3.C)
 export {
   handleCoverage,
-} from './coverage-handler.js';
+} from './lightweight.js';
+
+// Lessons handler — consolidated into lightweight.ts (V3.C)
+export {
+  handleLessonsCommand,
+} from './lightweight.js';
 
 // Transform handler (code transformation)
 export {
