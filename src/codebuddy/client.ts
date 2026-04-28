@@ -10,6 +10,10 @@ import type { CircuitBreakerConfig } from "../providers/circuit-breaker.js";
 import { parseRateLimitHeaders, storeRateLimitInfo } from "../utils/rate-limit-display.js";
 import { mapProviderError } from "../errors/index.js";
 import { GeminiNativeProvider } from "./providers/provider-gemini-native.js";
+import {
+  injectAnthropicCacheBreakpoints,
+  injectJsonSystemPromptForAnthropic,
+} from "./providers/provider-openai-compat-hooks.js";
 
 export type CodeBuddyMessage = ChatCompletionMessageParam;
 
@@ -612,17 +616,13 @@ export class CodeBuddyClient {
       // Disable tools for local inference (LM Studio) as they may not support function calling
       const useTools = !this.isLocalInference() && tools && tools.length > 0;
 
-      // Inject Anthropic prompt-cache breakpoints (Manus AI #20)
+      // Inject Anthropic prompt-cache breakpoints (Manus AI #20).
       // Marks the last system message with cache_control so the stable prefix is always cached.
+      // Hook lives in src/codebuddy/providers/provider-openai-compat-hooks.ts (Phase C1).
       let finalMessages: CodeBuddyMessage[] = messages;
       const modelInfo = getModelInfo(this.currentModel);
       if (modelInfo.provider === 'anthropic') {
-        try {
-          const { injectAnthropicCacheBreakpoints } = await import('../optimization/cache-breakpoints.js');
-          finalMessages = injectAnthropicCacheBreakpoints(messages) as CodeBuddyMessage[];
-        } catch {
-          // Non-critical: proceed without cache breakpoints
-        }
+        finalMessages = injectAnthropicCacheBreakpoints(messages) as CodeBuddyMessage[];
       }
 
       const requestPayload: ChatRequestPayload = {
@@ -653,27 +653,18 @@ export class CodeBuddyClient {
         requestPayload.service_tier = opts.service_tier;
       }
 
-      // JSON mode: add response_format for OpenAI/xAI providers
+      // JSON mode: add response_format for OpenAI/xAI providers.
+      // For Anthropic, also inject the system-prompt instruction since the API
+      // has no native equivalent. Hook lives in provider-openai-compat-hooks.ts.
       if (opts.responseFormat === 'json') {
         (requestPayload as unknown as Record<string, unknown>).response_format = { type: 'json_object' };
-        // For Anthropic, inject JSON instruction into system prompt since no native API
         if (modelInfo.provider === 'anthropic') {
-          const lastSystemIdx = finalMessages.findLastIndex(m => m.role === 'system');
-          if (lastSystemIdx >= 0) {
-            const sysMsg = finalMessages[lastSystemIdx];
-            if (typeof sysMsg.content === 'string') {
-              finalMessages = [...finalMessages];
-              finalMessages[lastSystemIdx] = {
-                ...sysMsg,
-                content: sysMsg.content + '\n\nIMPORTANT: You must respond with valid JSON only. No markdown, no explanation — just a JSON object.',
-              };
-            }
-          }
+          finalMessages = injectJsonSystemPromptForAnthropic(finalMessages);
         }
       }
       // Sync any post-payload-creation mutation of finalMessages back into the payload.
-      // The Anthropic JSON-mode hack above reassigns finalMessages to a new array;
-      // without this line, requestPayload.messages would keep pointing at the original.
+      // injectJsonSystemPromptForAnthropic above returns a new array; without
+      // this line, requestPayload.messages would keep pointing at the original.
       requestPayload.messages = finalMessages;
 
       // Apply tool_choice override from options
