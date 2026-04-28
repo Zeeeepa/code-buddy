@@ -553,15 +553,6 @@ export const TOOL_METADATA: ToolMetadata[] = [
     description: 'Scan source files for hardcoded secrets, credentials, and API keys'
   },
 
-  // Import management
-  {
-    name: 'organize_imports',
-    category: 'file_write' as ToolCategory,
-    keywords: ['import', 'organize', 'unused', 'missing', 'add import', 'remove import', 'sort', 'cleanup', 'typescript', 'python'],
-    priority: 6,
-    description: 'Organize, add missing, or remove unused imports in source files'
-  },
-
   // Log analyzer
   {
     name: 'analyze_logs',

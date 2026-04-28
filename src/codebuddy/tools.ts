@@ -39,7 +39,6 @@ import {
   FIRECRAWL_TOOLS,
   LSP_TOOLS,
   SECRETS_TOOLS,
-  IMPORT_TOOLS,
   LOG_ANALYZER_TOOLS,
   OPENAPI_TOOLS,
   LICENSE_SCANNER_TOOLS,
@@ -128,9 +127,6 @@ export function initializeToolRegistry(): void {
 
   // Secrets detector tools
   registerGroup(SECRETS_TOOLS);
-
-  // Import management tools
-  registerGroup(IMPORT_TOOLS);
 
   // Log analyzer tools
   registerGroup(LOG_ANALYZER_TOOLS);
