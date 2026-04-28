@@ -1,0 +1,857 @@
+/**
+ * Gemini native provider — Vague 2 Phase B.
+ *
+ * Migrated verbatim from `client.ts` (rev 17b148d). The only behavioral
+ * differences vs the inlined version:
+ *  - logger sources renamed `'CodeBuddyClient'` → `'GeminiNativeProvider'`
+ *  - public methods renamed `geminiChat`/`geminiChatStream` → `chat`/`chatStream`
+ *
+ * Known asymmetry preserved (will be addressed in Phase C or later):
+ *  - This provider uses raw `retry()` for fetch calls, NOT `withCircuitBreaker`.
+ *    The OpenAI-compat path wraps both `chat` and `chatStream` in a circuit
+ *    breaker. Aligning the two is out of scope for Phase B.
+ *  - `trackPromptCache` is OpenAI-compat-only (Gemini does not surface
+ *    `cached_tokens` in usageMetadata). This provider has no internal
+ *    cache stats.
+ *  - Rate-limit headers are not parsed (Gemini fetch bypasses
+ *    `parseRateLimitHeaders`).
+ */
+
+import type { ChatCompletionChunk } from 'openai/resources/chat';
+import { logger } from '../../utils/logger.js';
+import { retry, RetryStrategies, RetryPredicates } from '../../utils/retry.js';
+import type {
+  CodeBuddyMessage,
+  CodeBuddyTool,
+  CodeBuddyResponse,
+  CodeBuddyToolCall,
+  ChatOptions,
+  GeminiThinkingLevel,
+} from '../client.js';
+import type { Provider } from './provider-interface.js';
+
+export interface GeminiNativeProviderOptions {
+  apiKey: string;
+  baseURL: string;
+  model: string;
+  defaultMaxTokens: number;
+  geminiRequestTimeoutMs: number;
+  defaultThinkingLevel?: GeminiThinkingLevel;
+}
+
+export class GeminiNativeProvider implements Provider {
+  private apiKey: string;
+  private baseURL: string;
+  private currentModel: string;
+  private defaultMaxTokens: number;
+  private geminiRequestTimeoutMs: number;
+  private defaultThinkingLevel: GeminiThinkingLevel | undefined;
+
+  /**
+   * Gemini type mapping: lowercase OpenAI types to uppercase Gemini types
+   */
+  private static readonly GEMINI_TYPE_MAP: Record<string, string> = {
+    'string': 'STRING',
+    'number': 'NUMBER',
+    'integer': 'INTEGER',
+    'boolean': 'BOOLEAN',
+    'array': 'ARRAY',
+    'object': 'OBJECT',
+  };
+
+  constructor(opts: GeminiNativeProviderOptions) {
+    this.apiKey = opts.apiKey;
+    this.baseURL = opts.baseURL;
+    this.currentModel = opts.model;
+    this.defaultMaxTokens = opts.defaultMaxTokens;
+    this.geminiRequestTimeoutMs = opts.geminiRequestTimeoutMs;
+    this.defaultThinkingLevel = opts.defaultThinkingLevel;
+    logger.info('Using native Gemini API');
+  }
+
+  setModel(model: string): void {
+    this.currentModel = model;
+  }
+
+  setDefaultThinkingLevel(level: GeminiThinkingLevel): void {
+    this.defaultThinkingLevel = level;
+  }
+
+  private buildGeminiBody(
+    messages: CodeBuddyMessage[],
+    tools?: CodeBuddyTool[],
+    opts?: ChatOptions
+  ): Record<string, unknown> {
+    // Convert messages to Gemini format
+    const contents: Array<{
+      role: string;
+      parts: Array<{ text?: string; functionResponse?: { name: string; response: unknown }; inlineData?: { mimeType: string; data: string } }>;
+    }> = [];
+
+    let systemInstruction: { parts: Array<{ text: string }> } | undefined;
+
+    for (const msg of messages) {
+      if (msg.role === 'system') {
+        // Gemini uses systemInstruction instead of system message
+        systemInstruction = { parts: [{ text: String(msg.content) }] };
+      } else if (msg.role === 'user') {
+        const parts = this.convertContentToGeminiParts(msg.content);
+        contents.push({ role: 'user', parts });
+      } else if (msg.role === 'assistant') {
+        const assistantMsg = msg as { content?: string | null; tool_calls?: CodeBuddyToolCall[] };
+        if (assistantMsg.tool_calls && assistantMsg.tool_calls.length > 0) {
+          // Assistant with tool calls
+          const parts: Array<{ functionCall?: { name: string; args: unknown }; text?: string }> = [];
+          if (assistantMsg.content) {
+            parts.push({ text: assistantMsg.content });
+          }
+          for (const tc of assistantMsg.tool_calls) {
+            let args: unknown;
+            try {
+              args = JSON.parse(tc.function.arguments);
+            } catch {
+              args = {};
+            }
+            parts.push({
+              functionCall: {
+                name: tc.function.name,
+                args,
+              },
+            });
+          }
+          contents.push({ role: 'model', parts: parts as Array<{ text?: string; functionResponse?: { name: string; response: unknown } }> });
+        } else {
+          contents.push({
+            role: 'model',
+            parts: [{ text: String(msg.content || '') }],
+          });
+        }
+      } else if (msg.role === 'tool') {
+        const toolMsg = msg as { tool_call_id?: string; name?: string; content?: string };
+        const functionName = toolMsg.name || toolMsg.tool_call_id || 'unknown';
+
+        logger.debug('Adding functionResponse to Gemini request', {
+          source: 'GeminiNativeProvider',
+          functionName,
+          hasName: !!toolMsg.name,
+          toolCallId: toolMsg.tool_call_id,
+          contentLength: toolMsg.content?.length || 0,
+        });
+
+        const part = {
+          functionResponse: {
+            name: functionName,
+            response: { result: toolMsg.content },
+          },
+        };
+        // Merge consecutive tool results into a single 'function' turn
+        // (Gemini requires strict role alternation)
+        const lastContent = contents[contents.length - 1];
+        if (lastContent && lastContent.role === 'function') {
+          lastContent.parts.push(part);
+        } else {
+          contents.push({ role: 'function', parts: [part] });
+        }
+      }
+    }
+
+    // Sanitize contents for Gemini's strict conversation rules:
+    // 1. Must start with 'user'
+    // 2. No consecutive same-role turns
+    // 3. 'function' must immediately follow 'model' with functionCall
+    // 4. 'model' with functionCall must be immediately followed by 'function'
+    // Context compression can break these rules by removing intermediate messages.
+
+    // Pass 1: Drop orphaned function responses and strip orphaned functionCalls
+    const sanitized: typeof contents = [];
+    for (let i = 0; i < contents.length; i++) {
+      const entry = contents[i];
+      if (entry.role === 'function') {
+        const prev = sanitized[sanitized.length - 1];
+        if (prev && prev.role === 'model' && prev.parts.some(p => 'functionCall' in p)) {
+          sanitized.push(entry);
+        }
+        // else: drop orphaned function response
+      } else if (entry.role === 'model' && entry.parts.some(p => 'functionCall' in p)) {
+        const next = contents[i + 1];
+        if (next && next.role === 'function') {
+          sanitized.push(entry);
+        } else {
+          // Strip functionCall parts, keep text only
+          const textParts = entry.parts.filter(p => 'text' in p && p.text);
+          if (textParts.length > 0) {
+            sanitized.push({ role: 'model', parts: textParts });
+          }
+        }
+      } else {
+        sanitized.push(entry);
+      }
+    }
+
+    // Pass 2: Merge consecutive same-role entries
+    const merged: typeof contents = [];
+    for (const entry of sanitized) {
+      const prev = merged[merged.length - 1];
+      if (prev && prev.role === entry.role) {
+        prev.parts.push(...entry.parts);
+      } else {
+        merged.push(entry);
+      }
+    }
+
+    // Pass 3: Ensure conversation starts with 'user'
+    if (merged.length > 0 && merged[0].role !== 'user') {
+      merged.unshift({ role: 'user', parts: [{ text: '(continuing previous conversation)' }] });
+    }
+
+    // Build request body
+    // Build generationConfig with optional thinkingConfig for Gemini 3.x
+    const generationConfig: Record<string, unknown> = {
+      temperature: opts?.temperature ?? 0.7,
+      maxOutputTokens: this.defaultMaxTokens,
+    };
+
+    // Add thinkingLevel for Gemini 3.x models (never mix with budget_tokens)
+    // Use explicitly passed level, or fall back to the default from settings
+    const effectiveThinkingLevel = opts?.thinkingLevel || this.defaultThinkingLevel;
+    if (effectiveThinkingLevel) {
+      generationConfig.thinkingConfig = {
+        thinkingLevel: effectiveThinkingLevel,
+      };
+      logger.debug('Gemini thinkingLevel set', { level: effectiveThinkingLevel });
+    }
+
+    // JSON mode for Gemini: add responseMimeType
+    if (opts?.responseFormat === 'json') {
+      generationConfig.responseMimeType = 'application/json';
+    }
+
+    const body: Record<string, unknown> = {
+      contents: merged,
+      generationConfig,
+    };
+
+    if (systemInstruction) {
+      body.systemInstruction = systemInstruction;
+    }
+
+    // Add tools if provided
+    if (tools && tools.length > 0) {
+      const functionDeclarations = tools.map(tool => ({
+        name: tool.function.name,
+        description: tool.function.description,
+        parameters: this.sanitizeSchemaForGemini(tool.function.parameters),
+      }));
+      body.tools = [{ functionDeclarations }];
+      body.toolConfig = { functionCallingConfig: { mode: 'AUTO' } };
+
+      // Log first tool's sanitized schema for debugging
+      if (functionDeclarations.length > 0) {
+        logger.debug('Gemini tool schema sample (first tool)', {
+          source: 'GeminiNativeProvider',
+          toolName: functionDeclarations[0].name,
+          parametersType: (functionDeclarations[0].parameters as Record<string, unknown>)?.type,
+        });
+      }
+    }
+
+    // Log request for debugging
+    logger.debug('Gemini request body built', {
+      source: 'GeminiNativeProvider',
+      contentsCount: merged.length,
+      hasTools: !!(tools && tools.length > 0),
+      toolCount: tools?.length || 0,
+      toolNames: tools?.slice(0, 10).map(t => t.function.name).join(', ') || 'none',
+    });
+
+    return body;
+  }
+
+  /**
+   * Gemini-specific chat implementation
+   */
+  async chat(
+    messages: CodeBuddyMessage[],
+    tools?: CodeBuddyTool[],
+    opts?: ChatOptions
+  ): Promise<CodeBuddyResponse> {
+    const model = opts?.model || this.currentModel;
+    const malformedRetryCount = opts?.geminiMalformedRetryCount ?? 0;
+    const url = `${this.baseURL}/models/${model}:generateContent`;
+    const requestTimeoutMs =
+      opts?.timeoutMs && opts.timeoutMs >= 1000 ? opts.timeoutMs : this.geminiRequestTimeoutMs;
+
+    const body = this.buildGeminiBody(messages, tools, opts);
+
+    // Log request for debugging
+    logger.debug('Gemini request', {
+      source: 'GeminiNativeProvider',
+      model,
+      hasTools: !!(tools && tools.length > 0),
+      toolCount: tools?.length || 0,
+    });
+
+    let response: Response;
+    try {
+      // Make request with retry
+      response = await retry(
+        async () => {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), requestTimeoutMs);
+          let res: Response;
+          try {
+            res = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': this.apiKey,
+              },
+              body: JSON.stringify(body),
+              signal: controller.signal,
+            });
+          } finally {
+            clearTimeout(timeoutId);
+          }
+
+          if (!res.ok) {
+            const errorText = await res.text();
+            logger.error('Gemini API error', {
+              source: 'GeminiNativeProvider',
+              status: res.status,
+              statusText: res.statusText,
+              errorBody: errorText?.substring(0, 500),
+            });
+            throw new Error(`${res.status} ${errorText || res.statusText}`);
+          }
+
+          return res;
+        },
+        {
+          ...RetryStrategies.llmApi,
+          timeout: requestTimeoutMs * 2,
+          isRetryable: RetryPredicates.llmApiError,
+          onRetry: (error, attempt, delay) => {
+            logger.warn(`Gemini API call failed, retrying (attempt ${attempt}) in ${delay}ms...`, {
+              source: 'GeminiNativeProvider',
+              error: error instanceof Error ? error.message : String(error),
+              requestTimeoutMs,
+            });
+          },
+        }
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const looksLikeModel404 =
+        message.includes('404') &&
+        message.includes('models/') &&
+        message.includes('is not found');
+      const alreadyTriedFallback = opts?.geminiModelFallbackTried === true;
+
+      if (looksLikeModel404 && !alreadyTriedFallback && model !== 'gemini-2.5-flash') {
+        logger.warn('Gemini model not found, retrying with fallback model', {
+          source: 'GeminiNativeProvider',
+          originalModel: model,
+          fallbackModel: 'gemini-2.5-flash',
+        });
+        return await this.chat(messages, tools, {
+          ...opts,
+          model: 'gemini-2.5-flash',
+          geminiModelFallbackTried: true,
+        });
+      }
+      throw error;
+    }
+
+    const data = await response.json() as {
+      candidates: Array<{
+        content: {
+          parts: Array<{ text?: string; functionCall?: { name: string; args: unknown } }>;
+        };
+        finishReason: string;
+      }>;
+      usageMetadata?: {
+        promptTokenCount?: number;
+        candidatesTokenCount?: number;
+        totalTokenCount?: number;
+      };
+    };
+
+    // Convert response to CodeBuddy format
+    const candidate = data.candidates?.[0];
+
+    // Handle MALFORMED_FUNCTION_CALL: Gemini sometimes generates Python-style
+    // calls instead of strict JSON tool-call args.
+    if (candidate && !candidate.content && candidate.finishReason === 'MALFORMED_FUNCTION_CALL') {
+      const finishMsg = (candidate as { finishMessage?: string }).finishMessage || '';
+      logger.warn('Gemini returned MALFORMED_FUNCTION_CALL, requesting retry', {
+        source: 'GeminiNativeProvider',
+        snippet: finishMsg.substring(0, 200),
+        malformedRetryCount,
+      });
+
+      if (malformedRetryCount < 2) {
+        const recoverySystemMessage: CodeBuddyMessage = {
+          role: 'system',
+          content: 'Retry tool calling with strict JSON arguments only. Do not emit Python-style function syntax.',
+        };
+        return await this.chat(
+          [...messages, recoverySystemMessage],
+          tools,
+          { ...opts, geminiMalformedRetryCount: malformedRetryCount + 1 },
+        );
+      }
+
+      return {
+        choices: [{
+          message: {
+            role: 'assistant',
+            content: 'I generated a malformed function call. Let me retry with the correct tool format. I need to use proper JSON arguments, not Python syntax.',
+            tool_calls: undefined,
+          },
+          finish_reason: 'stop',
+        }],
+        usage: {
+          prompt_tokens: data.usageMetadata?.promptTokenCount ?? 0,
+          completion_tokens: 0,
+          total_tokens: data.usageMetadata?.totalTokenCount ?? 0,
+        },
+      };
+    }
+
+    if (!candidate || !candidate.content) {
+      logger.error('Gemini response missing candidate or content', {
+        source: 'GeminiNativeProvider',
+        hasCandidates: !!data.candidates,
+        candidatesLength: data.candidates?.length,
+        rawResponse: JSON.stringify(data).substring(0, 500),
+      });
+      throw new Error('Invalid Gemini response: missing candidate content');
+    }
+
+    // Handle empty content (Gemini may return content without parts for certain queries)
+    if (!candidate.content.parts || candidate.content.parts.length === 0) {
+      logger.warn('Gemini returned empty content parts', {
+        source: 'GeminiNativeProvider',
+        finishReason: candidate.finishReason,
+      });
+      // Return a graceful response instead of throwing
+      return {
+        choices: [{
+          message: {
+            role: 'assistant',
+            content: "Je ne peux pas répondre à cette question. Il s'agit peut-être d'une requête nécessitant des données en temps réel (météo, actualités) auxquelles je n'ai pas accès, ou d'une question que le modèle ne peut pas traiter.",
+            tool_calls: undefined,
+          },
+          finish_reason: candidate.finishReason || 'stop',
+        }],
+        usage: {
+          prompt_tokens: data.usageMetadata?.promptTokenCount ?? 0,
+          completion_tokens: 0,
+          total_tokens: data.usageMetadata?.totalTokenCount ?? 0,
+        },
+      };
+    }
+
+    const toolCalls: CodeBuddyToolCall[] = [];
+    let content = '';
+
+    for (const part of candidate.content.parts) {
+      if (part.text) {
+        content += part.text;
+      } else if (part.functionCall) {
+        const toolCall = {
+          id: `call_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+          type: 'function' as const,
+          function: {
+            name: part.functionCall.name,
+            arguments: JSON.stringify(part.functionCall.args),
+          },
+        };
+        toolCalls.push(toolCall);
+        logger.debug('Gemini tool call extracted', {
+          source: 'GeminiNativeProvider',
+          toolName: part.functionCall.name,
+          args: JSON.stringify(part.functionCall.args).substring(0, 200),
+        });
+      }
+    }
+
+    // Log response summary
+    logger.debug('Gemini response parsed', {
+      source: 'GeminiNativeProvider',
+      hasContent: !!content,
+      contentLength: content.length,
+      toolCallCount: toolCalls.length,
+      finishReason: candidate.finishReason,
+    });
+
+    return {
+      choices: [{
+        message: {
+          role: 'assistant',
+          content: content || null,
+          tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+        },
+        finish_reason: candidate.finishReason === 'STOP' ? 'stop' : candidate.finishReason.toLowerCase(),
+      }],
+      usage: data.usageMetadata ? {
+        prompt_tokens: data.usageMetadata.promptTokenCount || 0,
+        completion_tokens: data.usageMetadata.candidatesTokenCount || 0,
+        total_tokens: data.usageMetadata.totalTokenCount || 0,
+      } : undefined,
+    };
+  }
+
+  private convertContentToGeminiParts(
+    content: string | Array<{ type: string; text?: string; image_url?: { url: string } }> | null | undefined
+  ): Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> {
+    if (!content) {
+      return [{ text: '' }];
+    }
+    if (typeof content === 'string') {
+      return [{ text: content }];
+    }
+    const parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [];
+    for (const part of content) {
+      if (part.type === 'text' && part.text) {
+        parts.push({ text: part.text });
+      } else if (part.type === 'image_url' && part.image_url) {
+        const { mimeType, data } = this.parseDataUrl(part.image_url.url);
+        parts.push({ inlineData: { mimeType, data } });
+      }
+    }
+    return parts.length > 0 ? parts : [{ text: '' }];
+  }
+
+  private parseDataUrl(url: string): { mimeType: string; data: string } {
+    const match = url.match(/^data:([^;]+);base64,(.+)$/);
+    if (match) {
+      return { mimeType: match[1], data: match[2] };
+    }
+    return { mimeType: 'image/png', data: url };
+  }
+
+  /**
+   * Sanitize JSON Schema for Gemini API compatibility
+   * - Converts lowercase types to uppercase (string -> STRING, object -> OBJECT)
+   * - Ensures all array types have 'items' defined
+   */
+  private sanitizeSchemaForGemini(schema: Record<string, unknown>): Record<string, unknown> {
+    if (!schema || typeof schema !== 'object') {
+      return schema;
+    }
+
+    const result: Record<string, unknown> = { ...schema };
+
+    // Convert lowercase type to uppercase for Gemini
+    if (typeof result.type === 'string') {
+      const upperType = GeminiNativeProvider.GEMINI_TYPE_MAP[result.type.toLowerCase()];
+      if (upperType) {
+        result.type = upperType;
+      }
+    }
+
+    // If this is an array type without items, add default items (use uppercase for Gemini)
+    if (result.type === 'ARRAY' && !result.items) {
+      result.items = { type: 'OBJECT' };
+      logger.debug('Added missing items to array schema', {
+        source: 'GeminiNativeProvider',
+      });
+    }
+
+    // Recursively sanitize properties
+    if (result.properties && typeof result.properties === 'object') {
+      const props = result.properties as Record<string, Record<string, unknown>>;
+      const sanitizedProps: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(props)) {
+        sanitizedProps[key] = this.sanitizeSchemaForGemini(value);
+      }
+      result.properties = sanitizedProps;
+
+      // Filter required to only include properties that actually exist
+      if (Array.isArray(result.required)) {
+        const propKeys = new Set(Object.keys(sanitizedProps));
+        result.required = (result.required as string[]).filter(r => propKeys.has(r));
+        if ((result.required as string[]).length === 0) {
+          delete result.required;
+        }
+      }
+    }
+
+    // Recursively sanitize items if present
+    if (result.items && typeof result.items === 'object') {
+      result.items = this.sanitizeSchemaForGemini(result.items as Record<string, unknown>);
+    }
+
+    // Recursively sanitize enum values (keep as-is, just ensure array items are sanitized)
+    if (result.enum && Array.isArray(result.enum)) {
+      // Enum values stay as-is (they're string values, not types)
+    }
+
+    return result;
+  }
+
+  /**
+   * Parse Gemini SSE stream into individual JSON chunks
+   */
+  private async *parseGeminiSSE(
+    reader: ReadableStreamDefaultReader<Uint8Array>
+  ): AsyncGenerator<Record<string, unknown>, void, unknown> {
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Split on SSE boundaries
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('data: ')) {
+          const jsonStr = trimmed.slice(6);
+          if (jsonStr === '[DONE]') return;
+          try {
+            yield JSON.parse(jsonStr);
+          } catch {
+            // Skip malformed JSON lines
+          }
+        }
+      }
+    }
+
+    // Process remaining buffer
+    if (buffer.trim().startsWith('data: ')) {
+      const jsonStr = buffer.trim().slice(6);
+      if (jsonStr !== '[DONE]') {
+        try {
+          yield JSON.parse(jsonStr);
+        } catch {
+          // Skip malformed JSON
+        }
+      }
+    }
+  }
+
+  /**
+   * Gemini-specific streaming using streamGenerateContent SSE API
+   */
+  async *chatStream(
+    messages: CodeBuddyMessage[],
+    tools?: CodeBuddyTool[],
+    opts?: ChatOptions
+  ): AsyncGenerator<ChatCompletionChunk, void, unknown> {
+    const model = opts?.model || this.currentModel;
+    const streamUrl = `${this.baseURL}/models/${model}:streamGenerateContent?alt=sse`;
+    const requestTimeoutMs =
+      opts?.timeoutMs && opts.timeoutMs >= 1000 ? opts.timeoutMs : this.geminiRequestTimeoutMs;
+
+    try {
+      // Build the same request body as chat
+      const body = this.buildGeminiBody(messages, tools, opts);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), requestTimeoutMs);
+
+      let res: Response;
+      try {
+        res = await fetch(streamUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': this.apiKey,
+          },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      if (!res.ok) {
+        // Fallback to non-streaming on error
+        logger.warn('Gemini streaming failed, falling back to non-streaming', {
+          source: 'GeminiNativeProvider',
+          status: res.status,
+        });
+        yield* this.geminiChatStreamFallback(messages, tools, opts);
+        return;
+      }
+
+      if (!res.body) {
+        yield* this.geminiChatStreamFallback(messages, tools, opts);
+        return;
+      }
+
+      const reader = res.body.getReader();
+      let chunkIndex = 0;
+
+      for await (const chunk of this.parseGeminiSSE(reader)) {
+        const candidates = (chunk as Record<string, unknown>).candidates as Array<Record<string, unknown>> | undefined;
+        if (!candidates || candidates.length === 0) continue;
+
+        const candidate = candidates[0];
+        const content = candidate.content as { parts?: Array<Record<string, unknown>> } | undefined;
+        const parts = content?.parts;
+        if (!parts) continue;
+
+        for (const part of parts) {
+          if (part.text) {
+            yield {
+              id: `chatcmpl-gemini-${Date.now()}-${chunkIndex++}`,
+              object: 'chat.completion.chunk' as const,
+              created: Math.floor(Date.now() / 1000),
+              model,
+              choices: [{
+                index: 0,
+                delta: {
+                  role: 'assistant' as const,
+                  content: part.text as string,
+                },
+                finish_reason: null,
+              }],
+            };
+          }
+
+          if (part.functionCall) {
+            const fc = part.functionCall as { name: string; args?: Record<string, unknown> };
+            yield {
+              id: `chatcmpl-gemini-${Date.now()}-${chunkIndex++}`,
+              object: 'chat.completion.chunk' as const,
+              created: Math.floor(Date.now() / 1000),
+              model,
+              choices: [{
+                index: 0,
+                delta: {
+                  tool_calls: [{
+                    index: 0,
+                    id: `call_${Date.now()}_${chunkIndex}`,
+                    type: 'function' as const,
+                    function: {
+                      name: fc.name,
+                      arguments: JSON.stringify(fc.args || {}),
+                    },
+                  }],
+                },
+                finish_reason: null,
+              }],
+            };
+          }
+        }
+
+        // Check for finish reason
+        const finishReason = candidate.finishReason as string | undefined;
+        if (finishReason && finishReason !== 'STOP') {
+          // Map Gemini finish reasons to OpenAI format
+          const finishMap: Record<string, string> = {
+            'STOP': 'stop',
+            'MAX_TOKENS': 'length',
+            'SAFETY': 'content_filter',
+            'RECITATION': 'content_filter',
+          };
+          const mappedReason = finishMap[finishReason] || 'stop';
+          yield {
+            id: `chatcmpl-gemini-${Date.now()}-${chunkIndex++}`,
+            object: 'chat.completion.chunk' as const,
+            created: Math.floor(Date.now() / 1000),
+            model,
+            choices: [{
+              index: 0,
+              delta: {},
+              finish_reason: mappedReason as 'stop' | 'tool_calls' | 'length' | 'content_filter' | null,
+            }],
+          };
+        }
+      }
+
+      // Final stop chunk
+      yield {
+        id: `chatcmpl-gemini-${Date.now()}-${chunkIndex}`,
+        object: 'chat.completion.chunk' as const,
+        created: Math.floor(Date.now() / 1000),
+        model,
+        choices: [{
+          index: 0,
+          delta: {},
+          finish_reason: 'stop',
+        }],
+      };
+    } catch (error) {
+      logger.warn('Gemini streaming error, falling back to non-streaming', {
+        source: 'GeminiNativeProvider',
+        error: error instanceof Error ? error.message : String(error),
+      });
+      yield* this.geminiChatStreamFallback(messages, tools, opts);
+    }
+  }
+
+  /**
+   * Fallback: non-streaming Gemini call emitted as synthetic chunks
+   */
+  private async *geminiChatStreamFallback(
+    messages: CodeBuddyMessage[],
+    tools?: CodeBuddyTool[],
+    opts?: ChatOptions
+  ): AsyncGenerator<ChatCompletionChunk, void, unknown> {
+    const response = await this.chat(messages, tools, opts);
+    const choice = response.choices[0];
+
+    if (choice.message.content) {
+      yield {
+        id: `chatcmpl-${Date.now()}`,
+        object: 'chat.completion.chunk' as const,
+        created: Math.floor(Date.now() / 1000),
+        model: opts?.model || this.currentModel,
+        choices: [{
+          index: 0,
+          delta: {
+            role: 'assistant' as const,
+            content: choice.message.content,
+          },
+          finish_reason: null,
+        }],
+      };
+    }
+
+    if (choice.message.tool_calls && choice.message.tool_calls.length > 0) {
+      for (const toolCall of choice.message.tool_calls) {
+        yield {
+          id: `chatcmpl-${Date.now()}`,
+          object: 'chat.completion.chunk' as const,
+          created: Math.floor(Date.now() / 1000),
+          model: opts?.model || this.currentModel,
+          choices: [{
+            index: 0,
+            delta: {
+              tool_calls: [{
+                index: 0,
+                id: toolCall.id,
+                type: 'function' as const,
+                function: {
+                  name: toolCall.function.name,
+                  arguments: toolCall.function.arguments,
+                },
+              }],
+            },
+            finish_reason: null,
+          }],
+        };
+      }
+    }
+
+    yield {
+      id: `chatcmpl-${Date.now()}`,
+      object: 'chat.completion.chunk' as const,
+      created: Math.floor(Date.now() / 1000),
+      model: opts?.model || this.currentModel,
+      choices: [{
+        index: 0,
+        delta: {},
+        finish_reason: choice.finish_reason as 'stop' | 'tool_calls' | 'length' | 'content_filter' | null,
+      }],
+    };
+  }
+}

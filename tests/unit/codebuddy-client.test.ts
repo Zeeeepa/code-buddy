@@ -2136,5 +2136,49 @@ describe('CodeBuddyClient', () => {
       expect(calledUrl).toContain('streamGenerateContent');
       expect(mockCreate).not.toHaveBeenCalled();
     });
+
+    // ----- Vague 2 Phase B — strategy chain wiring (this commit)
+    // After Phase B, CodeBuddyClient delegates to a GeminiNativeProvider
+    // strategy. The client's setters must forward to that strategy or the
+    // provider's internal state drifts away from the client's. The advisor
+    // flagged setModel as a place where breakage would be silent (sentinel
+    // tests construct fresh clients, so post-construction setter chains
+    // weren't covered). This test pins the chain end-to-end.
+
+    it('setModel forwards to GeminiNativeProvider — fetch URL reflects the new model', async () => {
+            getModelInfo.mockReturnValue({
+        maxTokens: 8192,
+        provider: 'google',
+        isSupported: true,
+      });
+
+      const fetchMock = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          candidates: [{
+            finishReason: 'STOP',
+            content: { parts: [{ text: 'hi' }] },
+          }],
+          usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
+        }),
+      });
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      const geminiClient = new CodeBuddyClient(
+        'test-gemini-key',
+        'gemini-2.5-flash',
+        'https://generativelanguage.googleapis.com/v1beta',
+      );
+
+      // Mutate the client's model post-construction; provider must follow.
+      geminiClient.setModel('gemini-3.0-pro');
+
+      await geminiClient.chat([{ role: 'user', content: 'hi' }]);
+
+      const calledUrl = fetchMock.mock.calls[0][0] as string;
+      // The URL is built from the provider's own currentModel, not the client's.
+      // If the chain breaks, the URL would still say gemini-2.5-flash.
+      expect(calledUrl).toContain('models/gemini-3.0-pro:generateContent');
+    });
   });
 });
