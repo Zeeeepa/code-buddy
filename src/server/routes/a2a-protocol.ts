@@ -14,6 +14,7 @@ import { asyncHandler, requireScope } from '../middleware/index.js';
 import {
   A2AAgentClient,
   A2AAgentServer,
+  type AgentCard,
   createAgentCard,
   getTaskResult,
 } from '../../protocols/a2a/index.js';
@@ -42,14 +43,20 @@ export function createA2AProtocolRoutes(): Router {
     res.json(hostCard);
   });
 
-  // List registered agents
+  // List registered agents (local in-process + remote cross-host)
   router.get('/agents', requireScope('admin'), (_req, res) => {
     const agents = client.listAgents();
     const cards = agents.map((name) => ({
       name,
       card: client.getAgentCard(name),
     }));
-    res.json({ agents: cards });
+    const remotes = client.listRemoteAgents().map((r) => ({
+      name: r.name,
+      url: r.url,
+      card: r.card,
+      lastHeartbeat: r.lastHeartbeat,
+    }));
+    res.json({ agents: cards, remoteAgents: remotes });
   });
 
   // Submit a task
@@ -116,6 +123,53 @@ export function createA2AProtocolRoutes(): Router {
     const skillId = String(req.params.skillId);
     const agents = client.findAgentsWithSkill(skillId);
     res.json({ skill: skillId, agents });
+  });
+
+  // ── Fleet endpoints (V0.3 — register/heartbeat for cross-host spokes) ──
+  //
+  // Auth: scope 'read' (lower than 'admin') so any tailnet client can register.
+  // Mesh privé Tailscale = sécurité de base ; ouvrir 'admin' uniquement aux
+  // opérations destructives (tasks/send arbitraire).
+
+  // Register a remote agent's card (called by spoke at boot)
+  // Body : { name: string, url: string, card: AgentCard }
+  router.post('/agents/register', requireScope('read'), (req, res) => {
+    const { name, url, card } = req.body || {};
+    if (!name || typeof name !== 'string' ||
+        !url || typeof url !== 'string' ||
+        !card || typeof card !== 'object' ||
+        !Array.isArray(card.skills)) {
+      res.status(400).json({
+        error: 'Missing or invalid fields. Required: name (string), url (string), card.skills (array)',
+      });
+      return;
+    }
+    client.registerRemoteCard(String(name), {
+      url: String(url),
+      card: card as AgentCard,
+      lastHeartbeat: Date.now(),
+    });
+    res.json({ status: 'registered', agent: name, url });
+  });
+
+  // Heartbeat — called periodically by spoke to maintain liveness
+  router.post('/agents/:name/heartbeat', requireScope('read'), (req, res) => {
+    const ok = client.touchRemoteAgent(String(req.params.name));
+    if (!ok) {
+      res.status(404).json({ error: 'agent not registered' });
+      return;
+    }
+    res.json({ status: 'ok', timestamp: Date.now() });
+  });
+
+  // Unregister — called by spoke on graceful shutdown
+  router.delete('/agents/:name', requireScope('read'), (req, res) => {
+    const ok = client.unregisterRemoteAgent(String(req.params.name));
+    if (!ok) {
+      res.status(404).json({ error: 'agent not registered' });
+      return;
+    }
+    res.json({ status: 'unregistered', agent: req.params.name });
   });
 
   // Expose the client for external registration
