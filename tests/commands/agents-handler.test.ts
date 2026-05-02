@@ -15,29 +15,64 @@ const mocks = vi.hoisted(() => {
   const runWorkflowMock = vi.fn();
   const stopMock = vi.fn();
   const disposeMock = vi.fn();
+  const onMock = vi.fn();
+  const listenerCountMock = vi.fn(() => 0);
+  const removeAllListenersMock = vi.fn();
 
   const fakeSystem = {
     runWorkflow: runWorkflowMock,
     stop: stopMock,
     dispose: disposeMock,
+    on: onMock,
+    listenerCount: listenerCountMock,
+    removeAllListeners: removeAllListenersMock,
   };
 
   const getMultiAgentSystemMock = vi.fn(() => fakeSystem);
   const resetMultiAgentSystemMock = vi.fn();
 
+  // Phase F mocks
+  const markTaskStartedMock = vi.fn();
+  const recordTaskCompletionMock = vi.fn();
+  const getPerformanceReportMock = vi.fn(() => '== Performance Report ==\n(empty — no workflows yet)');
+  const getConflictsMock = vi.fn(() => []);
+  const fakeCoordinator = {
+    markTaskStarted: markTaskStartedMock,
+    recordTaskCompletion: recordTaskCompletionMock,
+    getPerformanceReport: getPerformanceReportMock,
+    getConflicts: getConflictsMock,
+  };
+  const getEnhancedCoordinatorMock = vi.fn(() => fakeCoordinator);
+
+  const getStatsMock = vi.fn(() => ({
+    totalSessions: 0,
+    activeSessions: 0,
+    totalMessages: 0,
+    byKind: { main: 0, channel: 0, cron: 0, hook: 0, spawn: 0, node: 0 },
+  }));
+  const fakeRegistry = { getStats: getStatsMock };
+  const getSessionRegistryMock = vi.fn(() => fakeRegistry);
+
   return {
-    runWorkflowMock,
-    stopMock,
-    disposeMock,
-    fakeSystem,
-    getMultiAgentSystemMock,
-    resetMultiAgentSystemMock,
+    runWorkflowMock, stopMock, disposeMock, onMock, listenerCountMock, removeAllListenersMock,
+    fakeSystem, getMultiAgentSystemMock, resetMultiAgentSystemMock,
+    markTaskStartedMock, recordTaskCompletionMock, getPerformanceReportMock, getConflictsMock,
+    fakeCoordinator, getEnhancedCoordinatorMock,
+    getStatsMock, fakeRegistry, getSessionRegistryMock,
   };
 });
 
 vi.mock('../../src/agent/multi-agent/multi-agent-system.js', () => ({
   getMultiAgentSystem: mocks.getMultiAgentSystemMock,
   resetMultiAgentSystem: mocks.resetMultiAgentSystemMock,
+}));
+
+vi.mock('../../src/agent/multi-agent/enhanced-coordination.js', () => ({
+  getEnhancedCoordinator: mocks.getEnhancedCoordinatorMock,
+}));
+
+vi.mock('../../src/agent/multi-agent/session-registry.js', () => ({
+  getSessionRegistry: mocks.getSessionRegistryMock,
 }));
 
 import { handleAgents, _resetAgentsHandlerForTests } from '../../src/commands/handlers/agents-handler.js';
@@ -51,8 +86,23 @@ describe('handleAgents (/agents)', () => {
     mocks.runWorkflowMock.mockReset();
     mocks.stopMock.mockReset();
     mocks.disposeMock.mockReset();
+    mocks.onMock.mockReset();
+    mocks.listenerCountMock.mockReset().mockReturnValue(0);
+    mocks.removeAllListenersMock.mockReset();
     mocks.getMultiAgentSystemMock.mockClear();
     mocks.resetMultiAgentSystemMock.mockClear();
+    mocks.markTaskStartedMock.mockReset();
+    mocks.recordTaskCompletionMock.mockReset();
+    mocks.getPerformanceReportMock.mockReset().mockReturnValue('== Performance Report ==\n(empty — no workflows yet)');
+    mocks.getConflictsMock.mockReset().mockReturnValue([]);
+    mocks.getEnhancedCoordinatorMock.mockClear();
+    mocks.getStatsMock.mockReset().mockReturnValue({
+      totalSessions: 0,
+      activeSessions: 0,
+      totalMessages: 0,
+      byKind: { main: 0, channel: 0, cron: 0, hook: 0, spawn: 0, node: 0 },
+    });
+    mocks.getSessionRegistryMock.mockClear();
   });
 
   afterEach(() => {
@@ -222,5 +272,103 @@ describe('handleAgents (/agents)', () => {
   it('action is case-insensitive', async () => {
     const r = await handleAgents(['ENABLE']);
     expect(r.entry?.content).toContain('Multi-agent system started');
+  });
+
+  // ────────────────────────────────────────────────────────────
+  // Phase F — EnhancedCoordinator + SessionRegistry actions
+  // ────────────────────────────────────────────────────────────
+
+  it('metrics returns coordinator performance report (no apiKey needed)', async () => {
+    delete process.env.GROK_API_KEY;
+    const r = await handleAgents(['metrics']);
+    expect(r.entry?.content).toContain('Performance Report');
+    expect(mocks.getEnhancedCoordinatorMock).toHaveBeenCalled();
+    expect(mocks.getPerformanceReportMock).toHaveBeenCalled();
+  });
+
+  it('conflicts returns honest empty message when none detected', async () => {
+    delete process.env.GROK_API_KEY;
+    const r = await handleAgents(['conflicts']);
+    expect(r.entry?.content).toContain('No conflicts detected');
+    expect(r.entry?.content).toContain('does not auto-detect');
+  });
+
+  it('conflicts returns formatted list when coordinator has some', async () => {
+    mocks.getConflictsMock.mockReturnValue([
+      { id: 'c1', type: 'code_overlap', severity: 'high', agents: ['coder', 'reviewer'], description: 'Both editing auth.ts', resolution: undefined, detectedAt: new Date() },
+    ] as never);
+    const r = await handleAgents(['conflicts']);
+    expect(r.entry?.content).toContain('Detected conflicts (1)');
+    expect(r.entry?.content).toContain('code_overlap');
+    expect(r.entry?.content).toContain('Both editing auth.ts');
+  });
+
+  it('sessions returns registry stats (no apiKey needed)', async () => {
+    delete process.env.GROK_API_KEY;
+    const r = await handleAgents(['sessions']);
+    expect(r.entry?.content).toContain('Session Registry Stats');
+    expect(r.entry?.content).toContain('Total sessions:   0');
+    expect(r.entry?.content).toContain('sessions_spawn');
+    expect(mocks.getSessionRegistryMock).toHaveBeenCalled();
+  });
+
+  it('enable wires coordinator to MAS workflow events', async () => {
+    await handleAgents(['enable']);
+    expect(mocks.onMock).toHaveBeenCalledWith('workflow:event', expect.any(Function));
+  });
+
+  it('coordinator wiring is idempotent across multiple enable/run calls', async () => {
+    mocks.runWorkflowMock.mockImplementation(() => new Promise(() => { /* never */ }));
+    await handleAgents(['enable']);
+    await handleAgents(['run', 'goal-1']);
+    await handleAgents(['stop']);
+    await handleAgents(['run', 'goal-2']);
+    expect(mocks.onMock).toHaveBeenCalledTimes(1);  // wired only once
+  });
+
+  it('wired listener routes task_completed events into recordTaskCompletion', async () => {
+    await handleAgents(['enable']);
+    expect(mocks.onMock).toHaveBeenCalledTimes(1);
+    const [, listener] = mocks.onMock.mock.calls[0] as [string, (e: unknown) => void];
+
+    listener({
+      type: 'task_completed',
+      data: {
+        task: { id: 't1', assignedTo: 'coder' },
+        result: { success: true, role: 'coder', duration: 100, rounds: 2 },
+      },
+    });
+
+    expect(mocks.recordTaskCompletionMock).toHaveBeenCalledOnce();
+    expect(mocks.recordTaskCompletionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 't1' }),
+      expect.objectContaining({ success: true, role: 'coder' })
+    );
+  });
+
+  it('wired listener routes task_started events into markTaskStarted', async () => {
+    await handleAgents(['enable']);
+    const [, listener] = mocks.onMock.mock.calls[0] as [string, (e: unknown) => void];
+
+    listener({
+      type: 'task_started',
+      data: { task: { id: 't2', assignedTo: 'orchestrator' } },
+    });
+
+    expect(mocks.markTaskStartedMock).toHaveBeenCalledOnce();
+    expect(mocks.markTaskStartedMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 't2' }),
+      'orchestrator'
+    );
+  });
+
+  it('wired listener ignores irrelevant event types', async () => {
+    await handleAgents(['enable']);
+    const [, listener] = mocks.onMock.mock.calls[0] as [string, (e: unknown) => void];
+
+    listener({ type: 'phase_started', data: { phase: 'planning' } });
+
+    expect(mocks.recordTaskCompletionMock).not.toHaveBeenCalled();
+    expect(mocks.markTaskStartedMock).not.toHaveBeenCalled();
   });
 });

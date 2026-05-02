@@ -320,6 +320,52 @@ export interface TeamSessionTomlConfig {
 }
 
 /**
+ * EnhancedCoordinator configuration (V0.2 — audit OpenClaw heritage Phase F).
+ * Optional sub-config under [multi_agent_system.coordination]. Enables
+ * agent metrics, adaptive task allocation, conflict detection, and
+ * checkpointing on top of the base MultiAgentSystem.
+ */
+export interface CoordinationTomlConfig {
+  /** Whether the EnhancedCoordinator instantiates at boot (default: false) */
+  enabled?: boolean;
+  /** Use scoring-based allocation vs static task.assignedTo (default: true) */
+  enable_adaptive_allocation?: boolean;
+  /** Min confidence threshold for adaptive allocation (default: 0.6) */
+  min_assignment_confidence?: number;
+  /** Max parallel tasks per single agent (default: 2) */
+  max_parallel_per_agent?: number;
+  /** Detect file/resource conflicts between agents (default: true) */
+  enable_conflict_resolution?: boolean;
+  /** Conflict timeout in ms (default: 30000) */
+  conflict_timeout?: number;
+  /** Track recent performance for learning-based allocation (default: true) */
+  enable_learning?: boolean;
+  /** Sliding window size for recentPerformance (default: 50) */
+  history_size?: number;
+  /** Auto-checkpoint every N completed tasks (default: 5) */
+  checkpoint_interval?: number;
+}
+
+/**
+ * SessionRegistry configuration (V0.2 — audit OpenClaw heritage Phase F).
+ * Optional sub-config under [multi_agent_system.sessions]. Enables
+ * multi-session coordination + persistence for the SessionToolExecutor
+ * (Phase E) and inter-session messaging.
+ */
+export interface SessionsTomlConfig {
+  /** Whether SessionRegistry starts at boot (default: false) */
+  enabled?: boolean;
+  /** Max sessions kept in registry (default: 1000) */
+  max_sessions?: number;
+  /** Idle timeout for cleanup in minutes (default: 30) */
+  idle_timeout_minutes?: number;
+  /** Persist sessions to ~/.codebuddy/sessions/sessions.json (default: true) */
+  enable_persistence?: boolean;
+  /** Max sub-agents spawned per workflow root session (default: 10) */
+  max_per_workflow?: number;
+}
+
+/**
  * MultiAgentSystem configuration (audit OpenClaw heritage findings 2026-05-02).
  * Wired by the `/agents enable` slash command. V0.1 limitation: no persistence
  * across process exits, no event streaming to terminal (logger.info only).
@@ -339,6 +385,10 @@ export interface MultiAgentSystemConfig {
   timeout_ms?: number;
   /** Max iterations for `iterative` strategy (default: 5) */
   max_iterations?: number;
+  /** EnhancedCoordinator sub-config (Phase F) */
+  coordination?: CoordinationTomlConfig;
+  /** SessionRegistry sub-config (Phase F) */
+  sessions?: SessionsTomlConfig;
 }
 
 /**

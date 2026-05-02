@@ -558,6 +558,46 @@ export class CodeBuddyAgent extends BaseAgent {
       }).catch((e) => { logger.debug('MultiAgentSystem module load failed (optional)', { error: String(e) }); });
     }).catch((e) => { logger.debug('Multi-agent system config check failed (optional)', { error: String(e) }); });
 
+    // Boot-time auto-instantiate of EnhancedCoordinator + SessionRegistry
+    // when [multi_agent_system.coordination|sessions].enabled = true (Phase F).
+    // Independent of MAS — these can be enabled separately to enable the
+    // /agents metrics / /agents conflicts / /agents sessions slash actions
+    // and to populate the SessionRegistry that the Phase E session_* tools depend on.
+    import('../config/toml-config.js').then(({ getConfigManager }) => {
+      const cfg = getConfigManager().getConfig().multi_agent_system;
+      const coordCfg = cfg?.coordination;
+      const sessCfg = cfg?.sessions;
+
+      if (coordCfg?.enabled) {
+        import('../agent/multi-agent/enhanced-coordination.js').then(({ getEnhancedCoordinator }) => {
+          type CC = Parameters<typeof getEnhancedCoordinator>[0];
+          const c: CC = {};
+          if (coordCfg.enable_adaptive_allocation !== undefined) c!.enableAdaptiveAllocation = coordCfg.enable_adaptive_allocation;
+          if (coordCfg.min_assignment_confidence !== undefined) c!.minAssignmentConfidence = coordCfg.min_assignment_confidence;
+          if (coordCfg.max_parallel_per_agent !== undefined) c!.maxParallelPerAgent = coordCfg.max_parallel_per_agent;
+          if (coordCfg.enable_conflict_resolution !== undefined) c!.enableConflictResolution = coordCfg.enable_conflict_resolution;
+          if (coordCfg.conflict_timeout !== undefined) c!.conflictTimeout = coordCfg.conflict_timeout;
+          if (coordCfg.enable_learning !== undefined) c!.enableLearning = coordCfg.enable_learning;
+          if (coordCfg.history_size !== undefined) c!.historySize = coordCfg.history_size;
+          if (coordCfg.checkpoint_interval !== undefined) c!.checkpointInterval = coordCfg.checkpoint_interval;
+          getEnhancedCoordinator(c);
+          logger.info('EnhancedCoordinator auto-instantiated from TOML config');
+        }).catch((e) => { logger.debug('EnhancedCoordinator module load failed (optional)', { error: String(e) }); });
+      }
+
+      if (sessCfg?.enabled) {
+        import('../agent/multi-agent/session-registry.js').then(async ({ getSessionRegistry }) => {
+          type SC = Parameters<typeof getSessionRegistry>[0];
+          const s: SC = {};
+          if (sessCfg.max_sessions !== undefined) s!.maxSessions = sessCfg.max_sessions;
+          if (sessCfg.idle_timeout_minutes !== undefined) s!.idleTimeoutMs = sessCfg.idle_timeout_minutes * 60 * 1000;
+          const reg = getSessionRegistry(s);
+          await reg.start();
+          logger.info('SessionRegistry auto-started from TOML config');
+        }).catch((e) => { logger.debug('SessionRegistry module load failed (optional)', { error: String(e) }); });
+      }
+    }).catch((e) => { logger.debug('Coordination/sessions config check failed (optional)', { error: String(e) }); });
+
     // Wire ICM cross-session memory bridge into executor
     import('../memory/icm-bridge.js').then(({ ICMBridge }) => {
       const bridge = new ICMBridge();

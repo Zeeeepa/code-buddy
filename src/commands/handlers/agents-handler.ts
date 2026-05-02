@@ -34,10 +34,12 @@
 
 import { CommandHandlerResult } from './branch-handlers.js';
 import { logger } from '../../utils/logger.js';
-import type { CollaborationStrategy, WorkflowResult } from '../../agent/multi-agent/types.js';
+import type { CollaborationStrategy, WorkflowResult, WorkflowEvent, AgentTask, AgentExecutionResult } from '../../agent/multi-agent/types.js';
 
 const VALID_ACTIONS = new Set([
-  'enable', 'disable', 'status', 'run', 'plan', 'stop', 'strategy', 'help', '',
+  'enable', 'disable', 'status', 'run', 'plan', 'stop', 'strategy',
+  'metrics', 'conflicts', 'sessions',
+  'help', '',
 ]);
 
 const VALID_STRATEGIES: ReadonlySet<CollaborationStrategy> = new Set<CollaborationStrategy>([
@@ -60,6 +62,14 @@ Actions:
                           One of: sequential | parallel | hierarchical |
                           peer_review | iterative (default: hierarchical).
 
+V0.2 Phase F (require [multi_agent_system.coordination|sessions].enabled):
+  metrics                 Show agent performance report (success rate, avg duration,
+                          specialties). Empty until at least one /agents run completes.
+  conflicts               List detected file/resource conflicts between agents.
+                          V0.1 honest note: MAS doesn't auto-detect — usually empty.
+  sessions                Show SessionRegistry stats (active sessions, message counts).
+                          Spawned via the sessions_spawn tool (Phase E) or directly.
+
 Configure defaults in TOML under [multi_agent_system]:
   enabled            = false                     # auto-instantiate at boot
   default_strategy   = "hierarchical"
@@ -73,6 +83,7 @@ Requires GROK_API_KEY env var.`;
 
 let agentsEnabled = false;
 let activeStrategy: CollaborationStrategy = 'hierarchical';
+let coordinatorWired = false;  // Phase F: wire MAS events → Coordinator only once
 
 interface ActiveWorkflow {
   goal: string;
@@ -96,6 +107,41 @@ function textResult(content: string): CommandHandlerResult {
     handled: true,
     entry: { type: 'assistant', content, timestamp: new Date() },
   };
+}
+
+/**
+ * Phase F — Wire MAS workflow events into the EnhancedCoordinator so
+ * /agents metrics shows real data after workflows run. Without this,
+ * metrics stay empty (the MAS doesn't call coordinator methods itself).
+ *
+ * MAS emits `workflow:event` with type 'task_started' or 'task_completed'
+ * and a `data` payload containing { task } or { task, result }.
+ * Idempotent — only wires once per process via `coordinatorWired` flag.
+ */
+async function wireCoordinatorIfPresent(system: { on: (e: string, h: (...a: unknown[]) => void) => void; listenerCount: (e: string) => number }): Promise<void> {
+  if (coordinatorWired) return;
+  try {
+    const { getEnhancedCoordinator } = await import('../../agent/multi-agent/enhanced-coordination.js');
+    const coordinator = getEnhancedCoordinator();
+    system.on('workflow:event', ((event: WorkflowEvent) => {
+      if (!event.data) return;
+      if (event.type === 'task_started') {
+        const data = event.data as { task?: AgentTask };
+        if (data.task?.assignedTo) {
+          coordinator.markTaskStarted(data.task, data.task.assignedTo);
+        }
+      } else if (event.type === 'task_completed') {
+        const data = event.data as { task?: AgentTask; result?: AgentExecutionResult };
+        if (data.task && data.result) {
+          coordinator.recordTaskCompletion(data.task, data.result);
+        }
+      }
+    }) as (...a: unknown[]) => void);
+    coordinatorWired = true;
+    logger.debug('EnhancedCoordinator wired to MAS workflow events');
+  } catch (err) {
+    logger.debug('EnhancedCoordinator wiring skipped (optional)', { error: String(err) });
+  }
 }
 
 function formatStatus(): string {
@@ -199,6 +245,63 @@ export async function handleAgents(args: string[]): Promise<CommandHandlerResult
     return textResult(`Workflow stopped: ${stoppedGoal}`);
   }
 
+  // Phase F read-only actions — no apiKey needed, no MAS instantiation.
+  if (action === 'metrics') {
+    try {
+      const { getEnhancedCoordinator } = await import('../../agent/multi-agent/enhanced-coordination.js');
+      const coordinator = getEnhancedCoordinator();
+      const report = coordinator.getPerformanceReport();
+      return textResult(report);
+    } catch (err) {
+      return textResult(`Could not load EnhancedCoordinator: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  if (action === 'conflicts') {
+    try {
+      const { getEnhancedCoordinator } = await import('../../agent/multi-agent/enhanced-coordination.js');
+      const coordinator = getEnhancedCoordinator();
+      const conflicts = coordinator.getConflicts();
+      if (conflicts.length === 0) {
+        return textResult(
+          'No conflicts detected.\n\n' +
+          'V0.1 honest note: MAS does not auto-detect conflicts during workflow execution.\n' +
+          'EnhancedCoordinator.detectConflicts() is API-only — V0.2 will integrate it into the workflow loop.'
+        );
+      }
+      const lines = conflicts.map((c, i) =>
+        `${i + 1}. [${c.type}] severity=${c.severity}\n   agents: ${c.agents.join(', ')}\n   ${c.description}`
+      );
+      return textResult(`Detected conflicts (${conflicts.length}):\n\n${lines.join('\n\n')}`);
+    } catch (err) {
+      return textResult(`Could not load EnhancedCoordinator: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  if (action === 'sessions') {
+    try {
+      const { getSessionRegistry } = await import('../../agent/multi-agent/session-registry.js');
+      const registry = getSessionRegistry();
+      const stats = registry.getStats();
+      const lines: string[] = [];
+      lines.push('Session Registry Stats');
+      lines.push('═'.repeat(40));
+      lines.push(`Total sessions:   ${stats.totalSessions}`);
+      lines.push(`Active sessions:  ${stats.activeSessions}`);
+      lines.push(`Total messages:   ${stats.totalMessages}`);
+      lines.push('');
+      lines.push('By kind:');
+      for (const [kind, count] of Object.entries(stats.byKind)) {
+        if (count > 0) lines.push(`  ${kind.padEnd(10)} ${count}`);
+      }
+      lines.push('');
+      lines.push('Spawn sub-agents via the sessions_spawn LLM tool (Phase E).');
+      return textResult(lines.join('\n'));
+    } catch (err) {
+      return textResult(`Could not load SessionRegistry: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
   // From here on (enable/run/plan), apiKey is needed — pattern from think-handlers.ts L210
   const apiKey = process.env.GROK_API_KEY ?? '';
   const baseURL = process.env.GROK_BASE_URL;
@@ -210,7 +313,8 @@ export async function handleAgents(args: string[]): Promise<CommandHandlerResult
 
   if (action === 'enable') {
     const wasEnabled = agentsEnabled;
-    getMultiAgentSystem(apiKey, baseURL); // instantiate singleton
+    const system = getMultiAgentSystem(apiKey, baseURL); // instantiate singleton
+    await wireCoordinatorIfPresent(system as unknown as { on: (e: string, h: (...a: unknown[]) => void) => void; listenerCount: (e: string) => number });
     agentsEnabled = true;
     if (wasEnabled) {
       return textResult('Multi-agent system already enabled. Use /agents status to check state.');
@@ -233,6 +337,7 @@ export async function handleAgents(args: string[]): Promise<CommandHandlerResult
       agentsEnabled = true;
     }
     const system = getMultiAgentSystem(apiKey, baseURL);
+    await wireCoordinatorIfPresent(system as unknown as { on: (e: string, h: (...a: unknown[]) => void) => void; listenerCount: (e: string) => number });
     try {
       const result = await system.runWorkflow(goal, { strategy: activeStrategy, dryRun: true });
       const planText = result.plan?.phases?.length
@@ -262,6 +367,7 @@ export async function handleAgents(args: string[]): Promise<CommandHandlerResult
       agentsEnabled = true;
     }
     const system = getMultiAgentSystem(apiKey, baseURL);
+    await wireCoordinatorIfPresent(system as unknown as { on: (e: string, h: (...a: unknown[]) => void) => void; listenerCount: (e: string) => number });
     const startedAt = new Date();
     const promise = system.runWorkflow(goal, { strategy: activeStrategy }).then(
       (result) => {
@@ -313,4 +419,5 @@ export function _resetAgentsHandlerForTests(): void {
   activeStrategy = 'hierarchical';
   activeWorkflow = null;
   lastResult = null;
+  coordinatorWired = false;
 }
