@@ -227,6 +227,11 @@ export class CSRFProtection extends EventEmitter {
     next: (err?: Error) => void
   ) => void {
     return (req, res, next) => {
+      // Exempt A2A endpoints from CSRF (they use authentication instead)
+      if (req.path?.startsWith('/api/a2a')) {
+        return next();
+      }
+
       // Skip safe methods
       const safeMethods = ['GET', 'HEAD', 'OPTIONS'];
       if (safeMethods.includes(req.method?.toUpperCase() || '')) {
