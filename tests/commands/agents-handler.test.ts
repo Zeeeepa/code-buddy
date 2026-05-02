@@ -75,6 +75,19 @@ vi.mock('../../src/agent/multi-agent/session-registry.js', () => ({
   getSessionRegistry: mocks.getSessionRegistryMock,
 }));
 
+// Phase G — workflow persistence mocks
+const persistenceMocks = vi.hoisted(() => ({
+  saveWorkflowMock: vi.fn().mockResolvedValue(undefined),
+  loadWorkflowMock: vi.fn().mockResolvedValue(null),
+  clearWorkflowMock: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../src/agent/multi-agent/workflow-persistence.js', () => ({
+  saveWorkflow: persistenceMocks.saveWorkflowMock,
+  loadWorkflow: persistenceMocks.loadWorkflowMock,
+  clearWorkflow: persistenceMocks.clearWorkflowMock,
+}));
+
 import { handleAgents, _resetAgentsHandlerForTests } from '../../src/commands/handlers/agents-handler.js';
 
 describe('handleAgents (/agents)', () => {
@@ -103,6 +116,9 @@ describe('handleAgents (/agents)', () => {
       byKind: { main: 0, channel: 0, cron: 0, hook: 0, spawn: 0, node: 0 },
     });
     mocks.getSessionRegistryMock.mockClear();
+    persistenceMocks.saveWorkflowMock.mockReset().mockResolvedValue(undefined);
+    persistenceMocks.loadWorkflowMock.mockReset().mockResolvedValue(null);
+    persistenceMocks.clearWorkflowMock.mockReset().mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -323,7 +339,11 @@ describe('handleAgents (/agents)', () => {
     await handleAgents(['run', 'goal-1']);
     await handleAgents(['stop']);
     await handleAgents(['run', 'goal-2']);
-    expect(mocks.onMock).toHaveBeenCalledTimes(1);  // wired only once
+    // getEnhancedCoordinator is the actual gate for "did we wire?" — once
+    // wired, the helper short-circuits via the coordinatorWired flag.
+    // (system.on() is now also called by Phase G persistence per-run, so
+    // counting `on` calls would be misleading.)
+    expect(mocks.getEnhancedCoordinatorMock).toHaveBeenCalledTimes(1);
   });
 
   it('wired listener routes task_completed events into recordTaskCompletion', async () => {
@@ -370,5 +390,85 @@ describe('handleAgents (/agents)', () => {
 
     expect(mocks.recordTaskCompletionMock).not.toHaveBeenCalled();
     expect(mocks.markTaskStartedMock).not.toHaveBeenCalled();
+  });
+
+  // ────────────────────────────────────────────────────────────
+  // Phase G — Workflow persistence + /agents resume
+  // ────────────────────────────────────────────────────────────
+
+  it('run saves workflow state to disk on launch', async () => {
+    mocks.runWorkflowMock.mockImplementation(() => new Promise(() => { /* never */ }));
+    await handleAgents(['run', 'persisted goal']);
+    expect(persistenceMocks.saveWorkflowMock).toHaveBeenCalled();
+    const firstCall = persistenceMocks.saveWorkflowMock.mock.calls[0][0];
+    expect(firstCall).toMatchObject({
+      goal: 'persisted goal',
+      status: 'running',
+      strategy: 'hierarchical',
+    });
+  });
+
+  it('resume returns no-workflow message when nothing persisted', async () => {
+    persistenceMocks.loadWorkflowMock.mockResolvedValueOnce(null);
+    const r = await handleAgents(['resume']);
+    expect(r.entry?.content).toContain('No interrupted workflow');
+  });
+
+  it('resume reports completed workflows as already-finished', async () => {
+    persistenceMocks.loadWorkflowMock.mockResolvedValueOnce({
+      goal: 'old goal',
+      startedAt: '2026-05-02T10:00:00Z',
+      strategy: 'hierarchical',
+      status: 'completed',
+      plan: null,
+      results: [],
+      artifacts: [],
+      timeline: [],
+      errors: [],
+      summary: 'all done',
+    });
+    const r = await handleAgents(['resume']);
+    expect(r.entry?.content).toContain('already finished');
+    expect(r.entry?.content).toContain('completed');
+    expect(r.entry?.content).toContain('all done');
+  });
+
+  it('resume refuses when an active workflow is in progress', async () => {
+    persistenceMocks.loadWorkflowMock.mockResolvedValue({
+      goal: 'old goal',
+      startedAt: '2026-05-02T10:00:00Z',
+      strategy: 'hierarchical',
+      status: 'running',
+      plan: null,
+      results: [],
+      artifacts: [],
+      timeline: [],
+      errors: [],
+    });
+    mocks.runWorkflowMock.mockImplementation(() => new Promise(() => { /* never */ }));
+    await handleAgents(['run', 'active goal']);
+    const r = await handleAgents(['resume']);
+    expect(r.entry?.content).toContain('Cannot resume');
+    expect(r.entry?.content).toContain('active goal');
+  });
+
+  it('resume shows interrupted workflow details with V0.1 limitation note', async () => {
+    persistenceMocks.loadWorkflowMock.mockResolvedValue({
+      goal: 'interrupted goal',
+      startedAt: '2026-05-02T10:00:00Z',
+      strategy: 'parallel',
+      status: 'running',
+      plan: null,
+      results: [['t1', { success: true, role: 'coder' }] as never],
+      artifacts: [],
+      timeline: [],
+      errors: [],
+    });
+    const r = await handleAgents(['resume']);
+    expect(r.entry?.content).toContain('Found interrupted workflow');
+    expect(r.entry?.content).toContain('interrupted goal');
+    expect(r.entry?.content).toContain('Tasks done:  1');
+    expect(r.entry?.content).toContain('V0.1 limitation');
+    expect(r.entry?.content).toContain('/agents run interrupted goal');
   });
 });

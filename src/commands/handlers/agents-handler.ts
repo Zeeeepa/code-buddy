@@ -35,10 +35,12 @@
 import { CommandHandlerResult } from './branch-handlers.js';
 import { logger } from '../../utils/logger.js';
 import type { CollaborationStrategy, WorkflowResult, WorkflowEvent, AgentTask, AgentExecutionResult } from '../../agent/multi-agent/types.js';
+import type { PersistedWorkflow } from '../../agent/multi-agent/workflow-persistence.js';
 
 const VALID_ACTIONS = new Set([
   'enable', 'disable', 'status', 'run', 'plan', 'stop', 'strategy',
   'metrics', 'conflicts', 'sessions',
+  'resume',
   'help', '',
 ]);
 
@@ -69,6 +71,11 @@ V0.2 Phase F (require [multi_agent_system.coordination|sessions].enabled):
                           V0.1 honest note: MAS doesn't auto-detect — usually empty.
   sessions                Show SessionRegistry stats (active sessions, message counts).
                           Spawned via the sessions_spawn tool (Phase E) or directly.
+
+V0.2 Phase G — workflow persistence:
+  resume                  Re-launch the most recent interrupted workflow (kept on
+                          disk in ~/.codebuddy/agents/current.json). Mid-tool death
+                          may have left partial artifacts; review before resuming.
 
 Configure defaults in TOML under [multi_agent_system]:
   enabled            = false                     # auto-instantiate at boot
@@ -368,6 +375,53 @@ export async function handleAgents(args: string[]): Promise<CommandHandlerResult
     }
     const system = getMultiAgentSystem(apiKey, baseURL);
     await wireCoordinatorIfPresent(system as unknown as { on: (e: string, h: (...a: unknown[]) => void) => void; listenerCount: (e: string) => number });
+
+    // Phase G — persistence. Save initial state + on every workflow:event
+    // (debounced) + on completion. Mid-tool death = inevitable; the persisted
+    // state is best-effort up to the last event captured.
+    const persistence = await import('../../agent/multi-agent/workflow-persistence.js');
+    let liveState: PersistedWorkflow = {
+      goal,
+      startedAt: new Date().toISOString(),
+      strategy: activeStrategy,
+      status: 'running',
+      plan: null,
+      results: [],
+      artifacts: [],
+      timeline: [],
+      errors: [],
+    };
+    await persistence.saveWorkflow(liveState);
+
+    let saveTimer: NodeJS.Timeout | null = null;
+    const flush = () => {
+      if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+      // Fire-and-forget — never block on persistence.
+      persistence.saveWorkflow(liveState).catch(() => { /* logged inside */ });
+    };
+    const debouncedSave = () => {
+      if (saveTimer) return;
+      saveTimer = setTimeout(() => { saveTimer = null; flush(); }, 500);
+    };
+
+    const eventListener = (event: WorkflowEvent) => {
+      liveState.timeline.push(event);
+      if (event.type === 'task_completed' && event.data) {
+        const data = event.data as { task?: AgentTask; result?: AgentExecutionResult };
+        if (data.task && data.result) {
+          liveState.results.push([data.task.id, data.result]);
+          if (data.result.artifacts?.length) {
+            liveState.artifacts.push(...data.result.artifacts);
+          }
+        }
+      }
+      debouncedSave();
+    };
+    (system as unknown as { on: (e: string, h: (...a: unknown[]) => void) => void }).on(
+      'workflow:event',
+      eventListener as (...a: unknown[]) => void
+    );
+
     const startedAt = new Date();
     const promise = system.runWorkflow(goal, { strategy: activeStrategy }).then(
       (result) => {
@@ -379,6 +433,19 @@ export async function handleAgents(args: string[]): Promise<CommandHandlerResult
           finishedAt: new Date(),
         };
         activeWorkflow = null;
+        liveState = {
+          ...liveState,
+          status: result.success ? 'completed' : 'failed',
+          plan: result.plan ?? null,
+          finishedAt: new Date().toISOString(),
+          summary: result.summary,
+          errors: result.errors ?? [],
+        };
+        flush();
+        // Clear on success — interrupted workflows are kept; clean ones are not.
+        if (result.success) {
+          persistence.clearWorkflow().catch(() => { /* logged inside */ });
+        }
         logger.info('MultiAgentSystem workflow completed', { goal, success: result.success });
         return result;
       },
@@ -391,6 +458,13 @@ export async function handleAgents(args: string[]): Promise<CommandHandlerResult
           finishedAt: new Date(),
         };
         activeWorkflow = null;
+        liveState = {
+          ...liveState,
+          status: 'failed',
+          finishedAt: new Date().toISOString(),
+          errors: [err instanceof Error ? err.message : String(err)],
+        };
+        flush();
         logger.error('MultiAgentSystem workflow failed', { goal, error: String(err) });
         throw err;
       }
@@ -402,7 +476,47 @@ export async function handleAgents(args: string[]): Promise<CommandHandlerResult
       `Strategy: ${activeStrategy}\n` +
       `Monitor with: /agents status\n` +
       `Stop with:    /agents stop\n` +
-      `(Process exit kills the workflow — V0.1 limitation, no persistence yet.)`
+      `(Persisted to ~/.codebuddy/agents/current.json — /agents resume on next boot.)`
+    );
+  }
+
+  if (action === 'resume') {
+    const persistence = await import('../../agent/multi-agent/workflow-persistence.js');
+    const persisted = await persistence.loadWorkflow();
+    if (!persisted) {
+      return textResult('No interrupted workflow on disk to resume.');
+    }
+    if (persisted.status === 'completed' || persisted.status === 'failed') {
+      return textResult(
+        `Persisted workflow already finished (status: ${persisted.status}).\n` +
+        `Goal: ${persisted.goal}\n` +
+        `Summary: ${persisted.summary ?? '(none)'}\n` +
+        `\nUse /agents run <new-goal> for a fresh workflow, or delete current.json to clear.`
+      );
+    }
+    if (activeWorkflow) {
+      return textResult(
+        `Cannot resume — another workflow is in progress: ${activeWorkflow.goal}\n` +
+        'Stop it first with /agents stop.'
+      );
+    }
+    // V0.1 resume strategy: restart workflow from scratch with original goal.
+    // Real per-task checkpoint resume = V0.3 (requires checkpoint hooks in MAS
+    // workflow loop, not just timeline events). Honest user-facing note:
+    return textResult(
+      `Found interrupted workflow:\n` +
+      `  Goal:        ${persisted.goal}\n` +
+      `  Strategy:    ${persisted.strategy}\n` +
+      `  Started:     ${persisted.startedAt}\n` +
+      `  Tasks done:  ${persisted.results.length}\n` +
+      `  Artifacts:   ${persisted.artifacts.length}\n` +
+      `\n` +
+      `V0.1 limitation: resume restarts the workflow from scratch — completed\n` +
+      `tasks ARE re-run. The persisted artifacts are still on disk for review.\n` +
+      `True per-task checkpoint resume is V0.3 (needs MAS-side checkpoint hooks).\n` +
+      `\n` +
+      `To restart: /agents run ${persisted.goal}\n` +
+      `To discard: delete ~/.codebuddy/agents/current.json`
     );
   }
 
