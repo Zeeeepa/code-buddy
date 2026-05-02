@@ -270,21 +270,55 @@ export class A2AAgentServer extends EventEmitter {
 
 /* ── Agent Client ── */
 
+/** Remote agent advertised by another host (registered via HTTP, not in-process) */
+export interface RemoteAgent {
+  /** URL where the agent's tasks/send endpoint is reachable */
+  url: string;
+  /** Agent card as advertised at registration time */
+  card: AgentCard;
+  /** Last heartbeat timestamp (ms since epoch) */
+  lastHeartbeat: number;
+}
+
 /**
  * A2A Agent Client — sends tasks to other agents.
  * Used by an orchestrator to delegate work to specialist agents.
  */
 export class A2AAgentClient {
   private agents: Map<string, A2AAgentServer> = new Map();
+  private remoteCards: Map<string, RemoteAgent> = new Map();
 
   /** Register a local agent (in-process, no HTTP) */
   registerAgent(key: string, agent: A2AAgentServer): void {
     this.agents.set(key, agent);
   }
 
+  /** Register a remote agent advertised over HTTP (cross-host fleet) */
+  registerRemoteCard(key: string, info: RemoteAgent): void {
+    this.remoteCards.set(key, info);
+  }
+
+  /** Update lastHeartbeat for a registered remote agent — returns false if unknown */
+  touchRemoteAgent(key: string): boolean {
+    const e = this.remoteCards.get(key);
+    if (!e) return false;
+    e.lastHeartbeat = Date.now();
+    return true;
+  }
+
+  /** List remote agents (cross-host) */
+  listRemoteAgents(): Array<{ name: string } & RemoteAgent> {
+    return Array.from(this.remoteCards.entries()).map(([name, info]) => ({ name, ...info }));
+  }
+
+  /** Drop a remote agent (e.g. on graceful shutdown notice) */
+  unregisterRemoteAgent(key: string): boolean {
+    return this.remoteCards.delete(key);
+  }
+
   /** Discover an agent's capabilities */
   getAgentCard(key: string): AgentCard | undefined {
-    return this.agents.get(key)?.getAgentCard();
+    return this.agents.get(key)?.getAgentCard() ?? this.remoteCards.get(key)?.card;
   }
 
   /** List all registered agent keys */
@@ -292,12 +326,17 @@ export class A2AAgentClient {
     return Array.from(this.agents.keys());
   }
 
-  /** Find agents that can handle a specific skill */
+  /** Find agents that can handle a specific skill (local + remote) */
   findAgentsWithSkill(skillId: string): string[] {
     const result: string[] = [];
     for (const [key, agent] of this.agents) {
       const card = agent.getAgentCard();
       if (card.skills.some((s) => s.id === skillId)) {
+        result.push(key);
+      }
+    }
+    for (const [key, info] of this.remoteCards) {
+      if (info.card.skills.some((s) => s.id === skillId)) {
         result.push(key);
       }
     }
