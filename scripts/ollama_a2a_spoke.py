@@ -32,6 +32,23 @@ def detect_hostname() -> str:
     except Exception:
         return socket.gethostname().split('.')[0].lower()
 
+
+def _extract_text(value) -> str:
+    """Defensive text extraction from an A2A part `text` field.
+
+    The hub may pass a plain string (correct, post Phase-B fix
+    code-buddy commit 8a9f5f4) OR a nested A2A message object
+    {role, parts:[{type:'text', text:'...'}]} (pre-fix bug — observed
+    on DARKSTAR 2026-05-03 when hub on Ministar Linux had not yet
+    pulled the fix). Recursively unwrap until we get a string."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        for p in value.get("parts", []):
+            if isinstance(p, dict) and p.get("type") == "text":
+                return _extract_text(p.get("text", ""))
+    return ""
+
 try:
     from fastapi import FastAPI, HTTPException
     from fastapi.responses import JSONResponse
@@ -96,12 +113,13 @@ class OllamaSpoke:
                 task_id = body.get("id", f"task_{datetime.utcnow().timestamp()}")
                 message = body.get("message", {})
 
-                # Extract prompt from A2A message format
+                # Extract prompt from A2A message format. _extract_text
+                # tolerates a nested object in `text` (pre-Phase-B hub bug).
                 parts = message.get("parts", [])
                 prompt = ""
                 for part in parts:
                     if part.get("type") == "text":
-                        prompt = part.get("text", "")
+                        prompt = _extract_text(part.get("text", ""))
                         break
 
                 if not prompt:
