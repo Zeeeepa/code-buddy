@@ -265,6 +265,30 @@ export interface LSPConfig {
 }
 
 /**
+ * Daily reset scheduler configuration — clear conversation history at a
+ * configurable time each day. Wired by `/daily-reset enable` slash command
+ * (audit OpenClaw heritage findings 2026-05-02).
+ *
+ * V0.1 limitation: the engine's internal scheduler calls `runReset([])`
+ * with an empty array — it cannot clear the agent's session messages
+ * without a callback registration. V0.2 will add callback wiring.
+ */
+export interface DailyResetConfig {
+  /** Whether the scheduler starts at boot (default: false) */
+  enabled?: boolean;
+  /** Reset hour 0-23 (default: 4) */
+  reset_hour?: number;
+  /** Reset minute 0-59 (default: 0) */
+  reset_minute?: number;
+  /** IANA timezone (default: system local) */
+  timezone?: string;
+  /** Post a summary message after reset (default: true) */
+  post_summary?: boolean;
+  /** Idle timeout in minutes — reset session if no activity (default: 0 = off) */
+  idle_minutes?: number;
+}
+
+/**
  * Heartbeat engine configuration — periodic HEARTBEAT.md review.
  * Wired by the `/heartbeat enable` slash command (V4.x autonomous fleet
  * support, AUTONOMOUS-FLEET-PROTOCOL-2026-05-02 v0.1).
@@ -330,6 +354,8 @@ export interface CodeBuddyConfig {
   lsp?: LSPConfig;
   /** Heartbeat engine settings (periodic HEARTBEAT.md review) — autonomous fleet support */
   heartbeat?: HeartbeatConfig;
+  /** Daily reset scheduler settings — daily context boundary */
+  daily_reset?: DailyResetConfig;
   /** Named configuration profiles (activated via --profile <name>) */
   profiles?: Record<string, ProfileConfig>;
 }

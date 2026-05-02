@@ -495,6 +495,26 @@ export class CodeBuddyAgent extends BaseAgent {
       }).catch((e) => { logger.debug('HeartbeatEngine module load failed (optional)', { error: String(e) }); });
     }).catch((e) => { logger.debug('Heartbeat config check failed (optional)', { error: String(e) }); });
 
+    // Boot-time auto-start of DailyResetManager when [daily_reset] enabled=true.
+    // The /daily-reset slash command can also start it manually at runtime.
+    // Wired via audit OpenClaw heritage findings (2026-05-02).
+    import('../config/toml-config.js').then(({ getConfigManager }) => {
+      const drCfg = getConfigManager().getConfig().daily_reset;
+      if (!drCfg?.enabled) return;
+      import('../daemon/daily-reset.js').then(({ getDailyResetManager }) => {
+        type DRP = Parameters<typeof getDailyResetManager>[0];
+        const p: DRP = { enabled: true };
+        if (drCfg.reset_hour !== undefined) p!.resetHour = drCfg.reset_hour;
+        if (drCfg.reset_minute !== undefined) p!.resetMinute = drCfg.reset_minute;
+        if (drCfg.timezone !== undefined) p!.timezone = drCfg.timezone;
+        if (drCfg.post_summary !== undefined) p!.postSummary = drCfg.post_summary;
+        if (drCfg.idle_minutes !== undefined) p!.idleMinutes = drCfg.idle_minutes;
+        const engine = getDailyResetManager(p);
+        engine.start();
+        logger.info('DailyResetManager auto-started from TOML config');
+      }).catch((e) => { logger.debug('DailyResetManager module load failed (optional)', { error: String(e) }); });
+    }).catch((e) => { logger.debug('Daily reset config check failed (optional)', { error: String(e) }); });
+
     // Wire ICM cross-session memory bridge into executor
     import('../memory/icm-bridge.js').then(({ ICMBridge }) => {
       const bridge = new ICMBridge();

@@ -1294,6 +1294,16 @@ const agentControlCommands: SlashCommand[] = [
     ]
   },
   {
+    name: 'daily-reset',
+    description: 'Manage the daily reset scheduler (enable/disable/status/run) — clear conversation at configured time',
+    prompt: '__DAILY_RESET__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'action', description: 'enable | disable | status | run (default: status)', required: false }
+    ]
+  },
+  {
     name: 'suggest',
     description: 'Get proactive suggestions for the current project context',
     prompt: '__SUGGEST__',

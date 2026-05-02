@@ -108,6 +108,8 @@ import {
   setBtwClient,
   // Heartbeat handler (V4.x — wire user-facing activation of HeartbeatEngine)
   handleHeartbeat,
+  // Daily reset handler (audit OpenClaw heritage activation)
+  handleDailyReset,
   // Clipboard handler
   handleCopy,
   // PR handler (GitHub/GitLab PR creation)
@@ -464,6 +466,9 @@ export class EnhancedCommandHandler {
 
     // Heartbeat engine activation (fleet AUTONOMOUS-FLEET-PROTOCOL v0.1)
     ['__HEARTBEAT__', (args) => handleHeartbeat(args)],
+
+    // Daily reset scheduler (audit OpenClaw heritage activation)
+    ['__DAILY_RESET__', (args) => handleDailyReset(args)],
 
     // Clipboard (copy last response, code block, or text)
     ['__COPY__', (args) => handleCopy(args, this.conversationHistory)],

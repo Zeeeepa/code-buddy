@@ -252,6 +252,9 @@ export {
 // Heartbeat handler (fleet AUTONOMOUS-FLEET-PROTOCOL v0.1)
 export { handleHeartbeat } from './heartbeat-handler.js';
 
+// Daily reset handler (audit OpenClaw heritage activation)
+export { handleDailyReset } from './daily-reset-handler.js';
+
 // PR handlers (GitHub/GitLab PR creation)
 export {
   handlePR,
