@@ -206,7 +206,7 @@ export interface WorkflowResult {
  */
 export interface WorkflowEvent {
   timestamp: Date;
-  type: "task_started" | "task_completed" | "task_failed" | "agent_message" | "phase_started" | "phase_completed";
+  type: "task_started" | "task_completed" | "task_failed" | "agent_message" | "phase_started" | "phase_completed" | "conflict_detected";
   agent?: AgentRole;
   taskId?: string;
   message: string;

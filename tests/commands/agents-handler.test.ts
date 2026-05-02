@@ -302,11 +302,13 @@ describe('handleAgents (/agents)', () => {
     expect(mocks.getPerformanceReportMock).toHaveBeenCalled();
   });
 
-  it('conflicts returns honest empty message when none detected', async () => {
+  it('conflicts returns empty message + Phase H V0.3 hint when none detected', async () => {
     delete process.env.GROK_API_KEY;
     const r = await handleAgents(['conflicts']);
     expect(r.entry?.content).toContain('No conflicts detected');
-    expect(r.entry?.content).toContain('does not auto-detect');
+    // Phase H rewrote the empty-state message to point at the new V0.3 wiring
+    expect(r.entry?.content).toContain('Phase H');
+    expect(r.entry?.content).toContain('detectConflicts');
   });
 
   it('conflicts returns formatted list when coordinator has some', async () => {

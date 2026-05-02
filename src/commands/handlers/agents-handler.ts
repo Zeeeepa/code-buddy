@@ -272,8 +272,10 @@ export async function handleAgents(args: string[]): Promise<CommandHandlerResult
       if (conflicts.length === 0) {
         return textResult(
           'No conflicts detected.\n\n' +
-          'V0.1 honest note: MAS does not auto-detect conflicts during workflow execution.\n' +
-          'EnhancedCoordinator.detectConflicts() is API-only — V0.2 will integrate it into the workflow loop.'
+          'V0.3 (Phase H): MAS now calls coordinator.detectConflicts() after every phase\n' +
+          'when [multi_agent_system.coordination].enable_conflict_resolution = true.\n' +
+          'If you see no conflicts after a workflow, either none were detected (good), or\n' +
+          'the flag is disabled — check `/config show multi_agent_system.coordination`.'
         );
       }
       const lines = conflicts.map((c, i) =>

@@ -94,6 +94,14 @@ export function attachStreamer(
     if (event.type === 'task_started' || event.type === 'task_completed' || event.type === 'task_failed') {
       return;
     }
+    // Phase H — format conflict_detected with severity prefix
+    if (event.type === 'conflict_detected') {
+      const conflict = (event.data as { conflict?: { severity?: string; type?: string } } | undefined)?.conflict;
+      const sev = conflict?.severity ?? '?';
+      const typ = conflict?.type ?? 'unknown';
+      writer(`  [conflict:${sev}] ${typ} — ${event.message}\n`);
+      return;
+    }
     writer(`  [event] ${event.message}\n`);
   };
 

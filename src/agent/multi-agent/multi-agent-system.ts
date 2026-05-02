@@ -375,6 +375,7 @@ export class MultiAgentSystem extends EventEmitter {
       }
 
       this.addTimelineEvent("phase_completed", `Phase completed: ${phase.name}`);
+      await this.detectAndEmitConflicts(phase.tasks);
     }
   }
 
@@ -404,6 +405,7 @@ export class MultiAgentSystem extends EventEmitter {
       }
 
       this.addTimelineEvent("phase_completed", `Phase completed: ${phase.name}`);
+      await this.detectAndEmitConflicts(phase.tasks);
     }
   }
 
@@ -440,6 +442,9 @@ export class MultiAgentSystem extends EventEmitter {
         );
         await Promise.all(promises);
       }
+
+      // Phase H — detect conflicts after each iteration's batches
+      await this.detectAndEmitConflicts(nextTasks);
     }
   }
 
@@ -453,6 +458,7 @@ export class MultiAgentSystem extends EventEmitter {
     options: WorkflowOptions
   ): Promise<void> {
     for (const phase of plan.phases) {
+      // Track per-phase tasks for conflict detection at phase end
       for (const task of phase.tasks) {
         if (task.assignedTo === "coder") {
           // Step 1: Coder implements
@@ -495,6 +501,8 @@ export class MultiAgentSystem extends EventEmitter {
           await this.executeTask(task, results, errors, options);
         }
       }
+      // Phase H — peer-review phase complete: detect conflicts
+      await this.detectAndEmitConflicts(phase.tasks);
     }
   }
 
@@ -531,6 +539,10 @@ export class MultiAgentSystem extends EventEmitter {
         break;
       }
 
+      // Phase H — detect conflicts after each iteration of iterative
+      const allTasks = plan.phases.flatMap(p => p.tasks);
+      await this.detectAndEmitConflicts(allTasks);
+
       // Reset task status for retry
       if (iteration < maxIterations - 1) {
         for (const phase of plan.phases) {
@@ -553,6 +565,16 @@ export class MultiAgentSystem extends EventEmitter {
     errors: string[],
     options: WorkflowOptions
   ): Promise<void> {
+    // Phase H — adaptive allocation. The helper is no-op if the
+    // coordinator is disabled in TOML, otherwise it consults it.
+    // Mutates task.assignedTo to the resolved role so downstream code
+    // (orchestrator.updateTaskStatus, persistence) sees the chosen agent.
+    const resolvedRole = await this.getAssignedAgent(task);
+    if (resolvedRole !== task.assignedTo) {
+      this.addTimelineEvent("task_started", `Reallocated: ${task.title} → ${resolvedRole}`, { task, originalRole: task.assignedTo, resolvedRole });
+      task.assignedTo = resolvedRole;
+    }
+
     const agent = this.agents.get(task.assignedTo);
     if (!agent) {
       errors.push(`No agent found for role: ${task.assignedTo}`);
@@ -879,6 +901,82 @@ export class MultiAgentSystem extends EventEmitter {
 
     output += `\n${"═".repeat(70)}\n`;
     return output;
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // Phase H — EnhancedCoordinator integration (lazy-loaded)
+  // ────────────────────────────────────────────────────────────
+
+  private coordinationConfigCache: {
+    enableAdaptiveAllocation: boolean;
+    minAssignmentConfidence: number;
+    enableConflictResolution: boolean;
+  } | null = null;
+
+  /** Lazy-load coordinator config from TOML. Cached after first call.
+   *  All defaults sensible if TOML missing/incomplete. */
+  private async getCoordinationConfig(): Promise<{
+    enableAdaptiveAllocation: boolean;
+    minAssignmentConfidence: number;
+    enableConflictResolution: boolean;
+  }> {
+    if (this.coordinationConfigCache) return this.coordinationConfigCache;
+    try {
+      const { getConfigManager } = await import('../../config/toml-config.js');
+      const cfg = getConfigManager().getConfig().multi_agent_system?.coordination;
+      this.coordinationConfigCache = {
+        enableAdaptiveAllocation: cfg?.enable_adaptive_allocation ?? false,
+        minAssignmentConfidence: cfg?.min_assignment_confidence ?? 0.6,
+        enableConflictResolution: cfg?.enable_conflict_resolution ?? false,
+      };
+    } catch {
+      this.coordinationConfigCache = {
+        enableAdaptiveAllocation: false,
+        minAssignmentConfidence: 0.6,
+        enableConflictResolution: false,
+      };
+    }
+    return this.coordinationConfigCache;
+  }
+
+  /** Resolve which agent should run a task. If TOML
+   *  enable_adaptive_allocation = false (default), returns task.assignedTo
+   *  unchanged. If enabled and the coordinator returns an allocation with
+   *  confidence ≥ threshold, returns the coordinator's choice. */
+  private async getAssignedAgent(task: AgentTask): Promise<AgentRole> {
+    const cfg = await this.getCoordinationConfig();
+    if (!cfg.enableAdaptiveAllocation) return task.assignedTo;
+    try {
+      const { getEnhancedCoordinator } = await import('./enhanced-coordination.js');
+      const coordinator = getEnhancedCoordinator();
+      const available = Array.from(this.agents.keys()) as AgentRole[];
+      const alloc = coordinator.allocateTask(task, available);
+      if (alloc.confidence >= cfg.minAssignmentConfidence) {
+        return alloc.agent;
+      }
+      return task.assignedTo;
+    } catch {
+      return task.assignedTo;
+    }
+  }
+
+  /** Phase H — detect agent conflicts in a set of tasks (file overlap,
+   *  resource contention) and emit `workflow:event` of type
+   *  `conflict_detected` for each. Called after each phase completes.
+   *  No-op if TOML enable_conflict_resolution = false. */
+  private async detectAndEmitConflicts(tasks: AgentTask[]): Promise<void> {
+    const cfg = await this.getCoordinationConfig();
+    if (!cfg.enableConflictResolution) return;
+    try {
+      const { getEnhancedCoordinator } = await import('./enhanced-coordination.js');
+      const coordinator = getEnhancedCoordinator();
+      const conflicts = coordinator.detectConflicts(tasks, this.sharedContext);
+      for (const conflict of conflicts) {
+        this.addTimelineEvent('conflict_detected', conflict.description, { conflict });
+      }
+    } catch {
+      // coord disabled or import fail — silently skip
+    }
   }
 }
 
