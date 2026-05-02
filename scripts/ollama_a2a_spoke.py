@@ -70,9 +70,67 @@ class OllamaSpoke:
                 }
             }
 
+        @self.app.post("/api/a2a/tasks/send")
+        async def task_send(body: dict):
+            """A2A standard endpoint — receive task, route to Ollama, return result"""
+            try:
+                task_id = body.get("id", f"task_{datetime.utcnow().timestamp()}")
+                message = body.get("message", {})
+
+                # Extract prompt from A2A message format
+                parts = message.get("parts", [])
+                prompt = ""
+                for part in parts:
+                    if part.get("type") == "text":
+                        prompt = part.get("text", "")
+                        break
+
+                if not prompt:
+                    raise ValueError("No text prompt found in message parts")
+
+                # Pick first available model (or use metadata.model if specified)
+                metadata = body.get("metadata", {})
+                model = metadata.get("model") or list(self.models.keys())[0] if self.models else None
+
+                if not model:
+                    raise ValueError("No Ollama models available")
+
+                # Call Ollama
+                response = requests.post(
+                    f"{self.ollama_url}/api/generate",
+                    json={
+                        "model": model,
+                        "prompt": prompt,
+                        "stream": False
+                    },
+                    timeout=300
+                )
+                response.raise_for_status()
+                result = response.json()
+
+                # Return in A2A format
+                return {
+                    "id": task_id,
+                    "status": "completed",
+                    "result": result.get("response", ""),
+                    "artifacts": [{
+                        "name": "response",
+                        "parts": [{"type": "text", "text": result.get("response", "")}]
+                    }]
+                }
+            except Exception as e:
+                return JSONResponse(
+                    status_code=500,
+                    content={
+                        "id": body.get("id", "unknown"),
+                        "status": "failed",
+                        "error": str(e)
+                    }
+                )
+
         @self.app.post("/api/a2a/tasks/execute")
         async def execute_task(task: dict):
-            """Execute a task (LLM generation) via Ollama"""
+            """Legacy endpoint — kept for backwards compatibility"""
             try:
                 model = task.get("model")
                 prompt = task.get("prompt")
