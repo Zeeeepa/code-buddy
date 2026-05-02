@@ -106,6 +106,8 @@ import {
   // BTW handler (Native Engine v2026.3.14 alignment)
   handleBtw,
   setBtwClient,
+  // Heartbeat handler (V4.x — wire user-facing activation of HeartbeatEngine)
+  handleHeartbeat,
   // Clipboard handler
   handleCopy,
   // PR handler (GitHub/GitLab PR creation)
@@ -459,6 +461,9 @@ export class EnhancedCommandHandler {
 
     // BTW side-question (Native Engine v2026.3.14 alignment)
     ['__BTW__', (args) => handleBtw(args)],
+
+    // Heartbeat engine activation (fleet AUTONOMOUS-FLEET-PROTOCOL v0.1)
+    ['__HEARTBEAT__', (args) => handleHeartbeat(args)],
 
     // Clipboard (copy last response, code block, or text)
     ['__COPY__', (args) => handleCopy(args, this.conversationHistory)],

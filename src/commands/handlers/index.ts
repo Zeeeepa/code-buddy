@@ -249,6 +249,9 @@ export {
   setBtwClient,
 } from './btw-handler.js';
 
+// Heartbeat handler (fleet AUTONOMOUS-FLEET-PROTOCOL v0.1)
+export { handleHeartbeat } from './heartbeat-handler.js';
+
 // PR handlers (GitHub/GitLab PR creation)
 export {
   handlePR,

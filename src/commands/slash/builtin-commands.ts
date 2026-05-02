@@ -1284,6 +1284,16 @@ const agentControlCommands: SlashCommand[] = [
     ]
   },
   {
+    name: 'heartbeat',
+    description: 'Manage the heartbeat engine (enable/disable/status) — periodic HEARTBEAT.md review',
+    prompt: '__HEARTBEAT__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'action', description: 'enable | disable | status (default: status)', required: false }
+    ]
+  },
+  {
     name: 'suggest',
     description: 'Get proactive suggestions for the current project context',
     prompt: '__SUGGEST__',

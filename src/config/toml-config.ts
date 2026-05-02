@@ -265,6 +265,28 @@ export interface LSPConfig {
 }
 
 /**
+ * Heartbeat engine configuration — periodic HEARTBEAT.md review.
+ * Wired by the `/heartbeat enable` slash command (V4.x autonomous fleet
+ * support, AUTONOMOUS-FLEET-PROTOCOL-2026-05-02 v0.1).
+ */
+export interface HeartbeatConfig {
+  /** Whether the engine starts automatically when CodeBuddyAgent boots (default: false) */
+  enabled?: boolean;
+  /** Tick interval in minutes (default: 30) */
+  interval_minutes?: number;
+  /** Hour of day (0-23) when heartbeats start firing (default: 8) */
+  active_hours_start?: number;
+  /** Hour of day (0-23) when heartbeats stop firing (default: 22) */
+  active_hours_end?: number;
+  /** Path to the checklist file (default: .codebuddy/HEARTBEAT.md) */
+  heartbeat_file?: string;
+  /** Keyword in agent response that suppresses follow-up action (default: HEARTBEAT_OK) */
+  suppression_keyword?: string;
+  /** Cap on consecutive suppressions before forcing a full review (default: 5) */
+  max_consecutive_suppressions?: number;
+}
+
+/**
  * Named configuration profile — a subset of config keys applied on top of the base config.
  * Activate with: `buddy --profile <name>`
  *
@@ -306,6 +328,8 @@ export interface CodeBuddyConfig {
   advisor?: AdvisorToolConfig;
   /** LSP server settings (AI completions, etc.) */
   lsp?: LSPConfig;
+  /** Heartbeat engine settings (periodic HEARTBEAT.md review) — autonomous fleet support */
+  heartbeat?: HeartbeatConfig;
   /** Named configuration profiles (activated via --profile <name>) */
   profiles?: Record<string, ProfileConfig>;
 }

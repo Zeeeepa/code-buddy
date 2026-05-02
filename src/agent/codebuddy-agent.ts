@@ -473,6 +473,28 @@ export class CodeBuddyAgent extends BaseAgent {
       }).catch((e) => { logger.debug('Advisor toml-config import failed (optional)', { error: String(e) }); });
     }).catch((e) => { logger.debug('Advisor config provider wire failed (optional)', { error: String(e) }); });
 
+    // Boot-time auto-start of HeartbeatEngine when [heartbeat] enabled=true in TOML.
+    // The /heartbeat slash command can also start it manually at runtime.
+    // Wired for autonomous fleet support (AUTONOMOUS-FLEET-PROTOCOL v0.1).
+    import('../config/toml-config.js').then(({ getConfigManager }) => {
+      const hbCfg = getConfigManager().getConfig().heartbeat;
+      if (!hbCfg?.enabled) return;
+      import('../daemon/heartbeat.js').then(({ getHeartbeatEngine }) => {
+        // Pass only defined keys (passing undefined would overwrite engine defaults via spread).
+        type HBP = Parameters<typeof getHeartbeatEngine>[0];
+        const p: HBP = { enabled: true };
+        if (hbCfg.interval_minutes !== undefined) p!.intervalMs = hbCfg.interval_minutes * 60 * 1000;
+        if (hbCfg.active_hours_start !== undefined) p!.activeHoursStart = hbCfg.active_hours_start;
+        if (hbCfg.active_hours_end !== undefined) p!.activeHoursEnd = hbCfg.active_hours_end;
+        if (hbCfg.heartbeat_file !== undefined) p!.heartbeatFilePath = hbCfg.heartbeat_file;
+        if (hbCfg.suppression_keyword !== undefined) p!.suppressionKeyword = hbCfg.suppression_keyword;
+        if (hbCfg.max_consecutive_suppressions !== undefined) p!.maxConsecutiveSuppressions = hbCfg.max_consecutive_suppressions;
+        const engine = getHeartbeatEngine(p);
+        if (!engine.isRunning()) engine.start();
+        logger.info('HeartbeatEngine auto-started from TOML config');
+      }).catch((e) => { logger.debug('HeartbeatEngine module load failed (optional)', { error: String(e) }); });
+    }).catch((e) => { logger.debug('Heartbeat config check failed (optional)', { error: String(e) }); });
+
     // Wire ICM cross-session memory bridge into executor
     import('../memory/icm-bridge.js').then(({ ICMBridge }) => {
       const bridge = new ICMBridge();
