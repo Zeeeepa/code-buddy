@@ -344,6 +344,16 @@ export interface CoordinationTomlConfig {
   history_size?: number;
   /** Auto-checkpoint every N completed tasks (default: 5) */
   checkpoint_interval?: number;
+  /** Phase M (V0.4.1) — when true, MAS calls coordinator.autoResolveConflicts(tasks)
+   *  pre-batch and mutates losing agents' tasks to status='blocked'. Default false
+   *  to preserve V0.3/V0.4 annotation-only behaviour. Requires
+   *  enable_conflict_resolution = true to have any effect. */
+  auto_resolve_enabled?: boolean;
+  /** Phase M — strategy used by autoResolveConflicts. V0.4.1 ships
+   *  'prefer-reviewer' only (priority order: reviewer > coder > tester >
+   *  orchestrator on code_overlap conflicts). 'none' = annotation only.
+   *  Default 'none'. */
+  auto_resolve_strategy?: 'prefer-reviewer' | 'none';
 }
 
 /**

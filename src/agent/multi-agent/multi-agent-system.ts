@@ -425,13 +425,19 @@ export class MultiAgentSystem extends EventEmitter {
     for (const phase of plan.phases) {
       this.addTimelineEvent("phase_started", `Phase: ${phase.name}`, { phase });
 
+      // Phase M (V0.4.1) — detect+resolve PRE-batch (was POST in V0.3/V0.4,
+      // making `code_overlap` detection effectively a no-op since tasks were
+      // `completed` by then). Auto-resolve mutates losing tasks to `blocked`,
+      // which the loop below skips naturally.
+      await this.detectAndEmitConflicts(phase.tasks);
+
       for (const task of phase.tasks) {
         if (task.status === "completed") continue; // Phase J — skip resumed
+        if (task.status === "blocked") continue; // Phase M — skip auto-blocked
         await this.executeTask(task, results, errors, options);
       }
 
       this.addTimelineEvent("phase_completed", `Phase completed: ${phase.name}`);
-      await this.detectAndEmitConflicts(phase.tasks);
     }
   }
 
@@ -447,8 +453,12 @@ export class MultiAgentSystem extends EventEmitter {
     for (const phase of plan.phases) {
       this.addTimelineEvent("phase_started", `Phase: ${phase.name}`, { phase });
 
-      // Phase J — filter completed tasks before scheduling
-      const pending = phase.tasks.filter((t) => t.status !== "completed");
+      // Phase M (V0.4.1) — detect+resolve PRE-batch. See executeSequential.
+      await this.detectAndEmitConflicts(phase.tasks);
+
+      // Phase J — filter completed tasks before scheduling.
+      // Phase M — also filter `blocked` tasks (auto-resolve outcome).
+      const pending = phase.tasks.filter((t) => t.status !== "completed" && t.status !== "blocked");
       if (phase.parallelizable) {
         // Execute all tasks in parallel
         const promises = pending.map(task =>
@@ -463,7 +473,6 @@ export class MultiAgentSystem extends EventEmitter {
       }
 
       this.addTimelineEvent("phase_completed", `Phase completed: ${phase.name}`);
-      await this.detectAndEmitConflicts(phase.tasks);
     }
   }
 
@@ -490,9 +499,17 @@ export class MultiAgentSystem extends EventEmitter {
         break;
       }
 
+      // Phase M (V0.4.1) — detect+resolve PRE-batch (was POST in V0.3/V0.4).
+      // Auto-resolve mutates losing tasks to `blocked`; we filter them out
+      // before scheduling so they don't run.
+      await this.detectAndEmitConflicts(nextTasks);
+      const runnable = nextTasks.filter((t) => t.status !== "blocked");
+
+      if (runnable.length === 0) continue;
+
       // Execute tasks (potentially in parallel)
       const parallelLimit = options.parallelAgents || 3;
-      const batches = this.chunk(nextTasks, parallelLimit);
+      const batches = this.chunk(runnable, parallelLimit);
 
       for (const batch of batches) {
         const promises = batch.map(task =>
@@ -500,9 +517,6 @@ export class MultiAgentSystem extends EventEmitter {
         );
         await Promise.all(promises);
       }
-
-      // Phase H — detect conflicts after each iteration's batches
-      await this.detectAndEmitConflicts(nextTasks);
     }
   }
 
@@ -516,9 +530,12 @@ export class MultiAgentSystem extends EventEmitter {
     options: WorkflowOptions
   ): Promise<void> {
     for (const phase of plan.phases) {
-      // Track per-phase tasks for conflict detection at phase end
+      // Phase M (V0.4.1) — detect+resolve PRE-batch. See executeSequential.
+      await this.detectAndEmitConflicts(phase.tasks);
+
       for (const task of phase.tasks) {
         if (task.status === "completed") continue; // Phase J — skip resumed
+        if (task.status === "blocked") continue; // Phase M — skip auto-blocked
         if (task.assignedTo === "coder") {
           // Step 1: Coder implements
           await this.executeTask(task, results, errors, options);
@@ -560,8 +577,6 @@ export class MultiAgentSystem extends EventEmitter {
           await this.executeTask(task, results, errors, options);
         }
       }
-      // Phase H — peer-review phase complete: detect conflicts
-      await this.detectAndEmitConflicts(phase.tasks);
     }
   }
 
@@ -582,7 +597,15 @@ export class MultiAgentSystem extends EventEmitter {
         `Iteration ${iteration + 1}/${maxIterations}`
       );
 
-      // Execute all tasks
+      // Phase M (V0.4.1) — detect+resolve PRE-iteration so blocked tasks are
+      // skipped throughout this iteration's executeSequential pass. Detection
+      // runs against all plan tasks since iterative re-runs the whole plan.
+      const allTasks = plan.phases.flatMap(p => p.tasks);
+      await this.detectAndEmitConflicts(allTasks);
+
+      // Execute all tasks (executeSequential also runs detect+resolve per
+      // phase, but the per-iteration pass above catches plan-wide conflicts
+      // that span phases).
       await this.executeSequential(plan, results, errors, options);
 
       // Run tests
@@ -598,15 +621,13 @@ export class MultiAgentSystem extends EventEmitter {
         break;
       }
 
-      // Phase H — detect conflicts after each iteration of iterative
-      const allTasks = plan.phases.flatMap(p => p.tasks);
-      await this.detectAndEmitConflicts(allTasks);
-
-      // Reset task status for retry
+      // Reset task status for retry. Phase M — also reset `blocked` tasks
+      // (they may have been auto-blocked by a prior iteration; the next
+      // iteration will re-detect and re-resolve from scratch).
       if (iteration < maxIterations - 1) {
         for (const phase of plan.phases) {
           for (const task of phase.tasks) {
-            if (task.status === "completed") {
+            if (task.status === "completed" || task.status === "blocked") {
               task.status = "pending";
             }
           }
@@ -997,6 +1018,8 @@ export class MultiAgentSystem extends EventEmitter {
     enableAdaptiveAllocation: boolean;
     minAssignmentConfidence: number;
     enableConflictResolution: boolean;
+    autoResolveEnabled: boolean;
+    autoResolveStrategy: 'prefer-reviewer' | 'none';
   } | null = null;
 
   /** Lazy-load coordinator config from TOML. Cached after first call.
@@ -1005,6 +1028,8 @@ export class MultiAgentSystem extends EventEmitter {
     enableAdaptiveAllocation: boolean;
     minAssignmentConfidence: number;
     enableConflictResolution: boolean;
+    autoResolveEnabled: boolean;
+    autoResolveStrategy: 'prefer-reviewer' | 'none';
   }> {
     if (this.coordinationConfigCache) return this.coordinationConfigCache;
     try {
@@ -1014,12 +1039,16 @@ export class MultiAgentSystem extends EventEmitter {
         enableAdaptiveAllocation: cfg?.enable_adaptive_allocation ?? false,
         minAssignmentConfidence: cfg?.min_assignment_confidence ?? 0.6,
         enableConflictResolution: cfg?.enable_conflict_resolution ?? false,
+        autoResolveEnabled: cfg?.auto_resolve_enabled ?? false,
+        autoResolveStrategy: cfg?.auto_resolve_strategy ?? 'none',
       };
     } catch {
       this.coordinationConfigCache = {
         enableAdaptiveAllocation: false,
         minAssignmentConfidence: 0.6,
         enableConflictResolution: false,
+        autoResolveEnabled: false,
+        autoResolveStrategy: 'none',
       };
     }
     return this.coordinationConfigCache;
@@ -1048,7 +1077,18 @@ export class MultiAgentSystem extends EventEmitter {
 
   /** Phase H — detect agent conflicts in a set of tasks (file overlap,
    *  resource contention) and emit `workflow:event` of type
-   *  `conflict_detected` for each. Called after each phase completes.
+   *  `conflict_detected` for each.
+   *
+   *  Phase M (V0.4.1) — call moved from POST-batch (where tasks are already
+   *  `completed`/`failed`) to PRE-batch in all 5 strategies, so detection
+   *  catches `pending` tasks before they execute. When TOML
+   *  `auto_resolve_enabled` is true and strategy is `prefer-reviewer`, also
+   *  invokes coordinator.autoResolveConflicts(tasks) which mutates losing
+   *  agents' tasks to `status='blocked'`. The strategy executors then skip
+   *  these blocked tasks naturally (orchestrator.getNextTasks filters by
+   *  status='pending', and explicit `task.status === 'completed'` skips
+   *  cover the rest).
+   *
    *  No-op if TOML enable_conflict_resolution = false. */
   private async detectAndEmitConflicts(tasks: AgentTask[]): Promise<void> {
     const cfg = await this.getCoordinationConfig();
@@ -1059,6 +1099,25 @@ export class MultiAgentSystem extends EventEmitter {
       const conflicts = coordinator.detectConflicts(tasks, this.sharedContext);
       for (const conflict of conflicts) {
         this.addTimelineEvent('conflict_detected', conflict.description, { conflict });
+      }
+
+      // Phase M — auto-resolve side-effects (block losing agents on
+      // code_overlap). Skipped when strategy='none' or
+      // auto_resolve_enabled=false (V0.3/V0.4 backward-compat = annotation
+      // only).
+      if (
+        cfg.autoResolveEnabled &&
+        cfg.autoResolveStrategy === 'prefer-reviewer' &&
+        conflicts.length > 0
+      ) {
+        const mutatedTaskIds = coordinator.autoResolveConflicts(tasks);
+        if (mutatedTaskIds.length > 0) {
+          this.addTimelineEvent(
+            'conflict_detected',
+            `Auto-resolved: ${mutatedTaskIds.length} task(s) blocked`,
+            { autoResolved: true, blockedTaskIds: mutatedTaskIds }
+          );
+        }
       }
     } catch {
       // coord disabled or import fail — silently skip

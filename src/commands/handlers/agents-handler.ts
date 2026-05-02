@@ -296,10 +296,19 @@ export async function handleAgents(args: string[]): Promise<CommandHandlerResult
           'the flag is disabled — check `/config show multi_agent_system.coordination`.'
         );
       }
-      const lines = conflicts.map((c, i) =>
-        `${i + 1}. [${c.type}] severity=${c.severity}\n   agents: ${c.agents.join(', ')}\n   ${c.description}`
-      );
-      return textResult(`Detected conflicts (${conflicts.length}):\n\n${lines.join('\n\n')}`);
+      const lines = conflicts.map((c, i) => {
+        const head = `${i + 1}. [${c.type}] severity=${c.severity}\n   agents: ${c.agents.join(', ')}\n   ${c.description}`;
+        // Phase M (V0.4.1) — show resolution + auto-resolve outcome if present.
+        if (c.resolution) {
+          return `${head}\n   → resolved (${c.resolution.strategy}): ${c.resolution.decision}`;
+        }
+        return head;
+      });
+      const resolved = conflicts.filter((c) => c.resolution).length;
+      const header = resolved > 0
+        ? `Detected conflicts (${conflicts.length}) — ${resolved} resolved:`
+        : `Detected conflicts (${conflicts.length}):`;
+      return textResult(`${header}\n\n${lines.join('\n\n')}`);
     } catch (err) {
       return textResult(`Could not load EnhancedCoordinator: ${err instanceof Error ? err.message : String(err)}`);
     }

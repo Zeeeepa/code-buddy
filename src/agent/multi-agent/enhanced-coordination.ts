@@ -22,6 +22,7 @@ import {
   SharedContext,
   TaskArtifact,
 } from './types.js';
+import { logger } from '../../utils/logger.js';
 
 /**
  * Agent performance metrics
@@ -57,6 +58,10 @@ export interface AgentConflict {
   severity: 'low' | 'medium' | 'high';
   timestamp: Date;
   resolution?: ConflictResolution;
+  /** Phase M (V0.4.1) — for `code_overlap` conflicts, the file path that
+   *  triggered the overlap. Used by autoResolveConflicts to find which tasks
+   *  to mutate. Other conflict types leave this undefined. */
+  affectedFile?: string;
 }
 
 /**
@@ -80,6 +85,13 @@ export interface TaskDependency {
 }
 
 /**
+ * Phase M (V0.4.1) — auto-resolve strategy. Only `prefer-reviewer` ships in
+ * V0.4.1 (other strategies kept as `'none'` until V0.5+). When `none`, the
+ * coordinator only annotates conflicts; no task.status mutation happens.
+ */
+export type AutoResolveStrategy = 'prefer-reviewer' | 'none';
+
+/**
  * Coordination configuration
  */
 export interface CoordinationConfig {
@@ -99,6 +111,12 @@ export interface CoordinationConfig {
   historySize: number;
   // Checkpoint interval (tasks)
   checkpointInterval: number;
+  /** Phase M (V0.4.1) — when true, `autoResolveConflicts(tasks)` mutates
+   *  losing agents' tasks to `status='blocked'` for `code_overlap` conflicts.
+   *  Default false to preserve V0.3/V0.4 annotation-only behaviour. */
+  autoResolveEnabled: boolean;
+  /** Phase M — strategy used for auto-resolve. V0.4.1 ships `prefer-reviewer`. */
+  autoResolveStrategy: AutoResolveStrategy;
 }
 
 const DEFAULT_CONFIG: CoordinationConfig = {
@@ -110,6 +128,8 @@ const DEFAULT_CONFIG: CoordinationConfig = {
   enableLearning: true,
   historySize: 50,
   checkpointInterval: 5,
+  autoResolveEnabled: false,
+  autoResolveStrategy: 'none',
 };
 
 /**
@@ -403,11 +423,18 @@ export class EnhancedCoordinator extends EventEmitter {
 
     const newConflicts: AgentConflict[] = [];
 
-    // Check for code overlap conflicts
+    // Check for code overlap conflicts.
+    // Phase M (V0.4.1) — loosened status filter from `in_progress`-only to
+    // include `pending` and `review_required`. The pre-V0.4.1 filter meant
+    // detection ran post-batch (when tasks were already `completed`/`failed`),
+    // making `code_overlap` effectively dead code. Pre-batch detection now
+    // sees `pending` tasks before they execute, enabling auto-resolve to
+    // actually block losing agents.
+    const detectableStatuses: ReadonlyArray<AgentTask['status']> = ['pending', 'in_progress', 'review_required'];
     const fileToAgents = new Map<string, AgentRole[]>();
     for (const task of tasks) {
       const targetFiles = task.metadata?.targetFiles as string[] | undefined;
-      if (task.status === 'in_progress' && targetFiles) {
+      if (detectableStatuses.includes(task.status) && targetFiles) {
         for (const file of targetFiles) {
           const agents = fileToAgents.get(file) || [];
           agents.push(task.assignedTo);
@@ -425,6 +452,7 @@ export class EnhancedCoordinator extends EventEmitter {
           description: `Multiple agents modifying ${file}`,
           severity: 'high',
           timestamp: new Date(),
+          affectedFile: file,
         });
       }
     }
@@ -473,48 +501,116 @@ export class EnhancedCoordinator extends EventEmitter {
   }
 
   /**
-   * Auto-resolve conflicts using predefined strategies
+   * Auto-resolve conflicts using predefined strategies.
+   *
+   * Phase M (V0.4.1) — when `tasks` is provided AND `autoResolveEnabled` is
+   * true AND `autoResolveStrategy` is `prefer-reviewer`, mutates losing
+   * agents' tasks to `status='blocked'` for `code_overlap` conflicts. This
+   * is the first concrete side-effect for autoResolve (V0.3 / V0.4 baseline
+   * was annotation-only).
+   *
+   * Other conflict types (`resource_contention`, `approach_disagreement`,
+   * `deadline_conflict`) keep V0.3 behaviour — annotation only, with a
+   * `logger.warn` flagging the V0.5+ deferral. Caller can still inspect
+   * `conflict.resolution` for advisory decision text.
+   *
+   * Returns the IDs of tasks whose status was mutated, so callers can log
+   * the side-effect or update streamers (empty array if no mutation
+   * happened — strategy=`none`, autoResolveEnabled=false, or no `tasks`
+   * provided).
    */
-  autoResolveConflicts(): void {
+  autoResolveConflicts(tasks?: AgentTask[]): string[] {
+    const mutatedTaskIds: string[] = [];
+    const strategy = this.config.autoResolveStrategy;
+    const sideEffectsEnabled =
+      this.config.autoResolveEnabled && strategy === 'prefer-reviewer' && tasks !== undefined;
+
     for (const conflict of this.conflicts) {
       if (conflict.resolution) continue;
 
       let resolution: Omit<ConflictResolution, 'timestamp'> | null = null;
 
       switch (conflict.type) {
-        case 'code_overlap':
-          // Priority-based: reviewer > coder > tester
+        case 'code_overlap': {
+          // Priority order: reviewer > coder > tester > orchestrator. The
+          // first agent in `conflict.agents` matching this order wins; the
+          // others have their conflicting tasks blocked (when side-effects
+          // are enabled).
           const priorityOrder: AgentRole[] = ['reviewer', 'coder', 'tester', 'orchestrator'];
-          const winner = conflict.agents.sort((a, b) =>
+          const winner = [...conflict.agents].sort((a, b) =>
             priorityOrder.indexOf(a) - priorityOrder.indexOf(b)
           )[0];
+          const losers = conflict.agents.filter((a) => a !== winner);
+          const file = conflict.affectedFile;
+
+          let blockedCount = 0;
+          if (sideEffectsEnabled && file && tasks) {
+            for (const task of tasks) {
+              if (
+                losers.includes(task.assignedTo) &&
+                Array.isArray(task.metadata?.targetFiles) &&
+                (task.metadata.targetFiles as string[]).includes(file) &&
+                task.status !== 'blocked' &&
+                task.status !== 'completed'
+              ) {
+                task.status = 'blocked';
+                task.error = `Blocked by code_overlap conflict — ${winner} has priority on ${file}`;
+                task.updatedAt = new Date();
+                mutatedTaskIds.push(task.id);
+                blockedCount++;
+              }
+            }
+          }
+
+          const decisionSuffix = blockedCount > 0
+            ? ` — blocked ${blockedCount} losing task(s): ${losers.join(', ')}`
+            : sideEffectsEnabled
+              ? ' — no losing tasks found to block'
+              : ' — annotation only (auto_resolve_enabled=false or strategy=none)';
+
           resolution = {
             strategy: 'priority',
-            decision: `Agent ${winner} has priority for this file`,
+            decision: `Agent ${winner} has priority${file ? ` for ${file}` : ''}${decisionSuffix}`,
             resolvedBy: 'orchestrator',
           };
           break;
+        }
 
         case 'resource_contention':
+          if (sideEffectsEnabled) {
+            logger.warn(
+              `[multi-agent] auto-resolve for type=resource_contention not implemented in V0.4.1 (annotation-only); deferred to V0.5+`
+            );
+          }
           resolution = {
             strategy: 'arbitration',
-            decision: 'Queue excess tasks for later execution',
+            decision: 'Queue excess tasks for later execution (V0.5+)',
             resolvedBy: 'orchestrator',
           };
           break;
 
         case 'approach_disagreement':
+          if (sideEffectsEnabled) {
+            logger.warn(
+              `[multi-agent] auto-resolve for type=approach_disagreement not implemented in V0.4.1 (annotation-only); deferred to V0.5+`
+            );
+          }
           resolution = {
             strategy: 'consensus',
-            decision: 'Prefer approach with higher confidence score',
+            decision: 'Prefer approach with higher confidence score (V0.5+)',
             resolvedBy: 'orchestrator',
           };
           break;
 
         case 'deadline_conflict':
+          if (sideEffectsEnabled) {
+            logger.warn(
+              `[multi-agent] auto-resolve for type=deadline_conflict not implemented in V0.4.1 (annotation-only); deferred to V0.5+`
+            );
+          }
           resolution = {
             strategy: 'priority',
-            decision: 'Prioritize critical path tasks',
+            decision: 'Prioritize critical path tasks (V0.5+)',
             resolvedBy: 'orchestrator',
           };
           break;
@@ -524,6 +620,8 @@ export class EnhancedCoordinator extends EventEmitter {
         this.resolveConflict(conflict.id, resolution);
       }
     }
+
+    return mutatedTaskIds;
   }
 
   /**
