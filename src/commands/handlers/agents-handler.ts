@@ -422,9 +422,16 @@ export async function handleAgents(args: string[]): Promise<CommandHandlerResult
       eventListener as (...a: unknown[]) => void
     );
 
+    // Phase D — live event streaming to the terminal via process.stdout.write
+    // (pattern from /docs in enhanced-command-handler.ts L228). Streamer
+    // detaches in the .then/.catch below to avoid listener leaks across runs.
+    const { attachStreamer } = await import('../../agent/multi-agent/workflow-event-streamer.js');
+    const streamerHandle = attachStreamer(system as unknown as Parameters<typeof attachStreamer>[0]);
+
     const startedAt = new Date();
     const promise = system.runWorkflow(goal, { strategy: activeStrategy }).then(
       (result) => {
+        streamerHandle.detach();
         lastResult = {
           goal,
           success: result.success,
@@ -450,6 +457,7 @@ export async function handleAgents(args: string[]): Promise<CommandHandlerResult
         return result;
       },
       (err: unknown) => {
+        streamerHandle.detach();
         lastResult = {
           goal,
           success: false,
