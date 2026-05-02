@@ -1304,6 +1304,16 @@ const agentControlCommands: SlashCommand[] = [
     ]
   },
   {
+    name: 'session',
+    description: 'Manage team-collaboration sessions (enable/disable/status/create/join/list/leave) — local-first V0.1, WS sync V0.2',
+    prompt: '__SESSION__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'action', description: 'enable | disable | status | create <name> | join <id> | list | leave', required: false }
+    ]
+  },
+  {
     name: 'suggest',
     description: 'Get proactive suggestions for the current project context',
     prompt: '__SUGGEST__',

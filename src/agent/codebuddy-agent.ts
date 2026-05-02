@@ -515,6 +515,28 @@ export class CodeBuddyAgent extends BaseAgent {
       }).catch((e) => { logger.debug('DailyResetManager module load failed (optional)', { error: String(e) }); });
     }).catch((e) => { logger.debug('Daily reset config check failed (optional)', { error: String(e) }); });
 
+    // Boot-time auto-instantiate of the TeamSessionManager when [team_session]
+    // enabled=true. The /session slash command can also instantiate it manually
+    // at runtime. Wired via audit OpenClaw heritage findings (2026-05-02 — top 1).
+    // V0.1 only instantiates the singleton (local-first); WS sync arrives in V0.2.
+    import('../config/toml-config.js').then(({ getConfigManager }) => {
+      const tsCfg = getConfigManager().getConfig().team_session;
+      if (!tsCfg?.enabled) return;
+      import('../collaboration/team-session.js').then(({ getTeamSessionManager }) => {
+        type TSP = Parameters<typeof getTeamSessionManager>[0];
+        const p: TSP = {};
+        if (tsCfg.server_url !== undefined) p!.serverUrl = tsCfg.server_url;
+        if (tsCfg.enable_encryption !== undefined) p!.enableEncryption = tsCfg.enable_encryption;
+        if (tsCfg.encryption_key !== undefined) p!.encryptionKey = tsCfg.encryption_key;
+        if (tsCfg.auto_reconnect !== undefined) p!.autoReconnect = tsCfg.auto_reconnect;
+        if (tsCfg.reconnect_interval !== undefined) p!.reconnectInterval = tsCfg.reconnect_interval;
+        if (tsCfg.heartbeat_interval !== undefined) p!.heartbeatInterval = tsCfg.heartbeat_interval;
+        if (tsCfg.max_reconnect_attempts !== undefined) p!.maxReconnectAttempts = tsCfg.max_reconnect_attempts;
+        getTeamSessionManager(p);
+        logger.info('TeamSessionManager auto-instantiated from TOML config');
+      }).catch((e) => { logger.debug('TeamSessionManager module load failed (optional)', { error: String(e) }); });
+    }).catch((e) => { logger.debug('Team session config check failed (optional)', { error: String(e) }); });
+
     // Wire ICM cross-session memory bridge into executor
     import('../memory/icm-bridge.js').then(({ ICMBridge }) => {
       const bridge = new ICMBridge();

@@ -289,6 +289,37 @@ export interface DailyResetConfig {
 }
 
 /**
+ * Team session manager configuration (TeamSessionManager wake).
+ * Wired by the `/session enable` slash command (audit OpenClaw heritage
+ * findings 2026-05-02 — top 1 priority).
+ *
+ * V0.1 limitation: real-time sync requires a WebSocket server (V0.2 work).
+ * Sessions are persisted locally under ~/.codebuddy/sessions/.
+ *
+ * Named `TeamSessionTomlConfig` (not `TeamSessionConfig`) to avoid name
+ * collision with the runtime config interface in `team-session.ts` —
+ * the TOML one uses snake_case and is a subset bound to the toml schema.
+ */
+export interface TeamSessionTomlConfig {
+  /** Whether the singleton auto-instantiates at boot (default: false) */
+  enabled?: boolean;
+  /** WebSocket server URL for real-time sync (V0.2 — leave empty for local-only) */
+  server_url?: string;
+  /** AES-256-GCM on session files (default: true) */
+  enable_encryption?: boolean;
+  /** Optional user-provided encryption key. If absent, manager generates one. */
+  encryption_key?: string;
+  /** Auto-reconnect on WebSocket disconnect (default: true) */
+  auto_reconnect?: boolean;
+  /** Reconnect retry interval in milliseconds (default: 5000) */
+  reconnect_interval?: number;
+  /** WebSocket heartbeat interval in milliseconds (default: 30000) */
+  heartbeat_interval?: number;
+  /** Max reconnect attempts before giving up (default: 10) */
+  max_reconnect_attempts?: number;
+}
+
+/**
  * Heartbeat engine configuration — periodic HEARTBEAT.md review.
  * Wired by the `/heartbeat enable` slash command (V4.x autonomous fleet
  * support, AUTONOMOUS-FLEET-PROTOCOL-2026-05-02 v0.1).
@@ -356,6 +387,8 @@ export interface CodeBuddyConfig {
   heartbeat?: HeartbeatConfig;
   /** Daily reset scheduler settings — daily context boundary */
   daily_reset?: DailyResetConfig;
+  /** Team session manager settings — TeamSessionManager wake (audit OpenClaw heritage) */
+  team_session?: TeamSessionTomlConfig;
   /** Named configuration profiles (activated via --profile <name>) */
   profiles?: Record<string, ProfileConfig>;
 }
