@@ -168,3 +168,46 @@ describe('SessionToolExecutor singleton integration', () => {
     expect(result.success).toBe(false);
   });
 });
+
+// ────────────────────────────────────────────────────────────
+// Phase I (V0.3) — per-minute spawn rate limit
+// ────────────────────────────────────────────────────────────
+
+describe('Phase I — per-minute spawn rate limit (SessionRegistry)', () => {
+  let registry: SessionRegistry;
+
+  beforeEach(() => {
+    registry = new SessionRegistry();
+  });
+
+  it('maxSpawnPerMinute = 0 (default) → no rate limit applied', () => {
+    const root = registry.createSession({ kind: 'main', agentId: 'a' });
+    for (let i = 0; i < 5; i++) {
+      // No throw expected — caps depth/breadth still apply but rate limit off
+      registry.spawnSession({ parentSessionId: root.id, task: `t${i}` });
+    }
+    // Should reach the breadth cap (10) before the rate limit kicks in
+    expect(true).toBe(true);
+  });
+
+  it('maxSpawnPerMinute = 3 → 4th spawn within 60s throws rate-limit', () => {
+    const root = registry.createSession({ kind: 'main', agentId: 'a' });
+    registry.spawnSession({ parentSessionId: root.id, task: 't1', maxSpawnPerMinute: 3 });
+    registry.spawnSession({ parentSessionId: root.id, task: 't2', maxSpawnPerMinute: 3 });
+    registry.spawnSession({ parentSessionId: root.id, task: 't3', maxSpawnPerMinute: 3 });
+    expect(() =>
+      registry.spawnSession({ parentSessionId: root.id, task: 't4', maxSpawnPerMinute: 3 })
+    ).toThrow(/rate limit/i);
+  });
+
+  it('rate limit cap is independent from depth/breadth caps', () => {
+    // Depth 3 + breadth 10 caps still fire even if rate limit not exceeded
+    const root = registry.createSession({ kind: 'main', agentId: 'a' });
+    for (let i = 0; i < 10; i++) {
+      registry.spawnSession({ parentSessionId: root.id, task: `t${i}`, maxSpawnPerMinute: 100 });
+    }
+    expect(() =>
+      registry.spawnSession({ parentSessionId: root.id, task: 't11', maxSpawnPerMinute: 100 })
+    ).toThrow(/Workflow session cap/i);
+  });
+});

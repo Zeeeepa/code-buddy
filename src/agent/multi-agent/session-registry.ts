@@ -401,6 +401,9 @@ export class SessionRegistry extends EventEmitter {
   /**
    * Spawn a sub-session
    */
+  /** Phase I (V0.3) — sliding window of recent spawn timestamps for rate limiting. */
+  private spawnTimestamps: number[] = [];
+
   spawnSession(params: {
     parentSessionId: string;
     task: string;
@@ -409,10 +412,24 @@ export class SessionRegistry extends EventEmitter {
     model?: string;
     allowedTools?: string[];
     context?: Record<string, unknown>;
+    /** Phase I — rate limit cap (0 = disabled, lazy-passed by caller from TOML). */
+    maxSpawnPerMinute?: number;
   }): SessionInfo {
     const parent = this.sessions.get(params.parentSessionId);
     if (!parent) {
       throw new Error(`Parent session ${params.parentSessionId} not found`);
+    }
+
+    // Phase I — per-minute spawn rate limit.
+    if (params.maxSpawnPerMinute && params.maxSpawnPerMinute > 0) {
+      const now = Date.now();
+      this.spawnTimestamps = this.spawnTimestamps.filter((t) => now - t < 60_000);
+      if (this.spawnTimestamps.length >= params.maxSpawnPerMinute) {
+        throw new Error(
+          `Spawn rate limit (${params.maxSpawnPerMinute}/min) exceeded — cool down before spawning more sub-agents`
+        );
+      }
+      this.spawnTimestamps.push(now);
     }
 
     // Phase E safety caps — bound the runaway-spawn blast radius.

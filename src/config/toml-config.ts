@@ -363,6 +363,12 @@ export interface SessionsTomlConfig {
   enable_persistence?: boolean;
   /** Max sub-agents spawned per workflow root session (default: 10) */
   max_per_workflow?: number;
+  /** Phase I (V0.3) — require user confirmation before sessions_send (default: false for back-compat) */
+  require_confirmation_for_send?: boolean;
+  /** Phase I (V0.3) — require user confirmation before sessions_spawn (default: false for back-compat) */
+  require_confirmation_for_spawn?: boolean;
+  /** Phase I (V0.3) — max spawned sessions per minute (rate limit, 0 = disabled, default: 0) */
+  max_spawn_per_minute?: number;
 }
 
 /**

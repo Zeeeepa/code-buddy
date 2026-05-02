@@ -231,6 +231,30 @@ export interface SessionToolResult {
   data?: unknown;
 }
 
+/** Phase I (V0.3) — lazy-load Sessions TOML config + map snake_case to
+ *  camelCase. All defaults are conservative (back-compat with V0.2). */
+async function getSessionsTomlConfig(): Promise<{
+  requireConfirmationForSend: boolean;
+  requireConfirmationForSpawn: boolean;
+  maxSpawnPerMinute: number;
+}> {
+  try {
+    const { getConfigManager } = await import('../../config/toml-config.js');
+    const cfg = getConfigManager().getConfig().multi_agent_system?.sessions;
+    return {
+      requireConfirmationForSend: cfg?.require_confirmation_for_send ?? false,
+      requireConfirmationForSpawn: cfg?.require_confirmation_for_spawn ?? false,
+      maxSpawnPerMinute: cfg?.max_spawn_per_minute ?? 0,
+    };
+  } catch {
+    return {
+      requireConfirmationForSend: false,
+      requireConfirmationForSpawn: false,
+      maxSpawnPerMinute: 0,
+    };
+  }
+}
+
 export class SessionToolExecutor {
   private registry: SessionRegistry;
   private currentSessionId: string;
@@ -357,6 +381,21 @@ export class SessionToolExecutor {
       return { success: false, error: 'sessionKey and message are required' };
     }
 
+    // Phase I (V0.3) — confirmation gate. Lazy-load TOML + helper.
+    const sessCfg = await getSessionsTomlConfig();
+    if (sessCfg.requireConfirmationForSend) {
+      const { checkConfirmation } = await import('../../utils/confirmation-helper.js');
+      const check = await checkConfirmation({
+        operationType: 'file',
+        operationDescription: 'send message to another session',
+        targetName: `session: ${sessionKey}`,
+        content: `Message preview:\n${message.slice(0, 500)}${message.length > 500 ? '…' : ''}`,
+      });
+      if (!check.confirmed) {
+        return { success: false, error: check.error || 'sessions_send cancelled by user' };
+      }
+    }
+
     const result = await this.registry.sendToSession(
       this.currentSessionId,
       sessionKey,
@@ -385,10 +424,27 @@ export class SessionToolExecutor {
     }
   }
 
-  private executeSessionsSpawn(args: Record<string, unknown>): SessionToolResult {
+  private async executeSessionsSpawn(args: Record<string, unknown>): Promise<SessionToolResult> {
     const task = args.task as string;
     if (!task) {
       return { success: false, error: 'task is required' };
+    }
+
+    // Phase I (V0.3) — confirmation gate before spawn.
+    const sessCfg = await getSessionsTomlConfig();
+    if (sessCfg.requireConfirmationForSpawn) {
+      const { checkConfirmation } = await import('../../utils/confirmation-helper.js');
+      const label = (args.label as string) || 'unnamed';
+      const timeoutS = (args.runTimeoutSeconds as number) || 300;
+      const check = await checkConfirmation({
+        operationType: 'file',
+        operationDescription: 'spawn isolated sub-agent',
+        targetName: `session: ${label}`,
+        content: `Task:    ${task}\nLabel:   ${label}\nTimeout: ${timeoutS}s\nModel:   ${args.model || '(default)'}`,
+      });
+      if (!check.confirmed) {
+        return { success: false, error: check.error || 'sessions_spawn cancelled by user' };
+      }
     }
 
     try {
@@ -400,6 +456,8 @@ export class SessionToolExecutor {
         model: args.model as string | undefined,
         allowedTools: args.allowedTools as string[] | undefined,
         context: args.context as Record<string, unknown> | undefined,
+        // Phase I — pass rate-limit cap from TOML; 0/undefined = disabled
+        maxSpawnPerMinute: sessCfg.maxSpawnPerMinute,
       });
 
       return {
