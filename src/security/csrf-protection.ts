@@ -382,6 +382,9 @@ export class CSRFProtection extends EventEmitter {
 // Types for Express-like request/response
 interface CSRFRequest {
   method?: string;
+  /** Express request path (e.g. '/api/a2a/tasks/send'). Used by the
+   * middleware to exempt A2A routes from CSRF (auth-based instead). */
+  path?: string;
   headers: Record<string, string | string[] | undefined>;
   cookies?: Record<string, string>;
   body?: Record<string, string>;

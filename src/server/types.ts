@@ -132,6 +132,7 @@ export interface ApiKey {
 }
 
 export type ApiScope =
+  | 'read'
   | 'chat'
   | 'chat:stream'
   | 'tools'
