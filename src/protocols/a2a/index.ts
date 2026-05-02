@@ -379,10 +379,13 @@ export class A2AAgentClient {
     metadata?: Record<string, string>
   ): Promise<Task> {
     const taskId = `task_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const baseUrl = remote.url.replace(/\/+$/, '');
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120_000);
 
     try {
       // Forward the task to the remote spoke
-      const response = await fetch(`${remote.url}/api/a2a/tasks/send`, {
+      const response = await fetch(`${baseUrl}/api/a2a/tasks/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -390,10 +393,13 @@ export class A2AAgentClient {
           message: { role: 'user', parts: [{ type: 'text', text: request }] },
           metadata,
         }),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
-        throw new Error(`Remote task submission failed: ${response.statusText}`);
+        const detail = await response.text().catch(() => '');
+        const suffix = detail ? ` — ${detail.slice(0, 500)}` : '';
+        throw new Error(`Remote task submission failed: ${response.status} ${response.statusText}${suffix}`);
       }
 
       const result = await response.json() as Record<string, unknown>;
@@ -409,7 +415,10 @@ export class A2AAgentClient {
         history: [{ status: TaskStatus.SUBMITTED, timestamp: Date.now() }],
       };
     } catch (err) {
-      const error = err instanceof Error ? err.message : String(err);
+      const isAbort = err instanceof Error && err.name === 'AbortError';
+      const error = isAbort
+        ? `Remote task timed out after 120s (${agentKey})`
+        : err instanceof Error ? err.message : String(err);
       return {
         id: taskId,
         sessionId: `${agentKey}_${taskId}`,
@@ -422,6 +431,8 @@ export class A2AAgentClient {
           { status: TaskStatus.FAILED, message: error, timestamp: Date.now() },
         ],
       };
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 

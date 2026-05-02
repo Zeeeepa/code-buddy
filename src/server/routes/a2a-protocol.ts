@@ -22,6 +22,31 @@ import {
 function getAgentServer(client: A2AAgentClient, name: string): A2AAgentServer | undefined {
   return (client as unknown as { agents: Map<string, A2AAgentServer> }).agents?.get(name);
 }
+
+/**
+ * Normalise the inbound `message` field of POST /tasks/send into a plain string.
+ * Accepts either a raw string or an A2A Message object `{role, parts: [{type:'text', text}]}`,
+ * which is what cross-host callers send. submitTask() expects a string and embeds it
+ * verbatim into a Message; passing an object would nest it as `text: <object>` and
+ * the downstream spoke would forward garbage to its model backend.
+ */
+function extractMessageText(message: unknown): string {
+  if (typeof message === 'string') return message;
+  if (message && typeof message === 'object') {
+    const parts = (message as { parts?: unknown }).parts;
+    if (Array.isArray(parts)) {
+      const texts = parts
+        .filter((p): p is { type: string; text: string } =>
+          !!p && typeof p === 'object' &&
+          (p as { type?: unknown }).type === 'text' &&
+          typeof (p as { text?: unknown }).text === 'string')
+        .map((p) => p.text);
+      if (texts.length > 0) return texts.join('\n');
+    }
+  }
+  return JSON.stringify(message);
+}
+
 interface A2ARouter extends Router { a2aClient?: A2AAgentClient; }
 
 export function createA2AProtocolRoutes(): Router {
@@ -69,7 +94,8 @@ export function createA2AProtocolRoutes(): Router {
     }
 
     try {
-      const task = await client.submitTask(agentName, message);
+      const messageText = extractMessageText(message);
+      const task = await client.submitTask(agentName, messageText);
       res.json({
         id: task.id,
         status: task.status,
