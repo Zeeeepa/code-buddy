@@ -15,6 +15,24 @@ Heading toward `1.0.0` final. Backlog tracked under `## [Unreleased]`'s
 [`docs/fleet-guide.md`](docs/fleet-guide.md) (V1.x roadmap section)
 and the audit follow-ups noted under `## [0.5.1-fleet]`.
 
+### Added since 1.0.0-rc.2
+- **`MessageHistoryManager.getComprehensiveHistory()` / `getCuratedHistory()`**
+  (`d7472e1`) — explicit raw-vs-curated distinction at the facade layer,
+  closes Gemini CLI audit recommendation #3 (final of 3 recos closed).
+  Additive only — no callers migrated yet (deferred V1.0.0 final).
+  9 new tests, first dedicated test file for this facade (T6 backlog
+  foundation). Helper `repairToolCallPairs` already covered by 7 tests.
+- **`/status` Memory section** (`0afc199`) — extends the existing
+  `handleStatus` with a one-line Memory dashboard cell showing project +
+  user counts and the relative time of the last persisted entry. Surfaces
+  the auto-memory writeback (`a2a4f72`) without typing `/memory recent`.
+  4 new tests. Silent skip on missing data.
+- **`docs/getting-started.md` Troubleshooting + Fleet quickstart +
+  Auto-memory sections** — extended the entry doc from 122 → ~260 lines
+  so a new user (or another Claude discovering the project) can be
+  productive in 5 minutes: 8-issue troubleshooting playbook, 30-second
+  Fleet connect quickstart, auto-memory inspection commands.
+
 ---
 
 ## [1.0.0-rc.2] — 2026-05-04
