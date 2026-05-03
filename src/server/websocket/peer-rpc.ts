@@ -183,7 +183,7 @@ function registerBuiltInMethods(): void {
     hostname: process.env.CODEBUDDY_FLEET_HOSTNAME || os.hostname(),
     pid: process.pid,
     methods: listPeerMethods(),
-    apiVersion: 'd.14',
+    apiVersion: 'd.15',
     role: getPeerRole(),
     maxDepth: getMaxDepth(),
   }));

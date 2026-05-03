@@ -34,6 +34,7 @@ import { chatRoutes, toolsRoutes, sessionsRoutes, memoryRoutes, healthRoutes, me
 import { setupWebSocket, closeAllConnections, getConnectionStats } from './websocket/index.js';
 import { startFleetHeartbeat, stopFleetHeartbeat } from '../fleet/heartbeat-broadcaster.js';
 import { wireCompactionBridge, unwireCompactionBridge } from '../fleet/compaction-bridge.js';
+import { wirePeerChatBridge, unwirePeerChatBridge } from '../fleet/peer-chat-bridge.js';
 import { logger } from '../utils/logger.js';
 import { initMetrics, getMetrics as _getMetrics } from '../metrics/index.js';
 import { CSRFProtection } from '../security/csrf-protection.js';
@@ -816,6 +817,14 @@ export async function startServer(userConfig: Partial<ServerConfig> = {}): Promi
     // fleet:peer:compacting:* so remote Claudes know when this peer is
     // briefly indisposed by a summarization pass.
     wireCompactionBridge();
+    // Phase (d).15 — register the `peer.chat` business method so remote
+    // Claudes can ask THIS peer's LLM a one-shot question. The default
+    // getClient closure returns null (CLIENT_UNAVAILABLE), since the
+    // standalone server doesn't instantiate a client by default. To
+    // expose this peer as a real LLM endpoint, wire a real getter
+    // either here (env-driven, V0.5+) or by calling wirePeerChatBridge
+    // again with a real getter from the embedding host process.
+    wirePeerChatBridge(() => null);
   }
 
   return new Promise((resolve, reject) => {
@@ -858,6 +867,8 @@ export async function stopServer(server: HttpServer): Promise<void> {
     // Phase (d).10 — detach the compaction-event bridge so the
     // SmartCompactionEngine doesn't retain dangling listener refs.
     unwireCompactionBridge();
+    // Phase (d).15 — un-register peer.chat method.
+    unwirePeerChatBridge();
 
     // Close WebSocket connections
     closeAllConnections();
