@@ -933,6 +933,16 @@ const toolCommands: SlashCommand[] = [
     arguments: [
       { name: 'action', description: 'list (default), info <name>, help', required: false }
     ]
+  },
+  {
+    name: 'swarm',
+    description: 'Spawn a swarm of specialized agents to work in parallel on a task (UX wrapper around /agents run with strategy=parallel; inspired by Korben\'s Claude Code Swarms article)',
+    prompt: '__SWARM__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'task', description: 'task description, OR: stop | status | help', required: false }
+    ]
   }
 ];
 

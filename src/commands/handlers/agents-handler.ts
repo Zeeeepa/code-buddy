@@ -93,6 +93,18 @@ let activeStrategy: CollaborationStrategy = 'hierarchical';
 let coordinatorWired = false;  // Phase F: wire MAS events → Coordinator only once
 
 /**
+ * Internal helpers — let other handlers (notably `/swarm`) temporarily
+ * override the default strategy without exposing it to the user-facing
+ * surface. Underscore prefix marks "internal API, not for slash commands".
+ */
+export function _peekActiveStrategy(): CollaborationStrategy {
+  return activeStrategy;
+}
+export function _setActiveStrategy(strategy: CollaborationStrategy): void {
+  activeStrategy = strategy;
+}
+
+/**
  * Phase O (V0.4.1) — opt-in WorkflowOrchestrator. Returns true only when
  * one of the orchestrator-specific TOML knobs is set. With pristine V0.3
  * TOML (or no TOML), this is false and /agents run uses the legacy

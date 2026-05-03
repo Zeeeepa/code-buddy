@@ -178,6 +178,14 @@ The fleet hub serves two complementary goals (per the design doc):
 1. **Real-time inter-AI collaboration** — multiple Claudes / Geminis observing the same project, exchanging messages
 2. **Pilot local LLMs from any peer** — Ollama on one node, prompted from another (free coding/reasoning over your Tailscale network)
 
+### Local swarm (no peers needed)
+
+If you don't want to set up multiple peers but want the team-lead pattern, use the local Multi-Agent System:
+```
+> /swarm refactor the auth module to use JWT with PKCE
+```
+This auto-enables `MultiAgentSystem`, decomposes the task, and dispatches subtasks to specialized worker agents (orchestrator, coder, reviewer, tester) running concurrently. Inspired by Korben's article on Claude Code's hidden Swarms mode — but Code Buddy ships the infrastructure built-in (no patch needed). Track with `/swarm status`, stop with `/swarm stop`.
+
 ### Full guide
 
 See [`docs/fleet-guide.md`](fleet-guide.md) for: provider auto-detection (Ollama priority), all peer-rpc methods, env vars (`CODEBUDDY_FLEET_*`), Tailscale lab examples, security model, hub-vs-spoke topology, and the V1.x roadmap.

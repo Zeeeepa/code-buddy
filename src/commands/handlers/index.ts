@@ -264,6 +264,10 @@ export { handleAgents } from './agents-handler.js';
 // Subagent handler — slash /subagent (rc.4: list/inspect PREDEFINED_SUBAGENTS, surfaces Explore + others)
 export { handleSubagent } from './subagent-handler.js';
 
+// Swarm handler — slash /swarm (rc.4: UX wrapper around /agents run with strategy=parallel,
+// inspired by Korben's article on Claude Code's hidden Swarms mode)
+export { handleSwarm } from './swarm-handler.js';
+
 // Fleet handler — slash /fleet (Phase (d).5 V0.4.1 — inter-Claude WS streaming receiver)
 export { handleFleet } from './fleet-handler.js';
 

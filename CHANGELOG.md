@@ -16,6 +16,22 @@ Heading toward `1.0.0` final. Backlog tracked under `## [Unreleased]`'s
 and the audit follow-ups noted under `## [0.5.1-fleet]`.
 
 ### Added since rc.3
+- **`/swarm <task>` slash command** — UX wrapper around the existing
+  `MultiAgentSystem` (V0.4) that exposes the team-lead pattern in one
+  memorable command. Forces strategy=parallel for the run, delegates
+  to `/agents run`, restores the user's previous strategy in a finally
+  block. Inspired by Korben's article on Claude Code's hidden Swarms
+  mode (`tengu_brass_pebble` flag + `claude-sneakpeek` patch) — Code
+  Buddy ships the infrastructure built-in (`WorkflowOrchestrator` +
+  `ParallelSubagentRunner`, max 10 workers), so no patching needed.
+  Sub-actions: `/swarm <task>` (dispatch), `/swarm stop`, `/swarm status`,
+  `/swarm help`. Two new internal helpers exported from agents-handler:
+  `_peekActiveStrategy` / `_setActiveStrategy` (underscore-prefixed,
+  not for user-facing slash). 11 new tests (mocking handleAgents +
+  strategy state). Documentation added to `getting-started.md` under
+  "Local swarm (no peers needed)" — pointers from Fleet section so
+  users discover both options together.
+
 - **`/subagent` slash command + `code-reviewer` hardening** — surfaces
   the `PREDEFINED_SUBAGENTS` registry to users. `/subagent list` shows
   the 7 predefined subagents (Explore, code-reviewer, debugger, etc.)

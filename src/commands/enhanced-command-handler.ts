@@ -115,6 +115,7 @@ import {
   // Agents handler — slash /agents (audit OpenClaw heritage activation, MultiAgentSystem wake)
   handleAgents,
   handleSubagent,
+  handleSwarm,
   // Fleet handler — slash /fleet (Phase (d).5 V0.4.1, inter-Claude WS streaming receiver)
   handleFleet,
   // Clipboard handler
@@ -483,6 +484,7 @@ export class EnhancedCommandHandler {
     // Multi-agent system — slash /agents (audit OpenClaw heritage, MultiAgentSystem wake)
     ['__AGENTS__', (args) => handleAgents(args)],
     ['__SUBAGENT__', (args) => handleSubagent(args)],
+    ['__SWARM__', (args) => handleSwarm(args)],
 
     // Fleet listener — slash /fleet (Phase (d).5 V0.4.1, inter-Claude streaming)
     ['__FLEET__', (args) => handleFleet(args)],
