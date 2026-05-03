@@ -22,6 +22,7 @@ import {
   EnhancedCompressionConfig,
 } from './enhanced-compression.js';
 import { ImportanceScorer } from './importance-scorer.js';
+import { computeAutoCompactThreshold } from './auto-compact-threshold.js';
 import type {
   KeyInformation,
   ContextArchive,
@@ -56,6 +57,15 @@ export interface ContextManagerConfig {
   autoCompactThreshold: number;
   /** Auto-compact threshold as percentage of context window (e.g., 80 = 80%). Overrides autoCompactThreshold if set. */
   autoCompactPercent?: number;
+  /**
+   * Phase post-audit (Claude Code source comparison): when `true`, use
+   * the per-model adaptive buffer helper (`computeAutoCompactThreshold`)
+   * INSTEAD of the percent/absolute logic. The helper subtracts a
+   * model-specific buffer (e.g. 13K for Claude Sonnet, 8K for Haiku)
+   * from `maxContextTokens` then optionally applies `autoCompactPercent`.
+   * Default `false` to preserve the current backward-compatible behavior.
+   */
+  useAdaptiveBuffer?: boolean;
   /** Warning thresholds as percentages (e.g., [50, 75, 90]) */
   warningThresholds: number[];
   /** Enable context warnings */
@@ -795,6 +805,21 @@ export class ContextManagerV2 {
    */
   shouldAutoCompact(messages: CodeBuddyMessage[]): boolean {
     const stats = this.getStats(messages);
+
+    // Phase post-audit V1.3: opt-in adaptive buffer (per-model lookup)
+    // Subtracts a model-specific buffer from maxContextTokens before
+    // applying optional percent. Default off — backward compat with
+    // the existing percent/threshold path below.
+    if (this.config.useAdaptiveBuffer) {
+      const envPctAdaptive = process.env.CODEBUDDY_AUTOCOMPACT_PCT;
+      const pctAdaptive = this.config.autoCompactPercent ?? (envPctAdaptive ? parseFloat(envPctAdaptive) : undefined);
+      const threshold = computeAutoCompactThreshold(
+        this.config.maxContextTokens,
+        this.config.model,
+        pctAdaptive !== undefined && !isNaN(pctAdaptive) ? { percent: pctAdaptive } : undefined,
+      );
+      return stats.totalTokens >= threshold;
+    }
 
     // CC17: Check percentage-based threshold first
     const envPct = process.env.CODEBUDDY_AUTOCOMPACT_PCT;
