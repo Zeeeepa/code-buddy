@@ -11,6 +11,7 @@ import { normalizeBaseURL, DEFAULT_BASE_URL } from "../utils/base-url.js";
 import type { CircuitBreakerConfig } from "../providers/circuit-breaker.js";
 import { GeminiNativeProvider } from "./providers/provider-gemini-native.js";
 import { OpenAICompatProvider } from "./providers/provider-openai-compat.js";
+import { withStreamRetry } from "./stream-retry.js";
 
 export type CodeBuddyMessage = ChatCompletionMessageParam;
 
@@ -110,6 +111,28 @@ export interface ChatOptions {
   responseFormat?: 'text' | 'json';
   /** tool_choice override for this request */
   tool_choice?: 'auto' | 'none' | 'required';
+  /**
+   * Mid-stream retry on network errors (ECONNRESET, "socket hang up",
+   * undici stream terminated, etc.). Wraps `chatStream()` with the
+   * `withStreamRetry` helper.
+   *
+   * - `true` → use defaults (4 attempts, 1s initial delay, 8s cap)
+   * - object → granular override of any field
+   * - `undefined` → no retry (default, backward-compat)
+   *
+   * Can also be enabled globally via env var `CODEBUDDY_STREAM_RETRY=1`.
+   * Per-call option takes precedence over the env var when explicitly set
+   * (including `false`, which forces no retry even if the env var is on).
+   *
+   * Trade-off: a retried stream restarts from the beginning, so callers
+   * may see duplicated chunks across the retry boundary. See
+   * `src/codebuddy/stream-retry.ts` for the full helper documentation.
+   */
+  streamRetry?: boolean | {
+    maxAttempts?: number;
+    initialDelayMs?: number;
+    maxDelayMs?: number;
+  };
 }
 
 export interface CodeBuddyResponse {
@@ -382,12 +405,28 @@ export class CodeBuddyClient {
       ? { model: options, searchOptions }
       : options || {};
 
-    // Dispatch to the active strategy.
-    if (this.geminiProvider) {
-      yield* this.geminiProvider.chatStream(messages, tools, opts);
+    // Dispatch to the active strategy. Wrapped in a factory so we can
+    // re-invoke it inside `withStreamRetry` when opt-in retry is enabled.
+    const factory = (): AsyncGenerator<ChatCompletionChunk, void, unknown> => {
+      if (this.geminiProvider) {
+        return this.geminiProvider.chatStream(messages, tools, opts);
+      }
+      return this.openaiCompatProvider!.chatStream(messages, tools, opts, searchOptions);
+    };
+
+    // Resolve retry opt-in. Per-call `streamRetry` wins over env var when
+    // explicitly set (including `false`, which forces no retry).
+    const envOptIn = process.env.CODEBUDDY_STREAM_RETRY === '1';
+    const callOptIn = opts.streamRetry;
+    const retryEnabled = callOptIn !== undefined ? !!callOptIn : envOptIn;
+
+    if (!retryEnabled) {
+      yield* factory();
       return;
     }
-    yield* this.openaiCompatProvider!.chatStream(messages, tools, opts, searchOptions);
+
+    const retryOpts = typeof callOptIn === 'object' && callOptIn !== null ? callOptIn : {};
+    yield* withStreamRetry(factory, retryOpts);
   }
 
   async search(
