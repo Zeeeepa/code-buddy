@@ -107,6 +107,7 @@ See [Getting Started](docs/getting-started.md) for installation options, headles
 | [Channels](docs/channels.md) | 20+ messaging channels, DM pairing, send policy |
 | [Context Engine](docs/context-engine.md) | Compression, tool output masking, JIT context, pre-compaction flush |
 | [Infrastructure](docs/infrastructure.md) | HTTP server, WebSocket gateway, daemon, cron, deploy, plugins |
+| [Fleet Guide](docs/fleet-guide.md) | **Multi-AI hub** — `/fleet listen` + `/fleet send peer.chat`, env-driven multi-provider auto-detect, Tailscale lab examples |
 | [Configuration](docs/configuration.md) | Environment variables, TOML config, project settings, model limits |
 | [Development](docs/development.md) | Build, test, architecture, coding conventions, adding tools |
 

@@ -1,0 +1,496 @@
+# Fleet Guide — Multi-AI hub for real-time inter-AI collaboration
+
+> *« Le but est que toutes mes IA collaborent dans l'harmonie. »*
+> — Patrice Huetz, 2026-05-03
+
+This guide covers Code Buddy's **fleet inter-Claude** subsystem
+(Phases (d).1 → (d).16a, May 2026). The fleet turns Code Buddy from a
+single-instance terminal agent into a **hub of communication between
+multiple AIs running on different hosts**, each potentially backed by
+a different LLM provider.
+
+---
+
+## Two objectives the fleet was built to serve
+
+### Objective 1 — Real-time inter-AI collaboration
+
+Multiple AI runtimes (Claude Code, Code Buddy, Antigravity, Codex,
+gemini-cli) running on different machines should be able to **observe
+each other's work in real time** and **call each other** to delegate
+work or ask questions. Not just an HTTP API — a stateful, low-latency
+mesh where one AI can subscribe to another's events, react, and
+respond.
+
+**Today this is operational** for any pair of Code Buddy instances
+connected via WebSocket (typically over a Tailscale mesh on the lab):
+- A peer's events (tool starts, workflow lifecycle, sub-agent spawns)
+  stream live to subscribers
+- A peer's LLM can be invoked synchronously via `peer.chat`
+- Presence beacons + compaction notices keep peers aware of each
+  other's availability
+
+### Objective 2 — Pilot local LLMs for coding (and more)
+
+Cloud LLM quotas are limited and expensive. Local LLMs (Ollama, LM
+Studio, vLLM) are free and unlimited, but their tooling is rough.
+Code Buddy's **fleet auto-detects an Ollama instance via `OLLAMA_HOST`
+in priority over cloud providers**, so a peer with a local Ollama
+serves as the LLM endpoint of choice — for coding tasks, reasoning,
+classification, anything you'd otherwise pay tokens for.
+
+**Today this is operational**: set `OLLAMA_HOST=http://localhost:11434`
+on a peer, start its `buddy server`, and any other peer can
+`/fleet send <peer-with-ollama> peer.chat {"prompt":"..."}` to get a
+**free, local response**. Mix and match: heavy reasoning on a Claude
+Max peer, code drafting on a local Qwen via Ollama, vision on a
+Gemini peer, all from the same fleet topology.
+
+---
+
+## Architecture
+
+```
+                     ┌──────────────────────────┐
+                     │  Hub (any Code Buddy)    │
+                     │  buddy server --port N   │
+                     │  ws://host:N/ws          │
+                     │  /api/health, /api/chat  │
+                     └────────────┬─────────────┘
+                                  │
+              ┌───────────────────┼───────────────────┐
+              │                   │                   │
+              ▼                   ▼                   ▼
+   ┌────────────────┐   ┌────────────────┐   ┌────────────────┐
+   │ Peer A         │   │ Peer B         │   │ Peer C         │
+   │ /fleet listen  │   │ /fleet listen  │   │ /fleet listen  │
+   │ /fleet send    │   │ /fleet send    │   │ /fleet send    │
+   └────────────────┘   └────────────────┘   └────────────────┘
+   Code Buddy +         Code Buddy +         Code Buddy +
+   Claude Max           Antigravity          Ollama qwen3.6
+   (peer.chat→Claude)   (peer.chat→Gemini)   (peer.chat→Ollama)
+```
+
+The "hub" is just another Code Buddy server — there's no special hub
+role. Any peer can host other peers' listen connections. In Patrice's
+lab the convention is: **Ministar Linux** (`100.98.18.76:3000`) is
+the always-on hub, **MINISTAR G7 PT** + **DARKSTAR PC 3090** are
+intermittent peers that connect when active.
+
+Topology is **star, not mesh** — simpler than DHT/gossip. A peer
+talks to one or more hubs; hubs don't talk to each other (yet).
+
+---
+
+## Slash commands
+
+All `/fleet` actions live in a single handler
+(`src/commands/handlers/fleet-handler.ts`). The active listeners are
+held in a `Map<peerId, ActiveListener>` (Phase (d).12 multi-peer
+fan-in), so a single Code Buddy can monitor + invoke N peers at once.
+
+### `/fleet listen <ws-url> [options]`
+
+Connect to a peer Code Buddy's WebSocket and subscribe to its
+`fleet:*` events.
+
+```bash
+/fleet listen ws://100.98.18.76:3000/ws \
+  --api-key cb_sk_xxx \
+  --auto-reconnect \
+  --max-attempts 5 \
+  --name ministar-linux
+```
+
+Options:
+- `--api-key <key>` — required. Override per-call; otherwise pulled
+  from `CODEBUDDY_FLEET_API_KEY` env. The key on the **peer's** side
+  must hold the `fleet:listen` scope.
+- `--name <id>` — stable peer id used by `/fleet stop`, `/fleet send`,
+  `/fleet history --peer`. Default = host:port of the WS URL with
+  dots → dashes (`100.98.18.76:3000` → `100-98-18-76:3000`).
+- `--auto-reconnect` — opt in to exponential-backoff reconnect on ws
+  drops (Phase (d).6, uses the shared `ReconnectionManager`).
+- `--max-attempts <n>` — cap for `--auto-reconnect` (default 5).
+
+The streaming output to your terminal is prefixed with the peer id
++ source identifier:
+```
+  [fleet:ministar-linux ministar-ubuntu:abc12345] fleet:agent:tool_started
+  [fleet:darkstar darkstar:def67890] fleet:workflow:start
+```
+
+### `/fleet send <peer> <method> [json-params] [--timeout <ms>]`
+
+Invoke a `peer.*` RPC method on a connected peer and print the
+response.
+
+```bash
+/fleet send ministar-linux peer.ping
+# → Peer "ministar-linux" → peer.ping OK (12ms): { "pong": true, ... }
+
+/fleet send ministar-linux peer.chat \
+  {"prompt":"Explain CEM-MPC briefly","model":"gemini-2.5-flash"}
+# → Peer "ministar-linux" → peer.chat OK (2300ms):
+#   { "text": "CEM-MPC is...", "modelRequested":"gemini-2.5-flash", ... }
+
+/fleet send (default) peer.chat {"prompt":"..."} --timeout 60000
+# → Default peer (when only one is connected); 60s timeout instead of 30s
+```
+
+JSON params must be a JSON object (not an array, not a primitive).
+Default timeout 30s. `--timeout` overrides per call.
+
+### `/fleet status`
+
+```
+Fleet listeners — 2 active
+
+Peer "ministar-linux"
+  URL:     ws://100.98.18.76:3000/ws
+  Uptime:  127s
+  Events:  18 received
+  Reconnect: enabled (0/5 attempts since last connect)
+  Last seen: 12s ago (heartbeat)
+  Last compaction: hybrid in 1234ms (saved 12000 tokens)
+
+Peer "darkstar"
+  URL:     ws://100.73.222.64:3000/ws
+  Uptime:  93s
+  Events:  4 received
+  Reconnect: enabled (0/5 attempts since last connect)
+  ⚠ stale (>90s) — Last seen: 124s ago (fleet:agent:tool_started)
+
+Stop a peer with /fleet stop <name>, or all with /fleet stop --all.
+```
+
+`⚠ stale` triggers when no event has been received from a peer in
+the last 90 seconds (configurable via the `STALE_THRESHOLD_MS` const
+in fleet-handler.ts). Auto-reconnect kicks in if the WS dropped, but
+a peer that's silently hung (handler stuck, GPU timeout) shows up as
+stale here.
+
+### `/fleet stop [name|--all]`
+
+```bash
+/fleet stop ministar-linux    # disconnect that peer
+/fleet stop                   # only valid when 1 peer active
+/fleet stop --all             # disconnect every peer
+```
+
+### `/fleet history [N] [--peer <name>]`
+
+Show the last N `fleet:*` events received from a peer (default 20,
+capped at the listener's ring capacity, default 50).
+
+```bash
+/fleet history --peer ministar-linux
+# → [22:14:03] fleet:agent:tool_started [ministar-ubuntu] tool=view_file
+#   [22:14:05] fleet:agent:tool_completed [ministar-ubuntu] tool=view_file
+#   [22:14:08] fleet:peer:heartbeat [ministar-ubuntu] (heartbeat)
+#   ...
+
+/fleet history 5 --peer darkstar     # last 5 events from darkstar
+```
+
+The history is **in-memory** per listener — kill the session, the
+history dies. For persistent audit, broadcast events go to the
+underlying WS surface anyway and can be logged elsewhere.
+
+---
+
+## peer-rpc methods
+
+Methods live in `src/server/websocket/peer-rpc.ts` (registry) and
+modules under `src/fleet/` register their methods at boot via
+`registerPeerMethod(name, handler)`.
+
+### Built-in methods (always available)
+
+#### `peer.describe`
+Returns the peer's identity + method catalogue + provider info:
+```json
+{
+  "hostname": "ministar-ubuntu",
+  "pid": 4823,
+  "methods": ["peer.describe", "peer.ping", "peer.echo", "peer.chat"],
+  "apiVersion": "d.16",
+  "role": "main",
+  "maxDepth": 3,
+  "peerChatProvider": {
+    "provider": "gemini",
+    "model": "gemini-2.5-flash",
+    "isLocal": false
+  }
+}
+```
+
+`peerChatProvider` is null when no LLM client is wired (the peer
+hasn't set any provider env var). Probe before sending.
+
+#### `peer.ping`
+```json
+{ "pong": true, "serverTime": 1714670345123 }
+```
+
+Use for round-trip latency measurement and connectivity smoke tests.
+
+#### `peer.echo`
+```json
+// Request: { "prompt": "...", "n": 42 }
+// Response:
+{ "echoed": { "prompt": "...", "n": 42 } }
+```
+
+Debug method: returns params verbatim. Useful for testing the
+request/response loop end-to-end.
+
+### Business methods (registered when wired)
+
+#### `peer.chat` — Phase (d).15
+
+One-shot LLM call on the peer's wired client. No tools, no history
+mutation (mirror of the local `/btw` slash pattern).
+
+Request:
+```json
+{
+  "prompt": "What's the time complexity of CEM-MPC?",   // required
+  "systemPrompt": "Answer briefly. No tools.",          // optional, default sensible
+  "model": "gemini-2.5-flash"                           // optional, override the wired default
+}
+```
+
+Response:
+```json
+{
+  "text": "CEM-MPC has...",
+  "modelRequested": "gemini-2.5-flash",
+  "finishReason": "stop",
+  "usage": {
+    "prompt_tokens": 38,
+    "completion_tokens": 142,
+    "total_tokens": 180
+  },
+  "traceId": "trace-1g2h3i4j-5k6l7m8n"
+}
+```
+
+Errors as Error with `code`:
+- `peer.chat: prompt is required` → caller bug (missing/empty prompt)
+- `CLIENT_UNAVAILABLE: no LLM client wired on this peer` → peer didn't
+  set any provider env var (check `peer.describe.peerChatProvider`)
+- `peer.invoke METHOD_ERROR: <upstream message>` → the peer's LLM call
+  failed (rate-limited, timeout, model error)
+- `peer.invoke REQUEST_TIMEOUT: peer.chat did not respond within 30000ms`
+- `peer.invoke MAX_DEPTH_EXCEEDED: depth N > max 3` → call chain too
+  deep (Phase (d).14 anti-loop guard)
+- `peer.invoke ROLE_LEAF: this peer is configured as leaf` →
+  `CODEBUDDY_PEER_ROLE=leaf` on this peer refuses outgoing invokes
+
+---
+
+## Configuration via env vars
+
+All configuration lives in env vars (no TOML for fleet yet — to
+match the rest of Code Buddy's server-side config). A `.env` file at
+the repo root is loaded at boot via `dotenv`.
+
+### Provider auto-detection (Phase (d).16a)
+
+`buddy server` at boot calls `createPeerChatClientFromEnv()` which
+walks env keys in priority order:
+
+1. **`CODEBUDDY_PEER_PROVIDER`** explicit override — `ollama` |
+   `grok` | `anthropic` | `gemini` | `openai`. Skips auto-detect.
+2. **`OLLAMA_HOST`** set → Ollama (local, free). Default model
+   `qwen2.5-coder:7b`.
+3. **`GROK_API_KEY`** → xAI Grok. Default model `grok-3`. Honors
+   `GROK_BASE_URL` override.
+4. **`ANTHROPIC_API_KEY`** → Claude. Default model `claude-sonnet-4-6`.
+5. **`GOOGLE_API_KEY`** OR **`GEMINI_API_KEY`** → Gemini. Default
+   model `gemini-2.5-flash`.
+6. **`OPENAI_API_KEY`** → GPT. Default model `gpt-4o`.
+7. None → `null` (peer.chat answers `CLIENT_UNAVAILABLE`).
+
+`CODEBUDDY_PEER_MODEL` overrides the default model for whichever
+provider is selected.
+
+### Anti-loop / role config (Phase (d).14)
+
+- **`CODEBUDDY_PEER_MAX_DEPTH`** (default `3`) — chain depth cap.
+  When a `peer.invoke` chain (peer A calls B which calls C which
+  calls...) reaches depth+1 = 4, the dispatcher returns
+  `MAX_DEPTH_EXCEEDED`.
+- **`CODEBUDDY_PEER_ROLE`** (default `main`) — one of `main`,
+  `orchestrator`, `leaf`. Setting `leaf` makes the peer's `request()`
+  client refuse outgoing invokes (it can still answer incoming).
+  Useful for service-only peers (Ollama backend, no autonomous
+  initiative).
+
+### Authentication
+
+- **`CODEBUDDY_FLEET_API_KEY`** (caller side) — default key passed
+  to `/fleet listen` when `--api-key` is omitted.
+- API keys are configured server-side via the existing key management
+  (see `docs/security.md`). Keys for fleet usage need the
+  `fleet:listen` scope (read-only events) and/or `peer:invoke` scope
+  (active RPC).
+
+### Hostname identification (Phase (d).1)
+
+- **`CODEBUDDY_FLEET_HOSTNAME`** — overrides `os.hostname()` in the
+  `source.hostname` field of every fleet:* event. Useful when you
+  want a peer to advertise itself as "darkstar-gpu" instead of the
+  raw OS hostname.
+
+### Backpressure (Phase (d).7 + (d).8)
+
+- **`CODEBUDDY_FLEET_BROADCAST_BUFFER_LIMIT`** (default 2 MiB) —
+  per-client `ws.bufferedAmount` ceiling. Above this, broadcasts to
+  that client are dropped (a stuck peer can't memory-bloat the server).
+
+### Auto-compact (post-audit, helper available)
+
+- **`CODEBUDDY_AUTOCOMPACT_BUFFER_TOKENS`** (Phase post-audit) —
+  reserved tokens above which compaction triggers. The new
+  `computeAutoCompactThreshold` helper supports per-model lookups; the
+  env override is global. Helper not yet wired by default in
+  `shouldAutoCompact` — see `src/context/auto-compact-threshold.ts`
+  + the v1-readiness plan (V1.3).
+
+---
+
+## Concrete example — Patrice's lab setup
+
+3 hosts on a Tailscale private network:
+
+| Host | Tailscale IP | Role | Provider |
+|------|-------------|------|----------|
+| **MINISTAR** (G7 PT) | `100.90.108.4` | Dev principal | Claude Max + Gemini Ultra |
+| **DARKSTAR** (PC 3090) | `100.73.222.64` | Heavy GPU | Ollama (qwen3.6:35b) + cloud fallback |
+| **Ministar Linux** | `100.98.18.76` | Always-on hub | Ollama (qwen3.6, qwen3, gemma4, nomic-embed) |
+
+### Bootstrap the hub on Ministar Linux (Ubuntu)
+
+```bash
+# In /home/patrice/code-buddy
+export GOOGLE_API_KEY="AIza..."         # → cloud fallback when needed
+export OLLAMA_HOST="http://localhost:11434"   # → priority 1
+export CODEBUDDY_FLEET_HOSTNAME="ministar-ubuntu"
+export CODEBUDDY_FLEET_API_KEY="cb_sk_xxx"
+
+buddy server --port 3000
+# log: [fleet] peer.chat wired: ollama (qwen2.5-coder:7b, local)
+```
+
+### Connect from MINISTAR (Windows G7 PT)
+
+```bash
+# In D:\CascadeProjects\grok-cli
+# .env already loads the keys
+buddy
+> /fleet listen ws://100.98.18.76:3000/ws --auto-reconnect --name ministar-linux --api-key $env:CODEBUDDY_FLEET_API_KEY
+> /fleet status
+# → 1 active. Provider on remote = ollama qwen2.5-coder:7b.
+
+> /fleet send ministar-linux peer.chat {"prompt":"Refactor this for clarity:\n\nfunction f(x) { return x.split(',').map(s => s.trim()).filter(Boolean) }"}
+# → REAL response from local Qwen on the Linux host. Zero cloud cost.
+```
+
+### Connect from DARKSTAR (Windows PC 3090)
+
+Same as MINISTAR but pointing at its own Tailscale IP if it also
+runs a `buddy server` exposing its local Ollama. Then any peer can
+delegate code drafts to DARKSTAR's heavier model:
+
+```bash
+# On any peer
+> /fleet send darkstar peer.chat {"prompt":"Generate Rust impl for trait Foo with method bar"}
+# → DARKSTAR's qwen3.6:35b answers. Free + fast.
+```
+
+---
+
+## Smoke test recipe
+
+After deploying / restart, validate the fleet end-to-end:
+
+```bash
+# Terminal 1 — start a server with peer.chat wired
+GOOGLE_API_KEY="..." buddy server --port 3001
+# → wait for the boot log: "[fleet] peer.chat wired: gemini (gemini-2.5-flash)"
+
+# Terminal 2 — connect + smoke
+buddy
+> /fleet listen ws://localhost:3001/ws --auto-reconnect --api-key $env:CODEBUDDY_FLEET_API_KEY --name self
+> /fleet send self peer.ping
+# → { pong: true, serverTime: ... } < 50ms
+> /fleet send self peer.describe
+# → see methods + peerChatProvider populated
+> /fleet send self peer.chat {"prompt":"Say hi briefly"}
+# → real Gemini response, ~30 tokens of quota
+> /fleet history --peer self
+# → at least 4 events captured (heartbeat + the 3 above)
+> /fleet stop self
+```
+
+If all 5 commands return as documented, your fleet is operational.
+
+---
+
+## Security model (V0.4.1, may evolve)
+
+- **Scope-gated**: peers must hold the right `ApiScope`
+  (`fleet:listen` for read-only events, `peer:invoke` for active RPC).
+  Without those, the WS handler returns FORBIDDEN.
+- **Network-gated**: the recommended deployment is over a Tailscale
+  private network (CGNAT IPs `100.x.x.x`). Don't expose `0.0.0.0:3000`
+  directly to the internet without a reverse proxy + auth.
+- **Anti-loop**: `CODEBUDDY_PEER_MAX_DEPTH` + `traceId` propagation
+  prevent recursive call chains (peer A → B → C → A → infinite).
+- **Role refusal**: `CODEBUDDY_PEER_ROLE=leaf` for service-only peers
+  that should answer but never initiate.
+- **Backpressure**: a stuck peer can't memory-bloat the server's
+  ws send buffer (drop-on-overflow at 2 MiB per client).
+
+What's NOT yet enforced (V1.x roadmap):
+- Per-method permission gating (e.g. `peer:chat:invoke` sub-scope).
+  Today `peer:invoke` lets the caller use any registered method.
+- Rate cap per peer (deferred to (d).16b — defer until burn-rate
+  problems observed live).
+- Audit logging of every peer.invoke for compliance.
+
+---
+
+## Roadmap (post-V1)
+
+- **V1.1** — `peer.chat-stream` (streaming responses via `peer:chunk`
+  frames). Useful for long generations where the caller wants to
+  display tokens as they arrive.
+- **V1.2** — `peer.chat-session.start/.continue/.end` (multi-tour
+  conversations between peers, with state held server-side).
+- **V1.3** — `peer.tool.invoke` (more powerful, more risky — exposing
+  the peer's local tools to remote callers requires a serious
+  permission design).
+- **V1.4** — Fleet of fleets (a peer that fans events from N upstream
+  peers to its own clients). Extends the singleton listener pattern
+  to a Map of upstreams.
+- **V2.0** — Federated identity (cross-host keys, capability
+  certificates) so peers don't need to trust the same shared key.
+
+---
+
+## See also
+
+- [`CHANGELOG.md`](../CHANGELOG.md) — release notes per phase
+- [`CLAUDE.md`](../CLAUDE.md) — overall architecture for AI assistants
+  working in this repo
+- [`docs/security.md`](security.md) — permission modes, scopes,
+  Guardian Agent
+- [`docs/configuration.md`](configuration.md) — full env var reference
+- `src/fleet/peer-chat-bridge.ts` — bridge implementation
+- `src/fleet/peer-chat-client-factory.ts` — env-driven detection
+- `src/server/websocket/peer-rpc.ts` — registry + dispatcher
+- `claude-et-patrice/propositions/AUDIT-COMPACTION-CLAUDE-CODE-2026-05-04.md` —
+  comparative audit that informed two recent fixes
