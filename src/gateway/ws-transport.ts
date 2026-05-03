@@ -19,6 +19,7 @@ import type {
 } from './types.js';
 import { DEFAULT_GATEWAY_CONFIG } from './types.js';
 import { logger } from '../utils/logger.js';
+import { SERVER_CONFIG } from '../config/constants.js';
 
 // ============================================================================
 // WebSocket Transport Configuration
@@ -73,6 +74,13 @@ interface WebSocketClient {
   isAlive: boolean;
   ip?: string;
   userAgent?: string;
+  /**
+   * Phase (d).8 — count of broadcast() / broadcastToSession() calls
+   * skipped for this client because socket.bufferedAmount exceeded the
+   * configured ceiling. Surfaced via getBroadcastDropStats(). Mirror of
+   * the per-client counter in src/server/websocket/handler.ts (Phase (d).7).
+   */
+  droppedMessages: number;
 }
 
 // ============================================================================
@@ -265,6 +273,7 @@ export class WebSocketGateway extends GatewayServer {
       isAlive: true,
       ip,
       userAgent,
+      droppedMessages: 0,
     };
 
     this.wsClients.set(clientId, client);
@@ -377,31 +386,126 @@ export class WebSocketGateway extends GatewayServer {
   }
 
   /**
-   * Broadcast to all connected clients
+   * Phase (d).8 — read the broadcast buffer ceiling. Env override resolved
+   * per call so tests can adjust without restarting the module. Shared
+   * env var with src/server/websocket/handler.ts (the other broadcast
+   * surface) — both protect against the same slow-consumer class of bug.
+   */
+  private getBroadcastBufferLimit(): number {
+    const raw = process.env.CODEBUDDY_FLEET_BROADCAST_BUFFER_LIMIT;
+    if (raw) {
+      const n = parseInt(raw, 10);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+    return SERVER_CONFIG.WS_BROADCAST_BUFFER_LIMIT;
+  }
+
+  /**
+   * Phase (d).8 — deliver one message to one client with backpressure
+   * protection. Returns true on send, false if skipped (closed socket
+   * OR slow consumer). Logs a debug line once per 100 drops/client to
+   * keep logs informative without spam under sustained backpressure.
+   *
+   * Inline check rather than refactoring sendToClient: the parent
+   * GatewayServer.sendToClient (server.ts:493) is `protected` with
+   * signature `(_clientId, _message): void`. Changing it to return a
+   * boolean would propagate to the base class, broaden the diff, and
+   * is unnecessary for unidirectional fan-out which is the only place
+   * backpressure matters here. Direct sendToClient calls in this class
+   * (session_info, errors) are 1:1 request/response and stay untouched.
+   */
+  private tryDeliverWithBackpressure(
+    client: WebSocketClient,
+    message: GatewayMessage,
+    limit: number,
+  ): boolean {
+    if (client.socket.readyState !== WebSocket.OPEN) return false;
+    if (client.socket.bufferedAmount > limit) {
+      client.droppedMessages++;
+      if (client.droppedMessages % 100 === 1) {
+        logger.debug('[gateway-ws] broadcast dropped — slow consumer', {
+          clientId: client.id,
+          bufferedAmount: client.socket.bufferedAmount,
+          limit,
+          totalDropsForClient: client.droppedMessages,
+        });
+      }
+      return false;
+    }
+    this.sendToClient(client.id, message);
+    return true;
+  }
+
+  /**
+   * Broadcast to all connected clients.
+   *
+   * Phase (d).8 — drop-on-overflow: clients whose ws.bufferedAmount has
+   * grown past WS_BROADCAST_BUFFER_LIMIT (default 2 MiB, env-overridable
+   * via CODEBUDDY_FLEET_BROADCAST_BUFFER_LIMIT) are skipped and their
+   * `droppedMessages` counter incremented. Other clients still receive.
+   * The optional `filter` short-circuits BEFORE the backpressure check,
+   * so a filtered-out client never counts as a drop.
    */
   broadcast(message: GatewayMessage, filter?: (client: WebSocketClient) => boolean): void {
+    const limit = this.getBroadcastBufferLimit();
     for (const client of this.wsClients.values()) {
-      if (client.socket.readyState === WebSocket.OPEN) {
-        if (!filter || filter(client)) {
-          this.sendToClient(client.id, message);
-        }
-      }
+      if (filter && !filter(client)) continue;
+      this.tryDeliverWithBackpressure(client, message, limit);
     }
   }
 
   /**
-   * Broadcast to session (override with WebSocket-specific impl)
+   * Broadcast to session (override with WebSocket-specific impl).
+   *
+   * Phase (d).8 — same drop-on-overflow protection as broadcast().
    */
   broadcastToSession(
     sessionId: string,
     message: GatewayMessage,
     excludeClientId?: string
   ): void {
+    const limit = this.getBroadcastBufferLimit();
     for (const client of this.wsClients.values()) {
-      if (client.state.sessions.has(sessionId) && client.id !== excludeClientId) {
-        this.sendToClient(client.id, message);
+      if (!client.state.sessions.has(sessionId)) continue;
+      if (client.id === excludeClientId) continue;
+      this.tryDeliverWithBackpressure(client, message, limit);
+    }
+  }
+
+  /**
+   * Phase (d).8 — broadcast drop telemetry. Per-client + cross-client
+   * total. Surfaces operational visibility for slow-consumer pressure.
+   */
+  getBroadcastDropStats(): {
+    totalDropped: number;
+    perClient: Array<{ clientId: string; dropped: number }>;
+  } {
+    let totalDropped = 0;
+    const perClient: Array<{ clientId: string; dropped: number }> = [];
+    for (const client of this.wsClients.values()) {
+      totalDropped += client.droppedMessages;
+      if (client.droppedMessages > 0) {
+        perClient.push({ clientId: client.id, dropped: client.droppedMessages });
       }
     }
+    return { totalDropped, perClient };
+  }
+
+  /**
+   * Test-only: register a pre-built client so unit tests can exercise
+   * broadcast() / broadcastToSession() / getBroadcastDropStats() without
+   * spinning up a real WS server. Pair with `_resetClientsForTests()`.
+   */
+  _registerClientForTests(client: WebSocketClient): void {
+    this.wsClients.set(client.id, client);
+  }
+
+  /**
+   * Test-only: clear the wsClients map without invoking close() on the
+   * held instances (some tests use stubs without a close method).
+   */
+  _resetClientsForTests(): void {
+    this.wsClients.clear();
   }
 
   /**
