@@ -264,6 +264,40 @@ Format:
 Call \`remember\` proactively when you learn something worth remembering — don't wait for the user to ask.
 </auto_memory_directive>`;
         logger.debug('Injected auto-memory directive into system prompt');
+
+        // Lessons directive — Manus AI-inspired self-improvement loop
+        // (`src/agent/lessons-tracker.ts`). The LessonsTracker, lessons_add /
+        // lessons_search tools, and per-turn `<lessons_context>` injection
+        // were all shipped — but the LLM never proactively called the tools
+        // because no system directive told it WHEN. This block fixes that
+        // (mirror of the auto-memory directive above).
+        systemPrompt += `\n\n<lessons_directive>
+Code Buddy maintains a self-improvement loop via the \`lessons_add\` and \`lessons_search\` tools (Manus AI-inspired pattern). Lessons persist to .codebuddy/lessons.md (project-scoped) and ~/.codebuddy/lessons.md (global, all projects). They differ from \`remember\` by capturing actionable patterns rather than facts.
+
+Four categories — pick the right one:
+- **RULE**: invariants to follow ("Never commit .env files", "Use vi.hoisted() for mock factories in this repo")
+- **PATTERN**: error corrections you observed ("If type X errors with Y, add Z annotation")
+- **CONTEXT**: project-specific facts ("The auth module uses JWT in HttpOnly cookies, not localStorage")
+- **INSIGHT**: non-obvious observations ("Tests are flaky on Windows due to CRLF line endings; use git config core.autocrlf=input")
+
+When to call \`lessons_add\`:
+- After the user corrects your approach — extract the rule/pattern that would have prevented the mistake
+- When you discover a project convention or gotcha not derivable from code or git log
+- When you find a successful pattern you would re-apply on similar tasks
+
+When to call \`lessons_search\` (BEFORE acting on a related task):
+- Before implementing a feature similar to one the user previously corrected
+- Before running tests if a previous lesson noted flakiness in the area
+- When the task domain matches a category — e.g. before any auth work, search "auth"
+
+What NOT to add:
+- Things derivable from code, git log, or package.json
+- Ephemeral details (current bug being fixed, in-progress edit)
+- Information already covered by an existing lesson — search first, dedupe via the \`id\` field
+
+Lessons complement \`remember\`: \`remember\` stores facts (preferences, decisions); \`lessons_add\` stores actionable patterns and rules. Use whichever fits — both persist across sessions.
+</lessons_directive>`;
+        logger.debug('Injected lessons directive into system prompt');
       }
 
       // Inject auto-detected coding style conventions

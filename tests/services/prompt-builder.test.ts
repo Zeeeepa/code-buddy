@@ -356,6 +356,67 @@ describe('PromptBuilder — Phase T4', () => {
     });
   });
 
+  describe('lessons directive (Manus AI-inspired)', () => {
+    it('injects <lessons_directive> when memoryEnabled=true and persistentMemory is wired', async () => {
+      const { builder, cacheSystemPrompt } = buildBuilder({
+        config: { memoryEnabled: true },
+        withMemory: true,
+        withPersistentMemory: 'persistent-bit',
+      });
+      await builder.buildSystemPrompt(undefined, 'grok-3', null);
+      const finalPrompt = cacheSystemPrompt.mock.calls[0][0] as string;
+      expect(finalPrompt).toContain('<lessons_directive>');
+      expect(finalPrompt).toContain('</lessons_directive>');
+      // The 4 categories must all appear
+      expect(finalPrompt).toContain('**RULE**');
+      expect(finalPrompt).toContain('**PATTERN**');
+      expect(finalPrompt).toContain('**CONTEXT**');
+      expect(finalPrompt).toContain('**INSIGHT**');
+      // Tool names + actionable triggers
+      expect(finalPrompt).toContain('`lessons_add`');
+      expect(finalPrompt).toContain('`lessons_search`');
+      expect(finalPrompt).toContain('Manus AI');
+      expect(finalPrompt).toMatch(/After the user corrects your approach/i);
+    });
+
+    it('injects BOTH directives in order (auto-memory first, then lessons)', async () => {
+      const { builder, cacheSystemPrompt } = buildBuilder({
+        config: { memoryEnabled: true },
+        withMemory: true,
+        withPersistentMemory: 'persistent-bit',
+      });
+      await builder.buildSystemPrompt(undefined, 'grok-3', null);
+      const finalPrompt = cacheSystemPrompt.mock.calls[0][0] as string;
+      const memoryIdx = finalPrompt.indexOf('<auto_memory_directive>');
+      const lessonsIdx = finalPrompt.indexOf('<lessons_directive>');
+      expect(memoryIdx).toBeGreaterThan(-1);
+      expect(lessonsIdx).toBeGreaterThan(-1);
+      expect(memoryIdx).toBeLessThan(lessonsIdx);
+    });
+
+    it('does NOT inject the lessons directive when memoryEnabled=false', async () => {
+      const { builder, cacheSystemPrompt } = buildBuilder({
+        config: { memoryEnabled: false },
+        withPersistentMemory: 'persistent-bit',
+      });
+      await builder.buildSystemPrompt(undefined, 'grok-3', null);
+      const finalPrompt = cacheSystemPrompt.mock.calls[0][0] as string;
+      expect(finalPrompt).not.toContain('<lessons_directive>');
+    });
+
+    it('lessons directive explicitly differentiates from `remember` (no overlap confusion)', async () => {
+      const { builder, cacheSystemPrompt } = buildBuilder({
+        config: { memoryEnabled: true },
+        withMemory: true,
+        withPersistentMemory: 'persistent-bit',
+      });
+      await builder.buildSystemPrompt(undefined, 'grok-3', null);
+      const finalPrompt = cacheSystemPrompt.mock.calls[0][0] as string;
+      // Must explain that lessons complement remember (not duplicate)
+      expect(finalPrompt).toMatch(/complement.*remember|differ from .*remember/i);
+    });
+  });
+
   describe('budget truncation', () => {
     it('truncates a system prompt longer than the model budget and appends "..."', async () => {
       // Force a tiny budget so the LEGACY_PROMPT_BODY ALONE overshoots.

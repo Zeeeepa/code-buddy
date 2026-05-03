@@ -187,15 +187,25 @@ export async function injectNextRoundContext(
   preparedMessages: CodeBuddyMessage[],
   deps: NextRoundContextDeps
 ): Promise<void> {
-  if (deps.queryComplexity === 'complex') {
-    const lessonsBlock = getLessonsTracker(deps.cwd).buildContextBlock();
-    if (lessonsBlock) {
-      preparedMessages.push({
-        role: 'system',
-        content: `<context type="lessons">\n${lessonsBlock}\n</context>`,
-      });
-    }
+  // Always re-inject lessons on rounds >0 — they're stable rules/patterns
+  // that remain relevant regardless of complexity. Pre-fix: only `complex`
+  // queries kept lessons mid-conversation, so trivial multi-round tasks
+  // (e.g. rename a variable across 3 files) lost lessons context after
+  // round 0. The complexity gate was the wrong signal — lessons are
+  // already content-bounded (autoDecay + buildContextBlock 5s cache).
+  // Activated alongside the lessons system-prompt directive shipped in
+  // the same commit.
+  const lessonsBlock = getLessonsTracker(deps.cwd).buildContextBlock();
+  if (lessonsBlock) {
+    preparedMessages.push({
+      role: 'system',
+      content: `<context type="lessons">\n${lessonsBlock}\n</context>`,
+    });
+  }
 
+  // Knowledge graph stays gated on complexity — it can be large and is
+  // less universally relevant than lessons.
+  if (deps.queryComplexity === 'complex') {
     try {
       const { getKnowledgeGraph } = await import('../../memory/knowledge-graph.js');
       const kg = getKnowledgeGraph();

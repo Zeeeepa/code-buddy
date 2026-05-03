@@ -15,6 +15,24 @@ Heading toward `1.0.0` final. Backlog tracked under `## [Unreleased]`'s
 [`docs/fleet-guide.md`](docs/fleet-guide.md) (V1.x roadmap section)
 and the audit follow-ups noted under `## [0.5.1-fleet]`.
 
+### Added since rc.4
+- **Lessons feature activation (Manus AI-inspired)** — system-prompt
+  `<lessons_directive>` + RAG always-include for `lessons_add` /
+  `lessons_search` + removal of the complexity gate that dropped lessons
+  context on trivial multi-round queries. Mirror of the `a2a4f72`
+  auto-memory activation pattern. The Manus AI-inspired feature
+  (`src/agent/lessons-tracker.ts`, 405 lines) was complete but dormant —
+  the LLM never proactively called the tools because no system directive
+  told it WHEN. This ship surfaces the 4 categories
+  (RULE / PATTERN / CONTEXT / INSIGHT) with explicit triggers ("after
+  user correction", "before similar tasks search lessons first"), and
+  differentiates `lessons_add` from `remember` (lessons = actionable
+  patterns + rules; remember = facts + preferences). 4 new tests in
+  `tests/services/prompt-builder.test.ts`. The 6th iteration of the
+  "wake dormant code" pattern this session — completes the persistence
+  trilogy: auto-memory (facts) + lessons (patterns) + ICM (cross-session
+  episodic, managed elsewhere).
+
 ---
 
 ## [1.0.0-rc.4] — 2026-05-04
