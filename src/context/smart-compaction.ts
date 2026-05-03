@@ -10,6 +10,7 @@
 
 import { EventEmitter } from 'events';
 import { logger } from '../utils/logger.js';
+import { preserveToolPairs } from './tool-pair-preserver.js';
 
 // ============================================================================
 // Types & Interfaces
@@ -418,6 +419,15 @@ export class SmartCompactionEngine extends EventEmitter {
       }
     }
 
+    // Phase post-audit (Claude Code source comparison, 2026-05-04):
+    // Truncating from newest can orphan a tool_result whose tool_use
+    // parent was dropped just past the budget. Pair integrity matters
+    // more than strict budget compliance — extend retention to cover
+    // any missing parents via the pure helper. Skipped when
+    // preserveToolCalls is explicitly false (rare; default true).
+    if (this.config.preserveToolCalls !== false) {
+      return preserveToolPairs(result, messages);
+    }
     return result;
   }
 
