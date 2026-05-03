@@ -434,7 +434,7 @@ export class SmartCompactionEngine extends EventEmitter {
   /**
    * Summarize older messages
    */
-  private async summarizeMessages(messages: Message[], targetTokens: number): Promise<Message[]> {
+  private async summarizeMessages(messages: Message[], _targetTokens: number): Promise<Message[]> {
     // Keep recent messages
     const recentCount = Math.max(this.config.minMessages || 4, 10);
     const recent = messages.slice(-recentCount);
@@ -493,7 +493,7 @@ export class SmartCompactionEngine extends EventEmitter {
   /**
    * Aggressive compaction: maximum compression
    */
-  private async aggressiveCompaction(messages: Message[], targetTokens: number): Promise<Message[]> {
+  private async aggressiveCompaction(messages: Message[], _targetTokens: number): Promise<Message[]> {
     const result: Message[] = [];
 
     // Keep only system message and recent 2 turns
@@ -560,7 +560,7 @@ export class SmartCompactionEngine extends EventEmitter {
             const result = await model.generateContent(prompt);
             return result.response.text().trim();
         }
-    } catch(e) {
+    } catch (_e) {
         logger.debug("LLM summarization failed, falling back to basic summary");
     }
 

@@ -232,7 +232,7 @@ function createApp(config: ServerConfig): Application {
       const manager = getDaemonManager();
       const status = await manager.status();
       res.json(status);
-    } catch (error) {
+    } catch (_error) {
       res.json({ running: false, services: [], restartCount: 0 });
     }
   });
@@ -243,7 +243,7 @@ function createApp(config: ServerConfig): Application {
       const { getHealthMonitor } = await import('../daemon/index.js');
       const monitor = getHealthMonitor();
       res.json(monitor.getHealthSummary());
-    } catch (error) {
+    } catch (_error) {
       res.json({ status: 'unknown', uptime: 0, memory: { percentage: 0, rss: 0 }, services: [] });
     }
   });
@@ -255,7 +255,7 @@ function createApp(config: ServerConfig): Application {
       const scheduler = getCronScheduler();
       const jobs = scheduler.listJobs();
       res.json({ jobs, stats: scheduler.getStats() });
-    } catch (error) {
+    } catch (_error) {
       res.json({ jobs: [], stats: {} });
     }
   });
@@ -281,7 +281,7 @@ function createApp(config: ServerConfig): Application {
       const { getNotificationManager } = await import('../agent/proactive/index.js');
       const manager = getNotificationManager();
       res.json(manager.getPreferences());
-    } catch (error) {
+    } catch (_error) {
       res.json({});
     }
   });
@@ -369,7 +369,7 @@ function createApp(config: ServerConfig): Application {
       const { getHeartbeatEngine } = await import('../daemon/heartbeat.js');
       const engine = getHeartbeatEngine();
       res.json(engine.getStatus());
-    } catch (error) {
+    } catch (_error) {
       res.json({ running: false, enabled: false, totalTicks: 0 });
     }
   });
