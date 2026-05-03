@@ -834,6 +834,25 @@ export async function handleReinitGrok(): Promise<CommandHandlerResult> {
 // /status - Show key configuration info at a glance
 // ============================================================================
 
+/**
+ * Render a relative-time string for the /status memory section.
+ * Local helper kept private to this module — mirrors `formatTimeAgo` in
+ * memory-handlers.ts but with the shorter formatting style appropriate
+ * for a tight one-line dashboard cell.
+ */
+function formatStatusTimeAgo(date: Date, now: Date = new Date()): string {
+  const diffMs = now.getTime() - date.getTime();
+  const sec = Math.max(0, Math.floor(diffMs / 1000));
+  if (sec < 30) return 'just now';
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  return `${day}d ago`;
+}
+
 export async function handleStatus(): Promise<CommandHandlerResult> {
   const lines: string[] = [];
   lines.push('Status Dashboard');
@@ -907,9 +926,27 @@ export async function handleStatus(): Promise<CommandHandlerResult> {
     lines.push(`  YOLO Mode:       ${yoloEnv ? 'ON' : 'OFF'}`);
   }
 
+  // Persistent memory (project + user counts + last update)
+  // Surfaces the auto-memory writeback shipped in a2a4f72 — Patrice can
+  // see at a glance whether the LLM is persisting facts across sessions
+  // without having to type `/memory recent`.
+  try {
+    const { getMemoryManager } = await import('../../memory/persistent-memory.js');
+    const mm = getMemoryManager();
+    const stats = mm.getStats();
+    const recent = mm.getRecentMemories(1);
+    const lastUpdate = recent.length > 0
+      ? formatStatusTimeAgo(recent[0].updatedAt)
+      : 'never';
+    lines.push(`  Memory:          ${stats.project} project • ${stats.user} user • last update: ${lastUpdate}`);
+  } catch (_err) {
+    // Memory manager not initialized yet — silent skip, status still useful.
+  }
+
   lines.push('');
   lines.push('Use /config for detailed configuration.');
   lines.push('Use /cost for cost breakdown.');
+  lines.push('Use /memory recent for the last persisted entries.');
 
   return {
     handled: true,
