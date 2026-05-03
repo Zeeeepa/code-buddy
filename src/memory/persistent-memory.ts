@@ -515,6 +515,36 @@ export class PersistentMemoryManager extends EventEmitter {
   }
 
   /**
+   * Return memories sorted by `updatedAt` descending. Decorates each entry
+   * with its scope so callers can render where it lives without re-querying.
+   *
+   * Powers `/memory recent [N] [scope?]` — the UX surface for the LLM's
+   * auto-memory writeback (system-prompt directive shipped 2026-05-03).
+   * The Map preserves insertion order, but we must sort by mtime explicitly
+   * because manual `/memory remember` and auto-saves from the LLM can
+   * arrive out of order.
+   */
+  getRecentMemories(
+    limit = 10,
+    scope?: "project" | "user"
+  ): Array<Memory & { scope: "project" | "user" }> {
+    const all: Array<Memory & { scope: "project" | "user" }> = [];
+    if (!scope || scope === "project") {
+      for (const m of this.projectMemories.values()) {
+        all.push({ ...m, scope: "project" });
+      }
+    }
+    if (!scope || scope === "user") {
+      for (const m of this.userMemories.values()) {
+        all.push({ ...m, scope: "user" });
+      }
+    }
+    return all
+      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+      .slice(0, Math.max(0, limit));
+  }
+
+  /**
    * Format memories for display
    */
   formatMemories(scope?: "project" | "user"): string {

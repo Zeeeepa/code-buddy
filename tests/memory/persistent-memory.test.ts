@@ -82,10 +82,64 @@ describe('PersistentMemoryManager', () => {
   it('should build context string for prompt', async () => {
     await manager.remember('framework', 'React', { category: 'project' });
     await manager.remember('indent', '2 spaces', { category: 'preferences', scope: 'user' });
-    
+
     const context = manager.getContextForPrompt();
     expect(context).toContain('--- PERSISTENT MEMORY ---');
     expect(context).toContain('framework: React');
     expect(context).toContain('indent: 2 spaces');
+  });
+
+  describe('getRecentMemories', () => {
+    it('returns an empty array when no memories are stored', () => {
+      expect(manager.getRecentMemories()).toEqual([]);
+      expect(manager.getRecentMemories(5, 'project')).toEqual([]);
+      expect(manager.getRecentMemories(5, 'user')).toEqual([]);
+    });
+
+    it('returns up to N entries sorted by updatedAt descending across both scopes', async () => {
+      // Insert 3 memories with controlled timestamps. Insertion order != recency.
+      await manager.remember('alpha', 'A', { scope: 'project', category: 'project' });
+      await manager.remember('beta', 'B', { scope: 'user', category: 'preferences' });
+      await manager.remember('gamma', 'C', { scope: 'project', category: 'patterns' });
+
+      // Manually backdate alpha so beta is the oldest, gamma the newest, alpha middle.
+      const now = Date.now();
+      // Direct map access via private cast for the test setup only.
+      const projectMap = (manager as unknown as { projectMemories: Map<string, { updatedAt: Date }> }).projectMemories;
+      const userMap = (manager as unknown as { userMemories: Map<string, { updatedAt: Date }> }).userMemories;
+      projectMap.get('alpha')!.updatedAt = new Date(now - 60_000); // 1 min ago
+      userMap.get('beta')!.updatedAt = new Date(now - 120_000); // 2 min ago
+      projectMap.get('gamma')!.updatedAt = new Date(now - 5_000); // 5s ago
+
+      const recent = manager.getRecentMemories(10);
+      expect(recent.map(m => m.key)).toEqual(['gamma', 'alpha', 'beta']);
+      // Each entry decorated with its scope.
+      expect(recent[0].scope).toBe('project');
+      expect(recent[2].scope).toBe('user');
+
+      // Limit honored — get top 2 only.
+      expect(manager.getRecentMemories(2).map(m => m.key)).toEqual(['gamma', 'alpha']);
+    });
+
+    it('respects the scope filter (project vs user)', async () => {
+      await manager.remember('p-only', 'P', { scope: 'project' });
+      await manager.remember('u-only', 'U', { scope: 'user' });
+
+      const projectOnly = manager.getRecentMemories(10, 'project');
+      expect(projectOnly).toHaveLength(1);
+      expect(projectOnly[0].key).toBe('p-only');
+      expect(projectOnly[0].scope).toBe('project');
+
+      const userOnly = manager.getRecentMemories(10, 'user');
+      expect(userOnly).toHaveLength(1);
+      expect(userOnly[0].key).toBe('u-only');
+      expect(userOnly[0].scope).toBe('user');
+    });
+
+    it('treats limit=0 or negative as empty result', async () => {
+      await manager.remember('any', 'value', { scope: 'project' });
+      expect(manager.getRecentMemories(0)).toEqual([]);
+      expect(manager.getRecentMemories(-5)).toEqual([]);
+    });
   });
 });

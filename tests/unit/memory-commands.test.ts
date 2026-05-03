@@ -18,6 +18,7 @@ vi.mock('../../src/memory/index.js', () => {
     forget: vi.fn().mockResolvedValue(false),
     formatMemories: vi.fn().mockReturnValue('Persistent Memory Status OK'),
     getContextForPrompt: vi.fn().mockReturnValue('Persistent Context'),
+    getRecentMemories: vi.fn().mockReturnValue([]),
   };
   return {
     getEnhancedMemory: vi.fn().mockReturnValue(mockEnhancedMemory),
@@ -111,6 +112,68 @@ describe('Memory Commands', () => {
       expect(result.handled).toBe(true);
       expect(result.entry?.content).toContain('Forgot');
       expect(mockEnhancedMem.forget).toHaveBeenCalledWith('2');
+    });
+
+    describe('recent', () => {
+      it('shows the empty-state hint when no memories exist', async () => {
+        mockPersistentMem.getRecentMemories.mockReturnValueOnce([]);
+        const result = await handleMemory(['recent']);
+        expect(result.handled).toBe(true);
+        expect(result.entry?.content).toContain('No memories yet');
+        // Empty-state mentions BOTH paths users can populate it through.
+        expect(result.entry?.content).toContain('/memory remember');
+        expect(result.entry?.content).toContain('`remember` tool');
+      });
+
+      it('formats recent memories with scope, key, category, and relative time', async () => {
+        const oneMinAgo = new Date(Date.now() - 60_000);
+        mockPersistentMem.getRecentMemories.mockReturnValueOnce([
+          {
+            key: 'indent-style',
+            value: 'The codebase uses 2-space indent, no tabs.',
+            category: 'patterns',
+            scope: 'project',
+            createdAt: oneMinAgo,
+            updatedAt: oneMinAgo,
+            accessCount: 0,
+          },
+        ]);
+        const result = await handleMemory(['recent']);
+        expect(result.handled).toBe(true);
+        const c = result.entry?.content as string;
+        expect(c).toContain('Recent memories (showing 1)');
+        expect(c).toContain('[project] indent-style (patterns)');
+        expect(c).toContain('1 minute ago');
+        expect(c).toContain('The codebase uses 2-space indent, no tabs.');
+      });
+
+      it('parses the limit arg and clamps to [1, 50]', async () => {
+        mockPersistentMem.getRecentMemories.mockReturnValue([]);
+        await handleMemory(['recent', '5']);
+        expect(mockPersistentMem.getRecentMemories).toHaveBeenLastCalledWith(5, undefined);
+
+        await handleMemory(['recent', '999']);
+        expect(mockPersistentMem.getRecentMemories).toHaveBeenLastCalledWith(50, undefined);
+
+        await handleMemory(['recent', '-1']);
+        expect(mockPersistentMem.getRecentMemories).toHaveBeenLastCalledWith(1, undefined);
+
+        await handleMemory(['recent', 'not-a-number']);
+        expect(mockPersistentMem.getRecentMemories).toHaveBeenLastCalledWith(10, undefined);
+      });
+
+      it('forwards the scope filter when given', async () => {
+        mockPersistentMem.getRecentMemories.mockReturnValue([]);
+        await handleMemory(['recent', '10', 'project']);
+        expect(mockPersistentMem.getRecentMemories).toHaveBeenLastCalledWith(10, 'project');
+
+        await handleMemory(['recent', '10', 'user']);
+        expect(mockPersistentMem.getRecentMemories).toHaveBeenLastCalledWith(10, 'user');
+
+        // Garbage scope arg → undefined (no filter)
+        await handleMemory(['recent', '10', 'whatever']);
+        expect(mockPersistentMem.getRecentMemories).toHaveBeenLastCalledWith(10, undefined);
+      });
     });
 
     it('should show usage for forget without args', async () => {

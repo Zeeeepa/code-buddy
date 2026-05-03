@@ -12,6 +12,27 @@ export interface CommandHandlerResult {
 }
 
 /**
+ * Render a relative-time string ("2 minutes ago", "3 hours ago", "just now").
+ * Used by `/memory recent` for human-friendly timestamps.
+ */
+function formatTimeAgo(date: Date, now: Date = new Date()): string {
+  const diffMs = now.getTime() - date.getTime();
+  const sec = Math.max(0, Math.floor(diffMs / 1000));
+  if (sec < 30) return "just now";
+  if (sec < 60) return `${sec} seconds ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min} minute${min === 1 ? "" : "s"} ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} hour${hr === 1 ? "" : "s"} ago`;
+  const day = Math.floor(hr / 24);
+  if (day < 30) return `${day} day${day === 1 ? "" : "s"} ago`;
+  const mon = Math.floor(day / 30);
+  if (mon < 12) return `${mon} month${mon === 1 ? "" : "s"} ago`;
+  const yr = Math.floor(day / 365);
+  return `${yr} year${yr === 1 ? "" : "s"} ago`;
+}
+
+/**
  * Memory - Manage persistent memory using PersistentMemoryManager (Markdown) and EnhancedMemory (SQLite/Vector)
  */
 export async function handleMemory(args: string[]): Promise<CommandHandlerResult> {
@@ -120,6 +141,29 @@ export async function handleMemory(args: string[]): Promise<CommandHandlerResult
                  `📁 **Persistent**:\n${persistentContext || "(empty)"}\n\n` +
                  `🔍 **Enhanced**:\n${enhancedContext || "(empty)"}`;
         break;
+
+      case "recent": {
+        // Parse limit (default 10, clamped to [1, 50])
+        const rawLimit = parseInt(args[1] ?? "10", 10);
+        const limit = Math.min(50, Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 10));
+        const scopeArg = args[2] === "project" || args[2] === "user" ? args[2] : undefined;
+
+        const recent = persistentMemory.getRecentMemories(limit, scopeArg);
+        if (recent.length === 0) {
+          content = `🧠 No memories yet.\n\nMemories appear here when:\n  • You save them via \`/memory remember <key> <value>\`\n  • The LLM auto-saves via the \`remember\` tool (active when memory is enabled)\n\nSee .codebuddy/CODEBUDDY_MEMORY.md once you have some.`;
+        } else {
+          const lines = [`🧠 Recent memories (showing ${recent.length})`, "═".repeat(50)];
+          for (const m of recent) {
+            const ago = formatTimeAgo(m.updatedAt);
+            const valuePreview = m.value.length > 200 ? m.value.slice(0, 200) + "…" : m.value;
+            lines.push(`[${m.scope}] ${m.key} (${m.category}) — ${ago}`);
+            lines.push(`  ${valuePreview}`);
+            lines.push("");
+          }
+          content = lines.join("\n").trimEnd();
+        }
+        break;
+      }
 
       case "status":
       case "list":
