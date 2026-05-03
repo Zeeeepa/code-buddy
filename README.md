@@ -24,6 +24,8 @@
 
 **A multi-AI terminal agent that writes code, runs commands, searches the web, talks to you, and manages your projects -- from your terminal, your phone, or running 24/7 in the background.**
 
+**Now with a [Multi-AI Fleet Hub](docs/fleet-guide.md)** — multiple Code Buddy peers can observe each other's events live and invoke each other's LLMs via `/fleet send peer.chat`. Pilot local Ollama LLMs from any peer in your Tailscale network for free coding/reasoning. *(Phase (d).1 → (d).16a, May 2026.)*
+
 <br/>
 
 [Quick Start](#quick-start) |

@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+> **Status: 1.0.0-rc.1 — V1 release candidate** (May 2026). Multi-AI fleet hub
+> (Phases (d).1 → (d).16a) is the headline feature. See
+> [`docs/fleet-guide.md`](docs/fleet-guide.md) and [`CHANGELOG.md`](CHANGELOG.md).
+
 Guidance for Claude Code when working in this repo. Keep this file short — it should capture what you *can't* derive by reading the source.
 
 ## Build, Test, Lint

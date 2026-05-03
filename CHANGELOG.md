@@ -10,9 +10,61 @@ once it reaches `1.0.0`.
 
 ## [Unreleased]
 
-Approaching `1.0.0-rc.1` — see the v1-readiness plan in `.claude/plans/`.
-Pending work tracked in [`docs/fleet-guide.md`](docs/fleet-guide.md) and
-the audit follow-ups noted under `## [0.5.1-fleet]`.
+Heading toward `1.0.0` final. Backlog tracked under `## [Unreleased]`'s
+"Backlog" section below; pending work tracked in
+[`docs/fleet-guide.md`](docs/fleet-guide.md) (V1.x roadmap section)
+and the audit follow-ups noted under `## [0.5.1-fleet]`.
+
+---
+
+## [1.0.0-rc.1] — 2026-05-04
+
+**Release candidate**. Signal that Code Buddy is approaching its first
+stable major release. The core feature set is now complete:
+- Multi-provider AI agent (15 providers via OpenAI-compat routing,
+  plus native Gemini, plus Ollama/local)
+- Multi-agent orchestration (V0.4.1 with conflict auto-resolve,
+  adaptive allocation, WorkflowOrchestrator)
+- **Multi-AI fleet hub** (Phases (d).1 → (d).16a) — peers can
+  `/fleet listen` to each other's events and `/fleet send peer.chat`
+  to invoke each other's LLMs over WebSocket
+- Comprehensive test plan T1-T5 closed (CRITIQUE-priority modules
+  at ≥93% coverage)
+- Two source-comparative audits (OpenClaw v2026.3.x → v5.2 + Claude
+  Code source compaction) feeding actionable improvements
+- 27 500+ tests passing across the repo
+
+### Added in 1.0.0-rc.1 (V1-readiness phases)
+- **V1.1** (`50dd511`): Initial CHANGELOG.md (Keep-a-Changelog format)
+  covering 0.4.x → 0.5.0 → 0.5.0-fleet-infrastructure → 0.5.1-fleet
+- **V1.2** (`a968695`): `docs/fleet-guide.md` — comprehensive guide for
+  the multi-AI hub: 2 stated objectives (real-time inter-AI collaboration
+  + pilot local LLMs), all slash commands, all peer-rpc methods, env
+  config, lab examples, smoke test recipe, security model, V1.x roadmap
+- **V1.3** (`b3fc4e8`): Wire adaptive auto-compact helper as opt-in
+  config flag `useAdaptiveBuffer`. Default false (backward compat).
+  Closes the loop on audit fix #1.
+- **V1.4** (`a74bbb1`): Underscore-prefix 8 pre-existing unused-var
+  lint warnings (server/index.ts catch params + smart-compaction.ts
+  unused fn args). Mechanical fix, 0 behavior change.
+- **V1.5** (this commit): Version bump 0.5.0 → 1.0.0-rc.1.
+  README.md mentions the fleet hub in the lead paragraph.
+  CLAUDE.md header notes the V1 RC status. CHANGELOG.md adds this
+  entry.
+
+### Notes for V1 final (1.0.0)
+Going from rc.1 to 1.0.0 requires:
+- Live smoke test of `peer.chat` with at least 2 different providers
+  on at least 2 different hosts (operator validation)
+- Optional: rate cap (d).16b if burn-rate problems are observed live
+- Optional: audit Gemini CLI source / Codex source for one more round
+  of comparative improvements
+- Operator decision (Patrice) on the cut date
+
+The rc.1 ship is intentional: signal the V1 intent without
+pre-committing to "stable" before live multi-host validation.
+
+---
 
 ### Backlog (not yet shipped)
 
