@@ -513,6 +513,42 @@ export class AgentExecutor {
     return history.slice(initialHistoryLength);
   }
 
+  /**
+   * Like `processUserMessage`, but ALSO collects every event yielded by
+   * `runTurnLoop` (incl. streaming-only events that the sequential path
+   * normally drops: `ask_user`, `tool_stream`, `token_count`, `reasoning`,
+   * `steer`). Returns both the new history entries AND the captured events
+   * so callers in batch / test / audit contexts can introspect what
+   * happened during the turn without paying the cost of the full streaming
+   * path.
+   *
+   * Derived from the comparative audit Gemini CLI vs Code Buddy
+   * (claude-et-patrice/propositions/AUDIT-GEMINI-CLI-AGENTIC-LOOP-2026-05-04.md,
+   * recommendation #2 — fix défensif S scope). Backward compat preserved:
+   * existing `processUserMessage` callers see no change.
+   *
+   * @param message - The user's input message
+   * @param history - Chat history array (modified in place)
+   * @param messages - LLM message array (modified in place)
+   * @returns `{ entries }` — new ChatEntries pushed during this turn
+   *   PLUS `{ streamingEvents }` — every event the loop yielded, in order
+   */
+  async processUserMessageWithStreamingEvents(
+    message: string,
+    history: ChatEntry[],
+    messages: CodeBuddyMessage[]
+  ): Promise<{ entries: ChatEntry[]; streamingEvents: ExecutorEvent[] }> {
+    const initialHistoryLength = history.length;
+    const streamingEvents: ExecutorEvent[] = [];
+    for await (const event of this.runTurnLoop(message, history, messages, null)) {
+      streamingEvents.push(event);
+    }
+    return {
+      entries: history.slice(initialHistoryLength),
+      streamingEvents,
+    };
+  }
+
 
   /**
    * Process a user message with streaming response
