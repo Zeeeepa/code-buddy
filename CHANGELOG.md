@@ -15,23 +15,71 @@ Heading toward `1.0.0` final. Backlog tracked under `## [Unreleased]`'s
 [`docs/fleet-guide.md`](docs/fleet-guide.md) (V1.x roadmap section)
 and the audit follow-ups noted under `## [0.5.1-fleet]`.
 
-### Added since 1.0.0-rc.2
-- **`MessageHistoryManager.getComprehensiveHistory()` / `getCuratedHistory()`**
-  (`d7472e1`) — explicit raw-vs-curated distinction at the facade layer,
-  closes Gemini CLI audit recommendation #3 (final of 3 recos closed).
-  Additive only — no callers migrated yet (deferred V1.0.0 final).
-  9 new tests, first dedicated test file for this facade (T6 backlog
-  foundation). Helper `repairToolCallPairs` already covered by 7 tests.
-- **`/status` Memory section** (`0afc199`) — extends the existing
-  `handleStatus` with a one-line Memory dashboard cell showing project +
-  user counts and the relative time of the last persisted entry. Surfaces
-  the auto-memory writeback (`a2a4f72`) without typing `/memory recent`.
-  4 new tests. Silent skip on missing data.
-- **`docs/getting-started.md` Troubleshooting + Fleet quickstart +
-  Auto-memory sections** — extended the entry doc from 122 → ~260 lines
-  so a new user (or another Claude discovering the project) can be
-  productive in 5 minutes: 8-issue troubleshooting playbook, 30-second
-  Fleet connect quickstart, auto-memory inspection commands.
+---
+
+## [1.0.0-rc.3] — 2026-05-04
+
+**Third release candidate**. Three follow-up ships after rc.2 closing the
+final Gemini CLI audit recommendation, surfacing the auto-memory feature
+in `/status`, and turning `getting-started.md` into an actionable
+playbook so new users (and other Claudes discovering the project) can
+be productive in 5 minutes.
+
+### Added
+- **`MessageHistoryManager.getComprehensiveHistory()` /
+  `getCuratedHistory()`** (`d7472e1`) — explicit raw-vs-curated
+  distinction at the facade layer (`src/agent/facades/message-history-manager.ts`).
+  Closes the **third and final** Gemini CLI audit recommendation
+  (`AUDIT-GEMINI-CLI-AGENTIC-LOOP-2026-05-04.md` reco #3) — all 3 of 3
+  recommendations now shipped (recos #1 + #2 closed in rc.2 via
+  `cd653ab`/`2a06864`/`7ec4bc0`). Comprehensive returns raw stored
+  history (debug, audit). Curated applies `repairToolCallPairs()` from
+  `src/context/transcript-repair.ts` — orphan tool_results removed,
+  lost tool_calls get synthetic `[result lost during compaction]` stubs.
+  Compression is intentionally NOT applied (model-specific, lives in
+  `ContextManagerV2`). Internal state never mutated. **Additive only**:
+  no existing callers migrated (deferred V1.0.0 final to limit blast
+  radius). Posed the foundation for the T6 test backlog: 9 new tests in
+  `tests/agent/facades/message-history-manager.test.ts` — first
+  dedicated test file for this facade.
+- **`/status` Memory section** (`0afc199`) — extended the existing
+  `handleStatus` (`src/commands/handlers/missing-handlers.ts:837`)
+  with a one-line Memory dashboard cell showing `N project • N user •
+  last update: …`. Surfaces the auto-memory writeback (rc.2 `a2a4f72`)
+  without typing `/memory recent`. Silent skip on missing data
+  (memory section is best-effort, never blocks the rest of the
+  dashboard from rendering). 4 new tests covering empty state,
+  populated state with relative time, error fallback, and footer hint.
+- **`docs/getting-started.md` extensions** (`dc1f7eb`) — entry doc
+  extended from 122 → 244 lines. Three new sections close the
+  "Code Buddy utilisable + les Claudes peuvent l'utiliser pour
+  dialoguer" gap Patrice explicitly flagged:
+  - **Auto-memory** — explains the proactive `remember` writeback
+    with concrete examples and inspection commands. Mirrors the
+    Claude Code MEMORY.md UX pattern.
+  - **Talking to other Claudes (Fleet)** — 30-second quickstart
+    (`buddy server` listener side, `/fleet listen ws://...` peer side).
+    Calls out the two stated objectives (real-time inter-AI
+    collaboration + pilot local LLMs from any peer over Tailscale).
+    Points to `fleet-guide.md` for depth.
+  - **Troubleshooting** — 9 issues with diagnosis + fix (401, ESM,
+    slow startup, stale lock files, permission prompts, memory not
+    persisting, fleet AUTH_FAILED, fleet drops, ripgrep, mid-stream
+    errors). Plus pointers to `buddy doctor`, `fleet-guide.md`,
+    CHANGELOG, GitHub Issues.
+
+### Notes for V1 final (1.0.0)
+Same items as rc.2, narrowed by what shipped here:
+- Live smoke test of `peer.chat` with ≥2 providers on ≥2 hosts still
+  pending (operator validation, hub-pull blocker on Ministar Linux)
+- `withStreamRetry` activation by default deferred until ≥1 week of
+  opt-in observation without regressions
+- Migration of `agent-executor.ts:636` and `:844` to `getCuratedHistory()`
+  deferred (would close the latent compression-without-repair gap but
+  touches the agentic loop core)
+- Vue agrégée des 7 sources mémoire deferred
+- Mode `buddy init --update` deferred
+- `/memory recent` color polish deferred (small follow-up)
 
 ---
 

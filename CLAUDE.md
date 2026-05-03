@@ -1,10 +1,13 @@
 # CLAUDE.md
 
-> **Status: 1.0.0-rc.2 — V1 release candidate** (May 2026). Multi-AI fleet hub
+> **Status: 1.0.0-rc.3 — V1 release candidate** (May 2026). Multi-AI fleet hub
 > (Phases (d).1 → (d).16a) is the headline feature. Auto-memory writeback,
-> `/memory recent`, `AGENTS.md` cross-CLI scaffold, and opt-in mid-stream
-> retry shipped in rc.2. See [`docs/fleet-guide.md`](docs/fleet-guide.md)
-> and [`CHANGELOG.md`](CHANGELOG.md).
+> `/memory recent`, `AGENTS.md` cross-CLI scaffold, opt-in mid-stream
+> retry, and `getComprehensive/CuratedHistory()` (Gemini CLI audit reco
+> #3, all 3/3 closed) shipped through rc.3. `getting-started.md` extended
+> with Troubleshooting + Fleet quickstart + Auto-memory in rc.3 — read
+> first. See [`docs/fleet-guide.md`](docs/fleet-guide.md) and
+> [`CHANGELOG.md`](CHANGELOG.md).
 
 Guidance for Claude Code when working in this repo. Keep this file short — it should capture what you *can't* derive by reading the source.
 
