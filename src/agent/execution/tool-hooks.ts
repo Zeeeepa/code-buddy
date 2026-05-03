@@ -14,6 +14,65 @@
 import type { CodeBuddyMessage } from '../../codebuddy/client.js';
 import { getUserHooksManager } from '../../hooks/user-hooks.js';
 
+/**
+ * Phase (d).2 V0.4.1 — fleet stream opt-in. When CODEBUDDY_FLEET_STREAM=1
+ * (or =true), every tool execution emits a fleet:agent:tool_started /
+ * tool_completed / tool_error event via broadcastFleetEvent so other
+ * Claudes on the Tailscale fleet can observe live activity. Default off
+ * to avoid noise on standalone installs.
+ */
+function isFleetStreamEnabled(): boolean {
+  const v = process.env.CODEBUDDY_FLEET_STREAM;
+  return v === '1' || v === 'true' || v === 'TRUE';
+}
+
+/**
+ * Emit a fleet event for tool execution. Best-effort: never throws,
+ * silently no-ops when fleet streaming is disabled or the WS server
+ * isn't running.
+ */
+export function emitFleetToolStarted(
+  toolCall: { id: string; function: { name: string } }
+): void {
+  if (!isFleetStreamEnabled()) return;
+  // Lazy import so unit tests for this module don't need to mock the WS
+  // bridge and CLI-only mode doesn't load server-side code at all.
+  import('../../server/websocket/fleet-bridge.js')
+    .then(({ broadcastFleetEvent }) => {
+      broadcastFleetEvent('fleet:agent:tool_started', {
+        toolName: toolCall.function.name,
+        toolCallId: toolCall.id,
+      });
+    })
+    .catch(() => {
+      /* fleet-bridge unavailable — drop the event */
+    });
+}
+
+export function emitFleetToolCompleted(
+  toolCall: { id: string; function: { name: string } },
+  result: { success: boolean; error?: string },
+  durationMs: number
+): void {
+  if (!isFleetStreamEnabled()) return;
+  const eventType = result.success
+    ? 'fleet:agent:tool_completed'
+    : 'fleet:agent:tool_error';
+  import('../../server/websocket/fleet-bridge.js')
+    .then(({ broadcastFleetEvent }) => {
+      broadcastFleetEvent(eventType, {
+        toolName: toolCall.function.name,
+        toolCallId: toolCall.id,
+        success: result.success,
+        durationMs,
+        error: result.error,
+      });
+    })
+    .catch(() => {
+      /* fleet-bridge unavailable — drop the event */
+    });
+}
+
 export interface PreHookResult {
   /** True when the tool call is allowed to proceed. */
   allowed: boolean;

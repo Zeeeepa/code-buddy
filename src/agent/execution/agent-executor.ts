@@ -31,6 +31,8 @@ import {
   pushBlockedToolMessage,
   runPostToolUseHook,
   recordToolMetric,
+  emitFleetToolStarted,
+  emitFleetToolCompleted,
 } from "./tool-hooks.js";
 import {
   extractTerminateMessage,
@@ -819,6 +821,11 @@ export class AgentExecutor {
               continue;
             }
 
+            // Phase (d).2 — broadcast tool_started to the fleet (opt-in via
+            // CODEBUDDY_FLEET_STREAM=1). Best-effort, no-op when disabled
+            // or when the WS server isn't running.
+            emitFleetToolStarted(toolCall);
+
             // Use streaming execution for tools that support it (bash, reason, + adapter-based)
             let result;
             const _streamToolStartMs = Date.now();
@@ -881,6 +888,8 @@ export class AgentExecutor {
             await runPostToolUseHook(process.cwd(), toolCall, result);
             // --- Per-tool metrics (streaming path, DeepWiki gap #3) ---
             await recordToolMetric(toolCall.function.name, result.success, Date.now() - _streamToolStartMs);
+            // Phase (d).2 — fleet broadcast on completion (opt-in).
+            emitFleetToolCompleted(toolCall, result, Date.now() - _streamToolStartMs);
 
             // --- Track file access for code graph context (streaming, incremental update) ---
             try {
