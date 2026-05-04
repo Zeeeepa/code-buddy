@@ -29,6 +29,9 @@
 
 import { EventEmitter } from 'events';
 import { ipcMain } from 'electron';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import * as os from 'os';
 import { log, logError } from '../utils/logger';
 import { getPresenceStore } from './presence-store';
 import { getFaceRecognizer } from './face-recognizer';
@@ -37,6 +40,30 @@ import type {
   PresenceEvent,
   PresenceMatch,
 } from '../../shared/presence/types';
+
+/**
+ * Stable cross-process location where the *current* presence state is
+ * mirrored. Code Buddy core agent reads from here in its
+ * `before_agent_execute` hook so it can adapt the system prompt to who
+ * is in front of the camera. Path is OS-portable and Electron-independent
+ * so the core lib stays free of Electron deps.
+ */
+const CURRENT_PRESENCE_FILE = path.join(
+  os.homedir(),
+  '.codebuddy',
+  'presence',
+  'current.json',
+);
+
+/** Format of the current-presence.json file. */
+interface CurrentPresenceFile {
+  /** ISO-ish timestamp of last write. */
+  updatedAt: number;
+  /** What's happening right now. `null` when nobody is detected. */
+  match: PresenceMatch | null;
+  /** Last event type — useful to know if we're in 'detected' or 'left' phase. */
+  lastEventType: PresenceEvent['type'] | null;
+}
 
 /**
  * IPC payloads — kept narrow to make the renderer↔main contract obvious.
@@ -193,6 +220,35 @@ export class PresenceBridge extends EventEmitter {
     } catch (err) {
       logError(`[PresenceBridge] event listener threw: ${(err as Error).message}`);
     }
+    // Mirror to disk for the Code Buddy core agent (different process).
+    // Fire-and-forget — we don't want to block the hot path on I/O errors.
+    void this.writeCurrentPresence(event).catch((err) => {
+      logError(`[PresenceBridge] writeCurrentPresence: ${(err as Error).message}`);
+    });
+  }
+
+  /**
+   * Atomically write the current presence state to a stable on-disk
+   * location so the Code Buddy core agent (a different process) can read
+   * it before each agent turn. Atomic via tmp+rename so the agent never
+   * sees a partial JSON.
+   */
+  private async writeCurrentPresence(event: PresenceEvent): Promise<void> {
+    const payload: CurrentPresenceFile = {
+      updatedAt: Date.now(),
+      match:
+        event.type === 'detected'
+          ? event.match ?? null
+          : event.type === 'left'
+            ? null
+            : this.lastSeenMatch,
+      lastEventType: event.type,
+    };
+    const json = JSON.stringify(payload, null, 2);
+    const tmp = `${CURRENT_PRESENCE_FILE}.tmp`;
+    await fs.mkdir(path.dirname(CURRENT_PRESENCE_FILE), { recursive: true });
+    await fs.writeFile(tmp, json, 'utf-8');
+    await fs.rename(tmp, CURRENT_PRESENCE_FILE);
   }
 
   /** Snapshot of the most recent match — useful for the agent's first system prompt at session start. */
