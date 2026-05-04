@@ -154,6 +154,33 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('artifacts.listRecentFiles', cwd, sinceMs, Math.min(limit, 500)),
   },
 
+  // Presence (face memory) — see cowork/src/main/presence/.
+  // Renderer-side capture + detection talks to main-side encode + match
+  // + persist via these channels. The renderer never touches ONNX or
+  // the on-disk store directly.
+  presence: {
+    enroll: (payload: {
+      name: string;
+      aliases?: string[];
+      embedding: number[];
+      snapshotPath?: string;
+    }): Promise<unknown> => ipcRenderer.invoke('presence:enroll', payload),
+    addSample: (payload: {
+      personId: string;
+      embedding: number[];
+      snapshotPath?: string;
+    }): Promise<unknown> => ipcRenderer.invoke('presence:add-sample', payload),
+    encode: (payload: { rgbBytes: number[] }): Promise<number[]> =>
+      ipcRenderer.invoke('presence:encode', payload),
+    match: (payload: {
+      embedding: number[];
+      threshold?: number;
+    }): Promise<unknown> => ipcRenderer.invoke('presence:match', payload),
+    list: (): Promise<unknown[]> => ipcRenderer.invoke('presence:list'),
+    remove: (payload: { personId: string }): Promise<boolean> =>
+      ipcRenderer.invoke('presence:remove', payload),
+  },
+
   // Config methods
   config: {
     get: (): Promise<AppConfig> => ipcRenderer.invoke('config.get'),
