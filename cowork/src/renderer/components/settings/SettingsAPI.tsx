@@ -11,6 +11,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { useApiConfigState } from '../../hooks/useApiConfigState';
+import { useIPC } from '../../hooks/useIPC';
 import { ApiConfigSetManager } from '../ApiConfigSetManager';
 import { CommonProviderSetupsCard, GuidanceInlineHint } from '../ProviderGuidance';
 import ApiDiagnosticsPanel from '../ApiDiagnosticsPanel';
@@ -93,6 +94,7 @@ export function SettingsAPI() {
     handleDeepDiagnose,
     shouldShowOllamaManualModelToggle,
   } = useApiConfigState();
+  const { geminiOauthLogin, geminiOauthClear, codexOauthLogin, codexOauthClear } = useIPC();
 
   if (isLoadingConfig) {
     return (
@@ -181,6 +183,92 @@ export function SettingsAPI() {
           <p className="text-xs text-text-muted">{currentPreset.keyHint}</p>
         )}
       </div>
+
+      {/* Gemini OAuth Section */}
+      {provider === 'gemini' && (
+        <div className="space-y-3 py-5 border-b border-border-muted">
+          <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
+            <Key className="w-4 h-4" />
+            Sign in to Google AI Ultra (OAuth)
+          </label>
+          <p className="text-xs leading-5 text-text-muted">
+            Authenticate directly with your Google account to access Gemini Advanced models without an API key. This will use your active Google session in the browser.
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={async () => {
+                const res = await geminiOauthLogin();
+                if (!res.success) {
+                  alert('Login failed: ' + res.error);
+                } else {
+                  alert('Successfully authenticated with Google AI Ultra!');
+                }
+              }}
+              className="px-4 py-2 bg-accent text-white rounded-lg text-sm hover:bg-accent-hover transition-colors shadow-sm"
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                const res = await geminiOauthClear();
+                if (!res.success) {
+                  alert('Failed to clear credentials: ' + res.error);
+                } else {
+                  alert('Successfully cleared Google credentials.');
+                }
+              }}
+              className="px-4 py-2 border border-border-muted text-text-secondary rounded-lg text-sm hover:bg-surface-hover transition-colors"
+            >
+              Clear Credentials
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Codex/OpenAI OAuth Section */}
+      {provider === 'openai' && (
+        <div className="space-y-3 py-5 border-b border-border-muted">
+          <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
+            <Key className="w-4 h-4" />
+            Sign in to ChatGPT (Codex OAuth)
+          </label>
+          <p className="text-xs leading-5 text-text-muted">
+            Authenticate directly with your ChatGPT account to access OpenAI models without an API key. This will use your active ChatGPT Plus/Pro session in the browser. Leave the API Key field empty or type "oauth" to use this method.
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={async () => {
+                const res = await codexOauthLogin();
+                if (!res.success) {
+                  alert('Login failed: ' + res.error);
+                } else {
+                  alert('Successfully authenticated with ChatGPT!');
+                }
+              }}
+              className="px-4 py-2 bg-accent text-white rounded-lg text-sm hover:bg-accent-hover transition-colors shadow-sm"
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                const res = await codexOauthClear();
+                if (!res.success) {
+                  alert('Failed to clear credentials: ' + res.error);
+                } else {
+                  alert('Successfully cleared ChatGPT credentials.');
+                }
+              }}
+              className="px-4 py-2 border border-border-muted text-text-secondary rounded-lg text-sm hover:bg-surface-hover transition-colors"
+            >
+              Clear Credentials
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Custom Protocol */}
       {provider === 'custom' && (

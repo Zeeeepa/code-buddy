@@ -160,13 +160,15 @@ export class CodeBuddyEngineAdapter implements EngineAdapter {
 
           case 'tool_result':
             if (chunk.toolCall && chunk.toolResult) {
+              const finalOutput = chunk.toolResult.output || chunk.toolResult.error;
               onEvent({
                 type: 'tool_end',
                 tool: {
                   id: chunk.toolCall.id,
                   name: chunk.toolCall.function.name,
-                  output: chunk.toolResult.output || chunk.toolResult.error,
+                  output: finalOutput,
                   isError: !chunk.toolResult.success,
+                  data: chunk.toolResult.data,
                 },
               });
             }

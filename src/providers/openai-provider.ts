@@ -6,6 +6,7 @@
  */
 
 import { BaseProvider } from './base-provider.js';
+import { getCodexOauthTokens } from './codex-oauth.js';
 import type {
   ProviderType,
   ProviderConfig,
@@ -35,9 +36,17 @@ export class OpenAIProvider extends BaseProvider {
   async initialize(config: ProviderConfig): Promise<void> {
     await super.initialize(config);
 
+    let apiKey = config.apiKey;
+    if (apiKey === 'oauth' || !apiKey) {
+      const oauthToken = await getCodexOauthTokens(false);
+      if (oauthToken) {
+        apiKey = oauthToken;
+      }
+    }
+
     const { default: OpenAI } = await import('openai');
     this.client = new OpenAI({
-      apiKey: config.apiKey,
+      apiKey: apiKey,
       baseURL: config.baseUrl,
       timeout: config.timeout || 120000,
       maxRetries: config.maxRetries || 3,

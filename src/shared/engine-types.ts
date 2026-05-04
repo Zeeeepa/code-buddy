@@ -38,6 +38,7 @@ export interface EngineStreamEvent {
     output?: string;
     isError?: boolean;
     delta?: string;
+    data?: unknown;
   };
   /** Token usage info */
   tokenCount?: number;

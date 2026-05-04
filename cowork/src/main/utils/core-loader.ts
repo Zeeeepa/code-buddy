@@ -21,7 +21,7 @@
 import { app } from 'electron';
 import { resolve, join, dirname } from 'path';
 import { existsSync } from 'fs';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { log, logWarn } from './logger';
 
 const moduleCache = new Map<string, unknown>();
@@ -87,8 +87,9 @@ export async function loadCoreModule<T = unknown>(relativePath: string): Promise
     if (!existsSync(fullPath)) continue;
 
     try {
+      const importUrl = pathToFileURL(fullPath).href;
       // /* @vite-ignore */ tells vite not to try to bundle this import
-      const mod = (await import(/* @vite-ignore */ fullPath)) as T;
+      const mod = (await import(/* @vite-ignore */ importUrl)) as T;
       moduleCache.set(relativePath, mod);
       log('[core-loader] Loaded', relativePath, 'from', root);
       return mod;

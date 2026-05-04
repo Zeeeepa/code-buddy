@@ -402,6 +402,20 @@ export function useIPC() {
             store.appendGuiAction(event.payload);
             break;
 
+          case 'panic-stop': {
+            const currentSessionId = store.activeSessionId;
+            if (currentSessionId) {
+              console.log('[useIPC] Received panic-stop, cancelling session:', currentSessionId);
+              window.electronAPI.send({ type: 'session.stop', payload: { sessionId: currentSessionId } });
+              store.cancelQueuedMessages(currentSessionId);
+              store.clearPendingTurns(currentSessionId);
+              store.clearActiveTurn(currentSessionId);
+              store.finishExecutionClock(currentSessionId);
+              store.setLoading(false);
+            }
+            break;
+          }
+
           default:
             console.log('[useIPC] Unknown server event:', event);
         }
@@ -852,6 +866,38 @@ export function useIPC() {
     [invoke]
   );
 
+  const geminiOauthLogin = useCallback(async () => {
+    if (!isElectron) return { success: false, error: 'Not running in Electron' };
+    return invoke<{ success: boolean; tokens?: any; error?: string }>({
+      type: 'config.geminiOauthLogin',
+      payload: {},
+    });
+  }, [invoke]);
+
+  const geminiOauthClear = useCallback(async () => {
+    if (!isElectron) return { success: false, error: 'Not running in Electron' };
+    return invoke<{ success: boolean; error?: string }>({
+      type: 'config.geminiOauthClear',
+      payload: {},
+    });
+  }, [invoke]);
+
+  const codexOauthLogin = useCallback(async () => {
+    if (!isElectron) return { success: false, error: 'Not running in Electron' };
+    return invoke<{ success: boolean; tokens?: any; error?: string }>({
+      type: 'config.codexOauthLogin',
+      payload: {},
+    });
+  }, [invoke]);
+
+  const codexOauthClear = useCallback(async () => {
+    if (!isElectron) return { success: false, error: 'Not running in Electron' };
+    return invoke<{ success: boolean; error?: string }>({
+      type: 'config.codexOauthClear',
+      payload: {},
+    });
+  }, [invoke]);
+
   const getMCPServers = useCallback(async () => {
     if (!isElectron) {
       return [];
@@ -877,6 +923,10 @@ export function useIPC() {
     getWorkingDir,
     changeWorkingDir,
     getMCPServers,
+    geminiOauthLogin,
+    geminiOauthClear,
+    codexOauthLogin,
+    codexOauthClear,
     isElectron,
   };
 }

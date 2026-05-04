@@ -22,11 +22,14 @@ import {
   Pause,
   Minimize2,
   Maximize2,
+  StopCircle,
 } from 'lucide-react';
 import { useAppStore } from '../store';
+import { useIPC } from '../hooks/useIPC';
 
 export const ComputerUseOverlay: React.FC = () => {
   const { t } = useTranslation();
+  const { stopSession } = useIPC();
   const guiActions = useAppStore((s) => s.guiActions);
   const show = useAppStore((s) => s.showComputerUseOverlay);
   const setShow = useAppStore((s) => s.setShowComputerUseOverlay);
@@ -96,16 +99,30 @@ export const ComputerUseOverlay: React.FC = () => {
         <div className="flex items-center gap-2">
           <Monitor size={14} className="text-accent" />
           <span className="text-xs font-semibold text-text-primary">
-            {t('computerUse.title')}
+            {t('computerUse.title', { defaultValue: 'Computer Use' })}
           </span>
           <span className="text-[10px] text-text-muted">
             {t('computerUse.stepOf', {
               current: stepIndex + 1,
               total: sessionActions.length,
+              defaultValue: `${stepIndex + 1} / ${sessionActions.length}`
             })}
           </span>
         </div>
         <div className="flex items-center gap-1">
+          <button
+            onClick={() => {
+              if (activeSessionId) {
+                stopSession(activeSessionId);
+                setPlaying(false);
+              }
+            }}
+            className="flex items-center gap-1 px-2 py-0.5 bg-red-500 hover:bg-red-600 text-white rounded transition-colors mr-2 shadow-sm"
+            title={t('computerUse.panicStop', { defaultValue: 'Stop Agent Immediately' })}
+          >
+            <StopCircle size={10} strokeWidth={3} />
+            <span className="text-[9px] font-black tracking-wider">STOP</span>
+          </button>
           <button
             onClick={() => setMinimized(true)}
             className="p-1 text-text-muted hover:text-text-primary transition-colors"
@@ -168,6 +185,69 @@ export const ComputerUseOverlay: React.FC = () => {
             {t('computerUse.clickAt', { x: current.click.x, y: current.click.y })}
           </div>
         )}
+        {current?.action === 'type' && !!current?.details?.text && (
+          <div className="text-[10px] text-text-muted mt-0.5">
+            {t('computerUse.typeText', { text: String(current.details.text), defaultValue: `Typed: "${String(current.details.text)}"` }) as string}
+          </div>
+        )}
+        {(current?.action === 'key' || current?.action === 'hotkey') && !!current?.details?.key && (
+          <div className="text-[10px] text-text-muted mt-0.5">
+            {t('computerUse.pressKey', { key: String(current.details.key), defaultValue: `Pressed: ${String(current.details.key)}` }) as string}
+          </div>
+        )}
+        {current?.action === 'scroll' && (
+          <div className="text-[10px] text-text-muted mt-0.5">
+            {t('computerUse.scroll', { defaultValue: 'Scrolled' }) as string}
+          </div>
+        )}
+        {current?.action === 'click_text' && !!current?.details?.text && (
+          <div className="text-[10px] text-text-muted mt-0.5">
+            {`OCR Click: "${String(current.details.text)}"`}
+          </div>
+        )}
+        {current?.action === 'macro' && !!current?.details?.macroResults && (
+          <div className="text-[10px] text-text-muted mt-1 flex flex-col gap-0.5">
+            <span className="font-semibold opacity-80">Macro Sequence:</span>
+            <div className="flex flex-wrap gap-1 mt-0.5">
+              {(current.details.macroResults as any[]).map((res, i) => (
+                <span key={i} className="px-1.5 py-[1px] bg-background border border-border-muted rounded-sm text-[9px]">
+                  {String(res.action)}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Visual History (Timeline) */}
+      <div className="flex gap-2 px-3 py-2 bg-surface/20 border-b border-border-muted overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+        {sessionActions.slice(-5).map((action, idx) => {
+          const actualIndex = sessionActions.length - Math.min(5, sessionActions.length) + idx;
+          const isActive = actualIndex === stepIndex;
+          const thumbSrc = action.screenshot?.startsWith('data:')
+            ? action.screenshot
+            : action.screenshot
+              ? `file://${action.screenshot.replace(/\\/g, '/')}`
+              : undefined;
+
+          return (
+            <button
+              key={actualIndex}
+              onClick={() => { setStepIndex(actualIndex); setPlaying(false); }}
+              className={`shrink-0 relative w-16 h-12 rounded border ${isActive ? 'border-accent ring-1 ring-accent shadow-sm' : 'border-border-muted opacity-60 hover:opacity-100'} overflow-hidden transition-all`}
+              title={action.toolName}
+            >
+              {thumbSrc ? (
+                <img src={thumbSrc} alt="thumb" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-surface text-[8px] text-text-muted">No Img</div>
+              )}
+              <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[8px] font-medium text-center truncate px-0.5 py-0.5">
+                {action.action || '—'}
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       {/* Playback controls */}

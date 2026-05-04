@@ -40,6 +40,14 @@ export type ComputerAction =
   | 'snapshot_with_screenshot'
   | 'get_element'
   | 'find_elements'
+  | 'macro'
+  | 'click_text'
+  | 'save_macro'
+  | 'play_macro'
+  | 'list_macros'
+  | 'delete_macro'
+  | 'wait_for_text'
+  | 'speak'
   // Mouse actions
   | 'click'
   | 'left_click'
@@ -151,6 +159,12 @@ export interface ComputerControlInput {
   audio?: boolean;
   // Permission params
   permission?: string;
+  // Macro params
+  steps?: ComputerControlInput[];
+  macroName?: string;
+  macroDescription?: string;
+  // OCR params
+  text?: string;
 }
 
 // ============================================================================
@@ -225,6 +239,22 @@ export class ComputerControlTool {
           return run(() => this.getElement(enrichedInput));
         case 'find_elements':
           return run(() => this.findElements(enrichedInput));
+        case 'macro':
+          return run(() => this.executeMacro(enrichedInput));
+        case 'click_text':
+          return run(() => this.clickText(enrichedInput));
+        case 'save_macro':
+          return run(() => this.saveMacro(enrichedInput));
+        case 'play_macro':
+          return run(() => this.playMacro(enrichedInput));
+        case 'list_macros':
+          return run(() => this.listMacros());
+        case 'delete_macro':
+          return run(() => this.deleteMacro(enrichedInput));
+        case 'wait_for_text':
+          return run(() => this.waitForText(enrichedInput));
+        case 'speak':
+          return run(() => this.speakText(enrichedInput));
 
         // Mouse actions
         case 'click':
@@ -343,6 +373,16 @@ export class ComputerControlTool {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error('Computer control error', { action, error: errorMessage });
+      
+      // Phase 7: Rétroaction Vocale sur Erreur
+      try {
+        const { exec } = await import('child_process');
+        const script = `Add-Type -AssemblyName System.Speech; $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer; $synth.Speak("Patrice, j'ai rencontré une erreur inattendue sur l'action ${action.replace(/_/g, ' ')}")`;
+        exec(`powershell -NoProfile -Command "${script}"`); // fire and forget
+      } catch (e) {
+        logger.debug('Failed to speak error', { error: e });
+      }
+      
       return this.finalizeActionResult(action, enrichedInput, {
         success: false,
         error: this.toAIFriendlyError(errorMessage, action),
@@ -385,6 +425,9 @@ export class ComputerControlTool {
       'resize_window',
       'set_window',
       'act_on_best_window',
+      'macro',
+      'click_text',
+      'play_macro',
     ].includes(action);
   }
 
@@ -1424,6 +1467,8 @@ export class ComputerControlTool {
   // ============================================================================
 
   private async resolvePoint(input: ComputerControlInput): Promise<{ x: number; y: number; browserError?: string } | null> {
+    let rawPoint: { x: number; y: number } | null = null;
+
     // If ref is provided, use element center
     if (input.ref !== undefined) {
       const element = this.snapshotManager.getElement(input.ref);
@@ -1437,16 +1482,313 @@ export class ComputerControlTool {
               `Use the browser tool with action=click and ref=${input.ref} instead of computer_control.`,
           };
         }
-        return element.center;
+        rawPoint = element.center;
       }
     }
 
     // If x,y are provided, use them directly
-    if (input.x !== undefined && input.y !== undefined) {
-      return { x: input.x, y: input.y };
+    if (!rawPoint && input.x !== undefined && input.y !== undefined) {
+      rawPoint = { x: input.x, y: input.y };
     }
 
-    return null;
+    if (!rawPoint) {
+      return null;
+    }
+
+    // Phase 2: Handle screen scaling
+    try {
+      const displays = await this.systemControl.getDisplays();
+      // Find the display containing the point, or default to primary
+      const display = displays.find(d => 
+        rawPoint!.x >= d.bounds.x && rawPoint!.x <= d.bounds.x + d.bounds.width &&
+        rawPoint!.y >= d.bounds.y && rawPoint!.y <= d.bounds.y + d.bounds.height
+      ) || displays.find(d => d.isPrimary) || displays[0];
+
+      if (display && display.scaleFactor && display.scaleFactor !== 1) {
+        // Logically adjust coordinates. Usually automation tools expect logical pixels
+        // whereas the screenshot gives native pixels.
+        return {
+          x: Math.round(rawPoint.x / display.scaleFactor),
+          y: Math.round(rawPoint.y / display.scaleFactor),
+        };
+      }
+    } catch (err) {
+      logger.debug('Failed to get displays for scale factor', { error: err });
+    }
+
+    return rawPoint;
+  }
+
+  private async executeMacro(input: ComputerControlInput): Promise<ToolResult> {
+    if (!input.steps || !Array.isArray(input.steps) || input.steps.length === 0) {
+      return { success: false, error: 'Macro requires a non-empty array of steps' };
+    }
+
+    const results: any[] = [];
+    let allSuccess = true;
+
+    for (let i = 0; i < input.steps.length; i++) {
+      const stepInput = input.steps[i];
+      // Do not allow nested macros
+      if (stepInput.action === 'macro') {
+        return { success: false, error: 'Nested macros are not allowed' };
+      }
+
+      // We need to execute the step using the main entry point to ensure
+      // logging, auditing, and pilot modes apply to each step individually
+      const stepResult = await this.execute(stepInput);
+      results.push({ action: stepInput.action, result: stepResult });
+
+      if (!stepResult.success) {
+        allSuccess = false;
+        break; // Stop on first failure
+      }
+    }
+
+    return {
+      success: allSuccess,
+      output: `Executed macro with ${results.length} steps. Success: ${allSuccess}`,
+      data: { macroResults: results },
+    };
+  }
+
+  // ============================================================================
+  // Macro / Record Actions
+  // ============================================================================
+
+  private async saveMacro(input: ComputerControlInput): Promise<ToolResult> {
+    if (!input.macroName || !input.steps) {
+      return { success: false, error: 'macroName and steps are required for save_macro' };
+    }
+    const { MacroManager } = await import('./macro-manager.js');
+    await MacroManager.getInstance().saveMacro(input.macroName, input.steps, input.macroDescription);
+    return {
+      success: true,
+      output: `Macro "${input.macroName}" saved successfully with ${input.steps.length} steps.`,
+    };
+  }
+
+  private async playMacro(input: ComputerControlInput): Promise<ToolResult> {
+    if (!input.macroName) {
+      return { success: false, error: 'macroName is required for play_macro' };
+    }
+    const { MacroManager } = await import('./macro-manager.js');
+    const macro = await MacroManager.getInstance().loadMacro(input.macroName);
+    if (!macro) {
+      return { success: false, error: `Macro "${input.macroName}" not found.` };
+    }
+
+    logger.debug(`Playing macro: ${input.macroName} (${macro.steps.length} steps)`);
+    // Re-use executeMacro logic by passing the loaded steps
+    return this.executeMacro({ ...input, action: 'macro', steps: macro.steps });
+  }
+
+  private async listMacros(): Promise<ToolResult> {
+    const { MacroManager } = await import('./macro-manager.js');
+    const macros = await MacroManager.getInstance().listMacros();
+    
+    if (macros.length === 0) {
+      return { success: true, output: 'No macros found.' };
+    }
+
+    const output = macros.map(m => `- ${m.name} (${m.steps.length} steps): ${m.description || 'No description'}`).join('\n');
+    return {
+      success: true,
+      output: `Found ${macros.length} macros:\n${output}`,
+      data: { macros }
+    };
+  }
+
+  private async deleteMacro(input: ComputerControlInput): Promise<ToolResult> {
+    if (!input.macroName) {
+      return { success: false, error: 'macroName is required for delete_macro' };
+    }
+    const { MacroManager } = await import('./macro-manager.js');
+    const deleted = await MacroManager.getInstance().deleteMacro(input.macroName);
+    
+    if (!deleted) {
+      return { success: false, error: `Macro "${input.macroName}" not found.` };
+    }
+    
+    return { success: true, output: `Macro "${input.macroName}" deleted.` };
+  }
+
+  // ============================================================================
+  // OCR Actions
+  // ============================================================================
+
+  private async waitForText(input: ComputerControlInput): Promise<ToolResult> {
+    if (!input.text) {
+      return { success: false, error: 'text is required for wait_for_text action' };
+    }
+
+    const timeoutMs = input.timeoutMs || 30000;
+    const pollIntervalMs = input.pollIntervalMs || 2000;
+    const startTime = Date.now();
+
+    logger.debug(`Starting visual polling for text: "${input.text}" (timeout: ${timeoutMs}ms)`);
+
+    while (Date.now() - startTime < timeoutMs) {
+      // 1. Try CDP Fast-Path
+      try {
+        const activeWindow = await this.systemControl.getActiveWindow();
+        if (activeWindow && (activeWindow.title.includes('Google Chrome') || activeWindow.title.includes('Edge'))) {
+          const { BrowserTool } = await import('./browser/playwright-tool.js');
+          const pwTool = BrowserTool.getInstance();
+          await pwTool.connectToExistingBrowser('http://localhost:9222');
+          
+          const found = await pwTool.evaluate(`!!document.body.innerText.includes(${JSON.stringify(input.text)})`);
+          if (found) {
+             return {
+               success: true,
+               output: `Detected text "${input.text}" via CDP after ${Date.now() - startTime}ms`,
+               data: { text: input.text, source: 'cdp', durationMs: Date.now() - startTime }
+             };
+          }
+        }
+      } catch (err) {
+         logger.debug('CDP polling failed', { error: err });
+      }
+
+      // 2. OCR Fallback
+      try {
+        const { UnifiedVfsRouter } = await import('../services/vfs/unified-vfs-router.js');
+        const path = await import('path');
+        const snapshotPath = path.join(process.cwd(), '.codebuddy', 'temp', `ocr_snapshot_${Date.now()}.png`);
+        
+        const { ScreenshotTool } = await import('./screenshot-tool.js');
+        const screenshotTool = new ScreenshotTool();
+        await screenshotTool.capture({ outputPath: snapshotPath });
+        
+        const { OCRTool } = await import('./ocr-tool.js');
+        const ocr = new OCRTool();
+        const ocrResult = await ocr.extractText({ imagePath: snapshotPath });
+        
+        try { await UnifiedVfsRouter.Instance.remove(snapshotPath); } catch (e) {}
+
+        if (ocrResult.success && ocrResult.data?.text?.toLowerCase().includes(input.text.toLowerCase())) {
+           return {
+             success: true,
+             output: `Detected text "${input.text}" via OCR after ${Date.now() - startTime}ms`,
+             data: { text: input.text, source: 'ocr', durationMs: Date.now() - startTime }
+           };
+        }
+      } catch (err) {
+         logger.debug('OCR check failed during polling', { error: err });
+      }
+
+      await this.delay(pollIntervalMs);
+    }
+
+    return {
+      success: false,
+      error: `Timeout: text "${input.text}" did not appear after ${timeoutMs}ms.`
+    };
+  }
+
+  // ============================================================================
+  // Voice Actions
+  // ============================================================================
+
+  private async speakText(input: ComputerControlInput): Promise<ToolResult> {
+    if (!input.text) {
+      return { success: false, error: 'text is required for speak action' };
+    }
+    
+    try {
+      const { exec } = await import('child_process');
+      const script = `Add-Type -AssemblyName System.Speech; $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer; $synth.Speak("${input.text.replace(/"/g, '""')}")`;
+      
+      await new Promise<void>((resolve, reject) => {
+        exec(`powershell -NoProfile -Command "${script}"`, (error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+      
+      return { success: true, output: `Spoke: "${input.text}"` };
+    } catch (err) {
+      return { success: false, error: `Failed to speak text: ${err}` };
+    }
+  }
+
+  private async clickText(input: ComputerControlInput): Promise<ToolResult> {
+    if (!input.text) {
+      return { success: false, error: 'text is required for click_text action' };
+    }
+
+    // Phase 4: CDP / Web DOM Fast-Path
+    try {
+      const activeWindow = await this.systemControl.getActiveWindow();
+      if (activeWindow && (activeWindow.title.includes('Google Chrome') || activeWindow.title.includes('Edge'))) {
+        const { BrowserTool } = await import('./browser/playwright-tool.js');
+        const pwTool = BrowserTool.getInstance();
+        
+        await pwTool.connectToExistingBrowser('http://localhost:9222');
+        await pwTool.findAndClickText(input.text);
+        
+        return {
+          success: true,
+          output: `Clicked text "${input.text}" via CDP (Playwright)`,
+          data: { click: { text: input.text, source: 'cdp' } }
+        };
+      }
+    } catch (err) {
+      logger.debug('CDP connect/click failed, falling back to OCR', { error: err });
+    }
+
+    // Phase 3: OCR Fallback
+    // 1. Take snapshot
+    const { UnifiedVfsRouter } = await import('../services/vfs/unified-vfs-router.js');
+    const path = await import('path');
+    const snapshotPath = path.join(process.cwd(), '.codebuddy', 'temp', `ocr_snapshot_${Date.now()}.png`);
+    const screenshotResult = await this.screenshotTool.capture({ outputPath: snapshotPath });
+    
+    if (!screenshotResult.success) {
+      return { success: false, error: `Failed to take screenshot for OCR: ${screenshotResult.error}` };
+    }
+
+    // 2. Run OCR
+    const { OCRTool } = await import('./ocr-tool.js');
+    const ocrTool = new OCRTool();
+    const ocrResult = await ocrTool.extractText(snapshotPath);
+    
+    // Clean up
+    try { await UnifiedVfsRouter.Instance.remove(snapshotPath); } catch (e) {}
+
+    if (!ocrResult.success || !ocrResult.data) {
+      return { success: false, error: `OCR failed: ${ocrResult.error || 'No data returned'}` };
+    }
+
+    const ocrData = ocrResult.data as import('./ocr-tool.js').OCRResult;
+    if (!ocrData.blocks) {
+      return { success: false, error: `No text blocks found on screen.` };
+    }
+
+    // 3. Find matching text (case insensitive, partial match)
+    const target = input.text.toLowerCase();
+    const match = ocrData.blocks.find(b => b.text && b.text.toLowerCase().includes(target));
+
+    if (!match || !match.boundingBox) {
+      return { success: false, error: `Text "${input.text}" not found on screen.` };
+    }
+
+    // 4. Calculate center and click
+    const centerX = match.boundingBox.x + Math.round(match.boundingBox.width / 2);
+    const centerY = match.boundingBox.y + Math.round(match.boundingBox.height / 2);
+
+    const resolved = await this.resolvePoint({ action: 'click_text', x: centerX, y: centerY });
+    if (resolved) {
+      await this.automation.moveMouse(resolved.x, resolved.y);
+      await this.automation.click('left');
+      return { 
+        success: true, 
+        output: `Clicked text "${input.text}" at ${centerX}, ${centerY}`,
+        data: { click: { x: centerX, y: centerY } }
+      };
+    }
+
+    return { success: false, error: 'Could not resolve point' };
   }
 
   /**
@@ -1784,7 +2126,21 @@ export class ComputerControlTool {
     ]);
 
     if (!dangerous.has(action)) {
+      // Phase 1: Filter dangerous keystrokes
+      if (action === 'hotkey' || action === 'key' || action === 'key_down') {
+        const key = String(input.key || '').toLowerCase();
+        const mods = (input.modifiers || []).map(m => String(m).toLowerCase());
+        
+        if (key === 'f4' && (mods.includes('alt') || mods.includes('alt_l') || mods.includes('alt_r'))) return true;
+        if (key === 'w' && (mods.includes('control') || mods.includes('ctrl') || mods.includes('command') || mods.includes('meta'))) return true;
+        if (key === 'delete') return true;
+        if (key === 'backspace' && (mods.includes('control') || mods.includes('ctrl') || mods.includes('command'))) return true;
+      }
       return false;
+    }
+
+    if (action === 'macro') {
+      return (input.steps || []).some(step => this.isDangerousAction(step.action, step));
     }
 
     if (action === 'act_on_best_window') {
@@ -1821,6 +2177,14 @@ export class ComputerControlTool {
 
     if (action === 'act_on_best_window' && input.bestWindowAction) {
       return true;
+    }
+
+    if (action === 'macro') {
+      return (input.steps || []).some(step => this.isMutatingAction(step.action, step));
+    }
+
+    if (action === 'click_text') {
+      return true; // it clicks
     }
 
     return mutating.has(action);

@@ -17,6 +17,8 @@ import type {
 } from './types.js';
 import { retry, RetryStrategies, RetryPredicates } from '../utils/retry.js';
 import { logger } from '../utils/logger.js';
+import { getAuthenticatedClient } from './gemini-oauth.js';
+import type { OAuth2Client } from 'google-auth-library';
 
 /**
  * Implementation of the Google Gemini provider.
@@ -62,6 +64,7 @@ export class GeminiProvider extends BaseProvider {
   readonly defaultModel = 'gemini-2.5-flash';
 
   private client: unknown = null;
+  private oauthClient: OAuth2Client | null = null;
 
   /**
    * Initializes the Gemini provider.
@@ -92,9 +95,20 @@ export class GeminiProvider extends BaseProvider {
     const client = this.client as { apiKey: string; baseUrl: string; model: string };
     const model = this.config.model || this.defaultModel;
     const url = `${client.baseUrl}/models/${model}:generateContent`;
-    const apiKey = client.apiKey;
 
     const body = this.formatRequest(options);
+    
+    let headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (client.apiKey && client.apiKey !== 'oauth') {
+      headers['x-goog-api-key'] = client.apiKey;
+    } else {
+      if (!this.oauthClient) {
+        this.oauthClient = await getAuthenticatedClient();
+      }
+      const token = await this.oauthClient.getAccessToken();
+      if (!token.token) throw new Error('Failed to get access token from Google OAuth.');
+      headers['Authorization'] = `Bearer ${token.token}`;
+    }
 
     // Log request details for debugging tool calling
     logger.debug('Gemini API request', {
@@ -112,7 +126,7 @@ export class GeminiProvider extends BaseProvider {
       async () => {
         const res = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+          headers,
           body: JSON.stringify(body),
         });
 
@@ -241,16 +255,27 @@ export class GeminiProvider extends BaseProvider {
     const client = this.client as { apiKey: string; baseUrl: string; model: string };
     const model = this.config.model || this.defaultModel;
     const url = `${client.baseUrl}/models/${model}:streamGenerateContent?alt=sse`;
-    const apiKey = client.apiKey;
 
     const body = this.formatRequest(options);
+    
+    let headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (client.apiKey && client.apiKey !== 'oauth') {
+      headers['x-goog-api-key'] = client.apiKey;
+    } else {
+      if (!this.oauthClient) {
+        this.oauthClient = await getAuthenticatedClient();
+      }
+      const token = await this.oauthClient.getAccessToken();
+      if (!token.token) throw new Error('Failed to get access token from Google OAuth.');
+      headers['Authorization'] = `Bearer ${token.token}`;
+    }
 
     // Use retry with exponential backoff for stream initialization
     const response = await retry(
       async () => {
         const res = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+          headers,
           body: JSON.stringify(body),
         });
 

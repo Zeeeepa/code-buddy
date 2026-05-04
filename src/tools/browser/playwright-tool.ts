@@ -108,6 +108,43 @@ export class BrowserTool {
     }
   }
 
+  async connectToExistingBrowser(endpointUrl: string = 'http://localhost:9222'): Promise<void> {
+    if (this.browser || this.isLaunching) {
+      return;
+    }
+
+    this.isLaunching = true;
+    try {
+      this.browser = await chromium.connectOverCDP(endpointUrl);
+      this.context = this.browser.contexts()[0];
+
+      this.actions = [];
+      this.consoleMessages = [];
+      this.pages.clear();
+      this.tabCounter = 0;
+
+      // Load existing pages
+      if (this.context) {
+        const pages = this.context.pages();
+        for (let i = 0; i < pages.length; i++) {
+          const tabId = this.generateTabId();
+          this.pages.set(tabId, pages[i]);
+          
+          // Set active page to the visible one, or just the first
+          if (!this.activePageId) {
+            this.activePageId = tabId;
+          }
+        }
+      }
+      logger.debug('Connected to existing browser via CDP', { endpointUrl });
+    } catch (error) {
+      logger.debug('Failed to connect to CDP', { error });
+      throw new Error(`CDP connection failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      this.isLaunching = false;
+    }
+  }
+
   async navigate(url: string): Promise<void> {
     const page = this.getActivePage();
     try {
@@ -127,6 +164,18 @@ export class BrowserTool {
       this.recordAction('click', selector);
     } catch (error) {
       throw new Error(`Failed to click selector ${selector}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  async findAndClickText(text: string): Promise<void> {
+    const page = this.getActivePage();
+    try {
+      const locator = page.getByText(text, { exact: false }).first();
+      await locator.waitFor({ state: 'visible', timeout: 5000 });
+      await locator.click({ timeout: 5000 });
+      this.recordAction('click_text', text);
+    } catch (error) {
+      throw new Error(`Failed to click text "${text}": ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

@@ -455,7 +455,11 @@ export type ClientEvent =
   | { type: 'folder.select'; payload: Record<string, never> }
   | { type: 'workdir.get'; payload: Record<string, never> }
   | { type: 'workdir.set'; payload: { path: string; sessionId?: string } }
-  | { type: 'workdir.select'; payload: { sessionId?: string; currentPath?: string } };
+  | { type: 'workdir.select'; payload: { sessionId?: string; currentPath?: string } }
+  | { type: 'config.geminiOauthLogin'; payload: Record<string, never> }
+  | { type: 'config.geminiOauthClear'; payload: Record<string, never> }
+  | { type: 'config.codexOauthLogin'; payload: Record<string, never> }
+  | { type: 'config.codexOauthClear'; payload: Record<string, never> };
 
 // Sandbox setup types (app startup)
 export type SandboxSetupPhase = 
@@ -548,7 +552,8 @@ export type ServerEvent =
   | { type: 'test.output'; payload: { stream: 'stdout' | 'stderr'; text: string } }
   | { type: 'test.complete'; payload: unknown }
   | { type: 'test.cancelled'; payload: null }
-  | { type: 'gui.action'; payload: GuiActionEvent };
+  | { type: 'gui.action'; payload: GuiActionEvent }
+  | { type: 'panic-stop'; payload: Record<string, never> };
 
 // Computer Use overlay events (Claude Cowork parity Phase 2 step 13)
 export interface GuiActionEvent {

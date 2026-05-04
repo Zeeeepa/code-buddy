@@ -45,6 +45,7 @@ interface EngineStreamEvent {
     output?: string;
     isError?: boolean;
     delta?: string;
+    data?: unknown;
   };
   tokenCount?: number;
   cost?: { inputTokens: number; outputTokens: number; totalCost: number };
@@ -244,7 +245,7 @@ export class CodeBuddyEngineRunner {
                     event.tool.id,
                     event.tool.name,
                     event.tool.input,
-                    event.tool.output
+                    event.tool.data
                   );
                 }
               }
@@ -503,6 +504,8 @@ function isGuiOperateTool(name: string): boolean {
   return (
     lower === 'gui_operate' ||
     lower === 'computer' ||
+    lower === 'gui_control' ||
+    lower === 'computer_control' ||
     lower.includes('screenshot') ||
     lower.includes('gui_') ||
     lower.startsWith('computer_') ||
@@ -511,33 +514,21 @@ function isGuiOperateTool(name: string): boolean {
 }
 
 /**
- * Extract a screenshot data URI / file path from a tool output blob.
- * Supports: base64 data URIs, JSON with `screenshot`/`image` fields,
- * absolute file paths ending in image extensions.
+ * Extract a screenshot data URI / file path from a tool output data blob.
+ * Supports: base64 data URIs, JSON with `screenshot`/`image` fields.
  */
-function extractScreenshotFromOutput(output: string | undefined): string | undefined {
-  if (!output) return undefined;
-  // Inline data URI
-  const dataUriMatch = output.match(/data:image\/[a-zA-Z]+;base64,[A-Za-z0-9+/=]+/);
-  if (dataUriMatch) return dataUriMatch[0];
-  // JSON output
-  try {
-    const parsed = JSON.parse(output);
-    if (parsed && typeof parsed === 'object') {
-      const obj = parsed as Record<string, unknown>;
-      const candidate = obj.screenshot ?? obj.image ?? obj.imagePath ?? obj.screenshotPath;
-      if (typeof candidate === 'string' && candidate.length > 0) {
-        return candidate;
-      }
+function extractScreenshotFromData(data: unknown): string | undefined {
+  if (!data || typeof data !== 'object') return undefined;
+  const obj = data as Record<string, unknown>;
+  const candidate = obj.screenshot ?? obj.image ?? obj.imagePath ?? obj.screenshotPath;
+  if (typeof candidate === 'string' && candidate.length > 0) {
+    if (!candidate.startsWith('data:image/') && !candidate.startsWith('file://')) {
+       if (/^[A-Za-z0-9+/=]+$/.test(candidate.substring(0, 50))) {
+         return `data:image/png;base64,${candidate}`;
+       }
     }
-  } catch {
-    /* not JSON */
+    return candidate;
   }
-  // Absolute file path ending with image extension
-  const pathMatch = output.match(/[A-Za-z]:[\\/][^\s"']+\.(?:png|jpg|jpeg|webp)/i);
-  if (pathMatch) return pathMatch[0];
-  const unixPathMatch = output.match(/\/[^\s"']+\.(?:png|jpg|jpeg|webp)/i);
-  if (unixPathMatch) return unixPathMatch[0];
   return undefined;
 }
 
@@ -547,7 +538,7 @@ function emitGuiActionEvent(
   toolUseId: string,
   toolName: string,
   rawInput: string | undefined,
-  rawOutput: string | undefined
+  data: unknown
 ): void {
   let input: Record<string, unknown> = {};
   if (rawInput) {
@@ -571,7 +562,7 @@ function emitGuiActionEvent(
       toolUseId,
       action,
       toolName,
-      screenshot: extractScreenshotFromOutput(rawOutput),
+      screenshot: extractScreenshotFromData(data),
       click,
       details: input,
       timestamp: Date.now(),

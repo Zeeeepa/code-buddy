@@ -12,7 +12,7 @@
  * Dependencies: session-manager, config-store, mcp-manager, sandbox-adapter,
  *               skills-manager, scheduled-task-manager, nav-server, remote-manager
  */
-import { app, BrowserWindow, ipcMain, dialog, shell, Menu, nativeTheme, Tray } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, Menu, nativeTheme, Tray, globalShortcut } from 'electron';
 import { join, resolve, dirname, isAbsolute, basename } from 'path';
 import * as fs from 'fs';
 import { execFileSync } from 'child_process';
@@ -124,6 +124,8 @@ import {
 } from './utils/logger';
 import { listRecentWorkspaceFiles } from './utils/recent-workspace-files';
 import { buildDiagnosticsSummary } from './utils/diagnostics-summary';
+import { getGeminiOauthTokens, clearGeminiCredentials } from '../../../src/providers/gemini-oauth';
+import { getCodexOauthTokens, clearCodexCredentials } from '../../../src/providers/codex-oauth';
 
 // Current working directory (persisted between sessions)
 let currentWorkingDir: string | null = null;
@@ -591,6 +593,19 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+  });
+
+  // Register Panic Stop Shortcut
+  mainWindow.on('focus', () => {
+    globalShortcut.register('CommandOrControl+Alt+S', () => {
+      logWarn('[App] Panic Stop shortcut triggered!');
+      if (mainWindow) {
+        sendToRenderer({ type: 'panic-stop', payload: {} });
+      }
+    });
+  });
+  mainWindow.on('blur', () => {
+    globalShortcut.unregister('CommandOrControl+Alt+S');
   });
 
   // Notify renderer about config status after window is ready
@@ -1528,6 +1543,47 @@ ipcMain.handle('config.switchModel', async (_event, model: string) => {
     return true;
   } catch {
     return false;
+  }
+});
+
+// ── Gemini OAuth IPC handlers ─────────────────────────────────────────
+ipcMain.handle('config.geminiOauthLogin', async () => {
+  try {
+    const tokens = await getGeminiOauthTokens(true);
+    return { success: true, tokens };
+  } catch (err: any) {
+    logError('[IPC] Gemini OAuth Login failed:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('config.geminiOauthClear', async () => {
+  try {
+    await clearGeminiCredentials();
+    return { success: true };
+  } catch (err: any) {
+    logError('[IPC] Gemini OAuth Clear failed:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('config.codexOauthLogin', async () => {
+  try {
+    const tokens = await getCodexOauthTokens(true);
+    return { success: true, tokens };
+  } catch (err: any) {
+    logError('[IPC] Codex OAuth Login failed:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('config.codexOauthClear', async () => {
+  try {
+    clearCodexCredentials();
+    return { success: true };
+  } catch (err: any) {
+    logError('[IPC] Codex OAuth Clear failed:', err);
+    return { success: false, error: err.message };
   }
 });
 
