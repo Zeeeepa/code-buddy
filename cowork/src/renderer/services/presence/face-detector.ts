@@ -1,6 +1,12 @@
 /**
  * Face Detector — MediaPipe BlazeFace.
  *
+ * **Renderer-side only.** MediaPipe Tasks Vision relies on
+ * `HTMLVideoElement` / WebGL / `tasks-vision-wasm` which only exist in
+ * the Chromium renderer process, not in the Node main process. The
+ * recognition step (encoding the cropped face into an embedding) lives
+ * in the main process via `face-recognizer.ts` and `onnxruntime-node`.
+ *
  * Adapted from Lisa `packages/vision-engine/src/FaceDetector.ts` (MIT,
  * original by Patrice Huetz). Adaptations vs Lisa version:
  * - Lazy-loads `@mediapipe/tasks-vision` so the bundle stays light when
@@ -8,13 +14,12 @@
  * - Allows passing a local WASM path (Cowork ships offline; defaulting to
  *   the CDN works for dev but isn't acceptable for a packaged Electron app).
  * - Allows passing a local model path (same reason).
- * - Returns the same `FaceDetection` shape we use in `presence-store` and
- *   `presence-bridge`, defined in `./types.ts`.
+ * - Returns the shared `FaceDetection` type from `cowork/shared/presence/types`.
  *
- * @module cowork/main/presence/face-detector
+ * @module cowork/renderer/services/presence/face-detector
  */
 
-import type { FaceDetection } from './types';
+import type { FaceDetection } from '../../../shared/presence/types';
 
 /**
  * Default MediaPipe assets URLs. Acceptable for `npm run dev` but at

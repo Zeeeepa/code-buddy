@@ -20,7 +20,7 @@ import type {
   FaceEmbedding,
   PersonIdentity,
   PresenceMatch,
-} from './types';
+} from '../../shared/presence/types';
 
 /** Filename inside `app.getPath('userData')`. */
 const STORE_FILENAME = 'presence-store.json';

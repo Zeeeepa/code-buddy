@@ -31,12 +31,12 @@ import { EventEmitter } from 'events';
 import { ipcMain } from 'electron';
 import { log, logError } from '../utils/logger';
 import { getPresenceStore } from './presence-store';
+import { getFaceRecognizer } from './face-recognizer';
 import type {
-  FaceEmbedding,
   PersonIdentity,
   PresenceEvent,
   PresenceMatch,
-} from './types';
+} from '../../shared/presence/types';
 
 /**
  * IPC payloads — kept narrow to make the renderer↔main contract obvious.
@@ -58,6 +58,16 @@ export interface AddSamplePayload {
 export interface MatchPayload {
   embedding: number[];
   threshold?: number;
+}
+
+/**
+ * Renderer ships the cropped, resized 112×112 RGB face bytes; main runs
+ * Buffalo_S to encode them. The byte length must be exactly
+ * `112 * 112 * 3 = 37632`. Sent over IPC as a regular number[] so the
+ * structured clone protocol doesn't choke.
+ */
+export interface EncodePayload {
+  rgbBytes: number[];
 }
 
 /**
@@ -104,6 +114,16 @@ export class PresenceBridge extends EventEmitter {
       const store = getPresenceStore();
       const embedding = Float32Array.from(payload.embedding);
       return store.addFaceSample(payload.personId, embedding, payload.snapshotPath);
+    });
+
+    ipcMain.handle('presence:encode', async (_event, payload: EncodePayload): Promise<number[]> => {
+      const recognizer = getFaceRecognizer();
+      if (!recognizer.isReady()) {
+        await recognizer.initialize();
+      }
+      const rgbBytes = Uint8Array.from(payload.rgbBytes);
+      const embedding = await recognizer.encode(rgbBytes);
+      return Array.from(embedding);
     });
 
     ipcMain.handle('presence:match', async (_event, payload: MatchPayload): Promise<PresenceMatch | null> => {
@@ -192,6 +212,7 @@ export class PresenceBridge extends EventEmitter {
     this.removeAllListeners();
     ipcMain.removeHandler('presence:enroll');
     ipcMain.removeHandler('presence:add-sample');
+    ipcMain.removeHandler('presence:encode');
     ipcMain.removeHandler('presence:match');
     ipcMain.removeHandler('presence:list');
     ipcMain.removeHandler('presence:remove');
