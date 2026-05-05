@@ -61,23 +61,39 @@ and `onnxruntime-node` (native binding ~30 MB).
 Buffalo_S is the small variant of InsightFace's ArcFace family. ~13 MB,
 512-dim embedding output, 112×112 RGB input.
 
-**Two paths, both surfaced in `ModelInstallDialog` the first time the
-user clicks "Enroll":**
+**Three paths, in order of preference:**
 
-1. **In-app download** (recommended) — the dialog pre-fills a public
-   HuggingFace mirror URL, the user confirms, the model is streamed to
-   `<userData>/models/buffalo_s.onnx` with a progress bar. The URL is
-   editable so any public `.onnx` mirror works. Magic byte (`0x08`) and
-   size (5–50 MB) are validated; the file is written atomically via
-   `.tmp` + rename. No silent network calls — the user always clicks
-   "Télécharger" first.
+1. **In-app download** (recommended) — `ModelInstallDialog` is surfaced
+   the first time the user clicks "Enroll". The dialog pre-fills a
+   public HuggingFace mirror URL, the user confirms, the model is
+   streamed to `<userData>/models/buffalo_s.onnx` with a progress bar.
+   The URL is editable so any public `.onnx` mirror works. Magic byte
+   (`0x08`) and size (5–50 MB) are validated; the file is written
+   atomically via `.tmp` + rename. No silent network calls — the user
+   always clicks "Télécharger" first.
 
-2. **Local file** — if the user has already downloaded the model
-   (e.g. from
+2. **Helper scripts (CLI)** — pre-flight install before Enrollment:
+
+   ```powershell
+   # Windows
+   powershell -ExecutionPolicy Bypass -File cowork\scripts\download-buffalo-s.ps1
+   ```
+
+   ```bash
+   # macOS / Linux
+   bash cowork/scripts/download-buffalo-s.sh
+   ```
+
+   The scripts are idempotent (skip download if a valid file is already
+   there) and create the target directory if missing. Useful in CI or
+   for ops handing pre-provisioned machines to users.
+
+3. **Local file picker** — `ModelInstallDialog` also exposes a "Choose
+   file" button. If the user already downloaded the model (e.g. from
    https://github.com/deepinsight/insightface/tree/master/python-package),
-   they can pick the `.onnx` from disk. Same validation pipeline.
+   they can point to the `.onnx` directly. Same validation pipeline.
 
-The cross-platform install path:
+**Cross-platform install path** (where all three methods write):
 - **Windows**: `%APPDATA%\codebuddy-cowork\models\buffalo_s.onnx`
 - **macOS**: `~/Library/Application Support/codebuddy-cowork/models/buffalo_s.onnx`
 - **Linux**: `~/.config/codebuddy-cowork/models/buffalo_s.onnx`
