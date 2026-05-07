@@ -4,6 +4,18 @@
 import type { ChatCompletionChunk } from 'openai/resources/chat';
 import { CodeBuddyClient } from '../../src/codebuddy/client.js';
 import type { CodeBuddyTool, CodeBuddyMessage } from '../../src/codebuddy/client.js';
+import type { GeminiNativeProvider } from '../../src/codebuddy/providers/provider-gemini-native.js';
+
+/**
+ * `buildGeminiBody` and `parseGeminiSSE` moved out of `CodeBuddyClient`
+ * into `GeminiNativeProvider` (Vague 2 Phase B). These tests reach
+ * through the dispatcher to exercise them directly.
+ */
+function geminiProvider(client: CodeBuddyClient): Record<string, Function> {
+  const inner = (client as unknown as { geminiProvider: GeminiNativeProvider }).geminiProvider;
+  if (!inner) throw new Error('CodeBuddyClient did not instantiate the Gemini native provider');
+  return inner as unknown as Record<string, Function>;
+}
 
 jest.mock('../../src/utils/logger.js', () => ({
   logger: {
@@ -114,7 +126,7 @@ describe('Gemini SSE Streaming', () => {
       ];
 
       // Access private method via casting
-      const body = (client as unknown as Record<string, Function>).buildGeminiBody(messages);
+      const body = geminiProvider(client).buildGeminiBody(messages);
 
       expect(body.contents).toBeDefined();
       expect(Array.isArray(body.contents)).toBe(true);
@@ -133,7 +145,7 @@ describe('Gemini SSE Streaming', () => {
         { role: 'user', content: 'Hello' },
       ];
 
-      const body = (client as unknown as Record<string, Function>).buildGeminiBody(messages);
+      const body = geminiProvider(client).buildGeminiBody(messages);
 
       expect(body.systemInstruction).toEqual({
         parts: [{ text: 'You are helpful.' }],
@@ -146,7 +158,7 @@ describe('Gemini SSE Streaming', () => {
         { role: 'user', content: 'Hello' },
       ];
 
-      const body = (client as unknown as Record<string, Function>).buildGeminiBody(
+      const body = geminiProvider(client).buildGeminiBody(
         messages, undefined, { temperature: 0.5 }
       );
 
@@ -162,7 +174,7 @@ describe('Gemini SSE Streaming', () => {
         { role: 'user', content: 'Read test.txt' },
       ];
 
-      const body = (client as unknown as Record<string, Function>).buildGeminiBody(
+      const body = geminiProvider(client).buildGeminiBody(
         messages, [sampleTool]
       );
 
@@ -192,7 +204,7 @@ describe('Gemini SSE Streaming', () => {
         { role: 'tool', tool_call_id: 'call_1', content: 'file contents here' },
       ];
 
-      const body = (client as unknown as Record<string, Function>).buildGeminiBody(messages);
+      const body = geminiProvider(client).buildGeminiBody(messages);
 
       const contents = body.contents as Array<{ role: string; parts: unknown[] }>;
       // user, model (with functionCall), function (response)
@@ -217,7 +229,7 @@ describe('Gemini SSE Streaming', () => {
         { role: 'user', content: 'Ok' },
       ];
 
-      const body = (client as unknown as Record<string, Function>).buildGeminiBody(messages);
+      const body = geminiProvider(client).buildGeminiBody(messages);
 
       const contents = body.contents as Array<{ role: string; parts: unknown[] }>;
       expect(contents[0].role).toBe('user');
@@ -229,7 +241,7 @@ describe('Gemini SSE Streaming', () => {
         { role: 'user', content: 'Hello' },
       ];
 
-      const body = (client as unknown as Record<string, Function>).buildGeminiBody(messages);
+      const body = geminiProvider(client).buildGeminiBody(messages);
 
       expect(body.tools).toBeUndefined();
       expect(body.toolConfig).toBeUndefined();
@@ -244,7 +256,7 @@ describe('Gemini SSE Streaming', () => {
       const stream = createSSEStream([payload]);
       const reader = stream.getReader();
 
-      const parse = (client as unknown as Record<string, Function>).parseGeminiSSE(reader);
+      const parse = geminiProvider(client).parseGeminiSSE(reader);
       const results: unknown[] = [];
       for await (const item of parse) {
         results.push(item);
@@ -265,7 +277,7 @@ describe('Gemini SSE Streaming', () => {
       const reader = stream.getReader();
 
       const results: unknown[] = [];
-      for await (const item of (client as unknown as Record<string, Function>).parseGeminiSSE(reader)) {
+      for await (const item of geminiProvider(client).parseGeminiSSE(reader)) {
         results.push(item);
       }
 
@@ -285,7 +297,7 @@ describe('Gemini SSE Streaming', () => {
       const reader = stream.getReader();
 
       const results: unknown[] = [];
-      for await (const item of (client as unknown as Record<string, Function>).parseGeminiSSE(reader)) {
+      for await (const item of geminiProvider(client).parseGeminiSSE(reader)) {
         results.push(item);
       }
 
@@ -303,7 +315,7 @@ describe('Gemini SSE Streaming', () => {
       const reader = stream.getReader();
 
       const results: unknown[] = [];
-      for await (const item of (client as unknown as Record<string, Function>).parseGeminiSSE(reader)) {
+      for await (const item of geminiProvider(client).parseGeminiSSE(reader)) {
         results.push(item);
       }
 
@@ -328,7 +340,7 @@ describe('Gemini SSE Streaming', () => {
       const reader = stream.getReader();
 
       const results: unknown[] = [];
-      for await (const item of (client as unknown as Record<string, Function>).parseGeminiSSE(reader)) {
+      for await (const item of geminiProvider(client).parseGeminiSSE(reader)) {
         results.push(item);
       }
 
@@ -346,7 +358,7 @@ describe('Gemini SSE Streaming', () => {
       const reader = stream.getReader();
 
       const results: unknown[] = [];
-      for await (const item of (client as unknown as Record<string, Function>).parseGeminiSSE(reader)) {
+      for await (const item of geminiProvider(client).parseGeminiSSE(reader)) {
         results.push(item);
       }
 

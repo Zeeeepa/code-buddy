@@ -112,6 +112,17 @@ export interface ChatOptions {
   /** tool_choice override for this request */
   tool_choice?: 'auto' | 'none' | 'required';
   /**
+   * Enable Gemini's native server-side Google Search grounding for this
+   * request. Only affects the GeminiNativeProvider — ignored by the
+   * OpenAI-compat path. When on, the response includes citation metadata
+   * which we surface as a "Sources:" footer in the assistant content.
+   *
+   * Defaults to the provider-level default (set via
+   * `setDefaultGoogleSearch` or env var `GEMINI_GOOGLE_SEARCH=1`).
+   * Pass `false` here to force off even when the default is on.
+   */
+  googleSearch?: boolean;
+  /**
    * Mid-stream retry on network errors (ECONNRESET, "socket hang up",
    * undici stream terminated, etc.). Wraps `chatStream()` with the
    * `withStreamRetry` helper.
@@ -162,6 +173,7 @@ export class CodeBuddyClient {
   private geminiRequestTimeoutMs: number;
   private circuitBreakerConfig: Partial<CircuitBreakerConfig> | undefined;
   private defaultThinkingLevel: GeminiThinkingLevel | undefined;
+  private defaultGoogleSearch: boolean | undefined;
   /** Strategy for native Gemini API calls — non-null only when isGeminiProvider. */
   private geminiProvider: GeminiNativeProvider | null = null;
   /** Strategy for OpenAI-compat backends — non-null only when NOT isGeminiProvider. */
@@ -179,6 +191,17 @@ export class CodeBuddyClient {
     this.defaultThinkingLevel = level;
     this.geminiProvider?.setDefaultThinkingLevel(level);
     logger.debug('Default Gemini thinkingLevel set from settings', { level });
+  }
+
+  /**
+   * Enable Gemini's native server-side Google Search grounding by default
+   * for every request through this client. Per-call `ChatOptions.googleSearch`
+   * still takes precedence (including `false` to force off).
+   */
+  setDefaultGoogleSearch(enabled: boolean): void {
+    this.defaultGoogleSearch = enabled;
+    this.geminiProvider?.setDefaultGoogleSearch(enabled);
+    logger.debug('Default Gemini googleSearch grounding set', { enabled });
   }
 
   setCircuitBreakerConfig(config: Partial<CircuitBreakerConfig>): void {
@@ -213,6 +236,12 @@ export class CodeBuddyClient {
         ? envGeminiTimeout
         : 60000;
 
+    // Env var opt-in for default Google Search grounding (only meaningful
+    // for Gemini-native; OpenAI-compat path ignores it).
+    if (process.env.GEMINI_GOOGLE_SEARCH === '1') {
+      this.defaultGoogleSearch = true;
+    }
+
     const envMax = Number(process.env.CODEBUDDY_MAX_TOKENS);
     if (Number.isFinite(envMax) && envMax > 0) {
       this.defaultMaxTokens = envMax;
@@ -232,6 +261,7 @@ export class CodeBuddyClient {
         defaultMaxTokens: this.defaultMaxTokens,
         geminiRequestTimeoutMs: this.geminiRequestTimeoutMs,
         defaultThinkingLevel: this.defaultThinkingLevel,
+        defaultGoogleSearch: this.defaultGoogleSearch,
       });
     } else {
       this.openaiCompatProvider = new OpenAICompatProvider({
