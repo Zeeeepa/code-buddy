@@ -1,4 +1,4 @@
-import { Minus, Square, X, Copy, Bell, Activity, Star, BarChart3, Focus, Sparkles, Network } from 'lucide-react';
+import { Minus, Square, X, Copy, Bell, Activity, Star, BarChart3, Focus, Sparkles, Network, Users } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../store';
@@ -66,6 +66,16 @@ export function Titlebar() {
         aria-label="Open fleet panel"
       >
         <Network className="w-4 h-4 text-text-secondary" />
+      </button>
+
+      {/* Team panel — Agent Teams (Phase 4 layer 9) */}
+      <button
+        onClick={() => useAppStore.getState().setShowTeamPanel(true)}
+        className="w-10 h-full flex items-center justify-center titlebar-no-drag hover:bg-surface transition-colors"
+        title="Agent Team"
+        aria-label="Open team panel"
+      >
+        <Users className="w-4 h-4 text-text-secondary" />
       </button>
 
       {/* Bookmarks panel (Phase 3 step 4) */}

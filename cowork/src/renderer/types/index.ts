@@ -528,6 +528,63 @@ export interface FleetEventRecord {
   agentId?: string;
 }
 
+// Agent Team (Phase 4 layer 9) — observed via TeamBridge events
+export type TeamStatusValue = 'inactive' | 'active' | 'paused' | 'dissolved';
+export type TeamMemberStatus = 'idle' | 'working' | 'done' | 'error';
+export type TeamTaskStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
+export type TeamTaskPriority = 'low' | 'medium' | 'high';
+
+export interface TeamMember {
+  id: string;
+  role: string;
+  label: string;
+  status: TeamMemberStatus;
+  currentTaskId: string | null;
+  completedTasks: number;
+  joinedAt: string;
+}
+
+export interface TeamTask {
+  id: string;
+  title: string;
+  description: string;
+  status: TeamTaskStatus;
+  priority: TeamTaskPriority;
+  assignedTo: string | null;
+  assignedRole: string | null;
+  dependencies: string[];
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+  result?: string;
+  error?: string;
+}
+
+export interface TeamMailboxMessage {
+  id: string;
+  from: string;
+  to: string;
+  content: string;
+  timestamp: string;
+  read: boolean;
+}
+
+export interface TeamSnapshot {
+  status: TeamStatusValue;
+  goal: string;
+  memberCount: number;
+  members: TeamMember[];
+  taskSummary: {
+    total: number;
+    pending: number;
+    inProgress: number;
+    completed: number;
+    failed: number;
+  };
+  unreadMessages: number;
+  uptime: string;
+}
+
 // A2A active task tracking — GAP 1
 export type A2ATaskStatus =
   | 'submitted'
@@ -597,6 +654,10 @@ export type ServerEvent =
   | { type: 'fleet.peer.update'; payload: { peer: FleetPeer } }
   | { type: 'fleet.event'; payload: FleetEventRecord }
   | { type: 'a2a.task.update'; payload: A2ATask }
+  | { type: 'team.update'; payload: { event: 'started' | 'stopped'; leadId?: string; goal?: string; stats?: { memberCount: number; completedTasks: number; totalTasks: number }; snapshot: TeamSnapshot } }
+  | { type: 'team.member.update'; payload: { event: 'added'; member: TeamMember } | { event: 'removed'; memberId: string; role: string } }
+  | { type: 'team.task.update'; payload: { event: 'added' | 'updated'; task: TeamTask } | { event: 'assigned'; taskId: string; memberId: string; role: string } }
+  | { type: 'team.message'; payload: TeamMailboxMessage }
   | { type: 'notification.message'; payload: { notification: NotificationEntry } }
   | { type: 'identity.updated'; payload: unknown[] }
   | { type: 'identity.activated'; payload: unknown | null }

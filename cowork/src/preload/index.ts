@@ -1216,6 +1216,43 @@ contextBridge.exposeInMainWorld('electronAPI', {
     > => ipcRenderer.invoke('a2a.listTasks'),
   },
 
+  // Team — Agent Teams (Phase 4 layer 9)
+  team: {
+    getStatus: (): Promise<unknown> => ipcRenderer.invoke('team.getStatus'),
+    start: (goal?: string): Promise<{ success: boolean; leadId?: string; message: string }> =>
+      ipcRenderer.invoke('team.start', goal),
+    stop: (): Promise<{ success: boolean; message: string }> =>
+      ipcRenderer.invoke('team.stop'),
+    addMember: (
+      role: string,
+      label?: string
+    ): Promise<{ success: boolean; memberId?: string; message: string }> =>
+      ipcRenderer.invoke('team.addMember', { role, label }),
+    removeMember: (memberId: string): Promise<{ success: boolean; message: string }> =>
+      ipcRenderer.invoke('team.removeMember', memberId),
+    addTask: (input: {
+      title: string;
+      description: string;
+      priority?: string;
+      assignedRole?: string;
+      dependencies?: string[];
+    }): Promise<unknown> => ipcRenderer.invoke('team.addTask', input),
+    updateTask: (
+      taskId: string,
+      updates: { status?: string; assignedTo?: string; result?: string; error?: string }
+    ): Promise<{ success: boolean; message: string }> =>
+      ipcRenderer.invoke('team.updateTask', { taskId, updates }),
+    assignTask: (
+      taskId: string,
+      memberId: string
+    ): Promise<{ success: boolean; message: string }> =>
+      ipcRenderer.invoke('team.assignTask', { taskId, memberId }),
+    sendMessage: (from: string, to: string, content: string): Promise<unknown> =>
+      ipcRenderer.invoke('team.sendMessage', { from, to, content }),
+    getInbox: (memberId: string, limit?: number): Promise<unknown[]> =>
+      ipcRenderer.invoke('team.getInbox', { memberId, limit }),
+  },
+
   // Fleet — multi-host Code Buddy listener (GAP 3)
   fleet: {
     list: (): Promise<
@@ -2637,6 +2674,35 @@ declare global {
             agentId?: string;
           }>
         >;
+      };
+      team: {
+        getStatus: () => Promise<unknown>;
+        start: (
+          goal?: string
+        ) => Promise<{ success: boolean; leadId?: string; message: string }>;
+        stop: () => Promise<{ success: boolean; message: string }>;
+        addMember: (
+          role: string,
+          label?: string
+        ) => Promise<{ success: boolean; memberId?: string; message: string }>;
+        removeMember: (memberId: string) => Promise<{ success: boolean; message: string }>;
+        addTask: (input: {
+          title: string;
+          description: string;
+          priority?: string;
+          assignedRole?: string;
+          dependencies?: string[];
+        }) => Promise<unknown>;
+        updateTask: (
+          taskId: string,
+          updates: { status?: string; assignedTo?: string; result?: string; error?: string }
+        ) => Promise<{ success: boolean; message: string }>;
+        assignTask: (
+          taskId: string,
+          memberId: string
+        ) => Promise<{ success: boolean; message: string }>;
+        sendMessage: (from: string, to: string, content: string) => Promise<unknown>;
+        getInbox: (memberId: string, limit?: number) => Promise<unknown[]>;
       };
       reasoning: {
         listTraces: () => Promise<

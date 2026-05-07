@@ -49,6 +49,7 @@ import { EnrollmentDialog } from './components/EnrollmentDialog';
 import { ModelInstallDialog } from './components/ModelInstallDialog';
 import { OrchestratorLauncher } from './components/OrchestratorLauncher';
 import { FleetPanel } from './components/FleetPanel';
+import { TeamPanel } from './components/TeamPanel';
 import { PresenceService } from './services/presence/PresenceService';
 import type { AppConfig } from './types';
 import type { GlobalNoticeAction } from './store';
@@ -540,6 +541,9 @@ function App() {
 
       {/* Fleet panel — multi-host Code Buddy listener (GAP 3) */}
       <FleetPanel />
+
+      {/* Team panel — Agent Teams (Phase 4 layer 9) */}
+      <TeamPanel />
     </div>
   );
 }

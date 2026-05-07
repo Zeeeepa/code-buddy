@@ -22,6 +22,10 @@ import type {
   FleetPeer,
   FleetEventRecord,
   A2ATask,
+  TeamSnapshot,
+  TeamMember,
+  TeamTask,
+  TeamMailboxMessage,
 } from '../types';
 import { applySessionUpdate } from '../utils/session-update';
 
@@ -258,6 +262,13 @@ interface AppState {
   // A2A active tasks (GAP 1)
   a2aTasks: Record<string, A2ATask>;
 
+  // Agent Teams — Phase 4 layer 9
+  team: TeamSnapshot | null;
+  teamMembers: Record<string, TeamMember>;
+  teamTasks: Record<string, TeamTask>;
+  teamMailbox: TeamMailboxMessage[];
+  showTeamPanel: boolean;
+
   // Notifications (Claude Cowork parity)
   notifications: NotificationEntry[];
   showNotificationCenter: boolean;
@@ -438,6 +449,14 @@ interface AppState {
   upsertA2ATask: (task: A2ATask) => void;
   removeA2ATask: (taskId: string) => void;
 
+  // Team actions
+  setTeamSnapshot: (snapshot: TeamSnapshot | null) => void;
+  upsertTeamMember: (member: TeamMember) => void;
+  removeTeamMember: (memberId: string) => void;
+  upsertTeamTask: (task: TeamTask) => void;
+  appendTeamMessage: (msg: TeamMailboxMessage) => void;
+  setShowTeamPanel: (show: boolean) => void;
+
   // Notification actions
   addNotification: (notification: NotificationEntry) => void;
   markNotificationRead: (notificationId: string) => void;
@@ -592,6 +611,11 @@ export const useAppStore = create<AppState>((set) => ({
   fleetEvents: [],
   showFleetPanel: false,
   a2aTasks: {},
+  team: null,
+  teamMembers: {},
+  teamTasks: {},
+  teamMailbox: [],
+  showTeamPanel: false,
   notifications: [],
   showNotificationCenter: false,
 
@@ -1265,6 +1289,40 @@ export const useAppStore = create<AppState>((set) => ({
       const { [taskId]: _dropped, ...rest } = state.a2aTasks;
       return { a2aTasks: rest };
     }),
+
+  // Team actions (Phase 4 layer 9)
+  setTeamSnapshot: (snapshot) =>
+    set(() => {
+      if (!snapshot) {
+        return { team: null, teamMembers: {}, teamTasks: {}, teamMailbox: [] };
+      }
+      const members = snapshot.members.reduce<Record<string, TeamMember>>((acc, m) => {
+        acc[m.id] = m;
+        return acc;
+      }, {});
+      return { team: snapshot, teamMembers: members };
+    }),
+  upsertTeamMember: (member) =>
+    set((state) => ({
+      teamMembers: { ...state.teamMembers, [member.id]: member },
+    })),
+  removeTeamMember: (memberId) =>
+    set((state) => {
+      const { [memberId]: _dropped, ...rest } = state.teamMembers;
+      return { teamMembers: rest };
+    }),
+  upsertTeamTask: (task) =>
+    set((state) => ({
+      teamTasks: { ...state.teamTasks, [task.id]: task },
+    })),
+  appendTeamMessage: (msg) =>
+    set((state) => {
+      const next = [...state.teamMailbox, msg];
+      const TEAM_MAILBOX_RING = 200;
+      while (next.length > TEAM_MAILBOX_RING) next.shift();
+      return { teamMailbox: next };
+    }),
+  setShowTeamPanel: (show) => set({ showTeamPanel: show }),
   clearSubAgents: (sessionId) =>
     set((state) => {
       const { [sessionId]: _dropped, ...rest } = state.subAgents;

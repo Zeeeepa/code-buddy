@@ -21,6 +21,7 @@ import { registerProjectIpcHandlers } from './ipc/project-ipc';
 import { registerSubAgentIpcHandlers } from './ipc/subagent-ipc';
 import { registerOrchestratorIpcHandlers } from './ipc/orchestrator-ipc';
 import { registerFleetIpcHandlers } from './ipc/fleet-ipc';
+import { registerTeamIpcHandlers } from './ipc/team-ipc';
 import { registerMentionIpcHandlers } from './ipc/mention-ipc';
 import { registerCommandIpcHandlers } from './ipc/command-ipc';
 import { registerSkillMdIpcHandlers } from './ipc/skill-md-ipc';
@@ -36,6 +37,7 @@ import { ProjectMemoryService } from './project/project-memory';
 import { SubAgentBridge } from './agent/sub-agent-bridge';
 import { OrchestratorBridge } from './agent/orchestrator-bridge';
 import { FleetBridge } from './fleet/fleet-bridge';
+import { TeamBridge } from './agent/team-bridge';
 import { MentionProcessor } from './input/mention-processor';
 import { SlashCommandBridge } from './commands/slash-command-bridge';
 import { SkillMdBridge } from './skills/skill-md-bridge';
@@ -162,6 +164,7 @@ let projectManager: ProjectManager | null = null;
 let subAgentBridge: SubAgentBridge | null = null;
 let orchestratorBridge: OrchestratorBridge | null = null;
 let fleetBridge: FleetBridge | null = null;
+let teamBridge: TeamBridge | null = null;
 let mentionProcessor: MentionProcessor | null = null;
 let slashCommandBridge: SlashCommandBridge | null = null;
 let skillMdBridge: SkillMdBridge | null = null;
@@ -969,6 +972,10 @@ app
     fleetBridge = new FleetBridge(sendToRenderer);
     void fleetBridge.init();
 
+    // Initialize team bridge — Phase 4 layer 9 (Agent Teams observability)
+    teamBridge = new TeamBridge(sendToRenderer);
+    void teamBridge.init();
+
     // Initialize A2A bridge with sendToRenderer so async task updates
     // (GAP 1 polling) can reach the renderer. Lazy `getA2ABridge()` calls
     // elsewhere will return this instance.
@@ -1669,6 +1676,9 @@ registerOrchestratorIpcHandlers(orchestratorBridge);
 
 // ── Fleet IPC handlers (GAP 3 — multi-host Code Buddy listener) ──────
 registerFleetIpcHandlers(fleetBridge);
+
+// ── Team IPC handlers (Phase 4 layer 9 — Agent Teams observability) ──
+registerTeamIpcHandlers(teamBridge);
 
 // ── Mention IPC handlers (Claude Cowork parity) ──────────────────────
 registerMentionIpcHandlers(mentionProcessor);

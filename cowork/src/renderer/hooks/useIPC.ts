@@ -409,6 +409,31 @@ export function useIPC() {
             store.upsertA2ATask(event.payload);
             break;
 
+          case 'team.update':
+            // Always refresh from snapshot — covers both started and stopped
+            store.setTeamSnapshot(event.payload.snapshot);
+            break;
+
+          case 'team.member.update':
+            if (event.payload.event === 'added') {
+              store.upsertTeamMember(event.payload.member);
+            } else {
+              store.removeTeamMember(event.payload.memberId);
+            }
+            break;
+
+          case 'team.task.update':
+            if (event.payload.event === 'added' || event.payload.event === 'updated') {
+              store.upsertTeamTask(event.payload.task);
+            }
+            // 'assigned' updates the task too — refetch via assignTask handler;
+            // the followup 'updated' event will carry the canonical task state
+            break;
+
+          case 'team.message':
+            store.appendTeamMessage(event.payload);
+            break;
+
           case 'notification.message':
             store.addNotification(event.payload.notification);
             break;
