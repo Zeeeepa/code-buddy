@@ -11,6 +11,7 @@
 
 import { Router } from 'express';
 import { asyncHandler, requireScope } from '../middleware/index.js';
+import { createRouteRateLimiter } from '../middleware/rate-limit.js';
 import {
   A2AAgentClient,
   A2AAgentServer,
@@ -18,6 +19,63 @@ import {
   createAgentCard,
   getTaskResult,
 } from '../../protocols/a2a/index.js';
+import { createCodeBuddyTaskExecutor } from '../../protocols/a2a/codebuddy-executor.js';
+import { initializeToolRegistry } from '../../codebuddy/tools.js';
+
+/**
+ * Code Buddy's local AgentCard. The skills declared here are the ONLY
+ * capabilities a remote peer can invoke against this instance via
+ * /tasks/send. They must stay in lockstep with the fleet-safe tool list
+ * (see `src/tools/metadata.ts:fleetSafe`) — declaring `code-edit` here
+ * while the executor only exposes read tools would be a dishonest card.
+ *
+ * Mutating skills (write/exec) intentionally NOT exposed in V1; they
+ * require an upgraded scope + per-peer quota that lives in the V2 backlog.
+ */
+function buildCodeBuddyAgentCard(): AgentCard {
+  return createAgentCard({
+    name: 'Code Buddy',
+    description:
+      'Multi-provider AI coding agent. A2A inbound surface is read-only: search, view, web fetch, codebase analysis, reasoning. Mutating skills (edit/exec) require an upgraded scope and are not exposed by default.',
+    skills: [
+      {
+        id: 'code-search',
+        name: 'Code search',
+        description: 'grep + symbol/reference lookup across the codebase',
+        inputModes: ['text/plain'],
+        outputModes: ['text/plain'],
+      },
+      {
+        id: 'code-read',
+        name: 'Code read',
+        description: 'view files and list directories',
+        inputModes: ['text/plain'],
+        outputModes: ['text/plain'],
+      },
+      {
+        id: 'codebase-analysis',
+        name: 'Codebase analysis',
+        description: 'graph + map + impact + bug-finder (static analysis only)',
+        inputModes: ['text/plain'],
+        outputModes: ['text/plain'],
+      },
+      {
+        id: 'web-query',
+        name: 'Web query',
+        description: 'web_search + web_fetch + firecrawl scraping',
+        inputModes: ['text/plain'],
+        outputModes: ['text/plain'],
+      },
+      {
+        id: 'reasoning',
+        name: 'Reasoning',
+        description: 'Tree-of-thought analysis on a problem (no host effects)',
+        inputModes: ['text/plain'],
+        outputModes: ['text/plain'],
+      },
+    ],
+  });
+}
 
 function getAgentServer(client: A2AAgentClient, name: string): A2AAgentServer | undefined {
   return (client as unknown as { agents: Map<string, A2AAgentServer> }).agents?.get(name);
@@ -53,19 +111,39 @@ export function createA2AProtocolRoutes(): Router {
   const router = Router();
   const client = new A2AAgentClient();
 
-  // Agent card discovery (well-known endpoint per A2A spec)
+  // Ensure the legacy ToolRegistry is populated before the inbound
+  // executor needs it. initializeToolRegistry() is idempotent — safe to
+  // call multiple times. Without this, getFleetSafeTools() returns []
+  // when a peer hits /tasks/send before any local code path has touched
+  // the registry.
+  try {
+    initializeToolRegistry();
+  } catch {
+    // Best-effort: tool registration failures shouldn't prevent the
+    // route from booting. The executor checks for empty tool lists and
+    // fails the task explicitly.
+  }
+
+  // Register Code Buddy itself as a local A2A agent so /tasks/send has
+  // a target. Without this, the agents Map stays empty and every
+  // submitTask resolves to a "not found" error.
+  const codebuddyCard = buildCodeBuddyAgentCard();
+  const codebuddyServer = new A2AAgentServer(codebuddyCard, createCodeBuddyTaskExecutor());
+  client.registerAgent('codebuddy', codebuddyServer);
+
+  // Agent card discovery (well-known endpoint per A2A spec). Returns the
+  // same card the inbound executor honors — keeps discovery and
+  // execution in lockstep.
   router.get('/.well-known/agent.json', (_req, res) => {
-    const hostCard = createAgentCard({
-      name: 'Code Buddy',
-      description: 'Multi-provider AI coding agent with specialized sub-agents',
-      skills: [
-        { id: 'code-edit', name: 'Code Editing', description: 'Edit and refactor code', inputModes: ['text/plain'], outputModes: ['text/plain'] },
-        { id: 'code-debug', name: 'Debugging', description: 'Find and fix bugs', inputModes: ['text/plain'], outputModes: ['text/plain'] },
-        { id: 'code-review', name: 'Code Review', description: 'Analyze code quality', inputModes: ['text/plain'], outputModes: ['text/plain'] },
-        { id: 'planning', name: 'Planning', description: 'Create and execute multi-step plans', inputModes: ['text/plain'], outputModes: ['text/plain'] },
-      ],
-    });
-    res.json(hostCard);
+    res.json(buildCodeBuddyAgentCard());
+  });
+
+  // Rate limit /tasks/send to protect the LLM provider quota and prevent
+  // a hostile peer from flooding. 10 req/min per auth subject is a
+  // conservative V1 default — tunable via env once we have telemetry.
+  const tasksSendLimiter = createRouteRateLimiter({
+    windowMs: 60_000,
+    maxRequests: 10,
   });
 
   // List registered agents (local in-process + remote cross-host)
@@ -87,7 +165,7 @@ export function createA2AProtocolRoutes(): Router {
   // Submit a task. Body accepts EITHER {agent} (Niveau 2 explicit routing)
   // OR {skill} (Niveau 3 auto-routing — hub finds matching spoke and delegates).
   // Both `message` is required regardless of routing mode.
-  router.post('/tasks/send', requireScope('admin'), asyncHandler(async (req, res) => {
+  router.post('/tasks/send', tasksSendLimiter, requireScope('admin'), asyncHandler(async (req, res) => {
     const { agent: agentName, skill: skillId, message } = req.body;
 
     if (!message) {

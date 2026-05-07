@@ -137,12 +137,17 @@ tool were locally-restricted, which is the safe default.
 
 ## What's NOT wired (next-session targets)
 
-1. **A2A inbound tool filtering.** The `TaskExecutor` registered with
-   `A2AAgentServer` (`src/protocols/a2a/index.ts:129`) currently accepts
-   any task. The change: when the server-side executor builds the tool
-   list visible to the peer-driven agent, call
-   `getFleetSafeTools()` instead of the full schema list. ~30 LOC, but
-   needs verification that nothing else upstream short-circuits this.
+1. ~~**A2A inbound tool filtering.**~~ ✅ **Done.** `createCodeBuddyTaskExecutor()`
+   in `src/protocols/a2a/codebuddy-executor.ts` now calls
+   `getFleetSafeTools()` and exposes only opted-in tools to the
+   peer-driven LLM. Wired into `src/server/routes/a2a-protocol.ts` on
+   route boot, with rate-limit (10 req/min) and audit log
+   `[a2a:inbound]`. AgentCard rectified to declare honest skills
+   (`code-search`, `code-read`, `codebase-analysis`, `web-query`,
+   `reasoning`) instead of misleading `code-edit` / `code-debug`. 8 unit
+   tests cover happy path, tool dispatch, hallucinated-tool defense,
+   turn cap, cost cap, fail-closed (no key / no tools), audit log
+   PII-safety.
 
 2. **Fleet event bus filtering.** Out of scope here — events are *emitted*,
    not *invoked*. Today's broadcast already lacks tool-execution. If
