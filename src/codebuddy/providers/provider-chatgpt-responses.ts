@@ -66,6 +66,21 @@ export interface ChatGptResponsesProviderOptions {
   refreshAuth?: () => Promise<ChatGptAuth | null>;
   model: string;
   defaultMaxTokens: number;
+  /**
+   * If true, skip auto-fallback when the backend rejects a model with
+   * `model_not_supported` / `model_not_found`. Default: false (i.e.
+   * auto-fallback is ON when the user did not pin `--model`). Useful
+   * for tests, or when the user genuinely wants to see the raw error.
+   */
+  disableModelFallback?: boolean;
+}
+
+/** Pick the next viable model after `current` from FALLBACK_MODELS.
+ *  Returns null if `current` is already the last entry or absent. */
+function pickFallbackModel(current: string): string | null {
+  const idx = FALLBACK_MODELS.indexOf(current);
+  if (idx < 0) return FALLBACK_MODELS[0]; // current not in list → start from top
+  return FALLBACK_MODELS[idx + 1] ?? null;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -156,6 +171,7 @@ export class ChatGptResponsesProvider implements Provider {
    * restart, so no asymmetry is introduced).
    */
   private lastTurnReasoningItems: ResponsesReasoningItem[] = [];
+  private disableModelFallback: boolean;
 
   constructor(opts: ChatGptResponsesProviderOptions) {
     this.authProvider = opts.authProvider;
@@ -163,6 +179,7 @@ export class ChatGptResponsesProvider implements Provider {
     this.currentModel = opts.model;
     this.defaultMaxTokens = opts.defaultMaxTokens;
     this.promptCacheKey = `cb-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    this.disableModelFallback = opts.disableModelFallback ?? false;
   }
 
   setModel(model: string): void {
@@ -266,9 +283,37 @@ export class ChatGptResponsesProvider implements Provider {
       response = await this.postResponses(body, auth);
     }
 
+    // 400 / 404 with `model_not_supported` (or `model_not_found`) →
+    // auto-fallback to the first FALLBACK_MODELS entry the user hasn't
+    // already tried. Saves them from copy-pasting `--model gpt-5.1-codex`
+    // when the backend rotates available slugs. Capped at one retry.
+    if (
+      !response.ok &&
+      (response.status === 400 || response.status === 404) &&
+      !this.disableModelFallback &&
+      !opts.model // only auto-switch when user didn't explicitly pin a model
+    ) {
+      const errorText = await response.clone().text().catch(() => '');
+      if (/model.*(not.{0,5}supported|not.{0,5}found)/i.test(errorText)) {
+        const fallback = pickFallbackModel(model);
+        if (fallback) {
+          logger.warn(
+            `[chatgpt-responses] Model "${model}" rejected by backend. Auto-falling back to "${fallback}". Set --model explicitly to override.`,
+          );
+          body.model = fallback;
+          this.currentModel = fallback;
+          response = await this.postResponses(body, auth);
+        }
+      }
+    }
+
     if (!response.ok) {
       const errorText = await response.text().catch(() => '');
-      throw enrichError(response.status, errorText, model);
+      // Report the model that was ACTUALLY rejected by the final
+      // request — `body.model` may have been mutated by the auto-fallback
+      // branch above. The local `model` variable is the original
+      // request, which is misleading after a fallback.
+      throw enrichError(response.status, errorText, body.model);
     }
 
     if (!response.body) {
@@ -278,9 +323,11 @@ export class ChatGptResponsesProvider implements Provider {
     // Reset capture buffer for THIS response — only successful new
     // reasoning blobs should populate `lastTurnReasoningItems`. We swap
     // in a fresh array so the SSE parser can push without races.
+    // Pass `body.model` (post-fallback) so streaming chunks are labelled
+    // with the model that actually served the response.
     const capturedReasoning: ResponsesReasoningItem[] = [];
     try {
-      yield* parseSseStream(response.body, model, (item) => {
+      yield* parseSseStream(response.body, body.model, (item) => {
         capturedReasoning.push(item);
       });
     } finally {
