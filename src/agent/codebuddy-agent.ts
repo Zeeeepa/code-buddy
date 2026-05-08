@@ -495,6 +495,39 @@ export class CodeBuddyAgent extends BaseAgent {
       }).catch((e) => { logger.debug('HeartbeatEngine module load failed (optional)', { error: String(e) }); });
     }).catch((e) => { logger.debug('Heartbeat config check failed (optional)', { error: String(e) }); });
 
+    // Boot-time auto-start of Autonomous Fleet Protocol v0.1 (Phase d.18).
+    // Schedules its own setInterval that runs the fleet tick — pull repo,
+    // pick task, claim, exec via in-process agent, append worklog, push.
+    // Independent of HeartbeatEngine (different concern, different cadence).
+    import('../config/toml-config.js').then(({ getConfigManager }) => {
+      const af = getConfigManager().getConfig().autonomous_fleet;
+      if (!af?.enabled) return;
+      if (!af.repo_path || !af.host) {
+        logger.warn('autonomous_fleet enabled but repo_path/host not configured — skipping');
+        return;
+      }
+      import('./autonomous/fleet-tick-handler.js').then(({ runFleetTick }) => {
+        const intervalMs = (af.interval_minutes ?? 30) * 60 * 1000;
+        const fire = (): void => {
+          runFleetTick({
+            repoPath: af.repo_path!,
+            host: af.host!,
+            maxTaskMs: af.max_task_ms,
+            priorityThreshold: af.priority_threshold ?? 'high',
+            llmProvider: af.llm_provider,
+          })
+            .then((outcome) => logger.info('Autonomous fleet tick result', { outcome }))
+            .catch((e) => logger.error('Autonomous fleet tick threw', { error: String(e) }));
+        };
+        // First tick after a short warm-up so boot stays fast; then on the
+        // configured interval. setInterval is fine — runFleetTick never
+        // throws and self-bounds via maxTaskMs.
+        setTimeout(fire, 60_000);
+        setInterval(fire, intervalMs);
+        logger.info('Autonomous fleet tick scheduled', { intervalMs, host: af.host });
+      }).catch((e) => logger.debug('autonomous_fleet module load failed (optional)', { error: String(e) }));
+    }).catch((e) => logger.debug('autonomous_fleet config check failed (optional)', { error: String(e) }));
+
     // Boot-time auto-start of DailyResetManager when [daily_reset] enabled=true.
     // The /daily-reset slash command can also start it manually at runtime.
     // Wired via audit OpenClaw heritage findings (2026-05-02).

@@ -234,6 +234,25 @@ export class PromptBuilder {
         }
       } catch { /* identity module optional */ }
 
+      // Fleet peer nudge (Phase (d).17) — one line when peers are connected,
+      // so the LLM knows it can autonomously delegate via list_peers + peer_delegate.
+      // Zero token cost when no peers (block omitted entirely).
+      try {
+        const { getFleetRegistry } = await import('../fleet/fleet-registry.js');
+        const peerCount = getFleetRegistry().size();
+        if (peerCount > 0) {
+          systemPrompt +=
+            `\n\n<fleet>Connected fleet peers: ${peerCount}. ` +
+            `Use the list_peers tool to discover peer IDs and status, ` +
+            `then peer_delegate to ask a peer a question. The peer answers ` +
+            `independently with its own model and the response is fed back ` +
+            `into your context. Useful for delegating heavy compute, asking a ` +
+            `peer with different domain knowledge, or coordinating across ` +
+            `hosts.</fleet>`;
+          logger.debug(`Injected fleet nudge into system prompt (${peerCount} peer(s))`);
+        }
+      } catch { /* fleet registry optional — module not loaded yet */ }
+
       // Inject auto-memory directive — tells the LLM WHEN to call the
       // `remember` tool to auto-persist non-obvious facts to
       // .codebuddy/CODEBUDDY_MEMORY.md (project) or ~/.codebuddy/memory.md

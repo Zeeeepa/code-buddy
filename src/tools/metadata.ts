@@ -586,6 +586,22 @@ export const TOOL_METADATA: ToolMetadata[] = [
     description: 'Consult a stronger reviewer model for a second opinion (full conversation forwarded)'
   },
 
+  // Fleet — multi-Claude orchestration via peer-RPC (Phase (d).17)
+  {
+    name: 'peer_delegate',
+    category: 'utility' as ToolCategory,
+    keywords: ['peer', 'delegate', 'fleet', 'consult', 'ask', 'collaborate', 'remote', 'claude', 'orchestrate', 'sub-agent', 'multi-ai', 'distributed'],
+    priority: 7,
+    description: 'Delegate a one-shot question to a connected fleet peer Code Buddy and get its answer back inline'
+  },
+  {
+    name: 'list_peers',
+    category: 'utility' as ToolCategory,
+    keywords: ['peers', 'fleet', 'connected', 'remote', 'claudes', 'list', 'discover', 'status'],
+    priority: 5,
+    description: 'List connected fleet peers with status, last-seen, and peer chat availability'
+  },
+
   // AskUserQuestion (structured multi-option mid-task questions)
   {
     name: 'ask_user_question',

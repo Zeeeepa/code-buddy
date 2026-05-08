@@ -47,6 +47,19 @@ export interface PeerMethodContext {
   traceId: string;
   /** Phase (d).14 — current call depth in the chain (0 = fresh request from a human/external). */
   depth: number;
+  /**
+   * Phase (d).19 — streaming output channel. When set, the handler can
+   * push partial result deltas as they're produced; the transport layer
+   * forwards each call as a `peer:chunk` frame. The final return value
+   * of the handler is still sent as a `peer:response` for correlation.
+   *
+   * Undefined means the caller didn't request streaming OR the
+   * transport doesn't support it — handlers should fall back to
+   * accumulating and returning the full result. Methods that REQUIRE
+   * streaming (like `peer.chat-stream`) should throw when this is
+   * undefined.
+   */
+  emitChunk?: (delta: string) => void;
 }
 
 /** Method handler signature. Async, returns the JSON-serializable payload. */
@@ -278,12 +291,14 @@ export async function dispatchPeerRequest(
     };
   }
 
-  // Build the per-call ctx with the resolved trace + depth.
+  // Build the per-call ctx with the resolved trace + depth. Forward
+  // emitChunk if the transport provided one (Phase d.19 — streaming).
   const callCtx: PeerMethodContext = {
     ...ctx,
     traceId,
     depth,
   };
+  if (ctx.emitChunk) callCtx.emitChunk = ctx.emitChunk;
   try {
     const payload = await handler(frame.params ?? {}, callCtx);
     return { id: frame.id, ok: true, payload };

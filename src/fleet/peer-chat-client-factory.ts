@@ -160,6 +160,63 @@ function buildOne(id: PeerChatProviderId): { client: CodeBuddyClient; info: Peer
   }
 }
 
+/**
+ * Resolved provider tuple — Phase (d).20.
+ * Returned by `resolveProviderFromEnv()` for callers that want to
+ * construct something other than a `CodeBuddyClient` (e.g. the
+ * autonomous fleet tick which constructs a `CodeBuddyAgent`).
+ */
+export interface ResolvedProvider {
+  provider: PeerChatProviderId;
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+  isLocal: boolean;
+}
+
+/**
+ * Resolve provider env without constructing a client. Useful for
+ * non-`peer.chat` consumers that need the same auto-detection logic
+ * (e.g. autonomous fleet tick → `CodeBuddyAgent`).
+ *
+ * `preferred`:
+ *   - undefined / 'auto' → use `CODEBUDDY_PEER_PROVIDER` override or
+ *     auto-detect order (same as `createPeerChatClientFromEnv`)
+ *   - explicit provider id → resolve only that provider, return null
+ *     if its env is incomplete
+ *
+ * Pure function. Returns null when no provider is resolvable.
+ */
+export function resolveProviderFromEnv(
+  preferred?: PeerChatProviderId | 'auto',
+): ResolvedProvider | null {
+  // Explicit provider id — resolve only that one
+  if (preferred && preferred !== 'auto') {
+    const spec = SPECS[preferred];
+    if (!spec) return null;
+    const resolved = spec.resolve();
+    if (!resolved) return null;
+    return {
+      provider: preferred,
+      apiKey: resolved.apiKey,
+      baseUrl: resolved.baseUrl,
+      model: process.env.CODEBUDDY_PEER_MODEL || spec.defaultModel,
+      isLocal: spec.isLocal,
+    };
+  }
+  // Auto-detect with override fallthrough
+  const override = process.env.CODEBUDDY_PEER_PROVIDER as PeerChatProviderId | undefined;
+  if (override && override in SPECS) {
+    const r = resolveProviderFromEnv(override);
+    if (r) return r;
+  }
+  for (const id of AUTO_DETECT_ORDER) {
+    const r = resolveProviderFromEnv(id);
+    if (r) return r;
+  }
+  return null;
+}
+
 /** Test-only helper: list provider IDs in detection priority order. */
 export function _getDetectionOrderForTests(): PeerChatProviderId[] {
   return [...AUTO_DETECT_ORDER];

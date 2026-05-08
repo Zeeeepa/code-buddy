@@ -478,6 +478,41 @@ export interface MultiAgentSystemConfig {
 }
 
 /**
+ * Autonomous Fleet Protocol v0.1 — Phase (d).18.
+ * Native TypeScript port of the Python wrapper
+ * `claude-et-patrice/tools/heartbeat_tick.py`. When `enabled=true`, Code
+ * Buddy schedules its own fleet ticks (independent of HeartbeatEngine):
+ * pull repo, pick claimable task, claim atomically, run agent, append
+ * worklog, mark completed. See AUTONOMOUS-FLEET-PROTOCOL-2026-05-02 v0.1.
+ */
+export interface AutonomousFleetConfig {
+  /** Whether the autonomous tick starts at boot (default: false). */
+  enabled?: boolean;
+  /** Absolute path to the claude-et-patrice repo (the fleet bus). */
+  repo_path?: string;
+  /** Host identifier broadcast in claims, e.g. `ministar/grok-cli`. */
+  host?: string;
+  /** Tick interval in minutes (default: 30). */
+  interval_minutes?: number;
+  /** Hard cap on the agent's wall-clock per task (default: 600 000 ms). */
+  max_task_ms?: number;
+  /** Lowest priority autonomously claimed (default: high). `critical` is always skipped. */
+  priority_threshold?: 'high' | 'medium' | 'low';
+  /**
+   * Phase (d).20 — LLM provider selection for autonomous tasks.
+   *   - `'cloud'` (default V0.1, backward-compat) → uses GROK env vars
+   *     (GROK_API_KEY / GROK_BASE_URL / GROK_MODEL), as Phase d.18 did.
+   *   - `'auto'` → delegates to `peer-chat-client-factory` auto-detect
+   *     (Ollama → grok → anthropic → gemini → openai).
+   *   - `'ollama'` / `'grok'` / `'anthropic'` / `'gemini'` / `'openai'`
+   *     → forces that provider (uses `CODEBUDDY_PEER_MODEL` if set,
+   *     else the provider's default model).
+   * Per-task `preferLocal: true` overrides this for that task only.
+   */
+  llm_provider?: 'cloud' | 'auto' | 'ollama' | 'grok' | 'anthropic' | 'gemini' | 'openai';
+}
+
+/**
  * Heartbeat engine configuration — periodic HEARTBEAT.md review.
  * Wired by the `/heartbeat enable` slash command (V4.x autonomous fleet
  * support, AUTONOMOUS-FLEET-PROTOCOL-2026-05-02 v0.1).
@@ -543,6 +578,8 @@ export interface CodeBuddyConfig {
   lsp?: LSPConfig;
   /** Heartbeat engine settings (periodic HEARTBEAT.md review) — autonomous fleet support */
   heartbeat?: HeartbeatConfig;
+  /** Autonomous Fleet Protocol v0.1 — Phase (d).18. */
+  autonomous_fleet?: AutonomousFleetConfig;
   /** Daily reset scheduler settings — daily context boundary */
   daily_reset?: DailyResetConfig;
   /** Team session manager settings — TeamSessionManager wake (audit OpenClaw heritage) */

@@ -38,6 +38,10 @@
 
 import type { CommandHandlerResult } from './branch-handlers.js';
 import { logger } from '../../utils/logger.js';
+import {
+  getFleetRegistry,
+  type ActiveListenerEntry,
+} from '../../fleet/fleet-registry.js';
 
 const HELP = `Usage: /fleet <action> [args]
 
@@ -66,74 +70,30 @@ Actions:
                                       "peer.echo". The peer's apiKey must
                                       have peer:invoke scope. Default
                                       timeout is 30000ms.
+  autonomous status                   (Phase (d).18) Show Autonomous Fleet
+            tick-now                  Protocol v0.1 config + state. tick-now
+                                      fires a one-shot tick (pull, claim a
+                                      task, run, log, push). Configured via
+                                      TOML [autonomous_fleet].
 
-Phase (d).5 → (d).13 V0.4.1 — multi-peer fan-in, opt-in auto-reconnect,
+Phase (d).5 → (d).18 — multi-peer fan-in, opt-in auto-reconnect,
 presence beacon, compaction notices, in-memory event history, active peer
-RPC routing.`;
+RPC routing, autonomous task claim/exec loop.`;
 
-interface ActiveListener {
-  /** Phase (d).12 — stable peer id (the Map key). Used by /fleet stop & history. */
-  id: string;
-  url: string;
-  startedAt: Date;
-  eventCount: number;
-  autoReconnect: boolean;
-  /**
-   * Tighter cap honored on /fleet listen than the manager default.
-   * Stored so /fleet status can show "N/M attempts".
-   */
-  maxAttempts: number;
-  /**
-   * FleetListener instance kept as `unknown`-equivalent to avoid pulling
-   * the ws import at handler-load time (matches lazy-import patterns).
-   */
-  listener: {
-    disconnect: () => Promise<void>;
-    getReconnectAttempts: () => number;
-    isReconnecting: () => boolean;
-    /** Phase (d).13 — peer RPC invoker. Returns method payload or rejects with code-bearing Error. */
-    request: (
-      method: string,
-      params?: Record<string, unknown>,
-      options?: { timeoutMs?: number; traceId?: string; depth?: number },
-    ) => Promise<unknown>;
-    getLastSeen: () => { at: number | null; reason: string | null; ageMs: number | null };
-    isStale: (thresholdMs?: number) => boolean;
-    getPeerCompactionState: () => {
-      active: boolean;
-      startedAt: number | null;
-      ageMs: number | null;
-      lastResult: {
-        success?: boolean;
-        originalTokens?: number;
-        compactedTokens?: number;
-        messagesRemoved?: number;
-        strategy?: string;
-        durationMs?: number;
-        completedAt: number;
-      } | null;
-    };
-    getEventHistory: () => readonly {
-      at: number;
-      type: string;
-      payload: Record<string, unknown>;
-      hostname?: string;
-      agentId?: string;
-    }[];
-  };
-}
+/**
+ * The `ActiveListenerEntry` interface (formerly local `ActiveListener`)
+ * + the `Map<string, ActiveListenerEntry>` registry both live in
+ * `src/fleet/fleet-registry.ts` since Phase (d).17, so the LLM-facing
+ * `peer_delegate` and `list_peers` tools can read peer state without
+ * depending on this command-handler module. Behaviour unchanged.
+ */
+type ActiveListener = ActiveListenerEntry;
 
 /** Default count rendered by `/fleet history` when no N supplied. */
 const HISTORY_DEFAULT_COUNT = 20;
 
 /** Stale threshold for /fleet status `⚠ stale` flag (Phase (d).9). */
 const STALE_THRESHOLD_MS = 90_000;
-
-/**
- * Phase (d).12 — registry of active peer listeners, keyed by peer id.
- * Replaces the V0.4.1 single-peer singleton.
- */
-const activeListeners = new Map<string, ActiveListener>();
 
 function textResult(content: string): CommandHandlerResult {
   return {
@@ -348,8 +308,9 @@ function formatPeerStatus(p: ActiveListener): string {
  * when 0 or >1 listeners (caller must error / require name).
  */
 function pickDefaultPeer(): ActiveListener | null {
-  if (activeListeners.size !== 1) return null;
-  return activeListeners.values().next().value ?? null;
+  const reg = getFleetRegistry();
+  if (reg.size() !== 1) return null;
+  return reg.list()[0] ?? null;
 }
 
 export async function handleFleet(args: string[]): Promise<CommandHandlerResult> {
@@ -361,13 +322,13 @@ export async function handleFleet(args: string[]): Promise<CommandHandlerResult>
   }
 
   if (action === 'status') {
-    if (activeListeners.size === 0) {
+    if (getFleetRegistry().size() === 0) {
       return textResult('No fleet listeners active.\n\n' + HELP);
     }
     const blocks: string[] = [];
-    blocks.push(`Fleet listeners — ${activeListeners.size} active`);
+    blocks.push(`Fleet listeners — ${getFleetRegistry().size()} active`);
     blocks.push('');
-    for (const peer of activeListeners.values()) {
+    for (const peer of getFleetRegistry().list()) {
       blocks.push(formatPeerStatus(peer));
       blocks.push('');
     }
@@ -376,37 +337,37 @@ export async function handleFleet(args: string[]): Promise<CommandHandlerResult>
   }
 
   if (action === 'stop') {
-    if (activeListeners.size === 0) {
+    if (getFleetRegistry().size() === 0) {
       return textResult('No fleet listeners active to stop.');
     }
     const { name, all } = parseStopArgs(rest);
     if (all) {
       const stopped: string[] = [];
-      for (const peer of [...activeListeners.values()]) {
+      for (const peer of getFleetRegistry().list()) {
         try {
           await peer.listener.disconnect();
         } catch (err) {
           logger.debug('Fleet listener disconnect error (ignored)', { error: String(err) });
         }
-        activeListeners.delete(peer.id);
+        getFleetRegistry().unregister(peer.id);
         stopped.push(`${peer.id} (${peer.eventCount} event(s))`);
       }
       return textResult(`Fleet stopped ${stopped.length} listener(s): ${stopped.join(', ')}`);
     }
     let target: ActiveListener | null = null;
     if (name) {
-      target = activeListeners.get(name) ?? null;
+      target = getFleetRegistry().get(name) ?? null;
       if (!target) {
         return textResult(
-          `No fleet peer named "${name}". Active peers: ${[...activeListeners.keys()].join(', ')}`,
+          `No fleet peer named "${name}". Active peers: ${getFleetRegistry().ids().join(', ')}`,
         );
       }
     } else {
       target = pickDefaultPeer();
       if (!target) {
         return textResult(
-          `Multiple fleet listeners active (${activeListeners.size}). ` +
-            `Specify a peer name or use --all. Active: ${[...activeListeners.keys()].join(', ')}`,
+          `Multiple fleet listeners active (${getFleetRegistry().size()}). ` +
+            `Specify a peer name or use --all. Active: ${getFleetRegistry().ids().join(', ')}`,
         );
       }
     }
@@ -418,7 +379,7 @@ export async function handleFleet(args: string[]): Promise<CommandHandlerResult>
     } catch (err) {
       logger.debug('Fleet listener disconnect error (ignored)', { error: String(err) });
     }
-    activeListeners.delete(id);
+    getFleetRegistry().unregister(id);
     return textResult(`Fleet listener "${id}" stopped. URL: ${url}\nReceived ${count} event(s) total.`);
   }
 
@@ -439,9 +400,9 @@ export async function handleFleet(args: string[]): Promise<CommandHandlerResult>
     }
 
     const peerId = explicitName ?? deriveDefaultPeerId(url);
-    if (activeListeners.has(peerId)) {
+    if (getFleetRegistry().has(peerId)) {
       return textResult(
-        `Fleet peer "${peerId}" is already active for ${activeListeners.get(peerId)!.url}. ` +
+        `Fleet peer "${peerId}" is already active for ${getFleetRegistry().get(peerId)!.url}. ` +
           `Stop it first with /fleet stop ${peerId}, then re-issue /fleet listen, ` +
           `or pick a different --name.`,
       );
@@ -461,7 +422,7 @@ export async function handleFleet(args: string[]): Promise<CommandHandlerResult>
       // Phase (d).12 — wire stdout streaming with the peer id in the prefix
       // so multi-peer output stays distinguishable when interleaved.
       listener.on('fleet:event', (data: { type: string; payload: Record<string, unknown> }) => {
-        const peer = activeListeners.get(peerId);
+        const peer = getFleetRegistry().get(peerId);
         if (peer) peer.eventCount++;
         const source = data.payload?.source as { hostname?: string; agentId?: string } | undefined;
         const hostInfo = source ? ` [${source.hostname}${source.agentId ? `:${source.agentId.slice(0, 8)}` : ''}]` : '';
@@ -474,7 +435,7 @@ export async function handleFleet(args: string[]): Promise<CommandHandlerResult>
         // the session — clear the registry entry. With auto-reconnect,
         // disconnected starts a retry cycle, so we keep the entry.
         if (!autoReconnect) {
-          activeListeners.delete(peerId);
+          getFleetRegistry().unregister(peerId);
         }
       });
 
@@ -495,12 +456,12 @@ export async function handleFleet(args: string[]): Promise<CommandHandlerResult>
           process.stdout.write(
             `  [fleet:${peerId}] reconnect exhausted after ${data.totalAttempts} attempt(s) — listener stopped\n`,
           );
-          activeListeners.delete(peerId);
+          getFleetRegistry().unregister(peerId);
         });
       }
 
       await listener.connect();
-      activeListeners.set(peerId, {
+      getFleetRegistry().register({
         id: peerId,
         url,
         startedAt,
@@ -525,7 +486,7 @@ export async function handleFleet(args: string[]): Promise<CommandHandlerResult>
   }
 
   if (action === 'history') {
-    if (activeListeners.size === 0) {
+    if (getFleetRegistry().size() === 0) {
       return textResult('No fleet listeners active.\n\n' + HELP);
     }
     const { count, peer: peerName } = parseHistoryArgs(rest);
@@ -533,18 +494,18 @@ export async function handleFleet(args: string[]): Promise<CommandHandlerResult>
 
     let target: ActiveListener | null = null;
     if (peerName) {
-      target = activeListeners.get(peerName) ?? null;
+      target = getFleetRegistry().get(peerName) ?? null;
       if (!target) {
         return textResult(
-          `No fleet peer named "${peerName}". Active peers: ${[...activeListeners.keys()].join(', ')}`,
+          `No fleet peer named "${peerName}". Active peers: ${getFleetRegistry().ids().join(', ')}`,
         );
       }
     } else {
       target = pickDefaultPeer();
       if (!target) {
         return textResult(
-          `Multiple fleet listeners active (${activeListeners.size}). ` +
-            `Specify --peer <name>. Active: ${[...activeListeners.keys()].join(', ')}`,
+          `Multiple fleet listeners active (${getFleetRegistry().size()}). ` +
+            `Specify --peer <name>. Active: ${getFleetRegistry().ids().join(', ')}`,
         );
       }
     }
@@ -565,7 +526,7 @@ export async function handleFleet(args: string[]): Promise<CommandHandlerResult>
   }
 
   if (action === 'send') {
-    if (activeListeners.size === 0) {
+    if (getFleetRegistry().size() === 0) {
       return textResult('No fleet listeners active. Connect with /fleet listen first.');
     }
     // Parse: send <peer> <method> [json-params] [--timeout <ms>]
@@ -598,10 +559,10 @@ export async function handleFleet(args: string[]): Promise<CommandHandlerResult>
         'Usage: /fleet send <peer> <method> [json-params] [--timeout <ms>]\n\n' + HELP,
       );
     }
-    const target = activeListeners.get(peerName);
+    const target = getFleetRegistry().get(peerName);
     if (!target) {
       return textResult(
-        `No fleet peer named "${peerName}". Active peers: ${[...activeListeners.keys()].join(', ')}`,
+        `No fleet peer named "${peerName}". Active peers: ${getFleetRegistry().ids().join(', ')}`,
       );
     }
     let params: Record<string, unknown> = {};
@@ -631,13 +592,97 @@ export async function handleFleet(args: string[]): Promise<CommandHandlerResult>
     }
   }
 
+  if (action === 'autonomous') {
+    return await handleAutonomous(rest);
+  }
+
   return textResult(`Unknown fleet action: ${args[0]}\n\n${HELP}`);
+}
+
+/**
+ * Phase (d).18 — `/fleet autonomous` sub-command.
+ * Sub-actions: status | tick-now (manual fire). Configuration lives in
+ * TOML `[autonomous_fleet]` and is honoured at boot — this slash is
+ * for inspection and ad-hoc one-shot ticks.
+ */
+async function handleAutonomous(rest: string[]): Promise<CommandHandlerResult> {
+  const sub = (rest[0] || 'status').trim().toLowerCase();
+  const { getConfigManager } = await import('../../config/toml-config.js');
+  const af = getConfigManager().getConfig().autonomous_fleet;
+
+  if (sub === 'status' || sub === '') {
+    if (!af?.enabled) {
+      return textResult(
+        'Autonomous fleet: disabled.\n\n' +
+          'Enable in .codebuddy/config.toml:\n' +
+          '  [autonomous_fleet]\n' +
+          '  enabled = true\n' +
+          '  repo_path = "/path/to/claude-et-patrice"\n' +
+          '  host = "ministar/grok-cli"\n' +
+          '  interval_minutes = 30\n' +
+          '  priority_threshold = "high"   # critical is always skipped\n' +
+          '  llm_provider = "cloud"        # or "auto" / "ollama" / "grok" / etc.\n',
+      );
+    }
+    // Resolve preview of the provider that the next tick would use for a
+    // task with no `preferLocal` hint, so the user sees the host-default.
+    const { resolveTickProvider } = await import(
+      '../../agent/autonomous/fleet-tick-handler.js'
+    );
+    const previewProvider = resolveTickProvider(
+      { preferLocal: false },
+      af.llm_provider,
+    );
+    return textResult(
+      [
+        'Autonomous fleet: ENABLED',
+        `  Repo path:           ${af.repo_path ?? '(unset!)'}`,
+        `  Host:                ${af.host ?? '(unset!)'}`,
+        `  Interval:            ${af.interval_minutes ?? 30} min`,
+        `  Max task ms:         ${af.max_task_ms ?? 600_000}`,
+        `  Priority threshold:  ${af.priority_threshold ?? 'high'}  (critical always skipped)`,
+        `  LLM provider config: ${af.llm_provider ?? 'cloud'}`,
+        `  Resolved (preview):  ${previewProvider.provider} model=${previewProvider.model}` +
+          ` ${previewProvider.isLocal ? '[LOCAL]' : '[cloud]'} (reason=${previewProvider.reason})`,
+        '',
+        'Tasks tagged `preferLocal: true` may use Ollama instead — see fleet-task-types.ts.',
+        'Use /fleet autonomous tick-now to fire a tick immediately.',
+      ].join('\n'),
+    );
+  }
+
+  if (sub === 'tick-now') {
+    if (!af?.enabled || !af.repo_path || !af.host) {
+      return textResult(
+        'Autonomous fleet not configured. Run /fleet autonomous status to see required keys.',
+      );
+    }
+    const { runFleetTick } = await import('../../agent/autonomous/fleet-tick-handler.js');
+    try {
+      const outcome = await runFleetTick({
+        repoPath: af.repo_path,
+        host: af.host,
+        maxTaskMs: af.max_task_ms,
+        priorityThreshold: af.priority_threshold ?? 'high',
+        llmProvider: af.llm_provider,
+      });
+      return textResult(`Autonomous fleet tick result:\n${JSON.stringify(outcome, null, 2)}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return textResult(`Autonomous fleet tick FAILED:\n  ${msg}`);
+    }
+  }
+
+  return textResult(
+    `Unknown /fleet autonomous sub-action: ${sub}\n\nAvailable: status, tick-now`,
+  );
 }
 
 /** Test reset hook. Stops all listeners and clears the registry. */
 export function _resetFleetHandlerForTests(): void {
-  for (const peer of activeListeners.values()) {
+  const reg = getFleetRegistry();
+  for (const peer of reg.list()) {
     peer.listener.disconnect().catch(() => { /* ignore */ });
   }
-  activeListeners.clear();
+  reg.clear();
 }

@@ -445,9 +445,23 @@ messageHandlers.set('peer:request', async (ws, state, payload) => {
     traceId?: string;
     depth?: number;
   };
+  const requestId = frame.id ?? '';
+  // Phase (d).19 — emitChunk forwards a partial result delta to the
+  // caller as a `peer:chunk` frame keyed by the same request id. The
+  // caller's FleetListener routes chunks to its onChunk callback. We
+  // only forward when the WS is still open; closed sockets silently
+  // drop chunks (the final response will fail with DISCONNECTED).
+  const emitChunk = (delta: string): void => {
+    if (ws.readyState !== ws.OPEN) return;
+    send(ws, {
+      type: 'peer:chunk',
+      payload: { id: requestId, delta },
+      timestamp: new Date().toISOString(),
+    });
+  };
   const response = await dispatchPeerRequest(
     {
-      id: frame.id ?? '',
+      id: requestId,
       method: frame.method ?? '',
       params: frame.params,
       traceId: frame.traceId,
@@ -460,6 +474,7 @@ messageHandlers.set('peer:request', async (ws, state, payload) => {
       // FRAME (so propagation is end-to-end) and overwrites these.
       traceId: '',
       depth: 0,
+      emitChunk,
     },
   );
   send(ws, {

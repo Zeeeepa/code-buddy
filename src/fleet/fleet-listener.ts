@@ -161,6 +161,8 @@ export class FleetListener extends EventEmitter {
       resolve: (value: unknown) => void;
       reject: (reason: Error) => void;
       timer: NodeJS.Timeout;
+      /** Phase (d).19 — optional onChunk for streaming requests. */
+      onChunk?: (delta: string) => void;
     }
   >();
   private requestSeq = 0;
@@ -398,6 +400,25 @@ export class FleetListener extends EventEmitter {
       // If we haven't authenticated yet, the error is fatal for connect()
       if (!this.authenticated) {
         settle(err);
+      }
+      return;
+    }
+    // Phase (d).19 — peer RPC streaming chunk. Match by frame.id against
+    // the pending map. If the pending request was opened with onChunk
+    // (via requestStream), invoke it with the delta. Chunks BEFORE the
+    // final peer:response do NOT clear the timer; the timeout still
+    // applies to total request duration.
+    if (msg.type === 'peer:chunk') {
+      const frame = (msg.payload ?? {}) as { id?: string; delta?: string };
+      if (typeof frame.id === 'string' && typeof frame.delta === 'string') {
+        const pending = this.pendingRequests.get(frame.id);
+        if (pending && pending.onChunk) {
+          try {
+            pending.onChunk(frame.delta);
+          } catch (err) {
+            logger.debug('[fleet-listener] onChunk threw', { error: String(err) });
+          }
+        }
       }
       return;
     }
@@ -697,6 +718,64 @@ export class FleetListener extends EventEmitter {
       // Phase (d).14 — include traceId + depth in the wire frame when
       // the caller provided them; otherwise omit and let the receiver
       // generate fresh ones (fresh top-level call).
+      const frame: Record<string, unknown> = { id, method, params };
+      if (options.traceId !== undefined) frame.traceId = options.traceId;
+      if (options.depth !== undefined) frame.depth = options.depth;
+      this.send('peer:request', frame);
+    });
+  }
+
+  /**
+   * Phase (d).19 — streaming variant of `request()`. Same semantics +
+   * an `onChunk` callback that's invoked once per `peer:chunk` frame
+   * received during the call. The promise resolves with the FINAL
+   * `peer:response` payload (the same shape `request()` returns).
+   *
+   * Use this for methods like `peer.chat-stream` where the peer pushes
+   * incremental output. The callback is invoked synchronously from the
+   * ws message handler — keep it light. The total elapsed time is still
+   * bounded by `timeoutMs` (chunks reset NEITHER the timer nor liveness
+   * — they're a peek into the in-progress work).
+   *
+   * Anti-loop guards (ROLE_LEAF, depth cap propagation) are identical to
+   * `request()` since the wire frame is the same.
+   */
+  async requestStream(
+    method: string,
+    params: Record<string, unknown> = {},
+    onChunk: (delta: string) => void,
+    options: { timeoutMs?: number; traceId?: string; depth?: number } = {},
+  ): Promise<unknown> {
+    if (process.env.CODEBUDDY_PEER_ROLE === 'leaf') {
+      const err = new Error(
+        'peer.invoke ROLE_LEAF: this peer is configured as leaf and cannot initiate peer.invoke calls',
+      );
+      (err as Error & { code?: string }).code = 'ROLE_LEAF';
+      throw err;
+    }
+    if (!this.authenticated) {
+      const err = new Error('peer.invoke NOT_AUTHENTICATED: listener is not authenticated');
+      (err as Error & { code?: string }).code = 'NOT_AUTHENTICATED';
+      throw err;
+    }
+    if (!this.ws || this.ws.readyState !== 1) {
+      const err = new Error('peer.invoke NOT_OPEN: ws is not in OPEN state');
+      (err as Error & { code?: string }).code = 'NOT_OPEN';
+      throw err;
+    }
+    const id = this.nextRequestId();
+    const timeoutMs = options.timeoutMs ?? 30_000;
+    return new Promise<unknown>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingRequests.delete(id);
+        const err = new Error(
+          `peer.invoke REQUEST_TIMEOUT: ${method} did not respond within ${timeoutMs}ms`,
+        );
+        (err as Error & { code?: string }).code = 'REQUEST_TIMEOUT';
+        reject(err);
+      }, timeoutMs);
+      timer.unref?.();
+      this.pendingRequests.set(id, { resolve, reject, timer, onChunk });
       const frame: Record<string, unknown> = { id, method, params };
       if (options.traceId !== undefined) frame.traceId = options.traceId;
       if (options.depth !== undefined) frame.depth = options.depth;
