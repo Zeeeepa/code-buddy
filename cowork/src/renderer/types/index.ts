@@ -459,7 +459,8 @@ export type ClientEvent =
   | { type: 'config.geminiOauthLogin'; payload: Record<string, never> }
   | { type: 'config.geminiOauthClear'; payload: Record<string, never> }
   | { type: 'config.codexOauthLogin'; payload: Record<string, never> }
-  | { type: 'config.codexOauthClear'; payload: Record<string, never> };
+  | { type: 'config.codexOauthClear'; payload: Record<string, never> }
+  | { type: 'config.codexOauthStatus'; payload: Record<string, never> };
 
 // Sandbox setup types (app startup)
 export type SandboxSetupPhase = 
@@ -714,6 +715,7 @@ export interface ExecutionContext {
 
 // App Config types
 export type ProviderType =
+  | 'chatgpt'
   | 'openrouter'
   | 'anthropic'
   | 'custom'
@@ -724,6 +726,7 @@ export type ProviderType =
 export type CustomProtocolType = 'anthropic' | 'openai' | 'gemini';
 export type AppTheme = 'dark' | 'light' | 'system';
 export type ProviderProfileKey =
+  | 'chatgpt'
   | 'openrouter'
   | 'anthropic'
   | 'openai'
@@ -791,6 +794,7 @@ export interface ProviderPreset {
 }
 
 export interface ProviderPresets {
+  chatgpt: ProviderPreset;
   openrouter: ProviderPreset;
   anthropic: ProviderPreset;
   custom: ProviderPreset;

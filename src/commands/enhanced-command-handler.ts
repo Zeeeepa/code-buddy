@@ -170,6 +170,7 @@ import {
 
 import { handleLessonsCommand } from "./handlers/index.js";
 import { handleContextStats } from "./handlers/extra-handlers.js";
+import { handleLogin, handleLogout, handleWhoami } from "./handlers/auth-handlers.js";
 import { handlePromptCommand as handlePromptCommandRaw } from "./slash/prompt-commands.js";
 import {
   handleShortcuts,
@@ -382,6 +383,11 @@ export class EnhancedCommandHandler {
     ['__TOOLS__', (args) => handleTools(args)],
     ['__VIM_MODE__', (args) => handleVimMode(args)],
     ['__CONFIG__', (args) => handleConfig(args)],
+
+    // Authentication (ChatGPT OAuth — Phase d.23)
+    ['__LOGIN__', (args) => handleLogin(args)],
+    ['__LOGOUT__', (args) => handleLogout(args)],
+    ['__WHOAMI__', () => handleWhoami()],
 
     // Permissions & Worktree (Enterprise-grade)
     ['__PERMISSIONS__', (args) => handlePermissions(args)],

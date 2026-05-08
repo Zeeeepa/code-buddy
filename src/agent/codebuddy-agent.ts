@@ -220,6 +220,28 @@ export class CodeBuddyAgent extends BaseAgent {
       laneQueue: getLaneQueue(),
       laneId: 'agent-tools',
       messageQueue: this.messageQueue,
+      // Phase d.22 — query-aware system prompt rebuild. Called by the
+      // executor on toolRounds === 0 so trivial queries on `lite`-profile
+      // models (Ollama qwen, llama, deepseek) get a minimal SP (~9 KB)
+      // instead of the full 73 KB rich prompt that confuses small models
+      // into hallucinating JSON tool calls.
+      rebuildSystemPromptForQuery: async (msg: string) => {
+        try {
+          if (!this.promptBuilder) return null;
+          const customInstructions = loadCustomInstructions();
+          return await this.promptBuilder.buildForQuery(
+            msg,
+            systemPromptId,
+            this.getCurrentModel(),
+            customInstructions,
+          );
+        } catch (err) {
+          logger.warn('rebuildSystemPromptForQuery failed', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return null;
+        }
+      },
     }, {
       maxToolRounds: this.maxToolRounds,
       isGrokModel: this.isGrokModel.bind(this),

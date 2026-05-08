@@ -132,7 +132,12 @@ import {
 import { listRecentWorkspaceFiles } from './utils/recent-workspace-files';
 import { buildDiagnosticsSummary } from './utils/diagnostics-summary';
 import { getGeminiOauthTokens, clearGeminiCredentials } from '../../../src/providers/gemini-oauth';
-import { getCodexOauthTokens, clearCodexCredentials } from '../../../src/providers/codex-oauth';
+import {
+  loginInteractive as codexLoginInteractive,
+  clearCodexCredentials,
+  getChatGptAuth,
+  hasCodexCredentials,
+} from '../../../src/providers/codex-oauth';
 
 // Current working directory (persisted between sessions)
 let currentWorkingDir: string | null = null;
@@ -1675,8 +1680,14 @@ ipcMain.handle('config.geminiOauthClear', async () => {
 
 ipcMain.handle('config.codexOauthLogin', async () => {
   try {
-    const tokens = await getCodexOauthTokens(true);
-    return { success: true, tokens };
+    const auth = await codexLoginInteractive();
+    return {
+      success: true,
+      email: auth.email ?? null,
+      plan_type: auth.plan_type ?? null,
+      account_id: auth.account_id ?? null,
+      is_fedramp: auth.is_fedramp,
+    };
   } catch (err: any) {
     logError('[IPC] Codex OAuth Login failed:', err);
     return { success: false, error: err.message };
@@ -1689,6 +1700,29 @@ ipcMain.handle('config.codexOauthClear', async () => {
     return { success: true };
   } catch (err: any) {
     logError('[IPC] Codex OAuth Clear failed:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('config.codexOauthStatus', async () => {
+  try {
+    if (!hasCodexCredentials()) {
+      return { success: true, signedIn: false };
+    }
+    const auth = await getChatGptAuth();
+    if (!auth) {
+      return { success: true, signedIn: false, error: 'credentials present but unreadable' };
+    }
+    return {
+      success: true,
+      signedIn: true,
+      email: auth.email ?? null,
+      plan_type: auth.plan_type ?? null,
+      account_id: auth.account_id ?? null,
+      is_fedramp: auth.is_fedramp,
+    };
+  } catch (err: any) {
+    logError('[IPC] Codex OAuth Status failed:', err);
     return { success: false, error: err.message };
   }
 });

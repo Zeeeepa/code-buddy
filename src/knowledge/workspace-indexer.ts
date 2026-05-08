@@ -11,7 +11,7 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 import { EventEmitter } from 'events';
 import { logger } from '../utils/logger.js';
-import { glob } from 'fast-glob';
+import glob from 'fast-glob';
 import { EmbeddingProvider } from '../embeddings/embedding-provider.js';
 
 // Fallback brute-force index if USearch is not available

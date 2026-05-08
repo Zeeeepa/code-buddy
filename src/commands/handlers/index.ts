@@ -116,6 +116,13 @@ export {
   handleConfig,
 } from './vibe-handlers.js';
 
+// Authentication handlers (ChatGPT OAuth — Phase d.23)
+export {
+  handleLogin,
+  handleLogout,
+  handleWhoami,
+} from './auth-handlers.js';
+
 // Permissions handlers (Enterprise-grade)
 export {
   handlePermissions,

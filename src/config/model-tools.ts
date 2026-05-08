@@ -32,6 +32,19 @@ export interface ModelToolConfig {
   contextWindow?: number;
   /** Preferred patch format: 'unified' | 'search_replace' | 'full_file' */
   patchFormat?: 'unified' | 'search_replace' | 'full_file';
+  /**
+   * Phase d.22 — system-prompt size profile.
+   *   - `'lite'` : minimal SP (base + writing-rules only). For small
+   *     local models (Ollama qwen 7b, llama3 8b) that drown in context
+   *     and hallucinate tool calls when shown 73 KB of directives.
+   *   - `'standard'` (default) : query-classified gating per
+   *     `classifyQuery(message).complexity` — trivial gets minimal,
+   *     complex gets full.
+   *   - `'rich'` : every block always injected. For top-tier cloud
+   *     models (Claude Opus, Grok-3) that handle and benefit from the
+   *     full instruction set.
+   */
+  promptProfile?: 'lite' | 'standard' | 'rich';
 }
 
 /**
@@ -109,6 +122,7 @@ const DEFAULT_MODEL_CONFIGS: ModelToolConfig[] = [
     contextWindow: 200000,
     maxOutputTokens: 128000,
     patchFormat: 'search_replace',
+    promptProfile: 'rich',
   },
   // Claude Sonnet 4.5 (200K context, 64K output)
   {
@@ -119,6 +133,7 @@ const DEFAULT_MODEL_CONFIGS: ModelToolConfig[] = [
     contextWindow: 200000,
     maxOutputTokens: 64000,
     patchFormat: 'search_replace',
+    promptProfile: 'rich',
   },
   // Claude Haiku 4.5 (200K context, 64K output)
   {
@@ -139,6 +154,7 @@ const DEFAULT_MODEL_CONFIGS: ModelToolConfig[] = [
     contextWindow: 200000,
     maxOutputTokens: 32000,
     patchFormat: 'search_replace',
+    promptProfile: 'rich',
   },
   // Claude Sonnet 4 (200K context, 64K output)
   {
@@ -171,6 +187,62 @@ const DEFAULT_MODEL_CONFIGS: ModelToolConfig[] = [
     patchFormat: 'search_replace',
   },
 
+  // ChatGPT Codex backend (Phase d.23) — exposed via OAuth subscription
+  // auth at chatgpt.com/backend-api/codex/responses. Slugs taken from the
+  // upstream `openai/codex` catalog. `gpt-5.5` is Patrice's default — if
+  // the backend rejects it with `model_not_found`, the chatgpt-responses
+  // provider surfaces these as suggested fallbacks.
+  {
+    model: 'gpt-5.5*',
+    supportsReasoning: true,
+    supportsToolCalls: true,
+    supportsVision: true,
+    contextWindow: 200000,
+    maxOutputTokens: 64000,
+    patchFormat: 'search_replace',
+    promptProfile: 'rich',
+  },
+  {
+    model: 'gpt-5.1-codex*',
+    supportsReasoning: true,
+    supportsToolCalls: true,
+    supportsVision: false,
+    contextWindow: 200000,
+    maxOutputTokens: 64000,
+    patchFormat: 'search_replace',
+    promptProfile: 'rich',
+  },
+  {
+    model: 'gpt-5-codex*',
+    supportsReasoning: true,
+    supportsToolCalls: true,
+    supportsVision: false,
+    contextWindow: 200000,
+    maxOutputTokens: 64000,
+    patchFormat: 'search_replace',
+    promptProfile: 'rich',
+  },
+  {
+    model: 'gpt-5.1*',
+    supportsReasoning: true,
+    supportsToolCalls: true,
+    supportsVision: true,
+    contextWindow: 200000,
+    maxOutputTokens: 64000,
+    patchFormat: 'search_replace',
+    promptProfile: 'rich',
+  },
+  {
+    model: 'gpt-5*',
+    supportsReasoning: true,
+    supportsToolCalls: true,
+    supportsVision: true,
+    contextWindow: 200000,
+    maxOutputTokens: 64000,
+    patchFormat: 'search_replace',
+    promptProfile: 'rich',
+  },
+
   // Grok 4.1 Fast (2M context)
   {
     model: 'grok-4*fast*',
@@ -180,6 +252,7 @@ const DEFAULT_MODEL_CONFIGS: ModelToolConfig[] = [
     contextWindow: 2000000,
     maxOutputTokens: 16384,
     patchFormat: 'search_replace',
+    promptProfile: 'rich',
   },
   // Grok 4 (256K context)
   {
@@ -190,6 +263,7 @@ const DEFAULT_MODEL_CONFIGS: ModelToolConfig[] = [
     contextWindow: 256000,
     maxOutputTokens: 16384,
     patchFormat: 'search_replace',
+    promptProfile: 'rich',
   },
   // Grok Code Fast (256K context)
   {
@@ -303,7 +377,14 @@ const DEFAULT_MODEL_CONFIGS: ModelToolConfig[] = [
     patchFormat: 'full_file',
   },
 
-  // Ollama / Local models (conservative defaults)
+  // Ollama / Local models — conservative defaults.
+  //
+  // The local-model match is tricky because the OpenAI-compat path
+  // (used when OLLAMA_HOST is set + we route through the openai
+  // strategy) sends the BARE model id like `qwen2.5-coder:7b`, not
+  // `ollama/qwen2.5-coder:7b`. So `ollama/*` alone misses it. We list
+  // the common Ollama-shipped families directly so the conservative
+  // config is picked up regardless of how the request was routed.
   {
     model: 'ollama/*',
     supportsReasoning: false,
@@ -314,6 +395,83 @@ const DEFAULT_MODEL_CONFIGS: ModelToolConfig[] = [
     maxToolRounds: 10,
     disabledTools: ['apply_patch', 'browser', 'computer_control'],
     patchFormat: 'full_file',
+    promptProfile: 'lite',
+  },
+  {
+    model: 'qwen2.5*',
+    supportsReasoning: false,
+    supportsToolCalls: false,
+    supportsVision: false,
+    contextWindow: 32768,
+    maxOutputTokens: 2048,
+    maxToolRounds: 10,
+    disabledTools: ['apply_patch', 'browser', 'computer_control'],
+    patchFormat: 'full_file',
+    promptProfile: 'lite',
+  },
+  {
+    model: 'qwen3*',
+    supportsReasoning: true,
+    supportsToolCalls: false,
+    supportsVision: false,
+    contextWindow: 32768,
+    maxOutputTokens: 4096,
+    maxToolRounds: 10,
+    disabledTools: ['apply_patch', 'browser', 'computer_control'],
+    patchFormat: 'full_file',
+    promptProfile: 'lite',
+  },
+  {
+    model: 'llama3*',
+    supportsReasoning: false,
+    supportsToolCalls: false,
+    supportsVision: false,
+    contextWindow: 8192,
+    maxOutputTokens: 2048,
+    maxToolRounds: 10,
+    disabledTools: ['apply_patch', 'browser', 'computer_control'],
+    patchFormat: 'full_file',
+    promptProfile: 'lite',
+  },
+  {
+    model: 'deepseek*',
+    supportsReasoning: false,
+    supportsToolCalls: false,
+    supportsVision: false,
+    contextWindow: 32768,
+    maxOutputTokens: 2048,
+    maxToolRounds: 10,
+    disabledTools: ['apply_patch', 'browser', 'computer_control'],
+    patchFormat: 'full_file',
+    promptProfile: 'lite',
+  },
+  // Gemma 4 (Ollama, e2b/e4b) — local lightweight model. Same lite
+  // profile as qwen/llama: minimal SP, no tool_calls advertised,
+  // chat-only base prompt to avoid JSON hallucination on small models.
+  {
+    model: 'gemma4*',
+    supportsReasoning: false,
+    supportsToolCalls: false,
+    supportsVision: false,
+    contextWindow: 8192,
+    maxOutputTokens: 2048,
+    maxToolRounds: 10,
+    disabledTools: ['apply_patch', 'browser', 'computer_control'],
+    patchFormat: 'full_file',
+    promptProfile: 'lite',
+  },
+  // Gemma 2/3 (legacy lineage) — same conservative defaults.
+  {
+    model: 'gemma*',
+    supportsReasoning: false,
+    supportsToolCalls: false,
+    supportsVision: false,
+    contextWindow: 8192,
+    maxOutputTokens: 2048,
+    maxToolRounds: 10,
+    disabledTools: ['apply_patch', 'browser', 'computer_control'],
+    patchFormat: 'full_file',
+    promptProfile: 'lite',
   },
 
   // LM Studio (same as Ollama)

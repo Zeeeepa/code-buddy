@@ -160,6 +160,15 @@ export interface ExecutorDependencies {
   middlewarePipeline?: MiddlewarePipeline;
   /** Optional message queue for steer/followup/collect modes */
   messageQueue?: MessageQueue;
+  /**
+   * Optional: rebuild the system prompt for the current user query +
+   * active model. When provided, called once per turn (toolRounds === 0)
+   * to swap `messages[0].content` with a query-aware prompt — saves
+   * ~60 KB on trivial queries against `promptProfile: 'lite'` models
+   * (Ollama qwen, llama, deepseek). Returns null to keep the existing
+   * static SP.
+   */
+  rebuildSystemPromptForQuery?: (message: string) => Promise<string | null>;
 }
 
 /**
@@ -652,9 +661,69 @@ export class AgentExecutor {
           }
         }
 
-        const selectionResult = await this.deps.toolSelectionStrategy.selectToolsForQuery(message);
-        const tools = selectionResult.tools;
+        // Rebuild the system prompt query-aware on the first round only.
+        // Per-turn rebuild costs are dominated by manager .load() calls
+        // (~50ms); doing it only on toolRounds === 0 amortizes the cost
+        // over the whole turn loop. Sub-turn tool follow-ups reuse the
+        // SP picked at turn start.
+        if (toolRounds === 0 && this.deps.rebuildSystemPromptForQuery) {
+          try {
+            const rebuiltSP = await this.deps.rebuildSystemPromptForQuery(message);
+            if (rebuiltSP && messages.length > 0 && messages[0].role === 'system') {
+              messages[0].content = rebuiltSP;
+              logger.debug(
+                `[agent-executor] system prompt rebuilt query-aware (${rebuiltSP.length} chars)`,
+              );
+            }
+          } catch (err) {
+            logger.warn('[agent-executor] query-aware SP rebuild failed', { error: String(err) });
+          }
+        }
+
+        // Profile-aware tool selection. For `lite` (small Ollama models),
+        // shrink the tool set to ~5 with a minimal alwaysInclude — we
+        // don't want to dangle `remember`/`lessons_*` in front of a model
+        // that can't actually call tools and would inline-hallucinate them.
+        let selectionOpts: Parameters<typeof this.deps.toolSelectionStrategy.selectToolsForQuery>[1] = {};
+        try {
+          const { getModelToolConfig } = await import('../../config/model-tools.js');
+          const cfg = getModelToolConfig(this.deps.client.getCurrentModel() ?? '');
+          if (cfg.promptProfile === 'lite') {
+            selectionOpts = {
+              maxTools: 5,
+              alwaysInclude: ['view_file', 'bash', 'search'],
+            };
+          }
+        } catch { /* model-tools optional, never block */ }
+        const selectionResult = await this.deps.toolSelectionStrategy.selectToolsForQuery(message, selectionOpts);
+        let tools = selectionResult.tools;
         if (toolRounds === 0) this.deps.toolSelectionStrategy.cacheTools(tools);
+
+        // If the active model is flagged `supportsToolCalls: false` in
+        // model-tools.ts (typical of small Ollama / LM Studio models that
+        // can't reliably emit OpenAI-style tool_call frames), drop the
+        // tool list entirely. Without this, the LLM still sees tool
+        // descriptors in the API contract and tries to "call" them by
+        // generating raw JSON in the assistant content — which we can't
+        // dispatch, so the user gets back the JSON literal instead of an
+        // executed tool result. Honest fallback: tool-less chat.
+        try {
+          const { getModelToolConfig } = await import('../../config/model-tools.js');
+          // CodeBuddyClient exposes `getCurrentModel()`; the previous
+          // `(client as { defaultModel? }).defaultModel` access always
+          // resolved to undefined because that field doesn't exist on
+          // the dispatcher class — left the guard latent for ages.
+          const modelName = this.deps.client.getCurrentModel() ?? '';
+          if (modelName) {
+            const cfg = getModelToolConfig(modelName);
+            if (cfg.supportsToolCalls === false && tools.length > 0) {
+              logger.debug(
+                `[agent-executor] supportsToolCalls=false for ${modelName} — dropping ${tools.length} tools from chat call`,
+              );
+              tools = [];
+            }
+          }
+        } catch { /* model-tools is optional, never block the loop */ }
 
         const preparedMessages = prepareTurnMessages(this.deps.contextManager, messages);
 
@@ -1176,8 +1245,16 @@ export class AgentExecutor {
 
       this.config.recordSessionCost(inputTokens, totalOutputTokens);
 
-      // Display per-turn token usage (streaming path)
-      const streamTurnCost = estimateCost(inputTokens, totalOutputTokens);
+      // Display per-turn token usage (streaming path). Pass the model
+      // name so estimateCost can zero out subscription-billed models
+      // (e.g. gpt-5.5 via ChatGPT Codex backend) — flat-fee, not per token.
+      const streamTurnCost = estimateCost(
+        inputTokens,
+        totalOutputTokens,
+        undefined,
+        undefined,
+        this.deps.client.getCurrentModel(),
+      );
       const streamUsageDisplay = formatTokenUsage({ inputTokens, outputTokens: totalOutputTokens, cost: streamTurnCost });
       logger.info(`Token usage: ${streamUsageDisplay}`);
       yield { type: "content", content: `\n${streamUsageDisplay}` };

@@ -39,6 +39,7 @@ import { API_PROVIDER_PRESETS, PI_AI_CURATED_PRESETS } from '../../shared/api-mo
  * Application configuration schema
  */
 export type ProviderType =
+  | 'chatgpt'
   | 'openrouter'
   | 'anthropic'
   | 'custom'
@@ -49,6 +50,7 @@ export type ProviderType =
 export type CustomProtocolType = 'anthropic' | 'openai' | 'gemini';
 export type AppTheme = 'dark' | 'light' | 'system';
 export type ProviderProfileKey =
+  | 'chatgpt'
   | 'openrouter'
   | 'anthropic'
   | 'openai'
@@ -176,6 +178,13 @@ const DIRECT_READ_KEYS = new Set<keyof AppConfig>([
 ]);
 
 const defaultProfiles: Record<ProviderProfileKey, ProviderProfile> = {
+  chatgpt: {
+    // Sentinel apiKey — `oauth-chatgpt` triggers ChatGptResponsesProvider
+    // routing in CodeBuddyClient. Real auth lives in ~/.codebuddy/codex-auth.json.
+    apiKey: 'oauth-chatgpt',
+    baseUrl: 'https://chatgpt.com/backend-api/codex',
+    model: 'gpt-5.5',
+  },
   openrouter: {
     apiKey: '',
     baseUrl: 'https://openrouter.ai/api/v1',

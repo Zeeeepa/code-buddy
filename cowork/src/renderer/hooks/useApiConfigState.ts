@@ -76,6 +76,7 @@ const DEFAULT_CONFIG_SET_NAME = 'Par défaut';
 export const FALLBACK_PROVIDER_PRESETS: ProviderPresets = API_PROVIDER_PRESETS;
 
 const PROFILE_KEYS: ProviderProfileKey[] = [
+  'chatgpt',
   'openrouter',
   'anthropic',
   'openai',
@@ -93,6 +94,7 @@ function isProfileKey(value: unknown): value is ProviderProfileKey {
 
 function isProviderType(value: unknown): value is ProviderType {
   return (
+    value === 'chatgpt' ||
     value === 'openrouter' ||
     value === 'anthropic' ||
     value === 'custom' ||

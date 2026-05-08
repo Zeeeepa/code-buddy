@@ -43,6 +43,8 @@ vi.mock('../../src/prompts/index.js', () => ({
   getSystemPromptForMode: promptMocks.getSystemPromptForModeMock,
   getPromptManager: () => ({ buildSystemPrompt: promptMocks.buildSystemPromptMock }),
   autoSelectPromptId: promptMocks.autoSelectPromptIdMock,
+  // Phase d.23: prompt-builder swaps to chat-only when supportsToolCalls=false.
+  getChatOnlySystemPrompt: vi.fn((_cwd?: string, _custom?: string) => 'CHAT_ONLY_BODY'),
 }));
 
 const modelToolsMock = vi.hoisted(() => ({
