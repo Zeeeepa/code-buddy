@@ -75,6 +75,20 @@ export function ModelInstallDialog() {
     };
   }, [showModelInstallDialog]);
 
+  // Tear down the progress listener whenever the dialog unmounts or
+  // a new download starts. MUST be declared BEFORE any early-return
+  // so the hook order is stable across renders (React Rules of Hooks).
+  // Previously this lived after the `installed === true && !showDialog`
+  // early-returns, which caused React error #185 in production builds
+  // when `installed` flipped from null → false (the dialog suddenly
+  // ran 7 hooks instead of 6 between renders).
+  useEffect(() => {
+    return () => {
+      unsubProgressRef.current?.();
+      unsubProgressRef.current = null;
+    };
+  }, []);
+
   // The dialog stays invisible when the model is already installed AND
   // the user hasn't explicitly opened it. Once the explicit open flag
   // flips on, we always show — even with the model present — so the
@@ -86,15 +100,6 @@ export function ModelInstallDialog() {
     // First check still in flight, model presence unknown — stay quiet.
     return null;
   }
-
-  // Tear down the progress listener whenever the dialog unmounts or
-  // a new download starts.
-  useEffect(() => {
-    return () => {
-      unsubProgressRef.current?.();
-      unsubProgressRef.current = null;
-    };
-  }, []);
 
   const handleClose = () => {
     setShowModelInstallDialog(false);

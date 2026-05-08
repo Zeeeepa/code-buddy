@@ -599,6 +599,11 @@ function createWindow() {
   } else {
     mainWindow.loadFile(join(__dirname, '../../dist/index.html'));
   }
+  // Phase d.21 audit-debug — auto-open DevTools when NODE_ENV=development
+  // so React errors come with full stack + console logs are visible.
+  if (process.env.NODE_ENV === 'development' && mainWindow) {
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
+  }
 
   mainWindow.on('closed', () => {
     mainWindow = null;

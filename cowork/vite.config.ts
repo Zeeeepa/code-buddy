@@ -90,5 +90,13 @@ export default defineConfig({
     sourcemap: process.env.NODE_ENV !== 'production',
     outDir: 'dist',
     emptyOutDir: true,
+    minify: process.env.NODE_ENV === 'production',
+  },
+  define: {
+    // Bake NODE_ENV at build time so React picks the correct prod/dev
+    // bundle. Without this, vite leaves `process.env.NODE_ENV` as a
+    // runtime expression which evaluates to "production" inside the
+    // packaged bundle even when launched with NODE_ENV=development.
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'production'),
   },
 });
