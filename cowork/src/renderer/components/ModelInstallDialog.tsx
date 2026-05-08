@@ -30,11 +30,16 @@ type DialogStatus = 'idle' | 'checking' | 'installing' | 'downloading' | 'succes
  * direct .onnx, so we point at the most popular community mirror
  * (Immich's mirror of buffalo_s, used by their face-recognition feature).
  *
- * The field is editable so the user can paste another mirror if this one
- * goes away — we never silently fetch from a hardcoded URL.
+ * The Buffalo_S "model pack" is actually a zip with several ONNX files
+ * (detection, recognition, gender-age…). For face recognition we only
+ * need the recognition stream (`recognition/model.onnx`, ~13 MB). The
+ * Immich mirror exposes it directly — no zip to extract.
+ *
+ * The field is editable so the user can paste another mirror if this
+ * one goes away — we never silently fetch from a hardcoded URL.
  */
 const DEFAULT_DOWNLOAD_URL =
-  'https://huggingface.co/immich-app/buffalo_s/resolve/main/buffalo_s.onnx';
+  'https://huggingface.co/immich-app/buffalo_s/resolve/main/recognition/model.onnx';
 
 export function ModelInstallDialog() {
   const showModelInstallDialog = useAppStore((s) => s.showModelInstallDialog);
