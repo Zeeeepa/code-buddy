@@ -251,6 +251,14 @@ export {
   resetAdvisorConfigProvider,
 } from './advisor-tools.js';
 
+// Tool Adapters - Fleet (peer_delegate, list_peers) — Phase (d).17
+export {
+  PeerDelegateTool,
+  ListPeersTool,
+  createFleetTools,
+  resetFleetToolInstances,
+} from './fleet-tools.js';
+
 // Tool Adapters - AskUserQuestion (ask_user_question)
 export {
   AskUserQuestionExecuteTool,
@@ -358,6 +366,7 @@ export async function createAllToolsAsync(): Promise<ITool[]> {
   const { createMergeConflictTools } = await import('./merge-conflict-tools.js');
   const { createVulnScannerTools } = await import('./vuln-scanner-tools.js');
   const { createAdvisorTools } = await import('./advisor-tools.js');
+  const { createFleetTools } = await import('./fleet-tools.js');
   const { createAskUserQuestionTools } = await import('./ask-user-question-tools.js');
   const { createExitPlanModeTools } = await import('./exit-plan-mode-tools.js');
   
@@ -396,6 +405,7 @@ export async function createAllToolsAsync(): Promise<ITool[]> {
     ...createMergeConflictTools(),
     ...createVulnScannerTools(),
     ...createAdvisorTools(),
+    ...createFleetTools(),
     ...createAskUserQuestionTools(),
     ...createExitPlanModeTools(),
     ...createMcpTools(),

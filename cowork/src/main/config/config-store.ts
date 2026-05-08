@@ -39,6 +39,7 @@ import { API_PROVIDER_PRESETS, PI_AI_CURATED_PRESETS } from '../../shared/api-mo
  * Application configuration schema
  */
 export type ProviderType =
+  | 'chatgpt'
   | 'openrouter'
   | 'anthropic'
   | 'custom'
@@ -49,6 +50,7 @@ export type ProviderType =
 export type CustomProtocolType = 'anthropic' | 'openai' | 'gemini';
 export type AppTheme = 'dark' | 'light' | 'system';
 export type ProviderProfileKey =
+  | 'chatgpt'
   | 'openrouter'
   | 'anthropic'
   | 'openai'
@@ -143,6 +145,15 @@ export interface AppConfig {
     apiKey?: string;
     /** Model override forwarded on every request */
     model?: string;
+    /**
+     * Activate Gemini's native server-side Google Search grounding when
+     * the resolved model is in the Gemini family (gemini-* / gemini-2.* /
+     * gemini-3.*). Wired through to GeminiNativeProvider via
+     * setDefaultGoogleSearch at engine adapter init. No-op for non-Gemini
+     * providers — kept here rather than per-provider because this is a
+     * UX-level toggle, not a provider config.
+     */
+    geminiGroundingEnabled?: boolean;
   };
 }
 
@@ -167,6 +178,13 @@ const DIRECT_READ_KEYS = new Set<keyof AppConfig>([
 ]);
 
 const defaultProfiles: Record<ProviderProfileKey, ProviderProfile> = {
+  chatgpt: {
+    // Sentinel apiKey — `oauth-chatgpt` triggers ChatGptResponsesProvider
+    // routing in CodeBuddyClient. Real auth lives in ~/.codebuddy/codex-auth.json.
+    apiKey: 'oauth-chatgpt',
+    baseUrl: 'https://chatgpt.com/backend-api/codex',
+    model: 'gpt-5.5',
+  },
   openrouter: {
     apiKey: '',
     baseUrl: 'https://openrouter.ai/api/v1',

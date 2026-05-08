@@ -11,7 +11,14 @@ import { normalizeBaseURL, DEFAULT_BASE_URL } from "../utils/base-url.js";
 import type { CircuitBreakerConfig } from "../providers/circuit-breaker.js";
 import { GeminiNativeProvider } from "./providers/provider-gemini-native.js";
 import { OpenAICompatProvider } from "./providers/provider-openai-compat.js";
+import { ChatGptResponsesProvider } from "./providers/provider-chatgpt-responses.js";
 import { withStreamRetry } from "./stream-retry.js";
+
+/** Sentinel apiKey for the ChatGPT OAuth path — auto-detect chain in
+ *  `src/index.ts` passes this when `~/.codebuddy/codex-auth.json` exists. */
+export const CHATGPT_OAUTH_SENTINEL = 'oauth-chatgpt';
+/** Canonical baseURL for the ChatGPT Codex Responses backend. */
+export const CHATGPT_RESPONSES_BASE_URL = 'https://chatgpt.com/backend-api/codex';
 
 export type CodeBuddyMessage = ChatCompletionMessageParam;
 
@@ -112,6 +119,17 @@ export interface ChatOptions {
   /** tool_choice override for this request */
   tool_choice?: 'auto' | 'none' | 'required';
   /**
+   * Enable Gemini's native server-side Google Search grounding for this
+   * request. Only affects the GeminiNativeProvider — ignored by the
+   * OpenAI-compat path. When on, the response includes citation metadata
+   * which we surface as a "Sources:" footer in the assistant content.
+   *
+   * Defaults to the provider-level default (set via
+   * `setDefaultGoogleSearch` or env var `GEMINI_GOOGLE_SEARCH=1`).
+   * Pass `false` here to force off even when the default is on.
+   */
+  googleSearch?: boolean;
+  /**
    * Mid-stream retry on network errors (ECONNRESET, "socket hang up",
    * undici stream terminated, etc.). Wraps `chatStream()` with the
    * `withStreamRetry` helper.
@@ -162,10 +180,15 @@ export class CodeBuddyClient {
   private geminiRequestTimeoutMs: number;
   private circuitBreakerConfig: Partial<CircuitBreakerConfig> | undefined;
   private defaultThinkingLevel: GeminiThinkingLevel | undefined;
+  private defaultGoogleSearch: boolean | undefined;
   /** Strategy for native Gemini API calls — non-null only when isGeminiProvider. */
   private geminiProvider: GeminiNativeProvider | null = null;
   /** Strategy for OpenAI-compat backends — non-null only when NOT isGeminiProvider. */
   private openaiCompatProvider: OpenAICompatProvider | null = null;
+  /** Strategy for ChatGPT Codex Responses backend (OAuth, Patrice's plan). */
+  private chatgptProvider: ChatGptResponsesProvider | null = null;
+  /** True when routed through ChatGPT Responses (apiKey sentinel or matching baseURL). */
+  private isChatGptProvider: boolean = false;
 
   /**
    * Configure the circuit breaker for this client.
@@ -179,6 +202,17 @@ export class CodeBuddyClient {
     this.defaultThinkingLevel = level;
     this.geminiProvider?.setDefaultThinkingLevel(level);
     logger.debug('Default Gemini thinkingLevel set from settings', { level });
+  }
+
+  /**
+   * Enable Gemini's native server-side Google Search grounding by default
+   * for every request through this client. Per-call `ChatOptions.googleSearch`
+   * still takes precedence (including `false` to force off).
+   */
+  setDefaultGoogleSearch(enabled: boolean): void {
+    this.defaultGoogleSearch = enabled;
+    this.geminiProvider?.setDefaultGoogleSearch(enabled);
+    logger.debug('Default Gemini googleSearch grounding set', { enabled });
   }
 
   setCircuitBreakerConfig(config: Partial<CircuitBreakerConfig>): void {
@@ -205,6 +239,12 @@ export class CodeBuddyClient {
 
     // Detect Gemini provider
     this.isGeminiProvider = this.baseURL.includes('generativelanguage.googleapis.com');
+    // Detect ChatGPT Codex (OAuth subscription auth). Either the sentinel
+    // apiKey set by the auto-detect chain, or an explicit baseURL pointing
+    // at the Codex Responses backend.
+    this.isChatGptProvider =
+      apiKey === CHATGPT_OAUTH_SENTINEL ||
+      this.baseURL.includes('chatgpt.com/backend-api/codex');
     const envGeminiTimeout = Number(
       process.env.CODEBUDDY_GEMINI_TIMEOUT_MS || process.env.CODEBUDDY_REQUEST_TIMEOUT_MS
     );
@@ -212,6 +252,12 @@ export class CodeBuddyClient {
       Number.isFinite(envGeminiTimeout) && envGeminiTimeout >= 5000
         ? envGeminiTimeout
         : 60000;
+
+    // Env var opt-in for default Google Search grounding (only meaningful
+    // for Gemini-native; OpenAI-compat path ignores it).
+    if (process.env.GEMINI_GOOGLE_SEARCH === '1') {
+      this.defaultGoogleSearch = true;
+    }
 
     const envMax = Number(process.env.CODEBUDDY_MAX_TOKENS);
     if (Number.isFinite(envMax) && envMax > 0) {
@@ -222,8 +268,9 @@ export class CodeBuddyClient {
     }
 
     // Instantiate the active strategy. Exactly one of geminiProvider /
-    // openaiCompatProvider is non-null. defaultMaxTokens is resolved first
-    // so the provider gets the same value the legacy methods used.
+    // openaiCompatProvider / chatgptProvider is non-null. defaultMaxTokens
+    // is resolved first so the provider gets the same value the legacy
+    // methods used.
     if (this.isGeminiProvider) {
       this.geminiProvider = new GeminiNativeProvider({
         apiKey: this.apiKey,
@@ -232,6 +279,25 @@ export class CodeBuddyClient {
         defaultMaxTokens: this.defaultMaxTokens,
         geminiRequestTimeoutMs: this.geminiRequestTimeoutMs,
         defaultThinkingLevel: this.defaultThinkingLevel,
+        defaultGoogleSearch: this.defaultGoogleSearch,
+      });
+    } else if (this.isChatGptProvider) {
+      // Lazy-imported via dynamic require to avoid circular init in tests.
+      // The auth provider closure runs on every request → opportunistic
+      // refresh stays automatic.
+      this.chatgptProvider = new ChatGptResponsesProvider({
+        authProvider: async () => {
+          const { getChatGptAuth } = await import('../providers/codex-oauth.js');
+          return getChatGptAuth();
+        },
+        refreshAuth: async () => {
+          // After a 401 we re-pull from disk — getChatGptAuth handles the
+          // refresh dance itself when last_refresh is stale.
+          const { getChatGptAuth } = await import('../providers/codex-oauth.js');
+          return getChatGptAuth();
+        },
+        model: model || this.currentModel,
+        defaultMaxTokens: this.defaultMaxTokens,
       });
     } else {
       this.openaiCompatProvider = new OpenAICompatProvider({
@@ -310,6 +376,7 @@ export class CodeBuddyClient {
     this.currentModel = model;
     this.geminiProvider?.setModel(model);
     this.openaiCompatProvider?.setModel(model);
+    this.chatgptProvider?.setModel(model);
   }
 
   getCurrentModel(): string {
@@ -324,7 +391,9 @@ export class CodeBuddyClient {
    * Derive a human-readable provider name from the base URL.
    */
   getProviderName(): string {
+    if (this.isChatGptProvider) return 'ChatGPT (OAuth)';
     const url = this.baseURL.toLowerCase();
+    if (url.includes('chatgpt.com')) return 'ChatGPT (OAuth)';
     if (url.includes('api.x.ai') || url.includes('xai')) return 'xAI';
     if (url.includes('openai.com')) return 'OpenAI';
     if (url.includes('anthropic.com')) return 'Anthropic';
@@ -391,6 +460,9 @@ export class CodeBuddyClient {
     if (this.geminiProvider) {
       return this.geminiProvider.chat(messages, tools, opts);
     }
+    if (this.chatgptProvider) {
+      return this.chatgptProvider.chat(messages, tools, opts);
+    }
     return this.openaiCompatProvider!.chat(messages, tools, opts, searchOptions);
   }
 
@@ -410,6 +482,9 @@ export class CodeBuddyClient {
     const factory = (): AsyncGenerator<ChatCompletionChunk, void, unknown> => {
       if (this.geminiProvider) {
         return this.geminiProvider.chatStream(messages, tools, opts);
+      }
+      if (this.chatgptProvider) {
+        return this.chatgptProvider.chatStream(messages, tools, opts);
       }
       return this.openaiCompatProvider!.chatStream(messages, tools, opts, searchOptions);
     };

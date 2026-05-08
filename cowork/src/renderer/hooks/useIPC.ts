@@ -393,6 +393,47 @@ export function useIPC() {
             );
             break;
 
+          case 'fleet.peers':
+            store.setFleetPeers(event.payload.peers);
+            break;
+
+          case 'fleet.peer.update':
+            store.upsertFleetPeer(event.payload.peer);
+            break;
+
+          case 'fleet.event':
+            store.appendFleetEvent(event.payload);
+            break;
+
+          case 'a2a.task.update':
+            store.upsertA2ATask(event.payload);
+            break;
+
+          case 'team.update':
+            // Always refresh from snapshot — covers both started and stopped
+            store.setTeamSnapshot(event.payload.snapshot);
+            break;
+
+          case 'team.member.update':
+            if (event.payload.event === 'added') {
+              store.upsertTeamMember(event.payload.member);
+            } else {
+              store.removeTeamMember(event.payload.memberId);
+            }
+            break;
+
+          case 'team.task.update':
+            if (event.payload.event === 'added' || event.payload.event === 'updated') {
+              store.upsertTeamTask(event.payload.task);
+            }
+            // 'assigned' updates the task too — refetch via assignTask handler;
+            // the followup 'updated' event will carry the canonical task state
+            break;
+
+          case 'team.message':
+            store.appendTeamMessage(event.payload);
+            break;
+
           case 'notification.message':
             store.addNotification(event.payload.notification);
             break;
@@ -884,7 +925,14 @@ export function useIPC() {
 
   const codexOauthLogin = useCallback(async () => {
     if (!isElectron) return { success: false, error: 'Not running in Electron' };
-    return invoke<{ success: boolean; tokens?: any; error?: string }>({
+    return invoke<{
+      success: boolean;
+      email?: string | null;
+      plan_type?: string | null;
+      account_id?: string | null;
+      is_fedramp?: boolean;
+      error?: string;
+    }>({
       type: 'config.codexOauthLogin',
       payload: {},
     });
@@ -894,6 +942,22 @@ export function useIPC() {
     if (!isElectron) return { success: false, error: 'Not running in Electron' };
     return invoke<{ success: boolean; error?: string }>({
       type: 'config.codexOauthClear',
+      payload: {},
+    });
+  }, [invoke]);
+
+  const codexOauthStatus = useCallback(async () => {
+    if (!isElectron) return { success: false, signedIn: false, error: 'Not running in Electron' };
+    return invoke<{
+      success: boolean;
+      signedIn: boolean;
+      email?: string | null;
+      plan_type?: string | null;
+      account_id?: string | null;
+      is_fedramp?: boolean;
+      error?: string;
+    }>({
+      type: 'config.codexOauthStatus',
       payload: {},
     });
   }, [invoke]);
@@ -927,6 +991,7 @@ export function useIPC() {
     geminiOauthClear,
     codexOauthLogin,
     codexOauthClear,
+    codexOauthStatus,
     isElectron,
   };
 }

@@ -97,11 +97,21 @@ export type Theme = typeof THEMES[number];
 // ----------------------------------------------------------------------------
 
 export const SettingsSchema = z.object({
+  // `model` is intentionally optional with NO default. The auto-detect
+  // chain in src/index.ts (`loadModel()` → `getDetectedProvider()`)
+  // resolves the right model based on the active provider (ChatGPT
+  // OAuth → gpt-5.5, Ollama → qwen2.5-coder:7b, Grok → grok-3-fast,
+  // etc.). A hardcoded default here used to write `'grok-3-latest'`
+  // into every project's settings.json on first load, which then
+  // hijacked the auto-detect on later runs — the ChatGPT provider
+  // would route correctly but the request body still carried
+  // `grok-3-latest` in the `model` field, getting rejected by the
+  // Codex backend.
   model: z.string()
     .min(1, 'Model name cannot be empty')
     .max(100, 'Model name too long')
-    .default('grok-3-latest')
-    .describe('Default AI model to use'),
+    .optional()
+    .describe('AI model to use (auto-detected from provider when unset)'),
 
   maxRounds: z.number()
     .int('Must be an integer')

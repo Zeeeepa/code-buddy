@@ -65,10 +65,18 @@ type PendingConfigSetAction = { type: 'switch'; targetSetId: string };
 const isElectron = typeof window !== 'undefined' && window.electronAPI !== undefined;
 const CONFIG_SET_LIMIT = 20;
 const DEFAULT_CONFIG_SET_ID = 'default';
-const DEFAULT_CONFIG_SET_NAME_ZH = '默认方案';
+// Display name for the bundled "default" config set. Was hardcoded in
+// Mandarin (`默认方案`) when the codebase was forked; replaced here with
+// a locale-neutral French string. Surfaced in the API Settings dialog
+// as "Par défaut" — matches the parenthetical that already appears in
+// the dropdown UI. Locale-aware naming would need a t() call which
+// isn't available in this non-component module; the current pragmatic
+// fix avoids importing i18n into a hot config-state hook.
+const DEFAULT_CONFIG_SET_NAME = 'Par défaut';
 export const FALLBACK_PROVIDER_PRESETS: ProviderPresets = API_PROVIDER_PRESETS;
 
 const PROFILE_KEYS: ProviderProfileKey[] = [
+  'chatgpt',
   'openrouter',
   'anthropic',
   'openai',
@@ -86,6 +94,7 @@ function isProfileKey(value: unknown): value is ProviderProfileKey {
 
 function isProviderType(value: unknown): value is ProviderType {
   return (
+    value === 'chatgpt' ||
     value === 'openrouter' ||
     value === 'anthropic' ||
     value === 'custom' ||
@@ -552,7 +561,7 @@ export function buildApiConfigSets(
   return [
     {
       id: fallbackId,
-      name: DEFAULT_CONFIG_SET_NAME_ZH,
+      name: DEFAULT_CONFIG_SET_NAME,
       isSystem: true,
       provider: activeMeta.provider,
       customProtocol: activeMeta.customProtocol,

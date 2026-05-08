@@ -45,6 +45,7 @@ import {
   CODEBASE_REPLACE_TOOLS,
   SESSION_TOOLS,
 } from "./tool-definitions/index.js";
+import { FLEET_TOOLS } from "./fleet-tool-defs.js";
 
 /**
  * Plugin tool definition interface
@@ -146,6 +147,10 @@ export function initializeToolRegistry(): void {
   // singleton on first use. Persistence + cleanup timer require [multi_agent_system.sessions].enabled
   // in TOML (cf. Phase F boot wiring).
   registerGroup(SESSION_TOOLS);
+
+  // Fleet tools — peer_delegate, list_peers (Phase (d).17). Always available;
+  // peer_delegate returns a clear error when no peers are connected.
+  registerGroup(FLEET_TOOLS);
 
   isRegistryInitialized = true;
   logger.debug('Tool registry initialized with built-in tools');

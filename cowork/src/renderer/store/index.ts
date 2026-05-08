@@ -19,6 +19,13 @@ import type {
   SubAgent,
   SubAgentStatus,
   NotificationEntry,
+  FleetPeer,
+  FleetEventRecord,
+  A2ATask,
+  TeamSnapshot,
+  TeamMember,
+  TeamTask,
+  TeamMailboxMessage,
 } from '../types';
 import { applySessionUpdate } from '../utils/session-update';
 
@@ -218,6 +225,33 @@ interface AppState {
   splitPaneEnabled: boolean;
   splitPaneRatio: number;
 
+  // Presence (face-memory) — UI dialogs + opt-in toggle.
+  // The toggle is persisted because the user's choice to run the camera
+  // service should survive restarts; the dialogs are transient.
+  showEnrollmentDialog: boolean;
+  showModelInstallDialog: boolean;
+  presenceEnabled: boolean;
+  // Live presence — pushed by PresenceService whenever the main-process
+  // bridge fires an event. Volatile (no localStorage) — it's the present.
+  // `currentPresence` carries the matched person while the camera sees
+  // them; `lastPresenceEventType` lets the indicator distinguish "Patrice
+  // est là" from "un visage inconnu" from "personne".
+  currentPresence: {
+    personId: string;
+    name: string;
+    aliases: string[];
+    confidence: number;
+    matchedAt: number;
+  } | null;
+  lastPresenceEventType: 'detected' | 'unknown' | 'left' | 'enrolled' | null;
+
+  // Multi-agent orchestrator launcher — modal-driven UI for triggering
+  // the existing OrchestratorBridge in main. The last-used options are
+  // persisted (localStorage) so the user doesn't have to re-pick the
+  // strategy + maxRounds on every spawn.
+  showOrchestratorLauncher: boolean;
+  lastOrchestratorOptions: { strategy: string; maxRounds: number };
+
   // Auto-update
   updateInfo: UpdateInfo | null;
 
@@ -232,6 +266,21 @@ interface AppState {
   // Sub-agents per session (Claude Cowork parity)
   subAgents: Record<string, SubAgent[]>;
   subAgentOutputs: Record<string, Record<string, string>>; // sessionId → agentId → output
+
+  // Fleet — multi-host Code Buddy listener (GAP 3)
+  fleetPeers: Record<string, FleetPeer>;
+  fleetEvents: FleetEventRecord[]; // ring buffer (FLEET_EVENT_RING)
+  showFleetPanel: boolean;
+
+  // A2A active tasks (GAP 1)
+  a2aTasks: Record<string, A2ATask>;
+
+  // Agent Teams — Phase 4 layer 9
+  team: TeamSnapshot | null;
+  teamMembers: Record<string, TeamMember>;
+  teamTasks: Record<string, TeamTask>;
+  teamMailbox: TeamMailboxMessage[];
+  showTeamPanel: boolean;
 
   // Notifications (Claude Cowork parity)
   notifications: NotificationEntry[];
@@ -372,6 +421,27 @@ interface AppState {
   toggleSplitPane: () => void;
   setSplitPaneRatio: (ratio: number) => void;
 
+  // Presence actions
+  setShowEnrollmentDialog: (show: boolean) => void;
+  setShowModelInstallDialog: (show: boolean) => void;
+  setPresenceEnabled: (enabled: boolean) => void;
+  setCurrentPresence: (
+    payload: {
+      type: 'detected' | 'unknown' | 'left' | 'enrolled';
+      match?: {
+        personId: string;
+        name: string;
+        aliases: string[];
+        confidence: number;
+        matchedAt: number;
+      };
+    } | null,
+  ) => void;
+
+  // Orchestrator launcher actions
+  setShowOrchestratorLauncher: (show: boolean) => void;
+  setLastOrchestratorOptions: (opts: { strategy: string; maxRounds: number }) => void;
+
   // Update actions
   setUpdateInfo: (info: UpdateInfo | null) => void;
 
@@ -392,6 +462,25 @@ interface AppState {
   completeSubAgent: (sessionId: string, agentId: string, result: string) => void;
   appendSubAgentOutput: (sessionId: string, agentId: string, delta: string) => void;
   clearSubAgents: (sessionId: string) => void;
+
+  // Fleet actions
+  setFleetPeers: (peers: FleetPeer[]) => void;
+  upsertFleetPeer: (peer: FleetPeer) => void;
+  removeFleetPeer: (peerId: string) => void;
+  appendFleetEvent: (event: FleetEventRecord) => void;
+  setShowFleetPanel: (show: boolean) => void;
+
+  // A2A task actions
+  upsertA2ATask: (task: A2ATask) => void;
+  removeA2ATask: (taskId: string) => void;
+
+  // Team actions
+  setTeamSnapshot: (snapshot: TeamSnapshot | null) => void;
+  upsertTeamMember: (member: TeamMember) => void;
+  removeTeamMember: (memberId: string) => void;
+  upsertTeamTask: (task: TeamTask) => void;
+  appendTeamMessage: (msg: TeamMailboxMessage) => void;
+  setShowTeamPanel: (show: boolean) => void;
 
   // Notification actions
   addNotification: (notification: NotificationEntry) => void;
@@ -501,6 +590,43 @@ export const useAppStore = create<AppState>((set) => ({
       return 0.5;
     }
   })(),
+  showEnrollmentDialog: false,
+  showModelInstallDialog: false,
+  currentPresence: null,
+  lastPresenceEventType: null,
+  showOrchestratorLauncher: false,
+  lastOrchestratorOptions: ((): { strategy: string; maxRounds: number } => {
+    try {
+      const raw =
+        typeof window !== 'undefined'
+          ? window.localStorage?.getItem('cowork.orchestrator.lastOptions')
+          : null;
+      if (raw) {
+        const parsed = JSON.parse(raw) as { strategy?: string; maxRounds?: number };
+        return {
+          strategy: typeof parsed.strategy === 'string' ? parsed.strategy : 'parallel',
+          maxRounds:
+            typeof parsed.maxRounds === 'number' && parsed.maxRounds > 0
+              ? parsed.maxRounds
+              : 3,
+        };
+      }
+    } catch {
+      /* ignore */
+    }
+    return { strategy: 'parallel', maxRounds: 3 };
+  })(),
+  presenceEnabled: ((): boolean => {
+    try {
+      // Default true — but the service still won't start the camera until
+      // at least one identity is enrolled (PresenceService.start() guard).
+      return typeof window !== 'undefined'
+        ? window.localStorage?.getItem('cowork.presence.enabled') !== '0'
+        : true;
+    } catch {
+      return true;
+    }
+  })(),
   updateInfo: null,
   searchQuery: '',
   searchActive: false,
@@ -508,6 +634,15 @@ export const useAppStore = create<AppState>((set) => ({
   activeProjectId: null,
   subAgents: {},
   subAgentOutputs: {},
+  fleetPeers: {},
+  fleetEvents: [],
+  showFleetPanel: false,
+  a2aTasks: {},
+  team: null,
+  teamMembers: {},
+  teamTasks: {},
+  teamMailbox: [],
+  showTeamPanel: false,
   notifications: [],
   showNotificationCenter: false,
 
@@ -1053,6 +1188,51 @@ export const useAppStore = create<AppState>((set) => ({
     }
   },
 
+  // Presence actions
+  setShowEnrollmentDialog: (show) => set({ showEnrollmentDialog: show }),
+  setShowModelInstallDialog: (show) => set({ showModelInstallDialog: show }),
+  setPresenceEnabled: (enabled) => {
+    set({ presenceEnabled: enabled });
+    try {
+      window.localStorage?.setItem('cowork.presence.enabled', enabled ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  },
+  setCurrentPresence: (payload) => {
+    if (payload === null) {
+      set({ currentPresence: null, lastPresenceEventType: null });
+      return;
+    }
+    // 'left' clears the current match; 'enrolled' is informational and
+    // doesn't change who's currently in front of the camera; 'detected'
+    // sets the match; 'unknown' keeps currentPresence null but records
+    // the event type so the indicator can show "👤 inconnu".
+    if (payload.type === 'left') {
+      set({ currentPresence: null, lastPresenceEventType: 'left' });
+    } else if (payload.type === 'detected' && payload.match) {
+      set({ currentPresence: payload.match, lastPresenceEventType: 'detected' });
+    } else if (payload.type === 'unknown') {
+      set({ currentPresence: null, lastPresenceEventType: 'unknown' });
+    } else {
+      set({ lastPresenceEventType: payload.type });
+    }
+  },
+
+  // Orchestrator launcher actions
+  setShowOrchestratorLauncher: (show) => set({ showOrchestratorLauncher: show }),
+  setLastOrchestratorOptions: (opts) => {
+    set({ lastOrchestratorOptions: opts });
+    try {
+      window.localStorage?.setItem(
+        'cowork.orchestrator.lastOptions',
+        JSON.stringify(opts),
+      );
+    } catch {
+      /* ignore */
+    }
+  },
+
   // Update actions
   setUpdateInfo: (info) => set({ updateInfo: info }),
 
@@ -1119,6 +1299,76 @@ export const useAppStore = create<AppState>((set) => ({
         },
       };
     }),
+
+  // Fleet actions (GAP 3)
+  setFleetPeers: (peers) =>
+    set(() => ({
+      fleetPeers: peers.reduce<Record<string, FleetPeer>>((acc, p) => {
+        acc[p.id] = p;
+        return acc;
+      }, {}),
+    })),
+  upsertFleetPeer: (peer) =>
+    set((state) => ({ fleetPeers: { ...state.fleetPeers, [peer.id]: peer } })),
+  removeFleetPeer: (peerId) =>
+    set((state) => {
+      const { [peerId]: _dropped, ...rest } = state.fleetPeers;
+      return {
+        fleetPeers: rest,
+        fleetEvents: state.fleetEvents.filter((e) => e.peerId !== peerId),
+      };
+    }),
+  appendFleetEvent: (event) =>
+    set((state) => {
+      const next = [...state.fleetEvents, event];
+      const FLEET_EVENT_RING = 200;
+      while (next.length > FLEET_EVENT_RING) next.shift();
+      return { fleetEvents: next };
+    }),
+  setShowFleetPanel: (show) => set({ showFleetPanel: show }),
+
+  // A2A task actions (GAP 1)
+  upsertA2ATask: (task) =>
+    set((state) => ({ a2aTasks: { ...state.a2aTasks, [task.taskId]: task } })),
+  removeA2ATask: (taskId) =>
+    set((state) => {
+      const { [taskId]: _dropped, ...rest } = state.a2aTasks;
+      return { a2aTasks: rest };
+    }),
+
+  // Team actions (Phase 4 layer 9)
+  setTeamSnapshot: (snapshot) =>
+    set(() => {
+      if (!snapshot) {
+        return { team: null, teamMembers: {}, teamTasks: {}, teamMailbox: [] };
+      }
+      const members = snapshot.members.reduce<Record<string, TeamMember>>((acc, m) => {
+        acc[m.id] = m;
+        return acc;
+      }, {});
+      return { team: snapshot, teamMembers: members };
+    }),
+  upsertTeamMember: (member) =>
+    set((state) => ({
+      teamMembers: { ...state.teamMembers, [member.id]: member },
+    })),
+  removeTeamMember: (memberId) =>
+    set((state) => {
+      const { [memberId]: _dropped, ...rest } = state.teamMembers;
+      return { teamMembers: rest };
+    }),
+  upsertTeamTask: (task) =>
+    set((state) => ({
+      teamTasks: { ...state.teamTasks, [task.id]: task },
+    })),
+  appendTeamMessage: (msg) =>
+    set((state) => {
+      const next = [...state.teamMailbox, msg];
+      const TEAM_MAILBOX_RING = 200;
+      while (next.length > TEAM_MAILBOX_RING) next.shift();
+      return { teamMailbox: next };
+    }),
+  setShowTeamPanel: (show) => set({ showTeamPanel: show }),
   clearSubAgents: (sessionId) =>
     set((state) => {
       const { [sessionId]: _dropped, ...rest } = state.subAgents;

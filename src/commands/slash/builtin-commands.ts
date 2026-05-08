@@ -112,6 +112,33 @@ const coreCommands: SlashCommand[] = [
     arguments: [
       { name: 'action', description: 'validate, show, defaults <schema>, docs <schema>', required: false }
     ]
+  },
+  {
+    name: 'login',
+    description: 'Authenticate with a provider (default: chatgpt — uses your ChatGPT subscription)',
+    prompt: '__LOGIN__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'provider', description: 'chatgpt (default) | gemini', required: false }
+    ]
+  },
+  {
+    name: 'logout',
+    description: 'Clear stored credentials for a provider',
+    prompt: '__LOGOUT__',
+    filePath: '',
+    isBuiltin: true,
+    arguments: [
+      { name: 'provider', description: 'chatgpt (default) | gemini', required: false }
+    ]
+  },
+  {
+    name: 'whoami',
+    description: 'Show current authentication status (email, plan, account)',
+    prompt: '__WHOAMI__',
+    filePath: '',
+    isBuiltin: true
   }
 ];
 

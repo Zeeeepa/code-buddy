@@ -1432,6 +1432,10 @@ describe("CodeBuddyAgent Message Processing", () => {
       expect(entries[0].content).toBe("Hello");
     });
 
+    // Skipped during the runTurnLoop fusion (2026-04-26): the assistant
+    // entry now arrives via the streaming generator's collector path,
+    // and the mock chat response setup in this file targets the legacy
+    // direct chat() call. Tracked for V1.1 mock refactor.
     it.skip("should return assistant response", async () => {
       const entries = await agent.processUserMessage("Hello");
 

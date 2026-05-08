@@ -15,6 +15,7 @@ import { EventEmitter } from 'events';
 import { logger } from '../utils/logger.js';
 import { EnhancedMemory, MemoryEntry, ConversationSummary } from './enhanced-memory.js';
 import { AutoCaptureManager, getAutoCaptureManager, MemoryRecallResult } from './auto-capture.js';
+import { injectPresenceBlock } from './presence-injector.js';
 
 // ============================================================================
 // Types
@@ -120,8 +121,17 @@ export class MemoryLifecycleHooks extends EventEmitter {
         });
       }
 
+      // Append the presence block (face memory from Cowork camera) when
+      // available. Free of Electron deps — reads a stable file path on
+      // disk so the core stays portable. Empty string when nobody is in
+      // front of the camera or when Cowork hasn't run yet.
+      const presenceBlock = await injectPresenceBlock();
+      const injectedContext = presenceBlock
+        ? `${result.injectedContext}\n\n${presenceBlock}`
+        : result.injectedContext;
+
       return {
-        injectedContext: result.injectedContext,
+        injectedContext,
         recalledMemories: result.memories,
         tokenCount: result.tokenCount,
       };

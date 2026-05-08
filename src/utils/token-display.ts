@@ -48,12 +48,30 @@ function formatCost(cost: number): string {
 /**
  * Estimate cost from token counts using approximate model pricing.
  * Uses a simple heuristic; for accurate cost tracking use CostTracker.
+ *
+ * Special-case: returns 0 when `model` indicates a ChatGPT subscription
+ * call (`gpt-5.5*`, `*-codex*`, `codex-1`). Those are billed against
+ * the user's flat-fee Plus/Pro plan, NOT per token, so reporting USD
+ * spend would be misleading. See `cost-tracker.ts:isChatGptSubscriptionModel`.
  */
 export function estimateCost(
   inputTokens: number,
   outputTokens: number,
   inputPricePer1k: number = 0.003,
   outputPricePer1k: number = 0.015,
+  model?: string,
 ): number {
+  if (model && isChatGptSubscriptionModel(model)) return 0;
   return (inputTokens / 1000) * inputPricePer1k + (outputTokens / 1000) * outputPricePer1k;
+}
+
+function isChatGptSubscriptionModel(model: string): boolean {
+  const m = model.toLowerCase();
+  return (
+    m === 'gpt-5.5' ||
+    m.startsWith('gpt-5.5-') ||
+    m.includes('-codex') ||
+    m === 'codex-1' ||
+    m.startsWith('codex-mini')
+  );
 }

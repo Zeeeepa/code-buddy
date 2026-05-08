@@ -220,6 +220,28 @@ export class CodeBuddyAgent extends BaseAgent {
       laneQueue: getLaneQueue(),
       laneId: 'agent-tools',
       messageQueue: this.messageQueue,
+      // Phase d.22 — query-aware system prompt rebuild. Called by the
+      // executor on toolRounds === 0 so trivial queries on `lite`-profile
+      // models (Ollama qwen, llama, deepseek) get a minimal SP (~9 KB)
+      // instead of the full 73 KB rich prompt that confuses small models
+      // into hallucinating JSON tool calls.
+      rebuildSystemPromptForQuery: async (msg: string) => {
+        try {
+          if (!this.promptBuilder) return null;
+          const customInstructions = loadCustomInstructions();
+          return await this.promptBuilder.buildForQuery(
+            msg,
+            systemPromptId,
+            this.getCurrentModel(),
+            customInstructions,
+          );
+        } catch (err) {
+          logger.warn('rebuildSystemPromptForQuery failed', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return null;
+        }
+      },
     }, {
       maxToolRounds: this.maxToolRounds,
       isGrokModel: this.isGrokModel.bind(this),
@@ -473,6 +495,20 @@ export class CodeBuddyAgent extends BaseAgent {
       }).catch((e) => { logger.debug('Advisor toml-config import failed (optional)', { error: String(e) }); });
     }).catch((e) => { logger.debug('Advisor config provider wire failed (optional)', { error: String(e) }); });
 
+    // Phase (d).21 ship 3 — wake NotificationManager via default sink.
+    // Idempotent. Once wired, anyone in the codebase can call notify()
+    // / notifyQuick() and it will gate + log + emit on the manager bus.
+    import('./proactive/notification-default-sink.js')
+      .then(({ wireDefaultNotificationSink }) => wireDefaultNotificationSink())
+      .catch((e) => logger.debug('NotificationManager wire failed (optional)', { error: String(e) }));
+
+    // Phase (d).21 ship 4 — wake ProgressTracker via default sink.
+    // Idempotent. Logs at 25/50/75/100 thresholds; consumers can attach
+    // additional listeners on getProgressTracker() for richer UX.
+    import('./planner/progress-default-sink.js')
+      .then(({ wireDefaultProgressSink }) => wireDefaultProgressSink())
+      .catch((e) => logger.debug('ProgressTracker wire failed (optional)', { error: String(e) }));
+
     // Boot-time auto-start of HeartbeatEngine when [heartbeat] enabled=true in TOML.
     // The /heartbeat slash command can also start it manually at runtime.
     // Wired for autonomous fleet support (AUTONOMOUS-FLEET-PROTOCOL v0.1).
@@ -494,6 +530,39 @@ export class CodeBuddyAgent extends BaseAgent {
         logger.info('HeartbeatEngine auto-started from TOML config');
       }).catch((e) => { logger.debug('HeartbeatEngine module load failed (optional)', { error: String(e) }); });
     }).catch((e) => { logger.debug('Heartbeat config check failed (optional)', { error: String(e) }); });
+
+    // Boot-time auto-start of Autonomous Fleet Protocol v0.1 (Phase d.18).
+    // Schedules its own setInterval that runs the fleet tick — pull repo,
+    // pick task, claim, exec via in-process agent, append worklog, push.
+    // Independent of HeartbeatEngine (different concern, different cadence).
+    import('../config/toml-config.js').then(({ getConfigManager }) => {
+      const af = getConfigManager().getConfig().autonomous_fleet;
+      if (!af?.enabled) return;
+      if (!af.repo_path || !af.host) {
+        logger.warn('autonomous_fleet enabled but repo_path/host not configured — skipping');
+        return;
+      }
+      import('./autonomous/fleet-tick-handler.js').then(({ runFleetTick }) => {
+        const intervalMs = (af.interval_minutes ?? 30) * 60 * 1000;
+        const fire = (): void => {
+          runFleetTick({
+            repoPath: af.repo_path!,
+            host: af.host!,
+            maxTaskMs: af.max_task_ms,
+            priorityThreshold: af.priority_threshold ?? 'high',
+            llmProvider: af.llm_provider,
+          })
+            .then((outcome) => logger.info('Autonomous fleet tick result', { outcome }))
+            .catch((e) => logger.error('Autonomous fleet tick threw', { error: String(e) }));
+        };
+        // First tick after a short warm-up so boot stays fast; then on the
+        // configured interval. setInterval is fine — runFleetTick never
+        // throws and self-bounds via maxTaskMs.
+        setTimeout(fire, 60_000);
+        setInterval(fire, intervalMs);
+        logger.info('Autonomous fleet tick scheduled', { intervalMs, host: af.host });
+      }).catch((e) => logger.debug('autonomous_fleet module load failed (optional)', { error: String(e) }));
+    }).catch((e) => logger.debug('autonomous_fleet config check failed (optional)', { error: String(e) }));
 
     // Boot-time auto-start of DailyResetManager when [daily_reset] enabled=true.
     // The /daily-reset slash command can also start it manually at runtime.

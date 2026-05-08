@@ -154,6 +154,92 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('artifacts.listRecentFiles', cwd, sinceMs, Math.min(limit, 500)),
   },
 
+  // Presence (face memory) — see cowork/src/main/presence/.
+  // Renderer-side capture + detection talks to main-side encode + match
+  // + persist via these channels. The renderer never touches ONNX or
+  // the on-disk store directly.
+  presence: {
+    enroll: (payload: {
+      name: string;
+      aliases?: string[];
+      embedding: number[];
+      snapshotPath?: string;
+    }): Promise<unknown> => ipcRenderer.invoke('presence:enroll', payload),
+    addSample: (payload: {
+      personId: string;
+      embedding: number[];
+      snapshotPath?: string;
+    }): Promise<unknown> => ipcRenderer.invoke('presence:add-sample', payload),
+    encode: (payload: { rgbBytes: number[] }): Promise<number[]> =>
+      ipcRenderer.invoke('presence:encode', payload),
+    match: (payload: {
+      embedding: number[];
+      threshold?: number;
+    }): Promise<unknown> => ipcRenderer.invoke('presence:match', payload),
+    list: (): Promise<unknown[]> => ipcRenderer.invoke('presence:list'),
+    remove: (payload: { personId: string }): Promise<boolean> =>
+      ipcRenderer.invoke('presence:remove', payload),
+    hasModel: (): Promise<{ installed: boolean; path: string }> =>
+      ipcRenderer.invoke('presence:has-model'),
+    selectModelFile: (): Promise<string | null> =>
+      ipcRenderer.invoke('presence:select-model-file'),
+    installModelFromPath: (
+      payload: { sourcePath: string },
+    ): Promise<{ ok: boolean; error?: string; installedPath?: string }> =>
+      ipcRenderer.invoke('presence:install-model-from-path', payload),
+    downloadModel: (
+      payload: { url: string },
+    ): Promise<{ ok: boolean; error?: string; installedPath?: string }> =>
+      ipcRenderer.invoke('presence:download-model', payload),
+    onDownloadProgress: (
+      listener: (progress: { bytes: number; total: number | null }) => void,
+    ): (() => void) => {
+      const wrapped = (
+        _event: Electron.IpcRendererEvent,
+        progress: { bytes: number; total: number | null },
+      ) => listener(progress);
+      ipcRenderer.on('presence:download-progress', wrapped);
+      return () => {
+        ipcRenderer.removeListener('presence:download-progress', wrapped);
+      };
+    },
+    // Live presence events forwarded by the main process whenever the
+    // bridge sees a face come in / go out / get enrolled. Returns an
+    // unsubscribe function — callers MUST call it on teardown.
+    onEvent: (
+      listener: (event: {
+        type: 'detected' | 'unknown' | 'left' | 'enrolled';
+        match?: {
+          personId: string;
+          name: string;
+          aliases: string[];
+          confidence: number;
+          matchedAt: number;
+        };
+        timestamp: number;
+      }) => void,
+    ): (() => void) => {
+      const wrapped = (
+        _event: Electron.IpcRendererEvent,
+        payload: Parameters<typeof listener>[0],
+      ) => listener(payload);
+      ipcRenderer.on('presence:event', wrapped);
+      return () => {
+        ipcRenderer.removeListener('presence:event', wrapped);
+      };
+    },
+  },
+
+  // Code Buddy backend toggles that need a live IPC round-trip (the
+  // settings file is the source of truth, but some flags benefit from
+  // hot-apply without restarting the app).
+  codebuddy: {
+    setGeminiGrounding: (
+      payload: { enabled: boolean },
+    ): Promise<{ ok: boolean; reason?: string }> =>
+      ipcRenderer.invoke('codebuddy:set-gemini-grounding', payload),
+  },
+
   // Config methods
   config: {
     get: (): Promise<AppConfig> => ipcRenderer.invoke('config.get'),
@@ -1139,6 +1225,97 @@ contextBridge.exposeInMainWorld('electronAPI', {
       result?: string;
       error?: string;
     }> => ipcRenderer.invoke('a2a.invoke', { id, message }),
+    cancelTask: (id: string, taskId: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('a2a.cancelTask', { id, taskId }),
+    listTasks: (): Promise<
+      Array<{
+        taskId: string;
+        agentId: string;
+        agentName?: string;
+        status: string;
+        startedAt: number;
+        updatedAt: number;
+        result?: string;
+        error?: string;
+      }>
+    > => ipcRenderer.invoke('a2a.listTasks'),
+  },
+
+  // Team — Agent Teams (Phase 4 layer 9)
+  team: {
+    getStatus: (): Promise<unknown> => ipcRenderer.invoke('team.getStatus'),
+    start: (goal?: string): Promise<{ success: boolean; leadId?: string; message: string }> =>
+      ipcRenderer.invoke('team.start', goal),
+    stop: (): Promise<{ success: boolean; message: string }> =>
+      ipcRenderer.invoke('team.stop'),
+    addMember: (
+      role: string,
+      label?: string
+    ): Promise<{ success: boolean; memberId?: string; message: string }> =>
+      ipcRenderer.invoke('team.addMember', { role, label }),
+    removeMember: (memberId: string): Promise<{ success: boolean; message: string }> =>
+      ipcRenderer.invoke('team.removeMember', memberId),
+    addTask: (input: {
+      title: string;
+      description: string;
+      priority?: string;
+      assignedRole?: string;
+      dependencies?: string[];
+    }): Promise<unknown> => ipcRenderer.invoke('team.addTask', input),
+    updateTask: (
+      taskId: string,
+      updates: { status?: string; assignedTo?: string; result?: string; error?: string }
+    ): Promise<{ success: boolean; message: string }> =>
+      ipcRenderer.invoke('team.updateTask', { taskId, updates }),
+    assignTask: (
+      taskId: string,
+      memberId: string
+    ): Promise<{ success: boolean; message: string }> =>
+      ipcRenderer.invoke('team.assignTask', { taskId, memberId }),
+    sendMessage: (from: string, to: string, content: string): Promise<unknown> =>
+      ipcRenderer.invoke('team.sendMessage', { from, to, content }),
+    getInbox: (memberId: string, limit?: number): Promise<unknown[]> =>
+      ipcRenderer.invoke('team.getInbox', { memberId, limit }),
+  },
+
+  // Fleet — multi-host Code Buddy listener (GAP 3)
+  fleet: {
+    list: (): Promise<
+      Array<{
+        id: string;
+        url: string;
+        label?: string;
+        addedAt: number;
+        status: string;
+        lastError?: string;
+        lastSeenAt?: number;
+        lastEventType?: string;
+      }>
+    > => ipcRenderer.invoke('fleet.list'),
+    addPeer: (input: {
+      url: string;
+      apiKey?: string;
+      jwt?: string;
+      label?: string;
+    }): Promise<{ success: boolean; peer?: unknown; error?: string }> =>
+      ipcRenderer.invoke('fleet.addPeer', input),
+    removePeer: (peerId: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('fleet.removePeer', peerId),
+    reconnect: (peerId: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('fleet.reconnect', peerId),
+    getEvents: (
+      peerId?: string,
+      limit?: number
+    ): Promise<
+      Array<{
+        peerId: string;
+        type: string;
+        payload: Record<string, unknown>;
+        receivedAt: number;
+        hostname?: string;
+        agentId?: string;
+      }>
+    > => ipcRenderer.invoke('fleet.events', peerId, limit),
   },
 
   // Reasoning trace viewer (Claude Cowork parity Phase 3 step 17)
@@ -1614,6 +1791,55 @@ declare global {
           sinceMs: number,
           limit?: number
         ) => Promise<Array<{ path: string; modifiedAt: number; size: number }>>;
+      };
+      presence: {
+        enroll: (payload: {
+          name: string;
+          aliases?: string[];
+          embedding: number[];
+          snapshotPath?: string;
+        }) => Promise<unknown>;
+        addSample: (payload: {
+          personId: string;
+          embedding: number[];
+          snapshotPath?: string;
+        }) => Promise<unknown>;
+        encode: (payload: { rgbBytes: number[] }) => Promise<number[]>;
+        match: (payload: {
+          embedding: number[];
+          threshold?: number;
+        }) => Promise<unknown>;
+        list: () => Promise<unknown[]>;
+        remove: (payload: { personId: string }) => Promise<boolean>;
+        hasModel: () => Promise<{ installed: boolean; path: string }>;
+        selectModelFile: () => Promise<string | null>;
+        installModelFromPath: (
+          payload: { sourcePath: string },
+        ) => Promise<{ ok: boolean; error?: string; installedPath?: string }>;
+        downloadModel: (
+          payload: { url: string },
+        ) => Promise<{ ok: boolean; error?: string; installedPath?: string }>;
+        onDownloadProgress: (
+          listener: (progress: { bytes: number; total: number | null }) => void,
+        ) => () => void;
+        onEvent: (
+          listener: (event: {
+            type: 'detected' | 'unknown' | 'left' | 'enrolled';
+            match?: {
+              personId: string;
+              name: string;
+              aliases: string[];
+              confidence: number;
+              matchedAt: number;
+            };
+            timestamp: number;
+          }) => void,
+        ) => () => void;
+      };
+      codebuddy: {
+        setGeminiGrounding: (
+          payload: { enabled: boolean },
+        ) => Promise<{ ok: boolean; reason?: string }>;
       };
       config: {
         get: () => Promise<AppConfig>;
@@ -2431,9 +2657,90 @@ declare global {
         ) => Promise<{
           success: boolean;
           taskId?: string;
+          status?: string;
           result?: string;
           error?: string;
         }>;
+        cancelTask: (
+          id: string,
+          taskId: string
+        ) => Promise<{ success: boolean; error?: string }>;
+        listTasks: () => Promise<
+          Array<{
+            taskId: string;
+            agentId: string;
+            agentName?: string;
+            status: string;
+            startedAt: number;
+            updatedAt: number;
+            result?: string;
+            error?: string;
+          }>
+        >;
+      };
+      fleet: {
+        list: () => Promise<
+          Array<{
+            id: string;
+            url: string;
+            label?: string;
+            addedAt: number;
+            status: string;
+            lastError?: string;
+            lastSeenAt?: number;
+            lastEventType?: string;
+          }>
+        >;
+        addPeer: (input: {
+          url: string;
+          apiKey?: string;
+          jwt?: string;
+          label?: string;
+        }) => Promise<{ success: boolean; peer?: unknown; error?: string }>;
+        removePeer: (peerId: string) => Promise<{ success: boolean }>;
+        reconnect: (peerId: string) => Promise<{ success: boolean; error?: string }>;
+        getEvents: (
+          peerId?: string,
+          limit?: number
+        ) => Promise<
+          Array<{
+            peerId: string;
+            type: string;
+            payload: Record<string, unknown>;
+            receivedAt: number;
+            hostname?: string;
+            agentId?: string;
+          }>
+        >;
+      };
+      team: {
+        getStatus: () => Promise<unknown>;
+        start: (
+          goal?: string
+        ) => Promise<{ success: boolean; leadId?: string; message: string }>;
+        stop: () => Promise<{ success: boolean; message: string }>;
+        addMember: (
+          role: string,
+          label?: string
+        ) => Promise<{ success: boolean; memberId?: string; message: string }>;
+        removeMember: (memberId: string) => Promise<{ success: boolean; message: string }>;
+        addTask: (input: {
+          title: string;
+          description: string;
+          priority?: string;
+          assignedRole?: string;
+          dependencies?: string[];
+        }) => Promise<unknown>;
+        updateTask: (
+          taskId: string,
+          updates: { status?: string; assignedTo?: string; result?: string; error?: string }
+        ) => Promise<{ success: boolean; message: string }>;
+        assignTask: (
+          taskId: string,
+          memberId: string
+        ) => Promise<{ success: boolean; message: string }>;
+        sendMessage: (from: string, to: string, content: string) => Promise<unknown>;
+        getInbox: (memberId: string, limit?: number) => Promise<unknown[]>;
       };
       reasoning: {
         listTraces: () => Promise<

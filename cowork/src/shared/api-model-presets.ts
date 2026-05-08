@@ -1,4 +1,5 @@
 export type SharedProviderType =
+  | 'chatgpt'
   | 'openrouter'
   | 'anthropic'
   | 'custom'
@@ -18,6 +19,7 @@ export interface SharedProviderPreset {
 }
 
 export interface SharedProviderPresets {
+  chatgpt: SharedProviderPreset;
   openrouter: SharedProviderPreset;
   anthropic: SharedProviderPreset;
   custom: SharedProviderPreset;
@@ -33,6 +35,23 @@ export interface ModelInputGuidance {
 }
 
 export const API_PROVIDER_PRESETS: SharedProviderPresets = {
+  chatgpt: {
+    name: 'ChatGPT (OAuth subscription)',
+    // Routed by CodeBuddyClient → ChatGptResponsesProvider when this
+    // baseURL substring is detected. The OAuth token replaces the
+    // API key (sentinel `oauth-chatgpt`).
+    baseUrl: 'https://chatgpt.com/backend-api/codex',
+    models: [
+      { id: 'gpt-5.5', name: 'GPT-5.5 (default)' },
+      { id: 'gpt-5.1-codex', name: 'GPT-5.1 Codex' },
+      { id: 'gpt-5.1-codex-max', name: 'GPT-5.1 Codex Max' },
+      { id: 'gpt-5-codex', name: 'GPT-5 Codex' },
+      { id: 'gpt-5.1', name: 'GPT-5.1' },
+      { id: 'gpt-5', name: 'GPT-5' },
+    ],
+    keyPlaceholder: 'oauth-chatgpt',
+    keyHint: 'Authentifié via Sign In — pas de clé API à coller.',
+  },
   openrouter: {
     name: 'OpenRouter',
     baseUrl: 'https://openrouter.ai/api/v1',

@@ -58,10 +58,26 @@ export function useIsSessionRunning(): boolean {
 // Message domain
 // ---------------------------------------------------------------------------
 
+/**
+ * Stable empty arrays — MUST NOT recreate on every getSnapshot call.
+ * Returning a fresh `[]` literal would trigger an infinite re-render in
+ * useSyncExternalStore (Zustand uses it under the hood: a new array
+ * reference looks like a state change every time, kicking another
+ * render → another getSnapshot → ad nauseam). React 18 surfaces this
+ * as "Maximum update depth exceeded" + the warning "result of
+ * getSnapshot should be cached to avoid an infinite loop". Bug
+ * triggered when ANY component subscribes to one of these selectors
+ * before the relevant slice is populated (e.g. OrchestratorLauncher
+ * mounting before the first session is created).
+ */
+const EMPTY_MESSAGES: Message[] = [];
+
 /** Returns the committed messages for the active session. */
 export function useActiveSessionMessages(): Message[] {
   return useAppStore((s) =>
-    s.activeSessionId ? (s.sessionStates[s.activeSessionId]?.messages ?? []) : []
+    s.activeSessionId
+      ? (s.sessionStates[s.activeSessionId]?.messages ?? EMPTY_MESSAGES)
+      : EMPTY_MESSAGES
   );
 }
 
@@ -70,7 +86,7 @@ export function useActiveSessionMessages(): Message[] {
  * Useful in list components that render session previews.
  */
 export function useSessionMessages(sessionId: string): Message[] {
-  return useAppStore((s) => s.sessionStates[sessionId]?.messages ?? []);
+  return useAppStore((s) => s.sessionStates[sessionId]?.messages ?? EMPTY_MESSAGES);
 }
 
 /** Returns the in-progress (streaming) text of the active session's response. */
@@ -115,10 +131,14 @@ export function useActiveTurn(): { stepId: string; userMessageId: string } | nul
   );
 }
 
+const EMPTY_PENDING_TURNS: string[] = [];
+
 /** Returns the list of pending turn message IDs for the active session. */
 export function usePendingTurns(): string[] {
   return useAppStore((s) =>
-    s.activeSessionId ? (s.sessionStates[s.activeSessionId]?.pendingTurns ?? []) : []
+    s.activeSessionId
+      ? (s.sessionStates[s.activeSessionId]?.pendingTurns ?? EMPTY_PENDING_TURNS)
+      : EMPTY_PENDING_TURNS
   );
 }
 
@@ -161,10 +181,14 @@ export function useActiveExecutionClock(): SessionExecutionClock | undefined {
 // Trace steps domain
 // ---------------------------------------------------------------------------
 
+const EMPTY_TRACE_STEPS: TraceStep[] = [];
+
 /** Returns the trace steps for the active session. */
 export function useActiveTraceSteps(): TraceStep[] {
   return useAppStore((s) =>
-    s.activeSessionId ? (s.sessionStates[s.activeSessionId]?.traceSteps ?? []) : []
+    s.activeSessionId
+      ? (s.sessionStates[s.activeSessionId]?.traceSteps ?? EMPTY_TRACE_STEPS)
+      : EMPTY_TRACE_STEPS
   );
 }
 
@@ -310,9 +334,13 @@ import type {
   NotificationEntry,
 } from '../types';
 
+const EMPTY_DIFF_PREVIEWS: DiffPreview[] = [];
+
 /** Returns diff previews for a specific session. */
 export function useDiffPreviews(sessionId: string | null): DiffPreview[] {
-  return useAppStore((s) => (sessionId ? s.diffPreviews[sessionId] ?? [] : []));
+  return useAppStore((s) =>
+    sessionId ? (s.diffPreviews[sessionId] ?? EMPTY_DIFF_PREVIEWS) : EMPTY_DIFF_PREVIEWS,
+  );
 }
 
 /** Returns the checkpoint timeline (or null). */

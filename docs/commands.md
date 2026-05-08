@@ -163,6 +163,20 @@ buddy doctor [--fix]   # Environment diagnostics (--fix for auto-migration)
 buddy speak [text] [--voice <name>] [--list-voices] [--speed <n>]
 ```
 
+### Observability
+
+```bash
+buddy run list                      # List recent runs (most recent first, 30-run prune)
+buddy run show <run-id>             # Show full event log for a run
+buddy run tail [--follow]           # Tail the active run; --follow streams as it grows
+buddy run replay <run-id>           # Replay a run's tool events for debugging
+```
+
+Runs are persisted as JSONL in `.codebuddy/runs/`. Each run captures
+the message thread, tool calls, results, errors, and timing. Combine
+with `OTEL_EXPORTER_OTLP_ENDPOINT` for remote traces or `SENTRY_DSN`
+for error reporting (see `docs/configuration.md`).
+
 ## Global CLI Flags
 
 | Flag | Short | Description | Default |

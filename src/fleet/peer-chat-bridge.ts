@@ -24,6 +24,9 @@ import { registerPeerMethod, unregisterPeerMethod } from '../server/websocket/pe
 import { logger } from '../utils/logger.js';
 import type { PeerChatProviderInfo } from './peer-chat-client-factory.js';
 
+// Re-imported for the streaming variant — kept narrow to avoid a wider import surface.
+type ContentChunk = { choices?: Array<{ delta?: { content?: string }; finish_reason?: string | null }>; usage?: unknown };
+
 /** Closure that returns the CodeBuddyClient to use for peer.chat, or null if none is wired. */
 export type PeerChatClientGetter = () => CodeBuddyClient | null;
 
@@ -96,14 +99,74 @@ export function wirePeerChatBridge(
       traceId: ctx.traceId,
     };
   });
+  // Phase (d).19 — streaming variant. Same params, but the handler
+  // pushes deltas via ctx.emitChunk and returns a final aggregate so
+  // callers without streaming support still get the full text.
+  registerPeerMethod('peer.chat-stream', async (params, ctx) => {
+    const prompt = typeof params.prompt === 'string' ? params.prompt : '';
+    const systemPrompt =
+      typeof params.systemPrompt === 'string' && params.systemPrompt.length > 0
+        ? params.systemPrompt
+        : DEFAULT_SYSTEM_PROMPT;
+    const model = typeof params.model === 'string' && params.model.length > 0
+      ? params.model
+      : undefined;
+
+    if (!prompt) {
+      throw new Error('peer.chat-stream: prompt is required (string)');
+    }
+    const client = cachedGetter?.() ?? null;
+    if (!client) {
+      throw new Error(
+        'CLIENT_UNAVAILABLE: no LLM client wired on this peer (peer.chat-stream cannot answer)',
+      );
+    }
+
+    const chatOptions: ChatOptions | undefined = model ? { model } : undefined;
+    const stream = client.chatStream(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: prompt },
+      ],
+      undefined, // no tools
+      chatOptions,
+    );
+
+    let aggregate = '';
+    let finishReason: string | null | undefined;
+    let usage: unknown;
+    for await (const chunk of stream as AsyncIterable<ContentChunk>) {
+      const delta = chunk?.choices?.[0]?.delta?.content ?? '';
+      if (delta) {
+        aggregate += delta;
+        // Best-effort emit — undefined when the transport doesn't support
+        // streaming. We still aggregate locally for the final response so
+        // the client gets the full text either way.
+        ctx.emitChunk?.(delta);
+      }
+      const fr = chunk?.choices?.[0]?.finish_reason;
+      if (fr) finishReason = fr;
+      if (chunk?.usage) usage = chunk.usage;
+    }
+
+    return {
+      text: aggregate,
+      modelRequested: model,
+      finishReason: finishReason ?? undefined,
+      usage,
+      traceId: ctx.traceId,
+    };
+  });
+
   wired = true;
   logger.debug('[peer-chat-bridge] wired');
 }
 
-/** Detach the peer.chat method. Idempotent. */
+/** Detach the peer.chat + peer.chat-stream methods. Idempotent. */
 export function unwirePeerChatBridge(): void {
   if (!wired) return;
   unregisterPeerMethod('peer.chat');
+  unregisterPeerMethod('peer.chat-stream');
   cachedGetter = null;
   cachedProviderInfo = null;
   wired = false;
@@ -128,6 +191,7 @@ export function isPeerChatBridgeWired(): boolean {
 export function _unwireForTests(): void {
   try {
     unregisterPeerMethod('peer.chat');
+    unregisterPeerMethod('peer.chat-stream');
   } catch {
     /* peer-rpc may not be initialised in some test setups */
   }

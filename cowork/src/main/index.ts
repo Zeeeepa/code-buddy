@@ -14,24 +14,31 @@
  */
 import { app, BrowserWindow, ipcMain, dialog, shell, Menu, nativeTheme, Tray, globalShortcut } from 'electron';
 import { join, resolve, dirname, isAbsolute, basename } from 'path';
+import { pathToFileURL } from 'url';
 import * as fs from 'fs';
 import { execFileSync } from 'child_process';
 import { config } from 'dotenv';
 import { registerProjectIpcHandlers } from './ipc/project-ipc';
 import { registerSubAgentIpcHandlers } from './ipc/subagent-ipc';
 import { registerOrchestratorIpcHandlers } from './ipc/orchestrator-ipc';
+import { registerFleetIpcHandlers } from './ipc/fleet-ipc';
+import { registerTeamIpcHandlers } from './ipc/team-ipc';
 import { registerMentionIpcHandlers } from './ipc/mention-ipc';
 import { registerCommandIpcHandlers } from './ipc/command-ipc';
 import { registerSkillMdIpcHandlers } from './ipc/skill-md-ipc';
 import { registerKnowledgeIpcHandlers } from './ipc/knowledge-ipc';
 import { initDatabase, closeDatabase } from './db/database';
 import { SessionManager, type EngineAdapterLike } from './session/session-manager';
+import { classifyEngineLoadError, isEmbeddedOptOut, resolveEnginePath } from './engine/embedded-mode';
+import { applyGroundingToggle } from './codebuddy/grounding-handler';
 import {
   ProjectManager,
 } from './project/project-manager';
 import { ProjectMemoryService } from './project/project-memory';
 import { SubAgentBridge } from './agent/sub-agent-bridge';
 import { OrchestratorBridge } from './agent/orchestrator-bridge';
+import { FleetBridge } from './fleet/fleet-bridge';
+import { TeamBridge } from './agent/team-bridge';
 import { MentionProcessor } from './input/mention-processor';
 import { SlashCommandBridge } from './commands/slash-command-bridge';
 import { SkillMdBridge } from './skills/skill-md-bridge';
@@ -125,7 +132,12 @@ import {
 import { listRecentWorkspaceFiles } from './utils/recent-workspace-files';
 import { buildDiagnosticsSummary } from './utils/diagnostics-summary';
 import { getGeminiOauthTokens, clearGeminiCredentials } from '../../../src/providers/gemini-oauth';
-import { getCodexOauthTokens, clearCodexCredentials } from '../../../src/providers/codex-oauth';
+import {
+  loginInteractive as codexLoginInteractive,
+  clearCodexCredentials,
+  getChatGptAuth,
+  hasCodexCredentials,
+} from '../../../src/providers/codex-oauth';
 
 // Current working directory (persisted between sessions)
 let currentWorkingDir: string | null = null;
@@ -157,6 +169,8 @@ let scheduledTaskManager: ScheduledTaskManager | null = null;
 let projectManager: ProjectManager | null = null;
 let subAgentBridge: SubAgentBridge | null = null;
 let orchestratorBridge: OrchestratorBridge | null = null;
+let fleetBridge: FleetBridge | null = null;
+let teamBridge: TeamBridge | null = null;
 let mentionProcessor: MentionProcessor | null = null;
 let slashCommandBridge: SlashCommandBridge | null = null;
 let skillMdBridge: SkillMdBridge | null = null;
@@ -353,7 +367,8 @@ function setupTray() {
       : process.platform === 'win32'
         ? 'tray-icon.ico'
         : 'tray-icon.png';
-  // TODO: create resources/tray-icon.ico from tray-icon.png for full Windows tray fidelity
+  // tray-icon.ico is generated from tray-icon.png by scripts/build-tray-icon.js
+  // (run as part of `npm run build` and available as `npm run build:tray-icon`).
   const iconPath = app.isPackaged
     ? join(process.resourcesPath, iconName)
     : join(__dirname, '../../resources', iconName);
@@ -589,6 +604,11 @@ function createWindow() {
     // mainWindow.webContents.openDevTools(); // Commented out - open manually with Cmd+Option+I if needed
   } else {
     mainWindow.loadFile(join(__dirname, '../../dist/index.html'));
+  }
+  // Phase d.21 audit-debug — auto-open DevTools when NODE_ENV=development
+  // so React errors come with full stack + console logs are visible.
+  if (process.env.NODE_ENV === 'development' && mainWindow) {
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
 
   mainWindow.on('closed', () => {
@@ -834,14 +854,36 @@ app
 
     pluginRuntimeService = new PluginRuntimeService(new PluginCatalogService());
 
-    // Initialize Code Buddy engine adapter if running in embedded mode
+    // Initialize Code Buddy engine adapter (embedded mode).
+    //
+    // Default-on: we attempt to load the engine unless the user has
+    // explicitly opted out with `CODEBUDDY_EMBEDDED=0`. See
+    // `engine/embedded-mode.ts` for the rationale (previously every
+    // entry point other than `buddy gui` silently fell back to the
+    // pi-coding-agent runner).
     let engineAdapter: EngineAdapterLike | undefined;
-    if (process.env.CODEBUDDY_EMBEDDED === '1') {
+    if (isEmbeddedOptOut()) {
+      log('[Main] CODEBUDDY_EMBEDDED=0 — embedded engine disabled by env opt-out');
+    } else {
       try {
-        const enginePath =
-          process.env.CODEBUDDY_ENGINE_PATH || resolve(app.getAppPath(), '..', 'dist');
+        // Packaged-aware resolution: extraResources copies the engine to
+        // `<install>/resources/dist/desktop/` (see electron-builder.yml),
+        // while dev mode keeps it at `<repo>/dist/desktop/` next to cowork.
+        const enginePath = resolveEnginePath({
+          envOverride: process.env.CODEBUDDY_ENGINE_PATH,
+          isPackaged: app.isPackaged,
+          resourcesPath: process.resourcesPath,
+          appPath: app.getAppPath(),
+        });
+        // Node's ESM loader on Windows REQUIRES file:// URLs for absolute
+        // paths (`d:\...` is rejected with ERR_UNSUPPORTED_ESM_URL_SCHEME).
+        // pathToFileURL produces a cross-platform-safe `file:///D:/...`
+        // form that the loader accepts on every platform.
+        const adapterUrl = pathToFileURL(
+          resolve(enginePath, 'desktop', 'codebuddy-engine-adapter.js'),
+        ).href;
         const { CodeBuddyEngineAdapter } = await import(
-          /* webpackIgnore: true */ resolve(enginePath, 'desktop', 'codebuddy-engine-adapter.js')
+          /* webpackIgnore: true */ /* @vite-ignore */ adapterUrl
         );
         const apiConfig = configStore.getAll();
         engineAdapter = new CodeBuddyEngineAdapter({
@@ -853,8 +895,11 @@ app
         }) as EngineAdapterLike;
         // Wire permission bridge for engine tool approvals
         try {
+          const permBridgeUrl = pathToFileURL(
+            resolve(enginePath, 'desktop', 'permission-bridge.js'),
+          ).href;
           const { DesktopPermissionBridge } = await import(
-            /* webpackIgnore: true */ resolve(enginePath, 'desktop', 'permission-bridge.js')
+            /* webpackIgnore: true */ /* @vite-ignore */ permBridgeUrl
           );
           const permissionBridge = new DesktopPermissionBridge(sendToRenderer);
           const adapterWithPerm = engineAdapter as unknown as {
@@ -879,11 +924,41 @@ app
           logWarn('[Main] Failed to wire permission bridge:', permErr);
         }
 
+        // Apply the user's persisted "Gemini Google Search grounding"
+        // preference, if any. No-op when the user hasn't touched the
+        // toggle (apiConfig.codebuddy?.geminiGroundingEnabled === undefined)
+        // and when the adapter doesn't expose the method (defensive).
+        if (apiConfig.codebuddy?.geminiGroundingEnabled === true) {
+          const result = applyGroundingToggle(engineAdapter, true);
+          if (result.ok) {
+            log('[Main] Gemini Google Search grounding enabled by user setting');
+          } else {
+            log(`[Main] Gemini grounding toggle saved but not applied (reason: ${result.reason ?? 'unknown'})`);
+          }
+        }
+
         log('[Main] Code Buddy engine adapter initialized (embedded mode)');
       } catch (err) {
-        logWarn('[Main] Failed to load Code Buddy engine, falling back to pi-coding-agent:', err);
+        if (classifyEngineLoadError(err) === 'missing') {
+          log('[Main] Code Buddy engine not present, using pi-coding-agent runner');
+        } else {
+          logWarn('[Main] Failed to load Code Buddy engine, falling back to pi-coding-agent:', err);
+        }
       }
     }
+
+    // Hot-apply IPC for the user's "Gemini Google Search grounding"
+    // toggle. Registered unconditionally so the renderer can call it
+    // even when the embedded engine isn't loaded — the helper returns
+    // {ok:false, reason} and the UI can degrade gracefully. The toggle
+    // is also persisted to config-store, so the preference survives a
+    // restart even when the hot-apply path is a no-op.
+    ipcMain.handle(
+      'codebuddy:set-gemini-grounding',
+      async (_event, payload: { enabled: boolean }) => {
+        return applyGroundingToggle(engineAdapter, payload.enabled === true);
+      },
+    );
 
     // Initialize session manager before creating an interactive window.
     // This avoids session.start racing the startup path and hitting a null manager.
@@ -913,6 +988,22 @@ app
       () => configStore.get('apiKey') || process.env.GROK_API_KEY || '',
       () => configStore.get('baseUrl') || process.env.GROK_BASE_URL
     );
+
+    // Initialize fleet bridge — multi-host Code Buddy listener (GAP 3)
+    fleetBridge = new FleetBridge(sendToRenderer);
+    void fleetBridge.init();
+
+    // Initialize team bridge — Phase 4 layer 9 (Agent Teams observability)
+    teamBridge = new TeamBridge(sendToRenderer);
+    void teamBridge.init();
+
+    // Initialize A2A bridge with sendToRenderer so async task updates
+    // (GAP 1 polling) can reach the renderer. Lazy `getA2ABridge()` calls
+    // elsewhere will return this instance.
+    {
+      const { getA2ABridge: bootA2A } = await import('./a2a/a2a-bridge');
+      bootA2A(sendToRenderer);
+    }
 
     // Initialize mention processor (Claude Cowork parity)
     mentionProcessor = new MentionProcessor();
@@ -1006,6 +1097,26 @@ app
 
     // Initialize knowledge service (Claude Cowork parity)
     knowledgeService = new KnowledgeService();
+
+    // Initialize presence bridge (face memory). Lazy-imported because the
+    // chain of presence-bridge -> face-recognizer -> onnxruntime-node loads
+    // a native binding we don't want eager on Cowork startup. The bridge
+    // simply registers IPC handlers; encoder load is deferred to first call.
+    const { getPresenceBridge } = await import('./presence/presence-bridge');
+    const presenceBridge = getPresenceBridge();
+    log('[main] PresenceBridge initialized — IPC handlers presence:* active');
+
+    // Forward bridge events (detected/left/unknown/enrolled) to every
+    // renderer window so the titlebar PresenceIndicator can show live
+    // identity. The bridge already throttles via PRESENCE_DEDUP_WINDOW_MS
+    // so we don't need to debounce here.
+    presenceBridge.on('presence', (event) => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) {
+          win.webContents.send('presence:event', event);
+        }
+      }
+    });
 
     // Global search wires existing project services for cross-source queries.
     globalSearchService = new GlobalSearchService({
@@ -1569,8 +1680,14 @@ ipcMain.handle('config.geminiOauthClear', async () => {
 
 ipcMain.handle('config.codexOauthLogin', async () => {
   try {
-    const tokens = await getCodexOauthTokens(true);
-    return { success: true, tokens };
+    const auth = await codexLoginInteractive();
+    return {
+      success: true,
+      email: auth.email ?? null,
+      plan_type: auth.plan_type ?? null,
+      account_id: auth.account_id ?? null,
+      is_fedramp: auth.is_fedramp,
+    };
   } catch (err: any) {
     logError('[IPC] Codex OAuth Login failed:', err);
     return { success: false, error: err.message };
@@ -1587,6 +1704,29 @@ ipcMain.handle('config.codexOauthClear', async () => {
   }
 });
 
+ipcMain.handle('config.codexOauthStatus', async () => {
+  try {
+    if (!hasCodexCredentials()) {
+      return { success: true, signedIn: false };
+    }
+    const auth = await getChatGptAuth();
+    if (!auth) {
+      return { success: true, signedIn: false, error: 'credentials present but unreadable' };
+    }
+    return {
+      success: true,
+      signedIn: true,
+      email: auth.email ?? null,
+      plan_type: auth.plan_type ?? null,
+      account_id: auth.account_id ?? null,
+      is_fedramp: auth.is_fedramp,
+    };
+  } catch (err: any) {
+    logError('[IPC] Codex OAuth Status failed:', err);
+    return { success: false, error: err.message };
+  }
+});
+
 // ── Project IPC handlers (Claude Cowork parity) ──────────────────────
 registerProjectIpcHandlers(projectManager, activityFeed);
 
@@ -1595,6 +1735,12 @@ registerSubAgentIpcHandlers(subAgentBridge);
 
 // ── Orchestrator IPC handlers ────────────────────────────────────────
 registerOrchestratorIpcHandlers(orchestratorBridge);
+
+// ── Fleet IPC handlers (GAP 3 — multi-host Code Buddy listener) ──────
+registerFleetIpcHandlers(fleetBridge);
+
+// ── Team IPC handlers (Phase 4 layer 9 — Agent Teams observability) ──
+registerTeamIpcHandlers(teamBridge);
 
 // ── Mention IPC handlers (Claude Cowork parity) ──────────────────────
 registerMentionIpcHandlers(mentionProcessor);
@@ -2840,6 +2986,25 @@ ipcMain.handle('a2a.invoke', async (_event, params: { id: string; message: strin
     return await getA2ABridge().invoke(params.id, params.message);
   } catch (err) {
     return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle('a2a.cancelTask', async (_event, params: { id: string; taskId: string }) => {
+  try {
+    const { getA2ABridge } = await import('./a2a/a2a-bridge');
+    return await getA2ABridge().cancelTask(params.id, params.taskId);
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+});
+
+ipcMain.handle('a2a.listTasks', async () => {
+  try {
+    const { getA2ABridge } = await import('./a2a/a2a-bridge');
+    return await getA2ABridge().listTasks();
+  } catch (err) {
+    logError('[a2a.listTasks] failed:', err);
+    return [];
   }
 });
 

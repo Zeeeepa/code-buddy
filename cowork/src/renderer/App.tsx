@@ -45,6 +45,12 @@ import { SplitPaneLayout } from './components/SplitPaneLayout';
 import { UpdateNotification } from './components/UpdateNotification';
 import { NotificationToastContainer } from './components/NotificationToast';
 import { NotificationCenter } from './components/NotificationCenter';
+import { EnrollmentDialog } from './components/EnrollmentDialog';
+import { ModelInstallDialog } from './components/ModelInstallDialog';
+import { OrchestratorLauncher } from './components/OrchestratorLauncher';
+import { FleetPanel } from './components/FleetPanel';
+import { TeamPanel } from './components/TeamPanel';
+import { PresenceService } from './services/presence/PresenceService';
 import type { AppConfig } from './types';
 import type { GlobalNoticeAction } from './store';
 
@@ -106,6 +112,10 @@ function App() {
   const setShowTestRunner = useAppStore((s) => s.setShowTestRunner);
   const showReasoningViewer = useAppStore((s) => s.showReasoningViewer);
   const setShowReasoningViewer = useAppStore((s) => s.setShowReasoningViewer);
+  const showEnrollmentDialog = useAppStore((s) => s.showEnrollmentDialog);
+  const setShowEnrollmentDialog = useAppStore((s) => s.setShowEnrollmentDialog);
+  const presenceEnabled = useAppStore((s) => s.presenceEnabled);
+  const setShowOrchestratorLauncher = useAppStore((s) => s.setShowOrchestratorLauncher);
   const splitPaneEnabled = useAppStore((s) => s.splitPaneEnabled);
   const toggleSplitPane = useAppStore((s) => s.toggleSplitPane);
   const updateInfo = useUpdateInfo();
@@ -176,6 +186,28 @@ function App() {
     setContextPanelCollapsed(width < 1100);
     setSidebarCollapsed(width < 800);
   }, [width, setContextPanelCollapsed, setSidebarCollapsed]);
+
+  // Presence (face memory) — start the continuous detection loop only
+  // when the user has opted in AND we're inside Electron. The service
+  // self-aborts if no model or no enrollment, so we don't double-guard
+  // here. Pause on tab hide so the camera light tracks user attention.
+  useEffect(() => {
+    if (!isElectron || !presenceEnabled) return;
+    const svc = PresenceService.getInstance();
+
+    void svc.start();
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') svc.pause();
+      else svc.resume();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      svc.stop();
+    };
+  }, [isElectron, presenceEnabled]);
 
   // Auto-collapse sidebar when Settings is open, restore on close
   useEffect(() => {
@@ -250,6 +282,10 @@ function App() {
         // Phase 3 step 17: reasoning trace viewer
         e.preventDefault();
         setShowReasoningViewer(true);
+      } else if (mod && e.shiftKey && (e.key === 'm' || e.key === 'M')) {
+        // Multi-agent orchestrator launcher
+        e.preventDefault();
+        setShowOrchestratorLauncher(true);
       } else if (mod && e.shiftKey && (e.key === 'i' || e.key === 'I')) {
         e.preventDefault();
         setShowSessionInsights(true);
@@ -304,6 +340,7 @@ function App() {
     setShowSessionInsights,
     setShowResumeChooser,
     setShowFocusView,
+    setShowOrchestratorLauncher,
     toggleSplitPane,
   ]);
 
@@ -489,6 +526,24 @@ function App() {
       {/* Notification toasts + center (Claude Cowork parity) */}
       <NotificationToastContainer />
       <NotificationCenter />
+
+      {/* Presence — face memory enrollment + model install. */}
+      <EnrollmentDialog
+        isOpen={showEnrollmentDialog}
+        onClose={() => setShowEnrollmentDialog(false)}
+        onEnrolled={() => setShowEnrollmentDialog(false)}
+      />
+      <ModelInstallDialog />
+
+      {/* Multi-agent orchestrator launcher — opens via Sparkles button
+          in Titlebar or Cmd/Ctrl+Shift+M. */}
+      <OrchestratorLauncher />
+
+      {/* Fleet panel — multi-host Code Buddy listener (GAP 3) */}
+      <FleetPanel />
+
+      {/* Team panel — Agent Teams (Phase 4 layer 9) */}
+      <TeamPanel />
     </div>
   );
 }

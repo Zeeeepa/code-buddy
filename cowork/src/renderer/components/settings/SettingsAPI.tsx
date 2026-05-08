@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { useEffect, useState } from 'react';
 import {
   Key,
   Plug,
@@ -12,6 +13,16 @@ import {
 } from 'lucide-react';
 import { useApiConfigState } from '../../hooks/useApiConfigState';
 import { useIPC } from '../../hooks/useIPC';
+import { useAppStore } from '../../store';
+import type { NotificationEntry, NotificationPriority } from '../../types';
+
+interface ChatGptStatus {
+  signedIn: boolean;
+  email?: string | null;
+  plan_type?: string | null;
+  account_id?: string | null;
+  is_fedramp?: boolean;
+}
 import { ApiConfigSetManager } from '../ApiConfigSetManager';
 import { CommonProviderSetupsCard, GuidanceInlineHint } from '../ProviderGuidance';
 import ApiDiagnosticsPanel from '../ApiDiagnosticsPanel';
@@ -94,7 +105,59 @@ export function SettingsAPI() {
     handleDeepDiagnose,
     shouldShowOllamaManualModelToggle,
   } = useApiConfigState();
-  const { geminiOauthLogin, geminiOauthClear, codexOauthLogin, codexOauthClear } = useIPC();
+  const { geminiOauthLogin, geminiOauthClear, codexOauthLogin, codexOauthClear, codexOauthStatus } = useIPC();
+  const addNotification = useAppStore((s) => s.addNotification);
+
+  // Phase d.23 — display the connected ChatGPT account next to the
+  // Sign In button, plus auto-refresh the badge after login/logout.
+  const [chatgptStatus, setChatgptStatus] = useState<ChatGptStatus>({ signedIn: false });
+
+  /** Non-blocking toast helper — replaces window.alert() so the user can
+   *  keep navigating Settings while the notification auto-dismisses. */
+  const toast = (
+    title: string,
+    body: string,
+    priority: NotificationPriority = 'normal',
+  ): void => {
+    const entry: NotificationEntry = {
+      id: `chatgpt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      title,
+      body,
+      priority,
+      timestamp: Date.now(),
+      read: false,
+    };
+    addNotification(entry);
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    if (provider !== 'chatgpt') return;
+    (async () => {
+      const res = await codexOauthStatus();
+      if (cancelled) return;
+      if (res.success) {
+        setChatgptStatus({
+          signedIn: !!res.signedIn,
+          email: res.email,
+          plan_type: res.plan_type,
+          account_id: res.account_id,
+          is_fedramp: res.is_fedramp,
+        });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [provider, codexOauthStatus]);
+
+  // Phase d.24 M — when the user picks the ChatGPT preset, the API key
+  // sentinel is auto-set so CodeBuddyClient routes to the OAuth backend.
+  // Only sets it when the field is empty/wrong, so we don't trample
+  // user customizations.
+  useEffect(() => {
+    if (provider === 'chatgpt' && apiKey !== 'oauth-chatgpt') {
+      setApiKey('oauth-chatgpt');
+    }
+  }, [provider, apiKey, setApiKey]);
 
   if (isLoadingConfig) {
     return (
@@ -142,7 +205,7 @@ export function SettingsAPI() {
         </label>
         <p className="text-xs leading-5 text-text-muted">{t('api.providerDescription')}</p>
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2">
-          {(['openrouter', 'anthropic', 'openai', 'gemini', 'ollama', 'lmstudio', 'custom'] as const).map(
+          {(['chatgpt', 'openrouter', 'anthropic', 'openai', 'gemini', 'ollama', 'lmstudio', 'custom'] as const).map(
             (p) => (
               <button
                 key={p}
@@ -161,28 +224,30 @@ export function SettingsAPI() {
         </div>
       </div>
 
-      {/* API Key */}
-      <div className="space-y-3 py-5 border-b border-border-muted">
-        <label
-          htmlFor="api-key-input"
-          className="flex items-center gap-2 text-sm font-medium text-text-primary"
-        >
-          <Key className="w-4 h-4" />
-          {t('api.apiKey')}
-        </label>
-        <p className="text-xs leading-5 text-text-muted">{t('api.apiKeyDescription')}</p>
-        <input
-          id="api-key-input"
-          type="password"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          placeholder={currentPreset?.keyPlaceholder || t('api.enterApiKey')}
-          className="w-full px-4 py-3 rounded-lg bg-background border border-border text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-all"
-        />
-        {currentPreset?.keyHint && (
-          <p className="text-xs text-text-muted">{currentPreset.keyHint}</p>
-        )}
-      </div>
+      {/* API Key — hidden for chatgpt (OAuth replaces it) */}
+      {provider !== 'chatgpt' && (
+        <div className="space-y-3 py-5 border-b border-border-muted">
+          <label
+            htmlFor="api-key-input"
+            className="flex items-center gap-2 text-sm font-medium text-text-primary"
+          >
+            <Key className="w-4 h-4" />
+            {t('api.apiKey')}
+          </label>
+          <p className="text-xs leading-5 text-text-muted">{t('api.apiKeyDescription')}</p>
+          <input
+            id="api-key-input"
+            type="password"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder={currentPreset?.keyPlaceholder || t('api.enterApiKey')}
+            className="w-full px-4 py-3 rounded-lg bg-background border border-border text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-all"
+          />
+          {currentPreset?.keyHint && (
+            <p className="text-xs text-text-muted">{currentPreset.keyHint}</p>
+          )}
+        </div>
+      )}
 
       {/* Gemini OAuth Section */}
       {provider === 'gemini' && (
@@ -227,40 +292,67 @@ export function SettingsAPI() {
         </div>
       )}
 
-      {/* Codex/OpenAI OAuth Section */}
-      {provider === 'openai' && (
+      {/* ChatGPT Codex OAuth Section — provider 'chatgpt' (Phase d.24 M) */}
+      {provider === 'chatgpt' && (
         <div className="space-y-3 py-5 border-b border-border-muted">
           <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
             <Key className="w-4 h-4" />
             Sign in to ChatGPT (Codex OAuth)
           </label>
           <p className="text-xs leading-5 text-text-muted">
-            Authenticate directly with your ChatGPT account to access OpenAI models without an API key. This will use your active ChatGPT Plus/Pro session in the browser. Leave the API Key field empty or type "oauth" to use this method.
+            Authentifie-toi avec ton compte ChatGPT pour utiliser ton abonnement Plus/Pro sans clé API. Le chat est routé vers le backend Codex (chatgpt.com/backend-api/codex/responses).
           </p>
+          {chatgptStatus.signedIn && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-xs">
+              <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+              <div className="flex flex-col gap-0.5">
+                <span className="text-emerald-300 font-medium">
+                  Connecté{chatgptStatus.email ? ` · ${chatgptStatus.email}` : ''}
+                </span>
+                {(chatgptStatus.plan_type || chatgptStatus.is_fedramp) && (
+                  <span className="text-text-muted">
+                    {chatgptStatus.plan_type ? `Plan : ${chatgptStatus.plan_type}` : ''}
+                    {chatgptStatus.plan_type && chatgptStatus.is_fedramp ? ' · ' : ''}
+                    {chatgptStatus.is_fedramp ? 'FedRAMP' : ''}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
           <div className="flex gap-2">
             <button
               type="button"
               onClick={async () => {
                 const res = await codexOauthLogin();
                 if (!res.success) {
-                  alert('Login failed: ' + res.error);
-                } else {
-                  alert('Successfully authenticated with ChatGPT!');
+                  toast('ChatGPT — Échec du login', res.error ?? 'Erreur inconnue', 'high');
+                  return;
                 }
+                setChatgptStatus({
+                  signedIn: true,
+                  email: res.email,
+                  plan_type: res.plan_type,
+                  account_id: res.account_id,
+                  is_fedramp: res.is_fedramp,
+                });
+                const detail = res.email ? ` · ${res.email}` : '';
+                const planSuffix = res.plan_type ? ` (Plan ${res.plan_type})` : '';
+                toast('ChatGPT — Connecté', `Authentifié${detail}${planSuffix}`);
               }}
               className="px-4 py-2 bg-accent text-white rounded-lg text-sm hover:bg-accent-hover transition-colors shadow-sm"
             >
-              Sign In
+              {chatgptStatus.signedIn ? 'Reconnecter' : 'Sign In'}
             </button>
             <button
               type="button"
               onClick={async () => {
                 const res = await codexOauthClear();
                 if (!res.success) {
-                  alert('Failed to clear credentials: ' + res.error);
-                } else {
-                  alert('Successfully cleared ChatGPT credentials.');
+                  toast('ChatGPT — Échec', res.error ?? 'Erreur inconnue', 'high');
+                  return;
                 }
+                setChatgptStatus({ signedIn: false });
+                toast('ChatGPT — Déconnecté', 'Credentials effacés.');
               }}
               className="px-4 py-2 border border-border-muted text-text-secondary rounded-lg text-sm hover:bg-surface-hover transition-colors"
             >

@@ -6,7 +6,8 @@
  */
 
 import { BaseProvider } from './base-provider.js';
-import { getCodexOauthTokens } from './codex-oauth.js';
+import { getChatGptAuth } from './codex-oauth.js';
+import { logger } from '../utils/logger.js';
 import type {
   ProviderType,
   ProviderConfig,
@@ -38,9 +39,24 @@ export class OpenAIProvider extends BaseProvider {
 
     let apiKey = config.apiKey;
     if (apiKey === 'oauth' || !apiKey) {
-      const oauthToken = await getCodexOauthTokens(false);
-      if (oauthToken) {
-        apiKey = oauthToken;
+      // ChatGPT subscription auth fallback. NOTE: this points the OAuth
+      // token at api.openai.com/v1/chat/completions, which the Codex
+      // bearer token does NOT grant access to. For real ChatGPT-quota
+      // chat usage, route via baseURL `chatgpt.com/backend-api/codex`
+      // (the CodeBuddyClient picks ChatGptResponsesProvider when it sees
+      // that baseURL or the `oauth-chatgpt` apiKey sentinel).
+      //
+      // This branch is kept for back-compat with consumers that still
+      // expect a string token in the OpenAI SDK shape (e.g. the legacy
+      // BaseProvider chain pre Phase d.23).
+      const auth = await getChatGptAuth();
+      if (auth?.access_token) {
+        apiKey = auth.access_token;
+      } else {
+        logger.warn(
+          'OpenAIProvider: apiKey="oauth" requested but no ChatGPT credentials found. ' +
+            'Run `/login chatgpt` (or use ChatGptResponsesProvider directly via baseURL=chatgpt.com/backend-api/codex).',
+        );
       }
     }
 

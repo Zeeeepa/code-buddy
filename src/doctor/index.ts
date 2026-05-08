@@ -82,6 +82,49 @@ function checkApiKeys(): DoctorCheck[] {
   }));
 }
 
+/**
+ * ChatGPT Codex OAuth credentials check (Phase d.23). `warn` when no
+ * credentials present (user might be using API keys instead — non-fatal).
+ * `error` only when the file is corrupt or refresh fails.
+ */
+async function checkChatGptOAuth(): Promise<DoctorCheck> {
+  try {
+    const { hasCodexCredentials, getChatGptAuth, getCodexAuthFilePath } = await import(
+      '../providers/codex-oauth.js'
+    );
+    if (!hasCodexCredentials()) {
+      return {
+        name: 'ChatGPT OAuth',
+        status: 'warn',
+        message: `not signed in (run \`/login chatgpt\` to use your ChatGPT subscription) — file: ${getCodexAuthFilePath()}`,
+      };
+    }
+    const auth = await getChatGptAuth();
+    if (!auth) {
+      return {
+        name: 'ChatGPT OAuth',
+        status: 'error',
+        message: `credential file present but unreadable — try \`/logout chatgpt\` then \`/login chatgpt\``,
+      };
+    }
+    const parts: string[] = [];
+    if (auth.email) parts.push(auth.email);
+    if (auth.plan_type) parts.push(`Plan: ${auth.plan_type}`);
+    if (auth.is_fedramp) parts.push('FedRAMP');
+    return {
+      name: 'ChatGPT OAuth',
+      status: 'ok',
+      message: parts.length > 0 ? parts.join(' · ') : 'signed in',
+    };
+  } catch (err) {
+    return {
+      name: 'ChatGPT OAuth',
+      status: 'error',
+      message: `check failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}
+
 function checkConfigFiles(cwd: string): DoctorCheck[] {
   const checks: DoctorCheck[] = [];
 
@@ -373,6 +416,7 @@ export async function runDoctorChecks(cwd?: string): Promise<DoctorCheck[]> {
     checkNodeVersion(),
     ...checkDependencies(),
     ...checkApiKeys(),
+    await checkChatGptOAuth(),
     ...checkConfigFiles(dir),
     ...checkStaleLockFiles(dir),
     ...checkTtsProviders(),

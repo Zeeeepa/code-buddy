@@ -285,7 +285,13 @@ describe('AgentExecutor', () => {
 
       await executor.processUserMessage('Hello', history, messages);
 
-      expect(deps.toolSelectionStrategy.selectToolsForQuery).toHaveBeenCalledWith('Hello');
+      // Phase d.22: executor now passes a (possibly empty) options object as
+      // the 2nd arg so it can override maxTools/alwaysInclude on lite-profile
+      // models. The strategy still receives the query as arg 0.
+      expect(deps.toolSelectionStrategy.selectToolsForQuery).toHaveBeenCalledWith(
+        'Hello',
+        expect.any(Object),
+      );
     });
 
     it('should call context manager to prepare messages', async () => {

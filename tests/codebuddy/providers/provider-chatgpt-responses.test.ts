@@ -1,0 +1,691 @@
+/**
+ * Phase d.23 — tests for the ChatGPT Codex Responses provider.
+ *
+ * Three layers exercised:
+ *   1. Pure helpers (`convertMessages`, `flattenTools`, `buildRequestBody`)
+ *      that turn chat/completions input into the Codex Responses shape.
+ *   2. The SSE parser, fed a hand-rolled ReadableStream of the
+ *      4 event kinds we handle (and one we ignore).
+ *   3. The `chatStream()` end-to-end with `global.fetch` mocked, to verify
+ *      headers (Authorization / ChatGPT-Account-ID / originator), the
+ *      400/404 model_not_found error message, and 401 → refresh → retry.
+ */
+
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import {
+  convertMessages,
+  flattenTools,
+  buildRequestBody,
+  parseSseStream,
+  isFreshUserTurn,
+  ChatGptResponsesProvider,
+} from '../../../src/codebuddy/providers/provider-chatgpt-responses.js';
+import type { ChatGptAuth } from '../../../src/providers/codex-oauth.js';
+import type { CodeBuddyMessage, CodeBuddyTool } from '../../../src/codebuddy/client.js';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+// ─── 1. Pure helpers ────────────────────────────────────────────────
+
+describe('convertMessages — chat/completions → Codex Responses input shape', () => {
+  it('puts system message into instructions, user goes into input', () => {
+    const out = convertMessages([
+      { role: 'system', content: 'You are helpful.' },
+      { role: 'user', content: 'Hi' },
+    ] as CodeBuddyMessage[]);
+    expect(out.instructions).toBe('You are helpful.');
+    expect(out.input).toHaveLength(1);
+    expect(out.input[0]).toMatchObject({
+      type: 'message',
+      role: 'user',
+      content: [{ type: 'input_text', text: 'Hi' }],
+    });
+  });
+
+  it('joins multiple system messages with double newline', () => {
+    const out = convertMessages([
+      { role: 'system', content: 'rule 1' },
+      { role: 'system', content: 'rule 2' },
+      { role: 'user', content: 'go' },
+    ] as CodeBuddyMessage[]);
+    expect(out.instructions).toBe('rule 1\n\nrule 2');
+  });
+
+  it('converts assistant tool_calls to function_call items', () => {
+    const out = convertMessages([
+      {
+        role: 'assistant',
+        content: null,
+        tool_calls: [
+          { id: 'call_1', type: 'function', function: { name: 'foo', arguments: '{"x":1}' } },
+        ],
+      },
+    ] as unknown as CodeBuddyMessage[]);
+    expect(out.input).toHaveLength(1);
+    expect(out.input[0]).toMatchObject({
+      type: 'function_call',
+      name: 'foo',
+      arguments: '{"x":1}',
+      call_id: 'call_1',
+    });
+  });
+
+  it('converts tool result messages to function_call_output items', () => {
+    const out = convertMessages([
+      { role: 'tool', tool_call_id: 'call_1', content: 'result-text' },
+    ] as unknown as CodeBuddyMessage[]);
+    expect(out.input).toHaveLength(1);
+    expect(out.input[0]).toMatchObject({
+      type: 'function_call_output',
+      call_id: 'call_1',
+      output: 'result-text',
+    });
+  });
+
+  it('handles assistant messages with both text and tool_calls', () => {
+    const out = convertMessages([
+      {
+        role: 'assistant',
+        content: 'Calling tool now',
+        tool_calls: [
+          { id: 'c1', type: 'function', function: { name: 'bar', arguments: '{}' } },
+        ],
+      },
+    ] as unknown as CodeBuddyMessage[]);
+    // First the function_call, then the assistant text.
+    expect(out.input).toHaveLength(2);
+    expect(out.input[0].type).toBe('function_call');
+    expect(out.input[1]).toMatchObject({
+      type: 'message',
+      role: 'assistant',
+      content: [{ type: 'output_text', text: 'Calling tool now' }],
+    });
+  });
+
+  it('omits instructions when there are no system messages', () => {
+    const out = convertMessages([{ role: 'user', content: 'X' }] as CodeBuddyMessage[]);
+    expect(out.instructions).toBeUndefined();
+  });
+
+  it('prepends prior reasoning items only when an assistant tool round exists', () => {
+    const reasoning = [{ type: 'reasoning' as const, encrypted_content: 'blob-1' }];
+
+    // No assistant round yet → reasoning blobs are skipped.
+    const fresh = convertMessages(
+      [{ role: 'user', content: 'first turn' }] as CodeBuddyMessage[],
+      reasoning,
+    );
+    expect(fresh.input.find((it) => it.type === 'reasoning')).toBeUndefined();
+
+    // Assistant tool round present → reasoning prepended.
+    const midTurn = convertMessages(
+      [
+        { role: 'user', content: 'find the bug' },
+        {
+          role: 'assistant',
+          content: null,
+          tool_calls: [
+            { id: 'c1', type: 'function', function: { name: 'grep', arguments: '{}' } },
+          ],
+        },
+        { role: 'tool', tool_call_id: 'c1', content: 'match found' },
+      ] as unknown as CodeBuddyMessage[],
+      reasoning,
+    );
+    expect(midTurn.input[0]).toEqual({ type: 'reasoning', encrypted_content: 'blob-1' });
+  });
+});
+
+describe('isFreshUserTurn — turn boundary detection', () => {
+  it('true when no messages yet', () => {
+    expect(isFreshUserTurn([])).toBe(true);
+  });
+
+  it('true when last message is a user message with nothing after', () => {
+    expect(isFreshUserTurn([
+      { role: 'system', content: 'x' },
+      { role: 'user', content: 'hello' },
+    ] as CodeBuddyMessage[])).toBe(true);
+  });
+
+  it('false when an assistant message follows the last user message', () => {
+    expect(isFreshUserTurn([
+      { role: 'user', content: 'hi' },
+      { role: 'assistant', content: 'hello' },
+    ] as CodeBuddyMessage[])).toBe(false);
+  });
+
+  it('false when a tool result follows the last user message (mid-turn)', () => {
+    expect(isFreshUserTurn([
+      { role: 'user', content: 'X' },
+      {
+        role: 'assistant',
+        content: null,
+        tool_calls: [{ id: 'c1', type: 'function', function: { name: 'foo', arguments: '{}' } }],
+      },
+      { role: 'tool', tool_call_id: 'c1', content: 'ok' },
+    ] as unknown as CodeBuddyMessage[])).toBe(false);
+  });
+});
+
+describe('flattenTools — chat/completions tool format → Codex Responses', () => {
+  it('hoists the function fields to the top level (no nested `function`)', () => {
+    const tools: CodeBuddyTool[] = [
+      {
+        type: 'function',
+        function: {
+          name: 'search',
+          description: 'Search the web',
+          parameters: { type: 'object', properties: {}, required: [] },
+        },
+      },
+    ];
+    const out = flattenTools(tools);
+    expect(out[0]).toMatchObject({
+      type: 'function',
+      name: 'search',
+      description: 'Search the web',
+      parameters: { type: 'object' },
+    });
+    expect((out[0] as Record<string, unknown>).function).toBeUndefined();
+  });
+});
+
+describe('buildRequestBody — assembled body matches Codex Responses contract', () => {
+  it('sets defaults: tool_choice=auto, parallel_tool_calls=true, store=false, stream=true', () => {
+    const body = buildRequestBody({
+      model: 'gpt-5.5',
+      input: [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: 'hi' }] }],
+      tools: [],
+    });
+    expect(body.model).toBe('gpt-5.5');
+    expect(body.tool_choice).toBe('auto');
+    expect(body.parallel_tool_calls).toBe(true);
+    expect(body.store).toBe(false);
+    expect(body.stream).toBe(true);
+  });
+
+  it('falls back to a minimal default for instructions when none supplied (backend rejects empty)', () => {
+    // The ChatGPT Codex backend rejects requests with missing/empty
+    // instructions: { detail: "Instructions are required" }. So we ship
+    // a non-empty default rather than omitting the field entirely.
+    const body = buildRequestBody({
+      model: 'gpt-5.5',
+      input: [],
+      tools: [],
+    });
+    expect(body.instructions).toBeTruthy();
+    expect(body.instructions!.length).toBeGreaterThan(0);
+    expect(body.tools).toBeUndefined();
+    expect(body.reasoning).toBeUndefined();
+  });
+
+  it('uses the caller-supplied instructions when present', () => {
+    const body = buildRequestBody({
+      model: 'gpt-5.5',
+      instructions: 'You are a French chef.',
+      input: [],
+      tools: [],
+    });
+    expect(body.instructions).toBe('You are a French chef.');
+  });
+
+  it('includes reasoning.effort when reasoningEffort is set', () => {
+    const body = buildRequestBody({
+      model: 'gpt-5.5',
+      input: [],
+      tools: [],
+      reasoningEffort: 'high',
+    });
+    expect(body.reasoning).toEqual({ effort: 'high' });
+  });
+
+  it('sets include: ["reasoning.encrypted_content"] when includeEncryptedReasoning is true', () => {
+    const body = buildRequestBody({
+      model: 'gpt-5.5',
+      input: [],
+      tools: [],
+      includeEncryptedReasoning: true,
+    });
+    expect(body.include).toEqual(['reasoning.encrypted_content']);
+  });
+
+  it('omits include field when includeEncryptedReasoning is false', () => {
+    const body = buildRequestBody({
+      model: 'gpt-5.5',
+      input: [],
+      tools: [],
+    });
+    expect(body.include).toBeUndefined();
+  });
+
+  it('includes prompt_cache_key when set (helps the backend cache)', () => {
+    const body = buildRequestBody({
+      model: 'gpt-5.5',
+      input: [],
+      tools: [],
+      promptCacheKey: 'thread-abc',
+    });
+    expect(body.prompt_cache_key).toBe('thread-abc');
+  });
+});
+
+// ─── 2. SSE parser ──────────────────────────────────────────────────
+
+function makeSseStream(events: string[]): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder();
+  return new ReadableStream({
+    start(controller) {
+      for (const ev of events) {
+        controller.enqueue(encoder.encode(ev));
+      }
+      controller.close();
+    },
+  });
+}
+
+describe('parseSseStream — Codex SSE → OpenAI ChatCompletionChunk', () => {
+  it('emits content chunks for output_text.delta events', async () => {
+    const stream = makeSseStream([
+      'data: {"type":"response.output_text.delta","delta":"Hello"}\n\n',
+      'data: {"type":"response.output_text.delta","delta":" world"}\n\n',
+      'data: {"type":"response.completed"}\n\n',
+    ]);
+
+    const chunks: Array<string | undefined> = [];
+    let finished = false;
+    for await (const chunk of parseSseStream(stream, 'gpt-5.5')) {
+      const delta = chunk.choices[0]?.delta;
+      if (delta?.content) chunks.push(delta.content);
+      if (chunk.choices[0]?.finish_reason === 'stop') finished = true;
+    }
+    expect(chunks).toEqual(['Hello', ' world']);
+    expect(finished).toBe(true);
+  });
+
+  it('emits tool_calls on output_item.done with type=function_call', async () => {
+    const stream = makeSseStream([
+      'data: {"type":"response.output_item.done","item":{"type":"function_call","name":"search","arguments":"{\\"q\\":\\"X\\"}","call_id":"c1"}}\n\n',
+      'data: {"type":"response.completed"}\n\n',
+    ]);
+
+    const toolCalls: Array<{ name: string; id: string; args: string }> = [];
+    for await (const chunk of parseSseStream(stream, 'gpt-5.5')) {
+      const tcs = chunk.choices[0]?.delta?.tool_calls;
+      if (tcs) {
+        for (const tc of tcs) {
+          if (tc.id && tc.function?.name) {
+            toolCalls.push({
+              id: tc.id,
+              name: tc.function.name,
+              args: tc.function.arguments ?? '',
+            });
+          }
+        }
+      }
+    }
+    expect(toolCalls).toEqual([{ id: 'c1', name: 'search', args: '{"q":"X"}' }]);
+  });
+
+  it('throws on response.failed with a useful message', async () => {
+    const stream = makeSseStream([
+      'data: {"type":"response.failed","response":{"error":{"code":"rate_limited","message":"Slow down"}}}\n\n',
+    ]);
+
+    let caught: Error | null = null;
+    try {
+      for await (const _chunk of parseSseStream(stream, 'gpt-5.5')) { /* drain */ }
+    } catch (err) {
+      caught = err as Error;
+    }
+    expect(caught).toBeTruthy();
+    expect(caught!.message).toContain('rate_limited');
+    expect(caught!.message).toContain('Slow down');
+  });
+
+  it('ignores unknown event types silently (response.in_progress, etc.)', async () => {
+    const stream = makeSseStream([
+      'data: {"type":"response.in_progress"}\n\n',
+      'data: {"type":"response.created"}\n\n',
+      'data: {"type":"response.output_text.delta","delta":"hi"}\n\n',
+      'data: {"type":"response.completed"}\n\n',
+    ]);
+
+    const contentChunks: string[] = [];
+    for await (const chunk of parseSseStream(stream, 'gpt-5.5')) {
+      const c = chunk.choices[0]?.delta?.content;
+      if (c) contentChunks.push(c);
+    }
+    expect(contentChunks).toEqual(['hi']);
+  });
+
+  it('captures encrypted_content from reasoning items via the onReasoningItem callback', async () => {
+    const stream = makeSseStream([
+      'data: {"type":"response.output_item.done","item":{"type":"reasoning","encrypted_content":"opaque-blob-A"}}\n\n',
+      'data: {"type":"response.output_text.delta","delta":"hi"}\n\n',
+      'data: {"type":"response.completed"}\n\n',
+    ]);
+
+    const captured: Array<{ type: string; encrypted_content: string }> = [];
+    for await (const _ of parseSseStream(stream, 'gpt-5.5', (item) => captured.push(item))) {
+      /* drain */
+    }
+    expect(captured).toEqual([{ type: 'reasoning', encrypted_content: 'opaque-blob-A' }]);
+  });
+
+  it('emits reasoning_text.delta as delta.reasoning_content (passthrough field)', async () => {
+    const stream = makeSseStream([
+      'data: {"type":"response.reasoning_text.delta","delta":"Let me think..."}\n\n',
+      'data: {"type":"response.reasoning_summary_text.delta","delta":"Plan: search code"}\n\n',
+      'data: {"type":"response.output_text.delta","delta":"answer"}\n\n',
+      'data: {"type":"response.completed"}\n\n',
+    ]);
+
+    const reasoningChunks: string[] = [];
+    const contentChunks: string[] = [];
+    for await (const chunk of parseSseStream(stream, 'gpt-5.5')) {
+      const delta = chunk.choices[0]?.delta as { content?: string; reasoning_content?: string } | undefined;
+      if (delta?.reasoning_content) reasoningChunks.push(delta.reasoning_content);
+      if (delta?.content) contentChunks.push(delta.content);
+    }
+    expect(reasoningChunks).toEqual(['Let me think...', 'Plan: search code']);
+    expect(contentChunks).toEqual(['answer']);
+  });
+});
+
+// ─── 3. End-to-end (mocked fetch) ───────────────────────────────────
+
+function authBundle(overrides: Partial<ChatGptAuth> = {}): ChatGptAuth {
+  return {
+    access_token: 'tok-123',
+    account_id: 'acct_xyz',
+    email: 'patrice@example.com',
+    plan_type: 'plus',
+    is_fedramp: false,
+    ...overrides,
+  };
+}
+
+function streamingResponse(events: string[]): Response {
+  return new Response(makeSseStream(events), {
+    status: 200,
+    headers: { 'content-type': 'text/event-stream' },
+  });
+}
+
+describe('ChatGptResponsesProvider — chatStream wiring', () => {
+  it('sends Authorization, ChatGPT-Account-ID, and originator headers', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(streamingResponse([
+        'data: {"type":"response.output_text.delta","delta":"4"}\n\n',
+        'data: {"type":"response.completed"}\n\n',
+      ]));
+
+    const provider = new ChatGptResponsesProvider({
+      authProvider: async () => authBundle(),
+      model: 'gpt-5.5',
+      defaultMaxTokens: 1000,
+    });
+
+    const out: string[] = [];
+    for await (const chunk of provider.chatStream(
+      [{ role: 'user', content: '2+2?' } as CodeBuddyMessage],
+      [],
+      {},
+    )) {
+      const c = chunk.choices[0]?.delta?.content;
+      if (c) out.push(c);
+    }
+
+    expect(out.join('')).toBe('4');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toBe('https://chatgpt.com/backend-api/codex/responses');
+    const headers = (init as RequestInit).headers as Record<string, string>;
+    expect(headers.Authorization).toBe('Bearer tok-123');
+    expect(headers['ChatGPT-Account-ID']).toBe('acct_xyz');
+    expect(headers.originator).toBe('codex_cli_rs');
+    expect(headers.Accept).toBe('text/event-stream');
+  });
+
+  it('sends X-OpenAI-Fedramp header only when is_fedramp is true', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(streamingResponse([
+        'data: {"type":"response.completed"}\n\n',
+      ]));
+
+    const provider = new ChatGptResponsesProvider({
+      authProvider: async () => authBundle({ is_fedramp: true }),
+      model: 'gpt-5.5',
+      defaultMaxTokens: 1000,
+    });
+
+    const gen = provider.chatStream(
+      [{ role: 'user', content: 'X' } as CodeBuddyMessage],
+      [],
+      {},
+    );
+    for await (const _ of gen) { /* drain */ }
+
+    const [, init] = fetchMock.mock.calls[0]!;
+    const headers = (init as RequestInit).headers as Record<string, string>;
+    expect(headers['X-OpenAI-Fedramp']).toBe('true');
+  });
+
+  it('throws a helpful message when no auth on disk', async () => {
+    const provider = new ChatGptResponsesProvider({
+      authProvider: async () => null,
+      model: 'gpt-5.5',
+      defaultMaxTokens: 1000,
+    });
+
+    let caught: Error | null = null;
+    try {
+      const gen = provider.chatStream(
+        [{ role: 'user', content: 'X' } as CodeBuddyMessage],
+        [],
+        {},
+      );
+      for await (const _ of gen) { /* drain */ }
+    } catch (err) {
+      caught = err as Error;
+    }
+    expect(caught?.message).toMatch(/login chatgpt/i);
+  });
+
+  it('refreshes auth on 401 and retries the request once', async () => {
+    let callCount = 0;
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      callCount += 1;
+      if (callCount === 1) {
+        return new Response('unauthorized', { status: 401 });
+      }
+      return streamingResponse([
+        'data: {"type":"response.output_text.delta","delta":"ok"}\n\n',
+        'data: {"type":"response.completed"}\n\n',
+      ]);
+    });
+
+    let refreshCalls = 0;
+    const provider = new ChatGptResponsesProvider({
+      authProvider: async () => authBundle({ access_token: 'old' }),
+      refreshAuth: async () => {
+        refreshCalls += 1;
+        return authBundle({ access_token: 'new' });
+      },
+      model: 'gpt-5.5',
+      defaultMaxTokens: 1000,
+    });
+
+    const out: string[] = [];
+    for await (const chunk of provider.chatStream(
+      [{ role: 'user', content: 'X' } as CodeBuddyMessage],
+      [],
+      {},
+    )) {
+      const c = chunk.choices[0]?.delta?.content;
+      if (c) out.push(c);
+    }
+
+    expect(refreshCalls).toBe(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(out.join('')).toBe('ok');
+    // Second call uses the fresh token.
+    const headers2 = (fetchMock.mock.calls[1]![1] as RequestInit).headers as Record<string, string>;
+    expect(headers2.Authorization).toBe('Bearer new');
+  });
+
+  it('multi-turn: round 2 injects the encrypted reasoning captured in round 1', async () => {
+    // Round 1 stream: reasoning blob + function_call.
+    // Round 2 stream: completed (no body, we just inspect the request body).
+    const responses: Response[] = [
+      streamingResponse([
+        'data: {"type":"response.output_item.done","item":{"type":"reasoning","encrypted_content":"opaque-blob-r1"}}\n\n',
+        'data: {"type":"response.output_item.done","item":{"type":"function_call","name":"search","arguments":"{\\"q\\":\\"x\\"}","call_id":"c1"}}\n\n',
+        'data: {"type":"response.completed"}\n\n',
+      ]),
+      streamingResponse([
+        'data: {"type":"response.output_text.delta","delta":"answer"}\n\n',
+        'data: {"type":"response.completed"}\n\n',
+      ]),
+    ];
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      return responses.shift() ?? new Response('', { status: 500 });
+    });
+
+    const provider = new ChatGptResponsesProvider({
+      authProvider: async () => authBundle(),
+      model: 'gpt-5.5',
+      defaultMaxTokens: 1000,
+    });
+
+    // Round 1: user asks something that triggers a tool_call.
+    const round1Messages: CodeBuddyMessage[] = [
+      { role: 'user', content: 'find the bug' } as CodeBuddyMessage,
+    ];
+    for await (const _ of provider.chatStream(round1Messages, [], { thinkingLevel: 'medium' })) {
+      /* drain */
+    }
+
+    // Round 2: append the assistant's tool_call + tool result, then call again.
+    const round2Messages: CodeBuddyMessage[] = [
+      ...round1Messages,
+      {
+        role: 'assistant',
+        content: null,
+        tool_calls: [{ id: 'c1', type: 'function', function: { name: 'search', arguments: '{"q":"x"}' } }],
+      } as unknown as CodeBuddyMessage,
+      { role: 'tool', tool_call_id: 'c1', content: 'match: line 42' } as unknown as CodeBuddyMessage,
+    ];
+    for await (const _ of provider.chatStream(round2Messages, [], { thinkingLevel: 'medium' })) {
+      /* drain */
+    }
+
+    // Inspect round-2 request body — must contain the reasoning item.
+    const round2Body = JSON.parse((fetchMock.mock.calls[1]![1] as RequestInit).body as string);
+    expect(round2Body.input[0]).toEqual({
+      type: 'reasoning',
+      encrypted_content: 'opaque-blob-r1',
+    });
+    // And the include flag should be set since reasoning effort is on.
+    expect(round2Body.include).toEqual(['reasoning.encrypted_content']);
+  });
+
+  it('multi-turn: a fresh user prompt clears stale reasoning from a previous turn', async () => {
+    // Round 1 produces a reasoning blob.
+    // Round 2 is a NEW user turn (no assistant round in between in messages[]).
+    // The provider must NOT inject the stale reasoning blob.
+    const responses: Response[] = [
+      streamingResponse([
+        'data: {"type":"response.output_item.done","item":{"type":"reasoning","encrypted_content":"stale-blob"}}\n\n',
+        'data: {"type":"response.completed"}\n\n',
+      ]),
+      streamingResponse([
+        'data: {"type":"response.output_text.delta","delta":"hi"}\n\n',
+        'data: {"type":"response.completed"}\n\n',
+      ]),
+    ];
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      return responses.shift() ?? new Response('', { status: 500 });
+    });
+
+    const provider = new ChatGptResponsesProvider({
+      authProvider: async () => authBundle(),
+      model: 'gpt-5.5',
+      defaultMaxTokens: 1000,
+    });
+
+    for await (const _ of provider.chatStream(
+      [{ role: 'user', content: 'first' } as CodeBuddyMessage],
+      [], { thinkingLevel: 'medium' },
+    )) { /* drain */ }
+
+    // Brand-new conversation turn — no assistant message follows the
+    // last user message → isFreshUserTurn() returns true, stale
+    // reasoning gets dropped before convertMessages() runs.
+    for await (const _ of provider.chatStream(
+      [{ role: 'user', content: 'second turn' } as CodeBuddyMessage],
+      [], { thinkingLevel: 'medium' },
+    )) { /* drain */ }
+
+    const round2Body = JSON.parse((fetchMock.mock.calls[1]![1] as RequestInit).body as string);
+    // No reasoning item — the input is just the user message.
+    const reasoningItems = (round2Body.input as Array<{ type: string }>).filter(
+      (it) => it.type === 'reasoning',
+    );
+    expect(reasoningItems).toHaveLength(0);
+  });
+
+  it('does NOT include encrypted_reasoning when reasoning effort is unset', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(streamingResponse([
+      'data: {"type":"response.completed"}\n\n',
+    ]));
+
+    const provider = new ChatGptResponsesProvider({
+      authProvider: async () => authBundle(),
+      model: 'gpt-5.5',
+      defaultMaxTokens: 1000,
+    });
+
+    for await (const _ of provider.chatStream(
+      [{ role: 'user', content: 'hi' } as CodeBuddyMessage],
+      [], {},  // no thinkingLevel
+    )) { /* drain */ }
+
+    const body = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
+    expect(body.include).toBeUndefined();
+    expect(body.reasoning).toBeUndefined();
+  });
+
+  it('surfaces model_not_found errors with suggested fallbacks', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ error: { code: 'model_not_found', message: 'not allowed' } }), {
+        status: 404,
+      }),
+    );
+
+    const provider = new ChatGptResponsesProvider({
+      authProvider: async () => authBundle(),
+      model: 'gpt-5.5',
+      defaultMaxTokens: 1000,
+    });
+
+    let caught: Error | null = null;
+    try {
+      const gen = provider.chatStream(
+        [{ role: 'user', content: 'X' } as CodeBuddyMessage],
+        [],
+        {},
+      );
+      for await (const _ of gen) { /* drain */ }
+    } catch (err) {
+      caught = err as Error;
+    }
+    expect(caught?.message).toContain('gpt-5.5');
+    expect(caught?.message).toMatch(/gpt-5\.1-codex/);
+  });
+});

@@ -537,6 +537,10 @@ describe('CodeBuddyAgent', () => {
   // =========================================================================
 
   describe('processUserMessage', () => {
+    // Skipped during the runTurnLoop fusion (2026-04-26): processUserMessage
+    // is now a thin sequential collector that consumes events from the
+    // streaming generator. The mock setup here predates that and would
+    // need re-plumbing through the new event flow. Tracked for V1.1.
     it.skip('should return user entry and assistant entry for simple message', async () => {
       agent = new CodeBuddyAgent('test-api-key');
       await agent.systemPromptReady;

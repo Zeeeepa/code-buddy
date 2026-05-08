@@ -463,11 +463,117 @@ What's NOT yet enforced (V1.x roadmap):
 
 ---
 
+## Phases (d).17 → (d).20 — V1.0.0 additions
+
+The fleet through Phase (d).16a was peer-RPC plumbing. Phases (d).17 →
+(d).20 turn it into actual multi-Claude orchestration.
+
+### `peer_delegate` + `list_peers` LLM tools (Phase d.17)
+
+Two new tools registered on every Code Buddy:
+
+- `list_peers()` — read-only snapshot of `FleetRegistry`. Returns peer
+  ids + URL + last-seen + compaction state + `peerChatLikelyAvailable`
+  hint. No RPC round-trips.
+- `peer_delegate(peer, prompt, [systemPrompt], [model], [timeoutMs])` —
+  wraps `peer.chat`. Returns the peer's text response, usage, traceId.
+
+Anti-loop guards stack: the existing `CODEBUDDY_PEER_ROLE=leaf` refusal
++ the new per-turn cap (default 5, env
+`CODEBUDDY_PEER_DELEGATE_MAX_PER_TURN`) + depth cap. The LLM gets a
+`<fleet>` system-prompt nudge whenever peer count > 0.
+
+When the human runs `/fleet listen ws://peer …`, the LLM thereafter
+can autonomously decide to delegate without a copy-paste step:
+
+```
+User: ask the darkstar peer how it would index a 50M-row table
+LLM: [calls list_peers, sees darkstar healthy, calls peer_delegate({peer: 'darkstar', ...})]
+LLM (continuing with peer's answer in context): "darkstar suggests …"
+```
+
+### Autonomous Fleet Protocol v0.1 (Phase d.18)
+
+Fleet bus = the `claude-et-patrice/.codebuddy/` repo on a shared
+Tailscale mesh. Each peer periodically:
+
+1. `git pull --rebase`
+2. Reads `.codebuddy/HEARTBEAT.md` for FLEET_PAUSE keyword
+3. Picks a claimable task in `colab-tasks.json` (open + claimedBy null,
+   priority cascade — `critical` is always SKIPPED for autonomous
+   claim, requires human validation)
+4. Atomic claim: mutate JSON, commit, push. Race-loss → abort.
+5. Spawn an in-process `CodeBuddyAgent` with a strict task prompt;
+   parse the JSON tail.
+6. Scope guard: `git diff --name-only` ⊆ `task.filesToModify`,
+   else rollback + mark blocked.
+7. Append `colab-worklog.json` entry, mark task completed, push.
+
+Configure via TOML `[autonomous_fleet]`:
+
+```toml
+[autonomous_fleet]
+enabled = true
+repo_path = "/path/to/claude-et-patrice"
+host = "ministar/grok-cli"
+interval_minutes = 30
+max_task_ms = 600000
+priority_threshold = "high"   # critical always skipped
+llm_provider = "auto"         # cloud (default) | auto | ollama | grok | …
+```
+
+Slash commands: `/fleet autonomous status` (preview resolved provider),
+`/fleet autonomous tick-now` (one-shot tick). The Python wrapper
+`claude-et-patrice/tools/heartbeat_tick.py` remains as the V0
+reference — same protocol, same files.
+
+### `peer.chat-stream` V1.1 (Phase d.19)
+
+Streaming variant of `peer.chat`. New wire frame `peer:chunk` carries
+`{ id, delta }`; server-side `peer.chat-stream` method calls
+`client.chatStream()` and pushes deltas via `ctx.emitChunk`. Final
+`peer:response` still arrives with the aggregated text (back-compat).
+
+Client-side: `FleetListener.requestStream(method, params, onChunk,
+options)` routes per-request chunks to the callback.
+
+```ts
+await listener.requestStream(
+  'peer.chat-stream',
+  { prompt: 'explain the bug' },
+  (delta) => process.stdout.write(delta),
+  { timeoutMs: 60_000 },
+);
+```
+
+Useful for long generations where the caller wants visibility into
+in-flight progress. `peer_delegate` (Phase d.17) currently aggregates
+locally — the streaming path is for power users via `/fleet send`.
+
+### Autonomous v0.2 — Ollama spokes (Phase d.20)
+
+Per-task or per-host LLM routing for the autonomous protocol:
+
+- Per-task: `FleetTask.preferLocal: true` → routes that task to Ollama
+  if `OLLAMA_HOST` is set (otherwise falls through to host config).
+- Per-host: `[autonomous_fleet].llm_provider`:
+  - `'cloud'` (default V0.1, backward-compat) — uses GROK env vars
+  - `'auto'` — factory auto-detect (Ollama first if available)
+  - `'<id>'` — forces that provider (`'ollama'`, `'grok'`, `'anthropic'`,
+    `'gemini'`, `'openai'`)
+
+Worklog entries record `provider` + `model` for cost audit. `/fleet
+autonomous status` shows the resolved provider preview. Backward-compat
+strict — V0.1 default unchanged unless TOML is edited.
+
+Use case: heavy reasoning on a Claude Max peer, mechanical lint /
+summary tasks on a local Qwen via Ollama, vision on a Gemini peer —
+all coordinated by the same fleet protocol.
+
+---
+
 ## Roadmap (post-V1)
 
-- **V1.1** — `peer.chat-stream` (streaming responses via `peer:chunk`
-  frames). Useful for long generations where the caller wants to
-  display tokens as they arrive.
 - **V1.2** — `peer.chat-session.start/.continue/.end` (multi-tour
   conversations between peers, with state held server-side).
 - **V1.3** — `peer.tool.invoke` (more powerful, more risky — exposing

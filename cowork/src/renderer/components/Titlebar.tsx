@@ -1,9 +1,10 @@
-import { Minus, Square, X, Copy, Bell, Activity, Star, BarChart3, Focus } from 'lucide-react';
+import { Minus, Square, X, Copy, Bell, Activity, Star, BarChart3, Focus, Sparkles, Network, Users } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../store';
 import { useUnreadNotificationCount } from '../store/selectors';
 import { TabBar } from './TabBar';
+import { PresenceIndicator } from './PresenceIndicator';
 
 const isMac = typeof window !== 'undefined' && window.electronAPI?.platform === 'darwin';
 
@@ -40,10 +41,47 @@ export function Titlebar() {
         <TabBar />
       </div>
 
+      {/* Presence indicator (face memory) — opens EnrollmentDialog on click. */}
+      <div className="titlebar-no-drag px-2 flex items-center ml-auto">
+        <PresenceIndicator
+          onEnrollClicked={() => useAppStore.getState().setShowEnrollmentDialog(true)}
+        />
+      </div>
+
+      {/* Multi-agent orchestrator launcher (Ctrl+Shift+M). */}
+      <button
+        onClick={() => useAppStore.getState().setShowOrchestratorLauncher(true)}
+        className="w-10 h-full flex items-center justify-center titlebar-no-drag hover:bg-surface transition-colors"
+        title="Spawn multi-agent team (Ctrl+Shift+M)"
+        aria-label="Spawn multi-agent team"
+      >
+        <Sparkles className="w-4 h-4 text-text-secondary" />
+      </button>
+
+      {/* Fleet panel — multi-host Code Buddy listener (GAP 3) */}
+      <button
+        onClick={() => useAppStore.getState().setShowFleetPanel(true)}
+        className="w-10 h-full flex items-center justify-center titlebar-no-drag hover:bg-surface transition-colors"
+        title="Fleet — multi-host Code Buddy"
+        aria-label="Open fleet panel"
+      >
+        <Network className="w-4 h-4 text-text-secondary" />
+      </button>
+
+      {/* Team panel — Agent Teams (Phase 4 layer 9) */}
+      <button
+        onClick={() => useAppStore.getState().setShowTeamPanel(true)}
+        className="w-10 h-full flex items-center justify-center titlebar-no-drag hover:bg-surface transition-colors"
+        title="Agent Team"
+        aria-label="Open team panel"
+      >
+        <Users className="w-4 h-4 text-text-secondary" />
+      </button>
+
       {/* Bookmarks panel (Phase 3 step 4) */}
       <button
         onClick={() => useAppStore.getState().setShowBookmarksPanel(true)}
-        className="w-10 h-full flex items-center justify-center titlebar-no-drag hover:bg-surface transition-colors ml-auto"
+        className="w-10 h-full flex items-center justify-center titlebar-no-drag hover:bg-surface transition-colors"
         title={t('bookmarks.title')}
       >
         <Star className="w-4 h-4 text-text-secondary" />

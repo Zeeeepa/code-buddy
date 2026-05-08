@@ -459,7 +459,8 @@ export type ClientEvent =
   | { type: 'config.geminiOauthLogin'; payload: Record<string, never> }
   | { type: 'config.geminiOauthClear'; payload: Record<string, never> }
   | { type: 'config.codexOauthLogin'; payload: Record<string, never> }
-  | { type: 'config.codexOauthClear'; payload: Record<string, never> };
+  | { type: 'config.codexOauthClear'; payload: Record<string, never> }
+  | { type: 'config.codexOauthStatus'; payload: Record<string, never> };
 
 // Sandbox setup types (app startup)
 export type SandboxSetupPhase = 
@@ -497,6 +498,112 @@ export interface SandboxSyncStatus {
   detail?: string;
   fileCount?: number;
   totalSize?: number;
+}
+
+// Fleet (multi-host Code Buddy listener) — GAP 3
+export type FleetPeerStatus =
+  | 'connecting'
+  | 'connected'
+  | 'authenticated'
+  | 'disconnected'
+  | 'reconnecting'
+  | 'error';
+
+export interface FleetPeer {
+  id: string;
+  url: string;
+  label?: string;
+  addedAt: number;
+  status: FleetPeerStatus;
+  lastError?: string;
+  lastSeenAt?: number;
+  lastEventType?: string;
+}
+
+export interface FleetEventRecord {
+  peerId: string;
+  type: string;
+  payload: Record<string, unknown>;
+  receivedAt: number;
+  hostname?: string;
+  agentId?: string;
+}
+
+// Agent Team (Phase 4 layer 9) — observed via TeamBridge events
+export type TeamStatusValue = 'inactive' | 'active' | 'paused' | 'dissolved';
+export type TeamMemberStatus = 'idle' | 'working' | 'done' | 'error';
+export type TeamTaskStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
+export type TeamTaskPriority = 'low' | 'medium' | 'high';
+
+export interface TeamMember {
+  id: string;
+  role: string;
+  label: string;
+  status: TeamMemberStatus;
+  currentTaskId: string | null;
+  completedTasks: number;
+  joinedAt: string;
+}
+
+export interface TeamTask {
+  id: string;
+  title: string;
+  description: string;
+  status: TeamTaskStatus;
+  priority: TeamTaskPriority;
+  assignedTo: string | null;
+  assignedRole: string | null;
+  dependencies: string[];
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+  result?: string;
+  error?: string;
+}
+
+export interface TeamMailboxMessage {
+  id: string;
+  from: string;
+  to: string;
+  content: string;
+  timestamp: string;
+  read: boolean;
+}
+
+export interface TeamSnapshot {
+  status: TeamStatusValue;
+  goal: string;
+  memberCount: number;
+  members: TeamMember[];
+  taskSummary: {
+    total: number;
+    pending: number;
+    inProgress: number;
+    completed: number;
+    failed: number;
+  };
+  unreadMessages: number;
+  uptime: string;
+}
+
+// A2A active task tracking — GAP 1
+export type A2ATaskStatus =
+  | 'submitted'
+  | 'working'
+  | 'input-required'
+  | 'completed'
+  | 'failed'
+  | 'canceled';
+
+export interface A2ATask {
+  taskId: string;
+  agentId: string;
+  agentName?: string;
+  status: A2ATaskStatus;
+  startedAt: number;
+  updatedAt: number;
+  result?: string;
+  error?: string;
 }
 
 export type ServerEvent =
@@ -544,6 +651,14 @@ export type ServerEvent =
   | { type: 'subagent.status'; payload: { sessionId: string; agentId: string; status: SubAgentStatus; nickname: string } }
   | { type: 'subagent.completed'; payload: { sessionId: string; agentId: string; nickname: string; result: string } }
   | { type: 'subagent.output'; payload: { sessionId: string; agentId: string; delta: string } }
+  | { type: 'fleet.peers'; payload: { peers: FleetPeer[] } }
+  | { type: 'fleet.peer.update'; payload: { peer: FleetPeer } }
+  | { type: 'fleet.event'; payload: FleetEventRecord }
+  | { type: 'a2a.task.update'; payload: A2ATask }
+  | { type: 'team.update'; payload: { event: 'started' | 'stopped'; leadId?: string; goal?: string; stats?: { memberCount: number; completedTasks: number; totalTasks: number }; snapshot: TeamSnapshot } }
+  | { type: 'team.member.update'; payload: { event: 'added'; member: TeamMember } | { event: 'removed'; memberId: string; role: string } }
+  | { type: 'team.task.update'; payload: { event: 'added' | 'updated'; task: TeamTask } | { event: 'assigned'; taskId: string; memberId: string; role: string } }
+  | { type: 'team.message'; payload: TeamMailboxMessage }
   | { type: 'notification.message'; payload: { notification: NotificationEntry } }
   | { type: 'identity.updated'; payload: unknown[] }
   | { type: 'identity.activated'; payload: unknown | null }
@@ -600,6 +715,7 @@ export interface ExecutionContext {
 
 // App Config types
 export type ProviderType =
+  | 'chatgpt'
   | 'openrouter'
   | 'anthropic'
   | 'custom'
@@ -610,6 +726,7 @@ export type ProviderType =
 export type CustomProtocolType = 'anthropic' | 'openai' | 'gemini';
 export type AppTheme = 'dark' | 'light' | 'system';
 export type ProviderProfileKey =
+  | 'chatgpt'
   | 'openrouter'
   | 'anthropic'
   | 'openai'
@@ -677,6 +794,7 @@ export interface ProviderPreset {
 }
 
 export interface ProviderPresets {
+  chatgpt: ProviderPreset;
   openrouter: ProviderPreset;
   anthropic: ProviderPreset;
   custom: ProviderPreset;

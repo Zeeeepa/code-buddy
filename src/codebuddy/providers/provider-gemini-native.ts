@@ -37,6 +37,15 @@ export interface GeminiNativeProviderOptions {
   defaultMaxTokens: number;
   geminiRequestTimeoutMs: number;
   defaultThinkingLevel?: GeminiThinkingLevel;
+  /**
+   * Enable Gemini's native server-side Google Search grounding by
+   * default. Each request can override via `ChatOptions.googleSearch`.
+   * When active, we inject `{ googleSearch: {} }` into the request's
+   * `tools` array (alongside any `functionDeclarations`) and surface
+   * the citation metadata as a "Sources:" footer in the assistant's
+   * content.
+   */
+  defaultGoogleSearch?: boolean;
 }
 
 export class GeminiNativeProvider implements Provider {
@@ -46,6 +55,42 @@ export class GeminiNativeProvider implements Provider {
   private defaultMaxTokens: number;
   private geminiRequestTimeoutMs: number;
   private defaultThinkingLevel: GeminiThinkingLevel | undefined;
+  private defaultGoogleSearch: boolean | undefined;
+
+  /**
+   * Format a Gemini `groundingMetadata` payload as a Markdown "Sources"
+   * footer. Returns an empty string when the metadata is absent or
+   * contains no usable URLs — callers can then append unconditionally.
+   *
+   * Public surface (exported via the static method) for testability and
+   * so the streaming path can reuse the exact same formatting.
+   */
+  static formatGroundingFooter(metadata: unknown): string {
+    if (!metadata || typeof metadata !== 'object') return '';
+    const meta = metadata as {
+      groundingChunks?: Array<{ web?: { uri?: string; title?: string } }>;
+      webSearchQueries?: string[];
+    };
+    const chunks = Array.isArray(meta.groundingChunks) ? meta.groundingChunks : [];
+    const seen = new Set<string>();
+    const sources: Array<{ uri: string; title: string }> = [];
+    for (const chunk of chunks) {
+      const uri = chunk.web?.uri;
+      if (!uri || seen.has(uri)) continue;
+      seen.add(uri);
+      sources.push({ uri, title: chunk.web?.title?.trim() || uri });
+    }
+    if (sources.length === 0) return '';
+
+    const lines = ['', '', '**Sources:**'];
+    for (const s of sources) {
+      lines.push(`- [${s.title}](${s.uri})`);
+    }
+    if (Array.isArray(meta.webSearchQueries) && meta.webSearchQueries.length > 0) {
+      lines.push('', `_Search queries: ${meta.webSearchQueries.join(', ')}_`);
+    }
+    return lines.join('\n');
+  }
 
   /**
    * Gemini type mapping: lowercase OpenAI types to uppercase Gemini types
@@ -66,6 +111,7 @@ export class GeminiNativeProvider implements Provider {
     this.defaultMaxTokens = opts.defaultMaxTokens;
     this.geminiRequestTimeoutMs = opts.geminiRequestTimeoutMs;
     this.defaultThinkingLevel = opts.defaultThinkingLevel;
+    this.defaultGoogleSearch = opts.defaultGoogleSearch;
     logger.info('Using native Gemini API');
   }
 
@@ -75,6 +121,10 @@ export class GeminiNativeProvider implements Provider {
 
   setDefaultThinkingLevel(level: GeminiThinkingLevel): void {
     this.defaultThinkingLevel = level;
+  }
+
+  setDefaultGoogleSearch(enabled: boolean): void {
+    this.defaultGoogleSearch = enabled;
   }
 
   private buildGeminiBody(
@@ -235,14 +285,26 @@ export class GeminiNativeProvider implements Provider {
       body.systemInstruction = systemInstruction;
     }
 
-    // Add tools if provided
+    // Decide whether to inject Google Search grounding. The per-call
+    // option wins (including `false` to force off when the default is on).
+    const groundingEnabled =
+      opts?.googleSearch !== undefined ? opts.googleSearch : this.defaultGoogleSearch === true;
+
+    // Build the tools array. Gemini accepts heterogeneous entries:
+    //   tools: [{ googleSearch: {} }, { functionDeclarations: [...] }]
+    // — server-side tools and client-side function declarations live
+    // side by side. We only set toolConfig when we have local functions.
+    const toolEntries: Array<Record<string, unknown>> = [];
+    if (groundingEnabled) {
+      toolEntries.push({ googleSearch: {} });
+    }
     if (tools && tools.length > 0) {
       const functionDeclarations = tools.map(tool => ({
         name: tool.function.name,
         description: tool.function.description,
         parameters: this.sanitizeSchemaForGemini(tool.function.parameters),
       }));
-      body.tools = [{ functionDeclarations }];
+      toolEntries.push({ functionDeclarations });
       body.toolConfig = { functionCallingConfig: { mode: 'AUTO' } };
 
       // Log first tool's sanitized schema for debugging
@@ -253,6 +315,22 @@ export class GeminiNativeProvider implements Provider {
           parametersType: (functionDeclarations[0].parameters as Record<string, unknown>)?.type,
         });
       }
+    }
+    if (toolEntries.length > 0) {
+      body.tools = toolEntries;
+    }
+    if (groundingEnabled) {
+      // Gemini rejects responseMimeType=application/json combined with
+      // googleSearch — strip it with a warning rather than 400-ing.
+      if ((generationConfig as Record<string, unknown>).responseMimeType) {
+        logger.warn('Gemini googleSearch is incompatible with JSON mode — dropping responseMimeType', {
+          source: 'GeminiNativeProvider',
+        });
+        delete (generationConfig as Record<string, unknown>).responseMimeType;
+      }
+      logger.debug('Gemini googleSearch grounding enabled for this request', {
+        source: 'GeminiNativeProvider',
+      });
     }
 
     // Log request for debugging
@@ -368,6 +446,7 @@ export class GeminiNativeProvider implements Provider {
           parts: Array<{ text?: string; functionCall?: { name: string; args: unknown } }>;
         };
         finishReason: string;
+        groundingMetadata?: unknown;
       }>;
       usageMetadata?: {
         promptTokenCount?: number;
@@ -476,6 +555,14 @@ export class GeminiNativeProvider implements Provider {
       }
     }
 
+    // When grounding was active, append the citation footer so the
+    // assistant message carries the sources alongside the prose. This
+    // is what the agent loop sees and what gets persisted to history.
+    const groundingFooter = GeminiNativeProvider.formatGroundingFooter(candidate.groundingMetadata);
+    if (groundingFooter && content) {
+      content += groundingFooter;
+    }
+
     // Log response summary
     logger.debug('Gemini response parsed', {
       source: 'GeminiNativeProvider',
@@ -483,6 +570,7 @@ export class GeminiNativeProvider implements Provider {
       contentLength: content.length,
       toolCallCount: toolCalls.length,
       finishReason: candidate.finishReason,
+      hasGrounding: !!groundingFooter,
     });
 
     return {
@@ -688,12 +776,19 @@ export class GeminiNativeProvider implements Provider {
 
       const reader = res.body.getReader();
       let chunkIndex = 0;
+      let lastGroundingMetadata: unknown = null;
 
       for await (const chunk of this.parseGeminiSSE(reader)) {
         const candidates = (chunk as Record<string, unknown>).candidates as Array<Record<string, unknown>> | undefined;
         if (!candidates || candidates.length === 0) continue;
 
         const candidate = candidates[0];
+        // Grounding metadata typically arrives in the final chunk of the
+        // stream — keep the latest non-empty payload around so we can
+        // emit the "Sources:" footer right before the stop chunk.
+        if (candidate.groundingMetadata) {
+          lastGroundingMetadata = candidate.groundingMetadata;
+        }
         const content = candidate.content as { parts?: Array<Record<string, unknown>> } | undefined;
         const parts = content?.parts;
         if (!parts) continue;
@@ -765,6 +860,26 @@ export class GeminiNativeProvider implements Provider {
             }],
           };
         }
+      }
+
+      // Emit the Sources footer (if any) BEFORE the final stop chunk so
+      // it lands in the assistant content rather than after finish_reason.
+      const groundingFooter = GeminiNativeProvider.formatGroundingFooter(lastGroundingMetadata);
+      if (groundingFooter) {
+        yield {
+          id: `chatcmpl-gemini-${Date.now()}-${chunkIndex++}`,
+          object: 'chat.completion.chunk' as const,
+          created: Math.floor(Date.now() / 1000),
+          model,
+          choices: [{
+            index: 0,
+            delta: {
+              role: 'assistant' as const,
+              content: groundingFooter,
+            },
+            finish_reason: null,
+          }],
+        };
       }
 
       // Final stop chunk

@@ -789,6 +789,15 @@ describe("Agent Core Module Tests", () => {
 
   // ===========================================================================
   // RESPONSE HANDLING TESTS
+  //
+  // NOTE: Several tests in this section are `it.skip` (rows 806, 865, 906,
+  // 911, 962, 975, 1013, 1075). They were authored against the V0.4
+  // sequential `processUserMessage` flow; the fusion-task refacto on
+  // 2026-04-26 (CLAUDE.md: "Single source of truth via runTurnLoop async
+  // generator") moved the assertion paths into streaming/message-reducer.ts
+  // and tools/tool-orchestrator.ts. They remain here as a regression
+  // backstop — to un-skip, port the mock setup to the new generator-driven
+  // path. Tracked for V1.1 cleanup.
   // ===========================================================================
   describe("Response Handling", () => {
     beforeEach(() => {

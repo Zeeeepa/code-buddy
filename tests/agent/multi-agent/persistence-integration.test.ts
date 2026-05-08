@@ -138,7 +138,7 @@ describe('EnhancedCoordinator — Phase N persistence integration', () => {
       c.dispose();
     });
 
-    it('warns when persisted metrics are older than metricsTtlDays', async () => {
+    it('clears persisted metrics older than metricsTtlDays (V0.5 enforcement)', async () => {
       // Save metrics, then forge an old timestamp directly in the file
       await saveMetrics(new Map([['coder', makePersistedMetrics('coder', 5)]]));
       const { promises: fs } = await import('fs');
@@ -148,17 +148,21 @@ describe('EnhancedCoordinator — Phase N persistence integration', () => {
       parsed.savedAt = oldDate.toISOString();
       await fs.writeFile(_metricsPathForTests(), JSON.stringify(parsed), 'utf8');
 
-      const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => {});
       const c = new EnhancedCoordinator({ enableLearning: true });
       await c.enablePersistence({ metricsTtlDays: 30 });
 
-      const staleWarnings = warnSpy.mock.calls.filter((call) =>
-        typeof call[0] === 'string' && call[0].includes('persisted metrics are')
+      // V0.5 (Phase d.21 ship 5) — TTL enforcement clears the file +
+      // resets in-memory metrics. The clear is logged at info level.
+      const clearLogs = infoSpy.mock.calls.filter((call) =>
+        typeof call[0] === 'string' && call[0].includes('cleared (V0.5 enforcement)')
       );
-      expect(staleWarnings.length).toBeGreaterThan(0);
-      // V0.4.1 = warning only — metrics are still loaded (not cleared).
-      expect(c.getAgentMetrics('coder')!.totalTasks).toBe(5);
-      warnSpy.mockRestore();
+      expect(clearLogs.length).toBeGreaterThan(0);
+      // Metrics reset to defaults — totalTasks=0 (not the 5 we'd seeded).
+      expect(c.getAgentMetrics('coder')!.totalTasks).toBe(0);
+      // File on disk has been removed.
+      await expect(fs.access(_metricsPathForTests())).rejects.toThrow();
+      infoSpy.mockRestore();
       c.dispose();
     });
 
