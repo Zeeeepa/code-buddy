@@ -334,4 +334,132 @@ describe('A2A inbound TaskExecutor', () => {
     const serialized = JSON.stringify(loggedPayload);
     expect(serialized).not.toContain('hello');
   });
+
+  // ─── V1.0 audit follow-ups (M1) ──────────────────────────────────────────
+
+  describe('error paths (V1.0 audit)', () => {
+    it('fails closed when GROK_API_KEY is missing', async () => {
+      delete process.env.GROK_API_KEY;
+      const executor = createCodeBuddyTaskExecutor();
+      const task = await executor(makeTask('anything'));
+      expect(task.status.status).toBe(TaskStatus.FAILED);
+      expect(task.status.message).toMatch(/api key/i);
+      expect(chatMock).not.toHaveBeenCalled();
+    });
+
+    it('fails closed when no fleet-safe tools are registered', async () => {
+      fleetSafeListMock.mockReturnValue([]);
+      const executor = createCodeBuddyTaskExecutor();
+      const task = await executor(makeTask('anything'));
+      expect(task.status.status).toBe(TaskStatus.FAILED);
+      expect(task.status.message).toMatch(/no fleet-safe tools/i);
+      expect(chatMock).not.toHaveBeenCalled();
+    });
+
+    it('fails when user message is empty (after part filtering)', async () => {
+      const task: Task = {
+        id: 'empty',
+        sessionId: 'sess-1',
+        status: { status: TaskStatus.SUBMITTED, timestamp: Date.now() },
+        messages: [{ role: 'user', parts: [{ type: 'text', text: '   ' }] }],
+        artifacts: [],
+        history: [{ status: TaskStatus.SUBMITTED, timestamp: Date.now() }],
+      };
+      const executor = createCodeBuddyTaskExecutor();
+      const result = await executor(task);
+      expect(result.status.status).toBe(TaskStatus.FAILED);
+      expect(result.status.message).toMatch(/empty user message/i);
+    });
+
+    it('fails when LLM call throws on the first turn', async () => {
+      chatMock.mockRejectedValueOnce(new Error('upstream 503'));
+      const executor = createCodeBuddyTaskExecutor();
+      const task = await executor(makeTask('hello'));
+      expect(task.status.status).toBe(TaskStatus.FAILED);
+      expect(task.status.message).toMatch(/llm call failed.*upstream 503/i);
+      // Warning logged (with phase=llm_call), with no peer prompt content.
+      const warnArgs = loggerWarnMock.mock.calls[0];
+      expect(warnArgs?.[0]).toBe('[a2a:inbound]');
+      expect(JSON.stringify(warnArgs?.[1])).not.toContain('hello');
+    });
+
+    it('rejects hallucinated non-fleet-safe tool (defense-in-depth)', async () => {
+      // First turn: LLM hallucinates an unsafe tool.
+      chatMock
+        .mockResolvedValueOnce({
+          choices: [
+            {
+              message: {
+                role: 'assistant',
+                content: null,
+                tool_calls: [
+                  {
+                    id: 'call-bad',
+                    type: 'function',
+                    function: { name: 'shell_exec', arguments: '{"cmd":"rm -rf /"}' },
+                  },
+                ],
+              },
+              finish_reason: 'tool_calls',
+            },
+          ],
+          usage: { total_tokens: 10 },
+        })
+        .mockResolvedValueOnce({
+          choices: [
+            {
+              message: { role: 'assistant', content: 'Cannot do that.', tool_calls: undefined },
+              finish_reason: 'stop',
+            },
+          ],
+          usage: { total_tokens: 18 },
+        });
+      // shell_exec is NOT fleet-safe — defensive registry check refuses.
+      isFleetSafeMock.mockImplementation((name: string) => name === 'view_file');
+
+      const executor = createCodeBuddyTaskExecutor();
+      const task = await executor(makeTask('please run shell'));
+      expect(task.status.status).toBe(TaskStatus.COMPLETED);
+      // formalExecuteMock should NOT have been called for the unsafe tool.
+      expect(formalExecuteMock).not.toHaveBeenCalled();
+      // Final message is the LLM's recovery reply.
+      const reply = task.messages.find((m) => m.role === 'agent');
+      expect((reply!.parts[0] as { text: string }).text).toBe('Cannot do that.');
+    });
+
+    it('terminates at MAX_TURNS cap and returns partial answer', async () => {
+      // 3 successive tool_calls turns → executor caps and returns partial.
+      const toolTurn = {
+        choices: [
+          {
+            message: {
+              role: 'assistant',
+              content: 'Still working...',
+              tool_calls: [
+                {
+                  id: 'call-x',
+                  type: 'function',
+                  function: { name: 'view_file', arguments: '{"path":"a.txt"}' },
+                },
+              ],
+            },
+            finish_reason: 'tool_calls',
+          },
+        ],
+        usage: { total_tokens: 15 },
+      };
+      chatMock
+        .mockResolvedValueOnce(toolTurn)
+        .mockResolvedValueOnce(toolTurn)
+        .mockResolvedValueOnce(toolTurn);
+      formalExecuteMock.mockResolvedValue({ success: true, output: 'file contents' });
+
+      const executor = createCodeBuddyTaskExecutor();
+      const task = await executor(makeTask('keep going'));
+      // Reach the cap → COMPLETED with whatever content the last reply had.
+      expect(task.status.status).toBe(TaskStatus.COMPLETED);
+      // chat called exactly MAX_TURNS=3 times.
+      expect(chatMock).toHaveBeenCalledTimes(3);
+    });
+  });
 });

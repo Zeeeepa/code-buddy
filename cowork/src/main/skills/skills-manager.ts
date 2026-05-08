@@ -693,21 +693,17 @@ export class SkillsManager {
       return;
     }
 
-    // TODO: Implement actual MCP server startup
-    // const { spawn } = await import('child_process');
-    // const mcpConfig = skill.config.mcp as McpServerConfig;
-    //
-    // const proc = spawn(mcpConfig.command, mcpConfig.args || [], {
-    //   env: { ...process.env, ...mcpConfig.env },
-    // });
-    //
-    // this.runningServers.set(skill.id, { process: proc, skill });
-
-    log(`MCP server started for skill: ${skill.name}`);
+    // Skill-specific MCP server lifecycle is V1.1 scope. Skills that
+    // ship as standalone MCP servers (separate from skill `command`
+    // execution which already works) require sandbox + auth-token
+    // rotation design before we can spawn them safely. For V1.0, this
+    // method is a stub: it logs intent and stores a placeholder entry
+    // so callers don't crash, but no child process is spawned.
+    log(`MCP server stub registered for skill: ${skill.name} (V1.1 scope)`);
   }
 
   /**
-   * Stop an MCP server
+   * Stop an MCP server (stub — see startMcpServer note for V1.1 scope).
    */
   async stopMcpServer(skillId: string): Promise<void> {
     const server = this.runningServers.get(skillId);
@@ -715,11 +711,9 @@ export class SkillsManager {
       return;
     }
 
-    // TODO: Implement graceful shutdown
-    // server.process.kill();
-
+    // Stub — no child process to kill yet (V1.1 will add real spawn).
     this.runningServers.delete(skillId);
-    log(`MCP server stopped for skill: ${server.skill.name}`);
+    log(`MCP server stub deregistered for skill: ${server.skill.name}`);
   }
 
   /**

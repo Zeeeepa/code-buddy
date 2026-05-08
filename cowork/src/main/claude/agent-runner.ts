@@ -475,9 +475,12 @@ export class ClaudeAgentRunner {
     log('[ClaudeAgentRunner] MCP servers cache invalidated — tools will rebuild on next query');
   }
 
-  // TODO: Credentials should be served via a secure MCP tool or IPC channel,
-  // not injected as plaintext into the system prompt. The getCredentialsPrompt()
-  // method was removed to eliminate credential leakage risk.
+  // Note: An earlier `getCredentialsPrompt()` method that injected
+  // credentials directly into the system prompt was removed to
+  // eliminate credential leakage risk via prompt → log → telemetry.
+  // If credentials need to reach an agent in the future, they must go
+  // through a secure MCP tool or dedicated IPC channel, never through
+  // the system prompt. (Audit closure 2026-05-08.)
 
   /**
    * Generate bundled executable path hints for production mode system prompt.

@@ -10,10 +10,122 @@ once it reaches `1.0.0`.
 
 ## [Unreleased]
 
-Heading toward `1.0.0` final. Backlog tracked under `## [Unreleased]`'s
-"Backlog" section below; pending work tracked in
-[`docs/fleet-guide.md`](docs/fleet-guide.md) (V1.x roadmap section)
-and the audit follow-ups noted under `## [0.5.1-fleet]`.
+Heading toward `1.0.0` final. Open audit blockers tracked in
+`claude-et-patrice/propositions/` and the V1.x roadmap section of
+[`docs/fleet-guide.md`](docs/fleet-guide.md). Backlog notes also under
+`## [0.5.1-fleet]`.
+
+---
+
+## [1.0.0-rc.6] — 2026-05-08
+
+**Sixth release candidate** — multi-Claude fleet activation +
+embodiment closure + V0.5 multi-agent enforcement. Eleven features
+shipped over the May 7-8 session, organised in three stacked branches.
+
+### Added — Cowork (face memory + UX)
+
+- **Presence V0.5 — live titlebar identity** (`cowork/src/renderer/components/PresenceIndicator.tsx`).
+  Main-process `PresenceBridge` events (`presence:detected/left/unknown/enrolled`)
+  forwarded to the renderer via a new `presence:event` IPC channel. Zustand
+  slice `currentPresence` drives a live "🟢 👋 {name} ({pct}%)" badge,
+  unknown-face badge, and enrolled-count fallback.
+
+- **Presence V0.6 — proactive greeting toast**. PresenceService tracks
+  `lastGreetedPersonId`; first detection of a new person fires
+  `addNotification({ title: '👋 Bonjour', body: '{name} est devant la caméra.' })`.
+  Reset on `presence:left` so returning persons get re-greeted. Reset on
+  service `stop()`.
+
+- **Auto-download Buffalo_S UX** — `EnrollmentDialog` probes
+  `presence.hasModel()` at open; if missing, opens `ModelInstallDialog`
+  before taking the camera. The reactive fallback at the encode call
+  site stays as a safety net.
+
+- **OrchestratorLauncher wiring** (Phase d.17 frontend) — modal trigger
+  for the multi-agent orchestrator, surfaced via the Sparkles button
+  in Titlebar and Cmd/Ctrl+Shift+M.
+
+### Added — Fleet & multi-AI orchestration (Phases (d).17 → (d).20)
+
+- **Phase (d).17 — `peer_delegate` + `list_peers` LLM tools**. Two new
+  tool-registry entries that let the LLM autonomously delegate a
+  one-shot question to a connected fleet peer Code Buddy and read the
+  response back in its tool result. Wraps `peer.chat` (Phase d.15).
+  Anti-loop guards: `CODEBUDDY_PEER_ROLE=leaf` refusal, per-turn cap
+  (default 5, env `CODEBUDDY_PEER_DELEGATE_MAX_PER_TURN`), depth cap
+  via existing `MAX_DEPTH_EXCEEDED`. `<fleet>` system-prompt nudge
+  injected when peer count > 0 (zero tokens otherwise). Refacto:
+  `activeListeners` Map promoted to `src/fleet/fleet-registry.ts`
+  singleton (17 references migrated, 43/43 fleet-handler regression
+  tests intact). 28 new tests.
+
+- **Phase (d).18 — Autonomous Fleet Protocol v0.1 (native TS port)**.
+  `src/agent/autonomous/{fleet-task-types,fleet-tick-handler}.ts`
+  ports the operational python wrapper
+  `claude-et-patrice/tools/heartbeat_tick.py` (proven over 6 cycles
+  on 2026-05-02). Pull → FLEET_PAUSE check → pickTask (priority
+  cascade, critical SKIPPED for autonomous) → atomic claim → in-process
+  agent run → scope guard → worklog → mark completed → push.
+  TOML `[autonomous_fleet]` block + boot wiring in `codebuddy-agent.ts` +
+  `/fleet autonomous status|tick-now` slash sub-commands. 26 new tests
+  covering all outcomes (FLEET_PAUSE, dirty repo, claim_lost,
+  out_of_scope rollback, timeout, priority threshold).
+
+- **Phase (d).19 — `peer.chat-stream` V1.1**. Wire-level: new
+  `peer:chunk` frame + `emitChunk` in `PeerMethodContext`. Server-side
+  `peer.chat-stream` method calls `client.chatStream()` and pushes
+  deltas via `ctx.emitChunk` while still returning the aggregated text
+  in the final `peer:response`. Client-side
+  `FleetListener.requestStream(method, params, onChunk, options)`
+  routes per-request `peer:chunk` frames to the callback. Falls back
+  to local aggregation when transport doesn't support streaming.
+  9 new tests.
+
+- **Phase (d).20 — Autonomous v0.2: Ollama spokes**.
+  `resolveProviderFromEnv()` public helper on
+  `peer-chat-client-factory.ts` returns `{ provider, apiKey, baseUrl,
+  model, isLocal }` for non-`peer.chat` consumers (e.g.
+  `CodeBuddyAgent`). New `FleetTask.preferLocal` hint +
+  `WorklogFileEntry.{provider, model}` for cost audit. New
+  `[autonomous_fleet].llm_provider` TOML field
+  (`'cloud'` default V0.1 / `'auto'` / explicit provider id) +
+  `resolveTickProvider()` priority cascade
+  (`preferLocal` → `llm_provider` → GROK fallback). `/fleet autonomous status`
+  shows resolved provider preview. 12 new routing tests.
+
+### Added — Wake dormant code (Phase (d).21, three ships)
+
+- **NotificationManager wake** (Tier D-1).
+  `src/agent/proactive/notification-default-sink.ts` exposes
+  `notify()` / `notifyQuick()` helpers that apply `shouldSend()` gates
+  (channel allowlist, quiet hours, rate limit) and log via
+  `logger.info`/`warn`. `wireDefaultNotificationSink()` boot-time
+  registration. `agent-executor` fires a notification after every tool
+  completion (low priority on success, high on failure). 8 new tests.
+
+- **progress-tracker wake** (Tier D-2).
+  `src/agent/planner/progress-default-sink.ts` exposes a process-level
+  singleton + log-based default sink that emits at 25/50/75/100
+  thresholds (avoids per-tool log spam).
+  `agent-executor.runTurnLoop()` calls `progress.start(maxToolRounds)`
+  at loop entry and `progress.update()` per tool completion. 8 new
+  tests.
+
+- **V0.5 metrics TTL enforcement** (Tier C-3). Replaces the warn-only
+  branch in `enhanced-coordination.ts:enablePersistence()` with
+  `await clearMetrics()` + `initializeMetrics()` reset when
+  `ageDays > metricsTtlDays`. Stale metrics no longer bias allocation
+  across process restarts. 5 new tests; existing
+  `persistence-integration.test.ts` updated to assert the new
+  enforcement behaviour.
+
+### Tests
+
+- 75+ new tests across the three branches; full session test count
+  growth is 27,366 / 27,366 + audit follow-ups in V1.0.0 final.
+- TypeScript clean (root + cowork); existing fleet/agent regression
+  suites (43 + 44 + 18 + …) all green.
 
 ---
 
