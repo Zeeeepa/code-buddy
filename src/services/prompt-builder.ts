@@ -414,8 +414,10 @@ Four categories — pick the right one:
 
 When to call \`lessons_add\`:
 - After the user corrects your approach — extract the rule/pattern that would have prevented the mistake
+- **After completing a bug-finding / audit / code-review task** — capture the underlying pattern as a RULE or INSIGHT so the same class of bug is detectable next time (e.g. "After mutating a request body field, prefer body.* as source of truth over the original local variable")
 - When you discover a project convention or gotcha not derivable from code or git log
 - When you find a successful pattern you would re-apply on similar tasks
+- After resolving a non-trivial debugging session — extract what was non-obvious about the root cause
 
 When to call \`lessons_search\` (BEFORE acting on a related task):
 - Before implementing a feature similar to one the user previously corrected

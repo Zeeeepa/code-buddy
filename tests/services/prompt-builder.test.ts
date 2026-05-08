@@ -379,6 +379,10 @@ describe('PromptBuilder — Phase T4', () => {
       expect(finalPrompt).toContain('`lessons_search`');
       expect(finalPrompt).toContain('Manus AI');
       expect(finalPrompt).toMatch(/After the user corrects your approach/i);
+      // Phase d.25: lessons_add should also fire after a bug-finding /
+      // audit / code-review task, so the LLM captures the underlying
+      // pattern as an actionable rule for next time.
+      expect(finalPrompt).toMatch(/bug-finding|audit|code-review/i);
     });
 
     it('injects BOTH directives (presence; order is intentionally shuffled by varySystemPrompt)', async () => {
