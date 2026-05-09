@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Cowork-on-core migration (Phases 1–5)** — Cowork now runs on the
+  same Code Buddy core agentic loop as the CLI by default. The legacy
+  `pi-coding-agent` runner is retained as a fallback. New
+  `RUNNER_AUDIT.md` documents the parity matrix and remaining gaps.
+- **Engine MCP runtime sync** — when you add/edit/remove an MCP server
+  in Settings, the change now propagates to the embedded engine's
+  `MCPManager` singleton automatically (previously only pi saw the
+  update). New `EngineAdapter.setMcpServers()` API.
+- **Runner status badge** — titlebar shows a CPU icon (green for
+  engine, orange for pi fallback, red for error). Click for details.
+- **Settings → Core engine** page with a 3-state radio: Auto / Always
+  on / Always off. Persisted across restarts. Env var
+  `CODEBUDDY_EMBEDDED=0` continues to override in Auto mode.
+- 24 new tests covering MCP sync (10), event mapping (9), and
+  embedded-mode precedence (5).
+
 ### Removed
 
 - Unused credentials store module and Keychain integration (eliminated macOS Keychain popup)

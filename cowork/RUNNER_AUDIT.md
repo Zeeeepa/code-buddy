@@ -161,11 +161,11 @@ CODEBUDDY_ENGINE_PATH=/abs/path/to/dist npm run dev
 
 ## Next steps
 
-- Phase 2 : fix the blocker (MCP sync) + audit permission UI.
-- Phase 3 : surface "active runner = engine | pi" in titlebar so
-  Patrice sees instantly which path is active.
-- Phase 5 : add tests so future changes don't silently break the
-  engine path.
-- Phase 6 : update `architecture.md` + CHANGELOG.
+- ~~Phase 2 : fix the blocker (MCP sync) + audit permission UI.~~ — done.
+- ~~Phase 3 : surface "active runner = engine | pi" in titlebar.~~ — done.
+- ~~Phase 4 : Settings opt-in / opt-out persisté.~~ — done.
+- ~~Phase 5 : add tests for event-mapping.~~ — done (9 cases).
+- Phase 6 : update CHANGELOG + README runner section. **In flight.**
 - Out of scope here : deprecate pi (V0.9+, after 4-6 weeks of
-  engine-only daily use).
+  engine-only daily use). The audit doc + Settings page are the
+  prerequisites for a clean deprecation announcement.
