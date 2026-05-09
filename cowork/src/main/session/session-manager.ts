@@ -605,6 +605,79 @@ export class SessionManager {
     });
   }
 
+  /**
+   * Cross-session content search (Phase 3 — global search "Messages" tab).
+   * Returns messages whose content matches the query substring, with the
+   * snippet trimmed to the area around the first match. The renderer uses
+   * the `sessionId` + `messageId` to navigate-and-highlight.
+   */
+  searchMessageContent(
+    query: string,
+    limit: number = 50
+  ): Array<{
+    messageId: string;
+    sessionId: string;
+    sessionTitle: string;
+    role: string;
+    snippet: string;
+    matchOffset: number;
+    timestamp: number;
+    projectId: string | null;
+  }> {
+    if (typeof query !== 'string' || query.trim().length === 0) return [];
+    const hits = this.db.messages.searchContent(query, limit);
+    const needle = query.trim().toLowerCase();
+    const SNIPPET_RADIUS = 60;
+    return hits.map((hit) => {
+      // The DB stores `content` as a JSON string. Decode it lazily; if
+      // decoding fails (legacy plain-text rows), fall back to the raw value.
+      let plain = hit.content;
+      try {
+        const parsed = JSON.parse(hit.content);
+        if (typeof parsed === 'string') {
+          plain = parsed;
+        } else if (parsed && typeof parsed === 'object') {
+          // Newer messages may store an array of content blocks; flatten
+          // text fields into a single string for snippeting.
+          plain = JSON.stringify(parsed);
+          if (Array.isArray(parsed)) {
+            const texts = parsed
+              .map((b: { type?: string; text?: string }) =>
+                b && typeof b.text === 'string' ? b.text : ''
+              )
+              .filter(Boolean);
+            if (texts.length > 0) plain = texts.join(' ');
+          } else if ('text' in parsed && typeof parsed.text === 'string') {
+            plain = parsed.text;
+          }
+        }
+      } catch {
+        // Not JSON — already plain text.
+      }
+      const lower = plain.toLowerCase();
+      const matchIdx = lower.indexOf(needle);
+      const start = matchIdx >= 0 ? Math.max(0, matchIdx - SNIPPET_RADIUS) : 0;
+      const end =
+        matchIdx >= 0
+          ? Math.min(plain.length, matchIdx + needle.length + SNIPPET_RADIUS)
+          : Math.min(plain.length, SNIPPET_RADIUS * 2);
+      const snippet =
+        (start > 0 ? '…' : '') +
+        plain.slice(start, end) +
+        (end < plain.length ? '…' : '');
+      return {
+        messageId: hit.message_id,
+        sessionId: hit.session_id,
+        sessionTitle: hit.session_title,
+        role: hit.role,
+        snippet,
+        matchOffset: matchIdx >= 0 ? matchIdx - start : 0,
+        timestamp: hit.timestamp,
+        projectId: hit.project_id,
+      };
+    });
+  }
+
   // Continue an existing session
   async continueSession(
     sessionId: string,

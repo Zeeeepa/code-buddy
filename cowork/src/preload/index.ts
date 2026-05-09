@@ -662,6 +662,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
       newName: string
     ): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('session.renameBranch', sessionId, branchId, newName),
+    /**
+     * Cross-session message search — used by GlobalSearchDialog "Messages" tab.
+     */
+    searchContent: (
+      query: string,
+      limit?: number
+    ): Promise<
+      Array<{
+        messageId: string;
+        sessionId: string;
+        sessionTitle: string;
+        role: string;
+        snippet: string;
+        matchOffset: number;
+        timestamp: number;
+        projectId: string | null;
+      }>
+    > => ipcRenderer.invoke('sessions.searchContent', query, limit),
   },
 
   // Auto-update
@@ -2234,6 +2252,21 @@ declare global {
           branchId: string,
           newName: string
         ) => Promise<{ success: boolean; error?: string }>;
+        searchContent: (
+          query: string,
+          limit?: number
+        ) => Promise<
+          Array<{
+            messageId: string;
+            sessionId: string;
+            sessionTitle: string;
+            role: string;
+            snippet: string;
+            matchOffset: number;
+            timestamp: number;
+            projectId: string | null;
+          }>
+        >;
       };
       update: {
         check: () => Promise<unknown>;

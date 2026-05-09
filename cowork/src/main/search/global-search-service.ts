@@ -35,6 +35,8 @@ export interface GlobalSearchHit {
     sessionId?: string;
     projectId?: string;
     messageIndex?: number;
+    /** Persistent id of the matched message — used by the renderer to scroll-and-highlight. */
+    messageId?: string;
     path?: string;
   };
 }
@@ -200,19 +202,22 @@ export class GlobalSearchService {
 
   private searchMessages(query: string, limit: number): GlobalSearchHit[] {
     const database = this.deps.db.raw;
+    // The messages table uses `timestamp` (not `created_at` — that's
+    // sessions). Earlier code used the wrong column, which made the
+    // statement throw and silently zeroed out the message category.
     const rows = database
       .prepare(
-        `SELECT id, session_id, content, created_at
+        `SELECT id, session_id, content, timestamp
          FROM messages
          WHERE LOWER(content) LIKE ?
-         ORDER BY created_at DESC
+         ORDER BY timestamp DESC
          LIMIT ?`
       )
       .all(`%${query.toLowerCase()}%`, limit) as Array<{
       id: string;
       session_id: string;
       content: string;
-      created_at: number;
+      timestamp: number;
     }>;
 
     return rows.map((row) => {
@@ -235,7 +240,7 @@ export class GlobalSearchService {
         title: text.slice(0, 60) + (text.length > 60 ? '…' : ''),
         snippet: extractSnippet(text, query),
         score: scoreMatch(text, query),
-        context: { sessionId: row.session_id },
+        context: { sessionId: row.session_id, messageId: row.id },
       };
     });
   }

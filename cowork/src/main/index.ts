@@ -2734,6 +2734,22 @@ ipcMain.handle('activity.clear', async () => {
   return { success: true };
 });
 
+/**
+ * Cross-session message search (Phase 3 — Global search "Messages" tab).
+ * Hits SessionManager.searchMessageContent which scans the messages
+ * table with a case-insensitive substring match. Returns up to `limit`
+ * (capped at 200) message hits with snippets ready for direct render.
+ */
+ipcMain.handle('sessions.searchContent', async (_event, query: string, limit?: number) => {
+  try {
+    if (!sessionManager) return [];
+    return sessionManager.searchMessageContent(query, Math.max(1, Math.min(limit ?? 50, 200)));
+  } catch (err) {
+    logError('[sessions.searchContent] failed:', err);
+    return [];
+  }
+});
+
 ipcMain.handle('sessionInsights.list', async (_event, limit?: number) => {
   try {
     return sessionInsightsBridge?.list(limit ?? 100) ?? [];

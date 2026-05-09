@@ -363,3 +363,92 @@ describe('SessionManager.deleteSession cache eviction', () => {
     expect(db.messages.getBySessionId).toHaveBeenCalledTimes(2);
   });
 });
+
+// ------------------------------------------------------------------
+// searchMessageContent — Phase 3 (cross-session search)
+// ------------------------------------------------------------------
+describe('SessionManager.searchMessageContent', () => {
+  it('returns empty array for empty/whitespace queries without hitting the DB', () => {
+    const searchContent = vi.fn(() => []);
+    const db = makeDb({
+      messages: {
+        create: vi.fn(),
+        update: vi.fn(),
+        delete: vi.fn(),
+        deleteBySessionId: vi.fn(),
+        getBySessionId: vi.fn(() => []),
+        searchContent,
+      } as any,
+    });
+    const manager = new SessionManager(db, vi.fn());
+    expect(manager.searchMessageContent('')).toEqual([]);
+    expect(manager.searchMessageContent('   ')).toEqual([]);
+    expect(searchContent).not.toHaveBeenCalled();
+  });
+
+  it('forwards the query and decorates hits with snippets centered on the match', () => {
+    const searchContent = vi.fn(() => [
+      {
+        message_id: 'm1',
+        session_id: 's1',
+        role: 'user',
+        content: JSON.stringify([
+          { type: 'text', text: 'long preamble lorem ipsum BANANA dolor sit amet trailing copy' },
+        ]),
+        timestamp: 1234,
+        session_title: 'My session',
+        project_id: 'p1',
+      },
+    ]);
+    const db = makeDb({
+      messages: {
+        create: vi.fn(),
+        update: vi.fn(),
+        delete: vi.fn(),
+        deleteBySessionId: vi.fn(),
+        getBySessionId: vi.fn(() => []),
+        searchContent,
+      } as any,
+    });
+    const manager = new SessionManager(db, vi.fn());
+
+    const hits = manager.searchMessageContent('banana', 25);
+    expect(searchContent).toHaveBeenCalledWith('banana', 25);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].messageId).toBe('m1');
+    expect(hits[0].sessionId).toBe('s1');
+    expect(hits[0].sessionTitle).toBe('My session');
+    expect(hits[0].snippet).toContain('BANANA');
+    expect(hits[0].timestamp).toBe(1234);
+    expect(hits[0].projectId).toBe('p1');
+  });
+
+  it('handles plain-string content (legacy rows) without throwing', () => {
+    const searchContent = vi.fn(() => [
+      {
+        message_id: 'm2',
+        session_id: 's2',
+        role: 'assistant',
+        content: 'plain text needle hidden in a haystack',
+        timestamp: 0,
+        session_title: 'legacy',
+        project_id: null,
+      },
+    ]);
+    const db = makeDb({
+      messages: {
+        create: vi.fn(),
+        update: vi.fn(),
+        delete: vi.fn(),
+        deleteBySessionId: vi.fn(),
+        getBySessionId: vi.fn(() => []),
+        searchContent,
+      } as any,
+    });
+    const manager = new SessionManager(db, vi.fn());
+
+    const [hit] = manager.searchMessageContent('needle');
+    expect(hit.snippet).toContain('needle');
+    expect(hit.projectId).toBeNull();
+  });
+});

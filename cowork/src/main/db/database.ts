@@ -29,6 +29,13 @@ export interface DatabaseInstance {
     getBySessionId: (sessionId: string) => MessageRow[];
     delete: (id: string) => void;
     deleteBySessionId: (sessionId: string) => void;
+    /**
+     * Cross-session content search. Returns the most recent `limit`
+     * messages whose `content` contains the (case-insensitive) substring.
+     * The result is enriched with the parent session's title and
+     * project_id for direct rendering in the global search overlay.
+     */
+    searchContent: (query: string, limit: number) => MessageSearchHit[];
   };
 
   traceSteps: {
@@ -97,6 +104,16 @@ export interface MessageRow {
   timestamp: number;
   token_usage: string | null; // JSON string
   execution_time_ms: number | null;
+}
+
+export interface MessageSearchHit {
+  message_id: string;
+  session_id: string;
+  role: string;
+  content: string;
+  timestamp: number;
+  session_title: string;
+  project_id: string | null;
 }
 
 export interface TraceStepRow {
@@ -516,6 +533,26 @@ export function initDatabase(): DatabaseInstance {
     DELETE FROM messages WHERE session_id = ?
   `);
 
+  // Cross-session content search (Phase 3 — global search "Messages" tab).
+  // Uses a `LIKE` substring scan rather than FTS5 to keep schema migrations
+  // out of the V1 release. The dataset is bounded (≤ ~50k messages per
+  // user), so a sequential scan is sub-50ms in practice. Joins sessions
+  // to expose the title/cwd/project_id needed by the renderer.
+  const searchMessagesByContentStmt = rawDb.prepare(`
+    SELECT m.id AS message_id,
+           m.session_id,
+           m.role,
+           m.content,
+           m.timestamp,
+           s.title AS session_title,
+           s.project_id
+      FROM messages m
+      JOIN sessions s ON s.id = m.session_id
+     WHERE LOWER(m.content) LIKE LOWER(?)
+     ORDER BY m.timestamp DESC
+     LIMIT ?
+  `);
+
   const insertTraceStep = rawDb.prepare(`
     INSERT OR REPLACE INTO trace_steps (
       id, session_id, type, status, title, content, tool_name, tool_input, tool_output, is_error, timestamp, duration
@@ -656,6 +693,19 @@ export function initDatabase(): DatabaseInstance {
 
       deleteBySessionId: (sessionId: string) => {
         deleteMessagesBySessionStmt.run(sessionId);
+      },
+
+      searchContent: (query: string, limit: number): MessageSearchHit[] => {
+        const trimmed = query.trim();
+        if (trimmed.length === 0) return [];
+        // Escape SQL LIKE wildcards in the user's query — without this,
+        // a literal `_` or `%` in the search would match anything.
+        const escaped = trimmed.replace(/[\\%_]/g, (c) => `\\${c}`);
+        const pattern = `%${escaped}%`;
+        return searchMessagesByContentStmt.all(
+          pattern,
+          Math.max(1, Math.min(limit, 200))
+        ) as MessageSearchHit[];
       },
     },
 
