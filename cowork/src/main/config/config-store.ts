@@ -169,6 +169,18 @@ export interface AppConfig {
     /** Persistent JWT secret. If absent, a runtime fallback is minted. */
     jwtSecret?: string;
   };
+
+  /**
+   * User preference for the agentic loop (Cowork-on-core migration P4).
+   *
+   * - `'auto'` (default): defers to env policy (`CODEBUDDY_EMBEDDED=0`
+   *   forces pi, otherwise engine).
+   * - `'force-on'`: always boot the embedded core engine.
+   * - `'force-off'`: always use the legacy pi-coding-agent runner.
+   *
+   * Persisted across restarts.
+   */
+  coreEngineMode?: 'auto' | 'force-on' | 'force-off';
 }
 
 const DEFAULT_CONFIG_SET_ID = 'default';

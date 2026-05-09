@@ -35,6 +35,38 @@ export function isEmbeddedOptOut(env: NodeJS.ProcessEnv = process.env): boolean 
 }
 
 /**
+ * User-level engine mode persisted in Cowork's config store
+ * (Settings → Advanced → "Code Buddy core engine"). Three states:
+ *
+ * - `'auto'` (default) — fall back to the env-var policy
+ *   (`isEmbeddedOptOut`). The engine is on unless `CODEBUDDY_EMBEDDED=0`.
+ * - `'force-on'` — always boot the engine. Env var is ignored.
+ * - `'force-off'` — always use pi. Env var is ignored.
+ *
+ * The env var takes precedence in `'auto'` only — that way developers
+ * setting `CODEBUDDY_EMBEDDED=0` for debug don't lose it just because
+ * a user toggled the Settings to `'force-on'`.
+ */
+export type CoreEngineMode = 'auto' | 'force-on' | 'force-off';
+
+/**
+ * Resolve the final on/off decision given the user's Settings choice
+ * + the env override + the historical default-on policy.
+ *
+ * Returns `true` if Cowork should attempt to load the embedded engine,
+ * `false` if it should skip straight to the pi fallback.
+ */
+export function shouldLoadEngine(
+  userMode: CoreEngineMode | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  if (userMode === 'force-on') return true;
+  if (userMode === 'force-off') return false;
+  // 'auto' (or undefined / unknown) → defer to env policy.
+  return !isEmbeddedOptOut(env);
+}
+
+/**
  * Return-shape from `classifyEngineLoadError`. Lets the caller decide
  * the log level without re-implementing the error classification.
  */

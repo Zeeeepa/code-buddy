@@ -30,7 +30,7 @@ import { registerSkillMdIpcHandlers } from './ipc/skill-md-ipc';
 import { registerKnowledgeIpcHandlers } from './ipc/knowledge-ipc';
 import { initDatabase, closeDatabase } from './db/database';
 import { SessionManager, type EngineAdapterLike } from './session/session-manager';
-import { classifyEngineLoadError, isEmbeddedOptOut, resolveEnginePath } from './engine/embedded-mode';
+import { classifyEngineLoadError, resolveEnginePath, shouldLoadEngine } from './engine/embedded-mode';
 import { applyGroundingToggle } from './codebuddy/grounding-handler';
 import {
   ProjectManager,
@@ -871,8 +871,13 @@ app
     // entry point other than `buddy gui` silently fell back to the
     // pi-coding-agent runner).
     let engineAdapter: EngineAdapterLike | undefined;
-    if (isEmbeddedOptOut()) {
-      log('[Main] CODEBUDDY_EMBEDDED=0 — embedded engine disabled by env opt-out');
+    const userEngineMode = configStore.getAll().coreEngineMode ?? 'auto';
+    if (!shouldLoadEngine(userEngineMode)) {
+      const reason =
+        userEngineMode === 'force-off'
+          ? 'user setting (Settings → Advanced → Code Buddy core engine = "Always off")'
+          : 'CODEBUDDY_EMBEDDED=0 env opt-out';
+      log(`[Main] embedded engine disabled (${reason})`);
     } else {
       try {
         // Packaged-aware resolution: extraResources copies the engine to

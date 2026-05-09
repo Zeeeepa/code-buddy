@@ -14,6 +14,7 @@ import {
   classifyEngineLoadError,
   isEmbeddedOptOut,
   resolveEnginePath,
+  shouldLoadEngine,
 } from '../src/main/engine/embedded-mode';
 
 describe('isEmbeddedOptOut', () => {
@@ -132,6 +133,31 @@ describe('resolveEnginePath', () => {
         appPath: '/app/resources/app.asar',
       }),
     ).toBe('/staging/engine');
+  });
+});
+
+describe('shouldLoadEngine — Settings × env precedence (Phase 4)', () => {
+  it("returns true when user mode is 'auto' and env is unset (default-on)", () => {
+    expect(shouldLoadEngine('auto', {})).toBe(true);
+    expect(shouldLoadEngine(undefined, {})).toBe(true);
+  });
+
+  it("returns false when user mode is 'auto' and env opts out", () => {
+    expect(shouldLoadEngine('auto', { CODEBUDDY_EMBEDDED: '0' })).toBe(false);
+  });
+
+  it("returns true when user mode is 'force-on' regardless of env", () => {
+    expect(shouldLoadEngine('force-on', { CODEBUDDY_EMBEDDED: '0' })).toBe(true);
+    expect(shouldLoadEngine('force-on', {})).toBe(true);
+  });
+
+  it("returns false when user mode is 'force-off' regardless of env", () => {
+    expect(shouldLoadEngine('force-off', {})).toBe(false);
+    expect(shouldLoadEngine('force-off', { CODEBUDDY_EMBEDDED: '1' })).toBe(false);
+  });
+
+  it("treats undefined / unknown user mode as 'auto'", () => {
+    expect(shouldLoadEngine(undefined, { CODEBUDDY_EMBEDDED: '0' })).toBe(false);
   });
 });
 

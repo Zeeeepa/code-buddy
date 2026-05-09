@@ -22,6 +22,7 @@ import {
   FolderKanban,
   Blocks,
   ServerCog,
+  Cpu,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useWindowSize } from '../hooks/useWindowSize';
@@ -45,6 +46,7 @@ import { SettingsWorkspacePresets } from './settings/SettingsWorkspacePresets';
 import { SettingsHooks } from './settings/SettingsHooks';
 import { SettingsA2AAgents } from './settings/SettingsA2AAgents';
 import { SettingsServer } from './settings/SettingsServer';
+import { SettingsCoreEngine } from './settings/SettingsCoreEngine';
 import { SettingsCustomize } from './settings/SettingsCustomize';
 import { SettingsProjects } from './settings/SettingsProjects';
 
@@ -94,6 +96,7 @@ type TabId =
   | 'hooks'
   | 'a2a'
   | 'server'
+  | 'coreEngine'
   | 'general';
 
 const VALID_TABS = new Set<TabId>([
@@ -117,6 +120,7 @@ const VALID_TABS = new Set<TabId>([
   'hooks',
   'a2a',
   'server',
+  'coreEngine',
   'general',
 ]);
 
@@ -280,6 +284,12 @@ export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProp
       label: t('settingsServer.title', 'Embedded server'),
       icon: ServerCog,
       description: t('settingsServer.hintShort', 'Configure port, JWT, websocket'),
+    },
+    {
+      id: 'coreEngine' as TabId,
+      label: t('settingsCoreEngine.tabLabel', 'Core engine'),
+      icon: Cpu,
+      description: t('settingsCoreEngine.tabHint', 'Pick the agentic loop'),
     },
     {
       id: 'general' as TabId,
@@ -452,6 +462,9 @@ export function SettingsPanel({ onClose, initialTab = 'api' }: SettingsPanelProp
               </div>
               <div className={activeTab === 'server' ? '' : 'hidden'}>
                 {viewedTabs.has('server') && <SettingsServer />}
+              </div>
+              <div className={activeTab === 'coreEngine' ? '' : 'hidden'}>
+                {viewedTabs.has('coreEngine') && <SettingsCoreEngine />}
               </div>
               <div className={activeTab === 'general' ? '' : 'hidden'}>
                 {viewedTabs.has('general') && <SettingsGeneral />}
