@@ -1,4 +1,4 @@
-import { Minus, Square, X, Copy, Bell, Activity, Star, BarChart3, Focus, Sparkles, Network, Users, HelpCircle, Power, Loader2, ClipboardCopy } from 'lucide-react';
+import { Minus, Square, X, Copy, Bell, Activity, Star, BarChart3, Focus, Sparkles, Network, Users, HelpCircle, Power, Loader2, ClipboardCopy, Headphones } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../store';
@@ -8,6 +8,7 @@ import { PresenceIndicator } from './PresenceIndicator';
 import { ServerDashboard } from './ServerDashboard';
 import { RunnerBadge } from './RunnerBadge';
 import { ClipboardSummaryPanel } from './ClipboardSummaryPanel';
+import { VoiceChatOverlay } from './VoiceChatOverlay';
 
 const isMac = typeof window !== 'undefined' && window.electronAPI?.platform === 'darwin';
 
@@ -122,6 +123,9 @@ export function Titlebar() {
 
       {/* Clipboard summary (Lisa-derived) */}
       <ClipboardButton />
+
+      {/* Voice chat overlay (Lisa-derived) */}
+      <VoiceOverlayButton />
 
       {/* Code Buddy HTTP server toggle — boots `src/server/index.ts` in-process */}
       <ServerToggle />
@@ -240,6 +244,31 @@ function ClipboardButton() {
         onClose={() => setOpen(false)}
         onSendToChat={handleSendToChat}
       />
+    </>
+  );
+}
+
+/**
+ * Voice chat overlay launcher (Lisa-derived). Bigger / dedicated
+ * voice-first composer that complements the small MicButton inside
+ * ChatView. Opens a modal with a 24×24 mic, editable transcript, and
+ * Settings drawer for Piper TTS rate / auto-speak.
+ */
+function VoiceOverlayButton() {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="w-10 h-full flex items-center justify-center titlebar-no-drag hover:bg-surface transition-colors"
+        title={t('voiceOverlay.button', 'Voice chat overlay')}
+        aria-label="Voice chat overlay"
+        data-testid="voice-overlay-button"
+      >
+        <Headphones className="w-4 h-4 text-text-secondary" />
+      </button>
+      <VoiceChatOverlay isOpen={open} onClose={() => setOpen(false)} />
     </>
   );
 }
