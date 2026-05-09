@@ -10,7 +10,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, X, Pin, PinOff } from 'lucide-react';
+import { Plus, X, Pin, PinOff, type LucideIcon } from 'lucide-react';
 import { useAppStore } from '../store';
 
 interface ContextMenuState {
@@ -257,7 +257,7 @@ export const TabBar: React.FC = () => {
 };
 
 const ContextMenuItem: React.FC<{
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: LucideIcon;
   label: string;
   onClick: () => void;
   disabled?: boolean;
