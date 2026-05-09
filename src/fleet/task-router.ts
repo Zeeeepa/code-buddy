@@ -1,0 +1,337 @@
+/**
+ * Fleet — Task router with capability-based scoring (Fleet P3).
+ *
+ * Given a task classification (complexity, requiresVision, etc.) and
+ * a registry of peers (each with their `PeerCapability` from
+ * `peer.describe`), compute a `DispatchPlan` that names the best
+ * peer + model for the primary lane, plus optional fallback and
+ * parallel-redundancy lanes.
+ *
+ * Scoring formula (per peer × model candidate):
+ *
+ *   score = 0.4·match  +  0.3·cost  +  0.2·load  +  0.1·latency
+ *
+ *   - match   : how well `model.strengths` cover the task's needs
+ *   - cost    : inverse of $/Mtok normalised by remaining budget
+ *   - load    : inverse of `peer.activeRequests / peer.maxConcurrency`
+ *   - latency : inverse of avg first-token p50
+ *
+ * A privacy veto fires when `task.sensitive` AND `peer.egress === 'cloud'`
+ * — those candidates are dropped before scoring.
+ *
+ * The router does NOT make the network call itself — it returns a
+ * plan that the saga executor (Fleet P4) consumes.
+ *
+ * @module fleet/task-router
+ */
+
+import type { TaskClassification } from '../optimization/model-routing.js';
+import type {
+  FleetEgress,
+  FleetModelDescriptor,
+  ModelStrength,
+  PeerCapability,
+} from './types.js';
+
+/** A single dispatch lane: which peer × which model. */
+export interface DispatchLane {
+  peerId: string;
+  model: string;
+  /** 0..1 — diagnostic, lets the UI explain "why this peer". */
+  score: number;
+  /** Per-term breakdown for the rationale text. */
+  breakdown: {
+    match: number;
+    cost: number;
+    load: number;
+    latency: number;
+  };
+}
+
+/** What the router returns. */
+export interface DispatchPlan {
+  /** Primary lane — execute first. */
+  primary: DispatchLane;
+  /** Fallback if primary errors. */
+  fallback?: DispatchLane;
+  /** When set, run all listed lanes in parallel (ensemble / voting). */
+  parallel?: DispatchLane[];
+  /** Human-readable summary, useful in UI tooltips and logs. */
+  rationale: string;
+}
+
+/** Constraints the caller imposes on the plan. */
+export interface DispatchConstraints {
+  /**
+   * When true, a peer with `egress === 'cloud'` is vetoed regardless
+   * of score. Used for sensitive prompts containing secrets, source
+   * code from private projects, etc. Detection lives upstream
+   * (privacy lint, Phase 8).
+   */
+  privacyTag?: 'sensitive' | 'public';
+  /** Hard cap on cost per task in USD. Drops candidates over budget. */
+  maxCostUsd?: number;
+  /** Hard cap on expected latency. Drops slow candidates. */
+  maxLatencyMs?: number;
+  /** When set, force-include this many parallel lanes for redundancy. */
+  parallelism?: number;
+  /**
+   * Estimated max input tokens — used to drop models whose
+   * `contextWindow` is too small. Defaults to `taskClassification.estimatedTokens`.
+   */
+  estimatedTokens?: number;
+}
+
+/** A peer entry as seen by the router (cap snapshot + dynamic load info). */
+export interface PeerSlot {
+  peerId: string;
+  capability: PeerCapability;
+}
+
+const PRIVACY_VETO_EGRESS: FleetEgress[] = ['cloud'];
+
+const DEFAULT_BUDGET_USD = 1; // per-task default if not provided
+
+export class TaskRouter {
+  /**
+   * Build a `DispatchPlan` from peers + a task classification. Throws
+   * `NoPeerAvailableError` when nothing matches after veto/filter.
+   */
+  plan(
+    classification: TaskClassification,
+    peers: PeerSlot[],
+    constraints: DispatchConstraints = {},
+  ): DispatchPlan {
+    const requiredStrengths = inferRequiredStrengths(classification);
+    const minContextWindow =
+      constraints.estimatedTokens ?? classification.estimatedTokens ?? 0;
+
+    // 1. Enumerate every (peer, model) candidate.
+    const candidates: DispatchLane[] = [];
+    const budget = constraints.maxCostUsd ?? DEFAULT_BUDGET_USD;
+
+    for (const slot of peers) {
+      const cap = slot.capability;
+
+      // Privacy veto.
+      if (
+        constraints.privacyTag === 'sensitive' &&
+        PRIVACY_VETO_EGRESS.includes(cap.egress)
+      ) {
+        continue;
+      }
+
+      for (const model of cap.models) {
+        // Hard filters first — drop before scoring.
+        if (model.contextWindow < minContextWindow) continue;
+        if (
+          constraints.maxLatencyMs !== undefined &&
+          model.avgLatencyMs !== undefined &&
+          model.avgLatencyMs > constraints.maxLatencyMs
+        ) {
+          continue;
+        }
+        if (
+          constraints.maxCostUsd !== undefined &&
+          model.costInputUsdPerMtok !== undefined &&
+          // Rough estimate: 1 Mtok input + 0.5 Mtok output.
+          (model.costInputUsdPerMtok + (model.costOutputUsdPerMtok ?? 0) * 0.5) >
+            constraints.maxCostUsd * 2
+        ) {
+          continue;
+        }
+
+        const breakdown = scoreCandidate(model, cap, requiredStrengths, budget);
+        const score =
+          0.4 * breakdown.match +
+          0.3 * breakdown.cost +
+          0.2 * breakdown.load +
+          0.1 * breakdown.latency;
+
+        candidates.push({
+          peerId: slot.peerId,
+          model: model.id,
+          score,
+          breakdown,
+        });
+      }
+    }
+
+    if (candidates.length === 0) {
+      throw new NoPeerAvailableError(
+        `No peer can satisfy the task (sensitive=${
+          constraints.privacyTag === 'sensitive'
+        }, requiresVision=${classification.requiresVision}, ` +
+          `requiresLongContext=${classification.requiresLongContext}).`,
+      );
+    }
+
+    candidates.sort((a, b) => b.score - a.score);
+    const primary = candidates[0];
+    const fallback = candidates.find(
+      (c) => c.peerId !== primary.peerId,
+    );
+
+    const plan: DispatchPlan = {
+      primary,
+      fallback,
+      rationale: buildRationale(primary, fallback, requiredStrengths, classification),
+    };
+
+    if (constraints.parallelism && constraints.parallelism > 1) {
+      // Take the top-N distinct peers (or top-N candidates if not
+      // enough peers — degrades to multi-model on the same peer).
+      const seen = new Set<string>();
+      const lanes: DispatchLane[] = [];
+      for (const c of candidates) {
+        if (seen.has(c.peerId)) continue;
+        seen.add(c.peerId);
+        lanes.push(c);
+        if (lanes.length >= constraints.parallelism) break;
+      }
+      // If we couldn't fan out across peers, top up with same-peer
+      // different models (still useful — voting across model families).
+      if (lanes.length < constraints.parallelism) {
+        for (const c of candidates) {
+          if (lanes.find((l) => l.peerId === c.peerId && l.model === c.model)) {
+            continue;
+          }
+          lanes.push(c);
+          if (lanes.length >= constraints.parallelism) break;
+        }
+      }
+      plan.parallel = lanes;
+    }
+
+    return plan;
+  }
+}
+
+// ─────────── Scoring internals ───────────
+
+function scoreCandidate(
+  model: FleetModelDescriptor,
+  cap: PeerCapability,
+  requiredStrengths: ModelStrength[],
+  budgetUsd: number,
+): DispatchLane['breakdown'] {
+  const match = scoreMatch(model.strengths, requiredStrengths);
+  const cost = scoreCost(model, budgetUsd);
+  const load = scoreLoad(cap);
+  const latency = scoreLatency(model);
+  return { match, cost, load, latency };
+}
+
+/**
+ * 1.0 when the model has every required strength; falls off
+ * proportionally when missing some. Bonuses (model has strengths
+ * the task didn't ask for, e.g. vision on a text-only task) don't
+ * count negatively but don't help either — just neutral.
+ */
+function scoreMatch(
+  modelStrengths: ModelStrength[],
+  required: ModelStrength[],
+): number {
+  if (required.length === 0) return 0.7; // no specific need → neutral OK
+  const have = new Set(modelStrengths);
+  let hits = 0;
+  for (const r of required) {
+    if (have.has(r)) hits++;
+  }
+  return hits / required.length;
+}
+
+/**
+ * 1.0 = free / very cheap, 0.0 = at or way over budget.
+ *
+ * Smooth decay `1 / (1 + ratio)` so even expensive models still get a
+ * non-zero score (lets the router pick them when they're the only
+ * candidate matching capabilities) while still strongly preferring
+ * cheap ones in head-to-head comparisons.
+ */
+function scoreCost(model: FleetModelDescriptor, budgetUsd: number): number {
+  if (model.costInputUsdPerMtok === undefined) {
+    // Local model, no $ cost — best score.
+    return 1;
+  }
+  // Estimate cost for a typical 1Mtok in / 0.5Mtok out exchange.
+  const expected =
+    model.costInputUsdPerMtok + (model.costOutputUsdPerMtok ?? 0) * 0.5;
+  if (budgetUsd <= 0) return 0;
+  const ratio = expected / budgetUsd;
+  return 1 / (1 + ratio);
+}
+
+/** 1.0 = idle, 0.0 = at max concurrency. */
+function scoreLoad(cap: PeerCapability): number {
+  const max = cap.maxConcurrency ?? 1;
+  const active = cap.activeRequests ?? 0;
+  if (max <= 0) return 0;
+  if (active >= max) return 0;
+  return 1 - active / max;
+}
+
+/** 1.0 = sub-second, decays linearly to 0 at 30 s. */
+function scoreLatency(model: FleetModelDescriptor): number {
+  if (model.avgLatencyMs === undefined) {
+    // No data — neutral.
+    return 0.6;
+  }
+  if (model.avgLatencyMs <= 1000) return 1;
+  if (model.avgLatencyMs >= 30000) return 0;
+  return 1 - (model.avgLatencyMs - 1000) / 29000;
+}
+
+/**
+ * Translate a task classification into the set of `ModelStrength`s
+ * the model ideally has. The mapping is intentionally conservative —
+ * we'd rather the router pick a slightly oversized model than miss
+ * a critical capability.
+ */
+function inferRequiredStrengths(c: TaskClassification): ModelStrength[] {
+  const set: Set<ModelStrength> = new Set();
+  if (c.requiresVision) set.add('vision');
+  if (c.requiresReasoning || c.complexity === 'reasoning_heavy') {
+    set.add('reasoning');
+    if (c.complexity === 'reasoning_heavy') set.add('thinking');
+  }
+  if (c.requiresLongContext) set.add('long-context');
+  // Only nudge towards cheap+fast when no specialized strength was
+  // already required — otherwise a "simple" vision task would lose
+  // to a vision-less cheap model just on cheap+fast hits.
+  if (
+    c.complexity === 'simple' &&
+    c.estimatedTokens < 4000 &&
+    set.size === 0
+  ) {
+    set.add('cheap');
+    set.add('fast');
+  }
+  return Array.from(set);
+}
+
+function buildRationale(
+  primary: DispatchLane,
+  fallback: DispatchLane | undefined,
+  required: ModelStrength[],
+  c: TaskClassification,
+): string {
+  const reqStr =
+    required.length > 0 ? required.join(', ') : 'no specific strength';
+  const parts = [
+    `Primary: ${primary.peerId} ${primary.model} (score ${primary.score.toFixed(3)})`,
+    `Required: ${reqStr}`,
+    `Complexity: ${c.complexity}`,
+  ];
+  if (fallback) {
+    parts.push(`Fallback: ${fallback.peerId} ${fallback.model}`);
+  }
+  return parts.join(' · ');
+}
+
+export class NoPeerAvailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NoPeerAvailableError';
+  }
+}

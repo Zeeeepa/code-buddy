@@ -237,6 +237,72 @@ function registerBuiltInMethods(): void {
     serverTime: Date.now(),
   }));
 
+  // Fleet P3 — peer.dispatch : kick off a sub-task on this peer.
+  // Accepts `{ id, prompt, model?, traceId?, parentRunId? }`, lets the
+  // local agent runtime pick up the work, and returns a `runId` that
+  // the caller can poll or subscribe-to-events on.
+  //
+  // The actual execution is handed off to peer-chat-bridge (which
+  // already wraps the local agent for `peer.chat` one-shots) — this
+  // method is a thin async wrapper so the caller doesn't block waiting
+  // for the LLM response.
+  registerPeerMethod('peer.dispatch', async (params) => {
+    const { id, prompt, model, traceId, parentRunId } = (params ?? {}) as {
+      id?: string;
+      prompt?: string;
+      model?: string;
+      traceId?: string;
+      parentRunId?: string;
+    };
+    if (typeof prompt !== 'string' || prompt.trim().length === 0) {
+      throw new Error('peer.dispatch: missing string prompt');
+    }
+    const dispatchId =
+      typeof id === 'string' && id.length > 0
+        ? id
+        : `disp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+
+    // Lazy-import to avoid pulling the bridge at module load.
+    const { dispatchPeerTask } = await import('../../fleet/peer-chat-bridge.js');
+    // Returns immediately — the bridge owns the async lifecycle.
+    void dispatchPeerTask({
+      runId: dispatchId,
+      prompt,
+      model,
+      traceId,
+      parentRunId,
+    });
+    return {
+      runId: dispatchId,
+      acceptedAt: Date.now(),
+    };
+  });
+
+  // Fleet P3 — poll the result of an earlier peer.dispatch call.
+  // The remote peer streams via the existing fleet WS event channel,
+  // but a poll-based fallback keeps things simple when the dispatcher
+  // hasn't subscribed to those events yet.
+  registerPeerMethod('peer.dispatchStatus', async (params) => {
+    const runId = (params ?? {}).runId;
+    if (typeof runId !== 'string' || runId.length === 0) {
+      throw new Error('peer.dispatchStatus: missing string runId');
+    }
+    const { getDispatchState } = await import('../../fleet/peer-chat-bridge.js');
+    const state = getDispatchState(runId);
+    if (!state) {
+      return { found: false };
+    }
+    return {
+      found: true,
+      runId: state.runId,
+      status: state.status,
+      result: state.result,
+      error: state.error,
+      startedAt: state.startedAt,
+      completedAt: state.completedAt,
+    };
+  });
+
   // peer.echo — debugging aid. Returns the params verbatim. Useful for
   // smoke-testing the request/response loop without depending on any
   // other method's semantics.

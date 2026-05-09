@@ -198,4 +198,112 @@ export function _unwireForTests(): void {
   cachedGetter = null;
   cachedProviderInfo = null;
   wired = false;
+  dispatchedTasks.clear();
+}
+
+// ─────────── Fleet P3 — peer.dispatch (fire-and-forget) ───────────
+
+/**
+ * In-flight dispatch state. Keyed by `runId`. Lets the caller (peer
+ * RPC handler) return immediately while the LLM call runs in the
+ * background; remote peers can later poll status via `peer.dispatchStatus`.
+ *
+ * Stays in memory for the lifetime of the process — durable
+ * persistence is the saga store (Fleet P4).
+ */
+interface DispatchState {
+  runId: string;
+  prompt: string;
+  model?: string;
+  traceId?: string;
+  parentRunId?: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  startedAt: number;
+  completedAt?: number;
+  result?: string;
+  error?: string;
+}
+
+const dispatchedTasks: Map<string, DispatchState> = new Map();
+
+/**
+ * Fire-and-forget LLM call for `peer.dispatch`. Returns immediately
+ * after queuing; the actual chat happens asynchronously and updates
+ * the in-memory state. Remote peers can poll via `peer.dispatchStatus`
+ * (also registered here).
+ */
+export function dispatchPeerTask(input: {
+  runId: string;
+  prompt: string;
+  model?: string;
+  traceId?: string;
+  parentRunId?: string;
+}): void {
+  const state: DispatchState = {
+    runId: input.runId,
+    prompt: input.prompt,
+    model: input.model,
+    traceId: input.traceId,
+    parentRunId: input.parentRunId,
+    status: 'pending',
+    startedAt: Date.now(),
+  };
+  dispatchedTasks.set(input.runId, state);
+
+  // Run in background — never await.
+  void runDispatchedTask(state).catch((err) => {
+    state.status = 'failed';
+    state.error = err instanceof Error ? err.message : String(err);
+    state.completedAt = Date.now();
+    logger.warn('[peer-chat-bridge] dispatch failed', {
+      runId: state.runId,
+      error: state.error,
+    });
+  });
+}
+
+async function runDispatchedTask(state: DispatchState): Promise<void> {
+  state.status = 'running';
+  const client = cachedGetter?.() ?? null;
+  if (!client) {
+    state.status = 'failed';
+    state.error = 'CLIENT_UNAVAILABLE: no LLM client wired on this peer';
+    state.completedAt = Date.now();
+    return;
+  }
+  const chatOptions: ChatOptions | undefined = state.model
+    ? { model: state.model }
+    : undefined;
+  const response = await client.chat(
+    [
+      { role: 'system', content: DEFAULT_SYSTEM_PROMPT },
+      { role: 'user', content: state.prompt },
+    ],
+    [],
+    chatOptions,
+  );
+  state.result = response?.choices?.[0]?.message?.content ?? '';
+  state.status = 'completed';
+  state.completedAt = Date.now();
+}
+
+/**
+ * Snapshot of a dispatched task's state. Read-only — used by
+ * `peer.dispatchStatus`.
+ */
+export function getDispatchState(runId: string): DispatchState | null {
+  return dispatchedTasks.get(runId) ?? null;
+}
+
+/**
+ * Remove a finished dispatch from memory. Caller (saga store) is
+ * expected to have persisted what it needs first.
+ */
+export function clearDispatch(runId: string): boolean {
+  return dispatchedTasks.delete(runId);
+}
+
+/** Test helper — list all known dispatches. */
+export function _listDispatchesForTests(): DispatchState[] {
+  return Array.from(dispatchedTasks.values());
 }
