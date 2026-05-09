@@ -1093,6 +1093,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('workflow.approve', stepId, approved),
   },
 
+  /**
+   * Tool registry catalogue — used by WorkflowEditor's NodeConfigTool
+   * to render a dropdown of available tools.
+   */
+  tools: {
+    list: (): Promise<Array<{ name: string; description: string; category: string }>> =>
+      ipcRenderer.invoke('tools.list'),
+  },
+
   // Project templates (Claude Cowork parity Phase 2 step 12)
   template: {
     list: (): Promise<
@@ -2546,6 +2555,9 @@ declare global {
           error?: string;
         }>;
         approve: (stepId: string, approved: boolean) => Promise<boolean>;
+      };
+      tools: {
+        list: () => Promise<Array<{ name: string; description: string; category: string }>>;
       };
       template: {
         list: () => Promise<

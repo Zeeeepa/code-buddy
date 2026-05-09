@@ -2849,6 +2849,42 @@ ipcMain.handle(
   }
 );
 
+// Tools list — exposes the core FormalToolRegistry's catalogue so the
+// WorkflowEditor's NodeConfigTool can render a dropdown instead of a
+// free-form text input. Returns an empty list if the core module isn't
+// loadable (graceful degradation — the input falls back to a textfield).
+ipcMain.handle('tools.list', async () => {
+  try {
+    const { loadCoreModule } = await import('./utils/core-loader');
+    const reg = await loadCoreModule<{
+      getFormalToolRegistry: () => {
+        getAll: () => Array<{
+          tool: { name: string };
+          metadata?: { name?: string; description?: string; category?: string };
+        }>;
+      };
+      registerBuiltinTools?: (r: unknown) => number;
+    }>('tools/registry/index.js');
+    if (!reg) return [];
+    const registry = reg.getFormalToolRegistry();
+    // Make sure the catalogue is populated (workflowBridge boot does this
+    // lazily on first run; tools.list may be called earlier).
+    try {
+      reg.registerBuiltinTools?.(registry);
+    } catch {
+      /* ignore — we just return whatever was already there */
+    }
+    return registry.getAll().map((entry) => ({
+      name: entry.tool.name,
+      description: entry.metadata?.description ?? '',
+      category: entry.metadata?.category ?? '',
+    }));
+  } catch (err) {
+    logWarn('[tools.list] failed:', err);
+    return [];
+  }
+});
+
 // Project templates — Claude Cowork parity Phase 2 step 12
 ipcMain.handle('template.list', async () => {
   if (!templateService) return [];
