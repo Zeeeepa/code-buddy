@@ -51,6 +51,7 @@ import { EnrollmentDialog } from './components/EnrollmentDialog';
 import { ModelInstallDialog } from './components/ModelInstallDialog';
 import { OrchestratorLauncher } from './components/OrchestratorLauncher';
 import { FleetPanel } from './components/FleetPanel';
+import { FleetCommandCenter } from './components/FleetCommandCenter';
 import { TeamPanel } from './components/TeamPanel';
 import { PresenceService } from './services/presence/PresenceService';
 import type { AppConfig } from './types';
@@ -549,6 +550,9 @@ function App() {
       {/* Fleet panel — multi-host Code Buddy listener (GAP 3) */}
       <FleetPanel />
 
+      {/* Fleet Command Center — multi-AI dispatch (Fleet P5) */}
+      <FleetCommandCenterWrapper />
+
       {/* Team panel — Agent Teams (Phase 4 layer 9) */}
       <TeamPanel />
     </div>
@@ -556,3 +560,15 @@ function App() {
 }
 
 export default App;
+
+/**
+ * Reactive wrapper so the FleetCommandCenter re-renders on store
+ * mutation. Putting the hook here (instead of inline in `App`) keeps
+ * the existing component tree intact and avoids extra subscriptions
+ * on App's main render path.
+ */
+function FleetCommandCenterWrapper() {
+  const open = useAppStore((s) => s.showFleetCommandCenter);
+  const close = useAppStore((s) => s.setShowFleetCommandCenter);
+  return <FleetCommandCenter isOpen={open} onClose={() => close(false)} />;
+}

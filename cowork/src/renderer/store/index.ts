@@ -325,6 +325,13 @@ interface AppState {
   fleetPeers: Record<string, FleetPeer>;
   fleetEvents: FleetEventRecord[]; // ring buffer (FLEET_EVENT_RING)
   showFleetPanel: boolean;
+  /**
+   * Fleet P5 — full Command Center overlay (`FleetCommandCenter.tsx`).
+   * Distinct from `showFleetPanel` (the legacy peer-list panel) so
+   * both can be opened independently — the panel is read-only events
+   * stream, the command center is the dispatch UI.
+   */
+  showFleetCommandCenter: boolean;
 
   // A2A active tasks (GAP 1)
   a2aTasks: Record<string, A2ATask>;
@@ -560,6 +567,7 @@ interface AppState {
   removeFleetPeer: (peerId: string) => void;
   appendFleetEvent: (event: FleetEventRecord) => void;
   setShowFleetPanel: (show: boolean) => void;
+  setShowFleetCommandCenter: (show: boolean) => void;
 
   // A2A task actions
   upsertA2ATask: (task: A2ATask) => void;
@@ -734,6 +742,7 @@ export const useAppStore = create<AppState>((set) => ({
   fleetPeers: {},
   fleetEvents: [],
   showFleetPanel: false,
+  showFleetCommandCenter: false,
   a2aTasks: {},
   team: null,
   teamMembers: {},
@@ -1609,6 +1618,7 @@ export const useAppStore = create<AppState>((set) => ({
       return { fleetEvents: next };
     }),
   setShowFleetPanel: (show) => set({ showFleetPanel: show }),
+  setShowFleetCommandCenter: (show) => set({ showFleetCommandCenter: show }),
 
   // A2A task actions (GAP 1)
   upsertA2ATask: (task) =>

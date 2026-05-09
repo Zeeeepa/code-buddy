@@ -1,4 +1,4 @@
-import { Minus, Square, X, Copy, Bell, Activity, Star, BarChart3, Focus, Sparkles, Network, Users, HelpCircle, Power, Loader2, ClipboardCopy, Headphones } from 'lucide-react';
+import { Minus, Square, X, Copy, Bell, Activity, Star, BarChart3, Focus, Sparkles, Network, Users, HelpCircle, Power, Loader2, ClipboardCopy, Headphones, Cpu } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../store';
@@ -66,10 +66,21 @@ export function Titlebar() {
       <button
         onClick={() => useAppStore.getState().setShowFleetPanel(true)}
         className="w-10 h-full flex items-center justify-center titlebar-no-drag hover:bg-surface transition-colors"
-        title="Fleet — multi-host Code Buddy"
+        title="Fleet — peer events"
         aria-label="Open fleet panel"
       >
         <Network className="w-4 h-4 text-text-secondary" />
+      </button>
+
+      {/* Fleet Command Center — multi-AI dispatch (Fleet P5) */}
+      <button
+        onClick={() => useAppStore.getState().setShowFleetCommandCenter(true)}
+        className="w-10 h-full flex items-center justify-center titlebar-no-drag hover:bg-surface transition-colors"
+        title="Fleet Command Center — dispatch goals across providers"
+        aria-label="Open fleet command center"
+        data-testid="fleet-command-center-button"
+      >
+        <Cpu className="w-4 h-4 text-text-secondary" />
       </button>
 
       {/* Team panel — Agent Teams (Phase 4 layer 9) */}

@@ -525,6 +525,27 @@ export interface FleetPeer {
   lastError?: string;
   lastSeenAt?: number;
   lastEventType?: string;
+  /**
+   * Latest capability snapshot from `peer.describe` (Fleet P2). Lets
+   * the UI display which models the peer can route to and the
+   * command center route tasks based on egress / strengths / cost.
+   */
+  capability?: {
+    egress: 'local' | 'lan' | 'cloud';
+    machineLabel: string;
+    machineSpec?: { cpu?: string; gpu?: string; ramGb?: number };
+    maxConcurrency?: number;
+    activeRequests?: number;
+    models: Array<{
+      id: string;
+      contextWindow: number;
+      strengths: string[];
+      provider: string;
+      costInputUsdPerMtok?: number;
+      costOutputUsdPerMtok?: number;
+      avgLatencyMs?: number;
+    }>;
+  };
 }
 
 export interface FleetEventRecord {

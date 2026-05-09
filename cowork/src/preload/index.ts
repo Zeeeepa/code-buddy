@@ -1465,6 +1465,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
         agentId?: string;
       }>
     > => ipcRenderer.invoke('fleet.events', peerId, limit),
+    /**
+     * Fleet P5 — dispatch a goal across the fleet via the task router.
+     * Returns the saga id once the dispatch is queued; sagas are
+     * polled separately via `listSagas`.
+     */
+    dispatch: (input: {
+      goal: string;
+      parallelism?: number;
+      privacyTag?: 'public' | 'sensitive';
+      maxCostUsd?: number;
+    }): Promise<{ ok: boolean; sagaId?: string; error?: string }> =>
+      ipcRenderer.invoke('fleet.dispatch', input),
+    /** List currently-tracked sagas (active + recent). */
+    listSagas: (): Promise<
+      Array<{
+        id: string;
+        goal: string;
+        status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+        steps: Array<{
+          peerId: string;
+          model: string;
+          lane: 'primary' | 'fallback' | 'parallel';
+          status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+        }>;
+        finalResult?: string;
+        createdAt: number;
+      }>
+    > => ipcRenderer.invoke('fleet.listSagas'),
   },
 
   // Reasoning trace viewer (Claude Cowork parity Phase 3 step 17)
@@ -2963,6 +2991,27 @@ declare global {
             receivedAt: number;
             hostname?: string;
             agentId?: string;
+          }>
+        >;
+        dispatch: (input: {
+          goal: string;
+          parallelism?: number;
+          privacyTag?: 'public' | 'sensitive';
+          maxCostUsd?: number;
+        }) => Promise<{ ok: boolean; sagaId?: string; error?: string }>;
+        listSagas: () => Promise<
+          Array<{
+            id: string;
+            goal: string;
+            status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+            steps: Array<{
+              peerId: string;
+              model: string;
+              lane: 'primary' | 'fallback' | 'parallel';
+              status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+            }>;
+            finalResult?: string;
+            createdAt: number;
           }>
         >;
       };
