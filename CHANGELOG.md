@@ -17,6 +17,112 @@ Heading toward `1.0.0` final. Open audit blockers tracked in
 
 ---
 
+## [1.0.0-rc.7] — 2026-05-09
+
+**Cowork visual workflows now executable** — closes the gap identified
+by the Cowork audit (`journal/ministar-ubuntu-grok-cli.md`). The
+WorkflowEditor saved DAGs but the runtime was a noop. Now wraps the
+core `Orchestrator` (`src/orchestration/orchestrator.ts`) with a
+4-agent pool that fulfils tool/approval steps. Validated end-to-end
+through Electron on Linux + DISPLAY=:10.0 + CDP-driven test injection.
+
+### Added — Cowork (workflow execution)
+
+- **WorkflowEditor V1 execution** (`cowork/src/main/workflows/`):
+  - `workflow-bridge.ts` (rewrite, ~440 LOC) — replaces the previous
+    `WorkflowEngine` wrapper that mapped every tool node to `noop`.
+    Now compiles the visual DAG, registers a 4-agent worker pool
+    against the core `Orchestrator`, dispatches `task_assigned`
+    events to a `CoworkToolAgent`. Two runtime bugs caught by an
+    advisor pass and fixed before ship: the `processQueue` deadlock
+    after `queueTask` (fixed via `task_created` listener +
+    `queueMicrotask`), and the listener-order issue where the
+    `workflow_started` global handler fired before the run-scoped
+    capture handler had populated the instanceId↔workflowId map
+    (fixed via `prependListener`).
+  - `dag-compiler.ts` (new, ~280 LOC) — Kahn topo-sort + automatic
+    branch detection for `parallel` (≥2 outgoing edges) and
+    `condition` (true/false labelled edges).
+  - `cowork-tool-agent.ts` (new, ~180 LOC) — fulfils `tool_invoke`
+    (delegates to `FormalToolRegistry.execute`) and `approval_wait`
+    (suspends until renderer signals via `workflow.approve` IPC,
+    with configurable timeout).
+  - `ApprovalDialog.tsx` (new, ~95 LOC) — modal driven by
+    `pendingApprovals[0]` from the store, with countdown timer +
+    Approve/Reject buttons.
+  - `WorkflowEditor.tsx` Inspector enriched: per-node-type config
+    (tool: dropdown of toolName + JSON input ; condition: expression ;
+    approval: message + timeout). Runtime overlay: each node's
+    stroke colours by status (running = pulsing blue, completed =
+    green, failed = red).
+
+- **WorkflowEditor V0.5 — loop nodes + convergence** (commit
+  `2dd2d987`):
+  - New `WorkflowNodeType = 'loop'` with `body` + `exit` outgoing
+    edges; iteration is delegated to the core engine. Documented
+    one-tick lag in the README + integration test.
+  - `parallel` and `condition` blocks can now rejoin on a shared
+    "join" node before continuing the main chain. The
+    `findJoinTarget` helper validates branches all converge on the
+    same node (or all flow to `end`); heterogeneous topologies throw
+    `CompilationError`.
+
+- **`registerBuiltinTools(registry)` export in
+  `src/tools/registry/index.ts`** (commit `6c5e39f6`) — synchronous
+  counterpart of `createAllToolsAsync()` that does NOT initialize
+  MCP. Called by `WorkflowBridge.ensureOrchestrator()` so visual
+  workflow tool nodes find their tools (the registry singleton was
+  empty when accessed from outside a CodeBuddyAgent session).
+
+### Added — Cowork (Hooks dry-run)
+
+- **HTTP hook dry-run** (`cowork/src/main/hooks/hooks-bridge.ts`):
+  `test()` now POSTs a synthetic body (`{tool:'sample',
+  event:'PreToolUse', dryRun:true, cwd}`) with header
+  `X-CodeBuddy-Hook-DryRun: 1`, AbortController-driven timeout, body
+  capped at 64 KB, user-supplied `handler.headers` forwarded. The
+  Test button in `SettingsHooks.tsx` now appears for both `command`
+  and `http` types.
+
+### Added — Server (cherry-pick from `feat/face-memory-cowork`)
+
+- **Channel-A2A bridge** (`src/server/channel-a2a-bridge.ts`, 220 LOC,
+  cherry-pick `f3b9b984`) — auto-loads channels from
+  `.codebuddy/channels.json` and forwards inbound messages to the
+  A2A router via HTTP self-call. Replaces the standalone
+  `scripts/telegram_a2a_spoke.py` wrapper.
+
+### Added — Cowork (presence)
+
+- **Buffalo_S downloader scripts** (`cowork/scripts/download-buffalo-s.{ps1,sh}`,
+  cherry-pick `15e1e9f8`) — idempotent CLI installers for the
+  ArcFace ONNX model, complementing the in-app
+  `ModelInstallDialog`. README rewritten to document all three
+  install paths (in-app dialog, helper scripts, manual file picker).
+
+### Tests
+
+- **34 new Vitest cases** for the workflow pipeline:
+  - 15 dag-compiler (linear, parallel, conditional, approval, loop,
+    convergence + all rejection paths)
+  - 8 cowork-tool-agent (tool_invoke, approval_wait lifecycle)
+  - 6 workflow-bridge integration with a real `Orchestrator` core
+    (covers the deadlock + listener-order regressions, V0.5 loop
+    3-iter, V0.5 parallel-join)
+  - 5 hooks-bridge HTTP dry-run (200, 404, timeout, invalid URL,
+    custom headers)
+- **9 new server/channel-a2a-bridge tests** (cherry-picked).
+
+### Notes
+
+- `rc.7` is **not tagged in this commit** — `release.yml` triggers on
+  `v*` and would publish the *root* package (`@phuetz/code-buddy`),
+  not Cowork. To release Cowork separately, either narrow the trigger
+  in `release.yml` to `v*-cowork` or publish manually from the cowork
+  workspace.
+
+---
+
 ## [1.0.0-rc.6] — 2026-05-08
 
 **Sixth release candidate** — multi-Claude fleet activation +
