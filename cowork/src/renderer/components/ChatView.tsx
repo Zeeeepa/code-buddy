@@ -1061,13 +1061,35 @@ export function ChatView() {
             })
           )}
 
-          {/* Processing indicator - show when we have an active turn but no streaming content yet */}
+          {/* Processing indicator - show when we have an active turn but no streaming content yet.
+              Enriched with elapsed-seconds counter and a cold-start hint after 5 s and 30 s
+              so users running large local models (qwen3.6:35b, gemma4:26b…) get feedback that
+              the model is loading rather than thinking the app is frozen. */}
           {hasActiveTurn &&
             (!partialMessage || partialMessage.trim() === '') &&
             !partialThinking && (
-              <div className="flex items-center gap-3 px-4 py-3 rounded-full bg-background/80 border border-border-subtle max-w-fit">
-                <Loader2 className="w-4 h-4 text-accent animate-spin" />
-                <span className="text-sm text-text-secondary">{t('chat.processing')}</span>
+              <div className="flex flex-col gap-1 px-4 py-3 rounded-2xl bg-background/80 border border-border-subtle max-w-fit">
+                <div className="flex items-center gap-3">
+                  <Loader2 className="w-4 h-4 text-accent animate-spin" />
+                  <span className="text-sm text-text-secondary">
+                    {t('chat.processing')}
+                    {liveElapsed > 1000 && (
+                      <span className="text-text-muted/80 ml-2 tabular-nums">
+                        · {Math.floor(liveElapsed / 1000)}s
+                      </span>
+                    )}
+                  </span>
+                </div>
+                {liveElapsed > 5000 && liveElapsed < 30000 && (
+                  <span className="text-[11px] text-text-muted/70 ml-7 italic">
+                    {t('chat.modelLoading', 'Loading model or generating thinking — first token usually arrives within 30 s.')}
+                  </span>
+                )}
+                {liveElapsed >= 30000 && (
+                  <span className="text-[11px] text-warning/80 ml-7 italic">
+                    {t('chat.modelColdStart', 'Cold start in progress (large local models can take 30–120 s on first run).')}
+                  </span>
+                )}
               </div>
             )}
 
