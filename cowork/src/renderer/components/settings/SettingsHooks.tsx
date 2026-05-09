@@ -370,13 +370,14 @@ export function SettingsHooks() {
           </div>
 
           <div className="flex items-center justify-end gap-2 pt-2">
-            {(draft.type === 'command' || draft.type === 'http') && (
+            {(draft.type === 'command' || draft.type === 'http' || draft.type === 'prompt') && (
               <button
                 onClick={() => void handleTest()}
                 disabled={
                   isTesting
                   || (draft.type === 'command' && !draft.command)
                   || (draft.type === 'http' && !draft.url)
+                  || (draft.type === 'prompt' && !draft.prompt)
                 }
                 className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-md bg-surface border border-accent text-accent hover:bg-accent/10 disabled:opacity-50 transition-colors"
               >

@@ -383,3 +383,22 @@ export async function generateTitleWithClaudeSdk(
     return null;
   }
 }
+
+/**
+ * Hooks prompt-handler dry-run: send a single user message to the
+ * configured LLM with a dry-run-aware system prompt and return the
+ * answer text + duration. Used by `HooksBridge.testPromptHandler`
+ * to let authors validate a prompt hook without firing the full
+ * agent loop.
+ */
+export async function dryRunPromptHook(
+  prompt: string,
+  config: AppConfig
+): Promise<{ text: string; hasThinking: boolean; durationMs: number }> {
+  return runPiAiOneShot(
+    prompt,
+    'You are a hook handler being tested in DRY-RUN mode. Respond briefly to '
+      + 'demonstrate the hook works; do not assume the real event happened.',
+    config
+  );
+}

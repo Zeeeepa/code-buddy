@@ -190,10 +190,11 @@ export class HooksBridge {
   }
 
   /**
-   * Dry-run a hook handler. Supports `command` (spawn shell) and `http`
-   * (POST with synthetic dry-run body). `prompt`/`agent` handlers are
-   * still mocked — they have no side-effect surface meaningful enough
-   * to test from the authoring UI without actually invoking an LLM.
+   * Dry-run a hook handler. Supports `command` (spawn shell), `http`
+   * (POST with synthetic dry-run body), and `prompt` (single LLM
+   * round-trip via pi-ai's `completeSimple`). `agent` handlers are
+   * still mocked — they would require spawning a sub-agent runtime
+   * which is too heavy for an authoring dry-run.
    */
   async test(handler: UserHookHandler): Promise<HooksTestResult> {
     if (handler.type === 'command') {
@@ -202,7 +203,10 @@ export class HooksBridge {
     if (handler.type === 'http') {
       return this.testHttpHandler(handler);
     }
-    // prompt / agent — no-op success.
+    if (handler.type === 'prompt') {
+      return this.testPromptHandler(handler);
+    }
+    // agent — no-op success.
     return {
       success: true,
       exitCode: 0,
@@ -386,6 +390,50 @@ export class HooksBridge {
         stderr: '',
         durationMs: Date.now() - start,
         error: message,
+      };
+    }
+  }
+  /**
+   * Dry-run a prompt handler: send the prompt to the configured LLM
+   * (no agent loop, no tool use) and return the answer text. Useful
+   * for authors to verify their prompt template before wiring it to
+   * the real lifecycle event.
+   */
+  private async testPromptHandler(handler: UserHookHandler): Promise<HooksTestResult> {
+    const prompt = handler.prompt?.trim();
+    if (!prompt) {
+      return {
+        success: false,
+        exitCode: null,
+        stdout: '',
+        stderr: '',
+        durationMs: 0,
+        error: 'Empty prompt',
+      };
+    }
+    const start = Date.now();
+    try {
+      const { dryRunPromptHook } = await import('../claude/claude-sdk-one-shot');
+      const { configStore } = await import('../config/config-store');
+      const config = configStore.getAll();
+      const result = await dryRunPromptHook(prompt, config);
+      return {
+        success: true,
+        exitCode: 0,
+        stdout: result.text || (result.hasThinking
+          ? '(model returned only a thinking block; see logs)'
+          : ''),
+        stderr: '',
+        durationMs: result.durationMs,
+      };
+    } catch (err) {
+      return {
+        success: false,
+        exitCode: null,
+        stdout: '',
+        stderr: '',
+        durationMs: Date.now() - start,
+        error: err instanceof Error ? err.message : String(err),
       };
     }
   }
