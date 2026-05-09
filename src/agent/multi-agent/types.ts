@@ -152,6 +152,23 @@ export interface AgentConfig {
   timeout?: number;
   allowedTools?: string[];
   capabilities: AgentCapability[];
+  /**
+   * Per-agent provider override (Fleet P1). Lets a single
+   * MultiAgentSystem run heterogeneous providers in parallel — e.g.,
+   * orchestrator on Anthropic Claude (reasoning), coder on OpenAI
+   * Codex, reviewer on Gemini (vision/long-context), tester on local
+   * Ollama (cheap parallel). When unset, the agent inherits the
+   * system-wide `(apiKey, baseURL)` passed to `MultiAgentSystem`.
+   *
+   * Each field is independently overridable: e.g., point a coder at
+   * a separate Ollama endpoint without touching its API key.
+   */
+  providerOverride?: {
+    apiKey?: string;
+    baseURL?: string;
+    /** Model id, e.g., 'claude-opus-4', 'qwen3.6:35b'. Falls back to `model`. */
+    model?: string;
+  };
 }
 
 /**

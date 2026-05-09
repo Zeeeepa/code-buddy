@@ -90,8 +90,13 @@ For modifications, use the str_replace_editor tool directly.`,
 export class CoderAgent extends BaseAgent {
   private codeStyle: Map<string, string> = new Map();
 
-  constructor(apiKey: string, baseURL?: string) {
-    super(CODER_CONFIG, apiKey, baseURL);
+  /** @see OrchestratorAgent — same overrides convention (Fleet P1). */
+  constructor(
+    apiKey: string,
+    baseURL?: string,
+    overrides?: Partial<AgentConfig>,
+  ) {
+    super({ ...CODER_CONFIG, ...(overrides ?? {}) }, apiKey, baseURL);
   }
 
   getSpecializedPrompt(): string {
@@ -305,7 +310,8 @@ TEST REQUIREMENTS:
 
 export function createCoderAgent(
   apiKey: string,
-  baseURL?: string
+  baseURL?: string,
+  overrides?: Partial<AgentConfig>,
 ): CoderAgent {
-  return new CoderAgent(apiKey, baseURL);
+  return new CoderAgent(apiKey, baseURL, overrides);
 }

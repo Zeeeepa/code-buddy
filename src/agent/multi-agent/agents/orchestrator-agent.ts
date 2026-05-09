@@ -85,8 +85,19 @@ DECISION MAKING:
 export class OrchestratorAgent extends BaseAgent {
   private executionPlan: ExecutionPlan | null = null;
 
-  constructor(apiKey: string, baseURL?: string) {
-    super(ORCHESTRATOR_CONFIG, apiKey, baseURL);
+  /**
+   * @param apiKey  System-wide fallback API key.
+   * @param baseURL System-wide fallback base URL.
+   * @param overrides Optional partial AgentConfig overlay — e.g.,
+   *   `{ providerOverride: { apiKey, baseURL, model } }` to point this
+   *   agent at a different LLM than the rest of the team (Fleet P1).
+   */
+  constructor(
+    apiKey: string,
+    baseURL?: string,
+    overrides?: Partial<AgentConfig>,
+  ) {
+    super({ ...ORCHESTRATOR_CONFIG, ...(overrides ?? {}) }, apiKey, baseURL);
   }
 
   getSpecializedPrompt(): string {
@@ -401,7 +412,8 @@ Please provide:
 
 export function createOrchestratorAgent(
   apiKey: string,
-  baseURL?: string
+  baseURL?: string,
+  overrides?: Partial<AgentConfig>,
 ): OrchestratorAgent {
-  return new OrchestratorAgent(apiKey, baseURL);
+  return new OrchestratorAgent(apiKey, baseURL, overrides);
 }

@@ -47,10 +47,21 @@ export abstract class BaseAgent extends EventEmitter {
       temperature: 0.7,
       ...config,
     };
+    // Fleet P1 — per-agent provider override.
+    // When `config.providerOverride` is set, each field falls through
+    // to the system-wide value if absent. This lets a single
+    // MultiAgentSystem instantiate heterogeneous providers (e.g.,
+    // orchestrator=Claude, coder=Ollama, reviewer=Gemini) without
+    // touching the call sites that already pass (apiKey, baseURL).
+    const override = config.providerOverride;
+    const effectiveApiKey = override?.apiKey ?? apiKey;
+    const effectiveBaseURL = override?.baseURL ?? baseURL;
+    const effectiveModel =
+      override?.model ?? config.model ?? "grok-3-latest";
     this.client = new CodeBuddyClient(
-      apiKey,
-      config.model || "grok-3-latest",
-      baseURL
+      effectiveApiKey,
+      effectiveModel,
+      effectiveBaseURL
     );
     this.initializeSystemPrompt();
   }

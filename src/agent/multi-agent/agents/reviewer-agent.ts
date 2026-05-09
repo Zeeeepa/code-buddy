@@ -113,8 +113,13 @@ export interface ReviewResult {
 }
 
 export class ReviewerAgent extends BaseAgent {
-  constructor(apiKey: string, baseURL?: string) {
-    super(REVIEWER_CONFIG, apiKey, baseURL);
+  /** @see OrchestratorAgent — same overrides convention (Fleet P1). */
+  constructor(
+    apiKey: string,
+    baseURL?: string,
+    overrides?: Partial<AgentConfig>,
+  ) {
+    super({ ...REVIEWER_CONFIG, ...(overrides ?? {}) }, apiKey, baseURL);
   }
 
   getSpecializedPrompt(): string {
@@ -406,7 +411,8 @@ Also check for:
 
 export function createReviewerAgent(
   apiKey: string,
-  baseURL?: string
+  baseURL?: string,
+  overrides?: Partial<AgentConfig>,
 ): ReviewerAgent {
-  return new ReviewerAgent(apiKey, baseURL);
+  return new ReviewerAgent(apiKey, baseURL, overrides);
 }

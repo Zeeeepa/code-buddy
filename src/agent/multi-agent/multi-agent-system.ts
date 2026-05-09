@@ -15,6 +15,7 @@ import { CodeBuddyTool, CodeBuddyToolCall } from "../../codebuddy/client.js";
 import { ToolResult, getErrorMessage } from "../../types/index.js";
 import { getAllCodeBuddyTools } from "../../codebuddy/tools.js";
 import {
+  AgentConfig,
   AgentRole,
   AgentTask,
   ExecutionPlan,
@@ -79,7 +80,23 @@ export class MultiAgentSystem extends EventEmitter {
   constructor(
     apiKey: string,
     baseURL?: string,
-    toolExecutor?: ToolExecutor
+    toolExecutor?: ToolExecutor,
+    /**
+     * Fleet P1 — per-agent provider override. Lets the caller route
+     * each role to a different provider (e.g., orchestrator on Claude
+     * for reasoning, coder on Codex, reviewer on Gemini, tester on
+     * a local Ollama). Each entry is a partial AgentConfig overlay
+     * that propagates to the matching `create*Agent()` factory.
+     *
+     * When omitted (today's default), every agent inherits
+     * `(apiKey, baseURL)` and uses its built-in `XXX_CONFIG`.
+     */
+    perAgentOverrides?: {
+      orchestrator?: Partial<AgentConfig>;
+      coder?: Partial<AgentConfig>;
+      reviewer?: Partial<AgentConfig>;
+      tester?: Partial<AgentConfig>;
+    },
   ) {
     super();
     this.apiKey = apiKey;
@@ -87,11 +104,24 @@ export class MultiAgentSystem extends EventEmitter {
 
     // Initialize agents
     this.agents = new Map();
-    this.orchestrator = createOrchestratorAgent(apiKey, baseURL);
+    this.orchestrator = createOrchestratorAgent(
+      apiKey,
+      baseURL,
+      perAgentOverrides?.orchestrator,
+    );
     this.agents.set("orchestrator", this.orchestrator);
-    this.agents.set("coder", createCoderAgent(apiKey, baseURL));
-    this.agents.set("reviewer", createReviewerAgent(apiKey, baseURL));
-    this.agents.set("tester", createTesterAgent(apiKey, baseURL));
+    this.agents.set(
+      "coder",
+      createCoderAgent(apiKey, baseURL, perAgentOverrides?.coder),
+    );
+    this.agents.set(
+      "reviewer",
+      createReviewerAgent(apiKey, baseURL, perAgentOverrides?.reviewer),
+    );
+    this.agents.set(
+      "tester",
+      createTesterAgent(apiKey, baseURL, perAgentOverrides?.tester),
+    );
 
     // Initialize shared context
     this.sharedContext = {

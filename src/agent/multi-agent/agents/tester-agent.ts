@@ -126,8 +126,13 @@ export class TesterAgent extends BaseAgent {
   private testFramework: string | null = null;
   private testCommand: string | null = null;
 
-  constructor(apiKey: string, baseURL?: string) {
-    super(TESTER_CONFIG, apiKey, baseURL);
+  /** @see OrchestratorAgent — same overrides convention (Fleet P1). */
+  constructor(
+    apiKey: string,
+    baseURL?: string,
+    overrides?: Partial<AgentConfig>,
+  ) {
+    super({ ...TESTER_CONFIG, ...(overrides ?? {}) }, apiKey, baseURL);
   }
 
   getSpecializedPrompt(): string {
@@ -464,7 +469,8 @@ STEPS:
 
 export function createTesterAgent(
   apiKey: string,
-  baseURL?: string
+  baseURL?: string,
+  overrides?: Partial<AgentConfig>,
 ): TesterAgent {
-  return new TesterAgent(apiKey, baseURL);
+  return new TesterAgent(apiKey, baseURL, overrides);
 }
