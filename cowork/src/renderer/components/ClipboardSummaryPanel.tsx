@@ -1,0 +1,246 @@
+/**
+ * ClipboardSummaryPanel — Lisa-derived feature adapted for Cowork.
+ *
+ * Sits as a floating popover triggered from a clipboard icon in the
+ * Titlebar. When the user enables auto-monitoring, the main process
+ * polls the system clipboard every 2 s; on substantial new content,
+ * it asks the configured LLM for a 2-3 sentence French summary and
+ * pushes a `clipboard.summary` ServerEvent. The user can also click
+ * "Résumer maintenant" to summarise the current clipboard on demand.
+ *
+ * Once a summary is ready, "Envoyer comme prompt" puts a templated
+ * prompt into the active session's ChatView composer so the user
+ * can ask follow-up questions without re-pasting the source.
+ *
+ * @module renderer/components/ClipboardSummaryPanel
+ */
+import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  ClipboardCopy,
+  Loader2,
+  Play,
+  Power,
+  Send,
+  X,
+} from 'lucide-react';
+import { useAppStore } from '../store';
+
+interface Props {
+  isOpen: boolean;
+  onClose: () => void;
+  /** Called with a pre-built prompt when user clicks "send to chat". */
+  onSendToChat?: (prompt: string) => void;
+}
+
+export const ClipboardSummaryPanel: React.FC<Props> = ({
+  isOpen,
+  onClose,
+  onSendToChat,
+}) => {
+  const { t } = useTranslation();
+  const summary = useAppStore((s) => s.clipboardSummary);
+  const monitoringEnabled = useAppStore((s) => s.clipboardMonitoringEnabled);
+  const summarising = useAppStore((s) => s.clipboardSummarising);
+  const setMonitoringEnabled = useAppStore((s) => s.setClipboardMonitoringEnabled);
+  const setSummarising = useAppStore((s) => s.setClipboardSummarising);
+  const setSummary = useAppStore((s) => s.setClipboardSummary);
+  const [error, setError] = useState<string | null>(null);
+
+  // Hydrate the toggle state from main on open.
+  useEffect(() => {
+    if (!isOpen) return;
+    void (async () => {
+      try {
+        const status = await window.electronAPI?.clipboard?.status?.();
+        if (status) setMonitoringEnabled(status.monitoringEnabled);
+      } catch {
+        /* main might not be ready */
+      }
+    })();
+  }, [isOpen, setMonitoringEnabled]);
+
+  // ESC closes.
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
+
+  const handleSummarizeNow = async () => {
+    if (!window.electronAPI?.clipboard?.summarizeNow) return;
+    setError(null);
+    setSummarising(true);
+    try {
+      const result = await window.electronAPI.clipboard.summarizeNow();
+      if (!result.ok) {
+        setError(result.error ?? 'unknown error');
+        setSummarising(false);
+        return;
+      }
+      if (result.payload) setSummary(result.payload);
+      setSummarising(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setSummarising(false);
+    }
+  };
+
+  const handleToggleMonitoring = async () => {
+    const next = !monitoringEnabled;
+    setMonitoringEnabled(next); // optimistic
+    try {
+      await window.electronAPI?.clipboard?.setMonitoring?.(next);
+    } catch (err) {
+      setMonitoringEnabled(!next); // rollback
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleSendToChat = () => {
+    if (!summary?.summary || !onSendToChat) return;
+    const prompt =
+      `J'ai copié ce texte (${summary.sourceLength} caractères) :\n\n` +
+      `> ${summary.sourcePreview}…\n\n` +
+      `Résumé automatique : « ${summary.summary} »\n\n` +
+      `Peux-tu m'aider à propos de ce contenu ?`;
+    onSendToChat(prompt);
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-black/40"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="w-[560px] max-w-[92vw] max-h-[80vh] bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-zinc-800 shrink-0">
+          <div className="flex items-center gap-2">
+            <ClipboardCopy size={14} className="text-accent" />
+            <h2 className="text-sm font-medium text-zinc-200">
+              {t('clipboardSummary.title', 'Résumé du presse-papiers')}
+            </h2>
+            {summarising && (
+              <Loader2 size={11} className="animate-spin text-zinc-500" />
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            className="text-zinc-500 hover:text-zinc-300 transition-colors"
+            aria-label={t('common.close', 'Close')}
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Controls */}
+        <div className="flex items-center gap-2 px-5 py-3 border-b border-zinc-800 shrink-0">
+          <button
+            type="button"
+            onClick={() => void handleSummarizeNow()}
+            disabled={summarising}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded bg-accent text-background hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <Play size={11} />
+            {t('clipboardSummary.summarizeNow', 'Résumer maintenant')}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleToggleMonitoring()}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded transition-colors ${
+              monitoringEnabled
+                ? 'bg-success/15 text-success'
+                : 'bg-surface text-text-secondary hover:bg-surface-hover'
+            }`}
+          >
+            <Power size={11} />
+            {monitoringEnabled
+              ? t('clipboardSummary.autoOn', 'Auto-surveillance activée')
+              : t('clipboardSummary.autoOff', 'Auto-surveillance désactivée')}
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-5">
+          {error && (
+            <div className="p-2 mb-3 rounded bg-error/10 border border-error/30 text-error text-xs">
+              {error}
+            </div>
+          )}
+
+          {!summary ? (
+            <div className="text-xs text-zinc-500 text-center py-12 leading-relaxed">
+              <ClipboardCopy size={28} className="mx-auto mb-2 opacity-30" />
+              <p>
+                {t(
+                  'clipboardSummary.empty',
+                  'Aucun résumé. Copiez un texte (>100 caractères) et activez l\'auto-surveillance, ou cliquez sur « Résumer maintenant ».',
+                )}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="text-[10px] uppercase tracking-wider text-zinc-500">
+                {t('clipboardSummary.summaryLabel', 'Résumé')}
+              </div>
+              {summary.summary ? (
+                <div className="text-sm text-zinc-200 leading-relaxed whitespace-pre-wrap">
+                  {summary.summary}
+                </div>
+              ) : (
+                <div className="text-sm text-warning italic">
+                  {t(
+                    'clipboardSummary.llmFailed',
+                    'Le LLM n\'a pas pu produire un résumé (réseau, clé manquante, …).',
+                  )}
+                </div>
+              )}
+              <div className="text-[10px] text-zinc-500 mt-2 italic">
+                {t('clipboardSummary.sourceMeta', 'Source')} :{' '}
+                {summary.sourceLength.toLocaleString()}{' '}
+                {t('clipboardSummary.chars', 'caractères')} ·{' '}
+                {new Date(summary.at).toLocaleTimeString()}
+              </div>
+              <details className="mt-2">
+                <summary className="text-[11px] text-zinc-500 cursor-pointer hover:text-zinc-300">
+                  {t('clipboardSummary.showSource', 'Voir l\'aperçu source')}
+                </summary>
+                <pre className="mt-2 text-[11px] text-zinc-400 bg-zinc-800/50 rounded p-2 overflow-x-auto whitespace-pre-wrap">
+                  {summary.sourcePreview}…
+                </pre>
+              </details>
+            </div>
+          )}
+        </div>
+
+        {/* Footer actions */}
+        {summary?.summary && onSendToChat && (
+          <div className="px-5 py-3 border-t border-zinc-800 shrink-0 flex justify-end">
+            <button
+              type="button"
+              onClick={handleSendToChat}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded bg-accent text-background hover:bg-accent-hover transition-colors"
+            >
+              <Send size={11} />
+              {t('clipboardSummary.sendToChat', 'Envoyer comme prompt')}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

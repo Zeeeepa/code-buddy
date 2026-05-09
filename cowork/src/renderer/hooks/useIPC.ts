@@ -199,6 +199,11 @@ export function useIPC() {
             store.setPendingPermission(event.payload);
             break;
 
+          case 'clipboard.summary':
+            store.setClipboardSummary(event.payload);
+            store.setClipboardSummarising(false);
+            break;
+
           case 'permission.dismiss': {
             const currentPermission = useAppStore.getState().pendingPermission;
             if (currentPermission?.toolUseId === event.payload.toolUseId) {

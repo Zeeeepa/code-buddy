@@ -1,4 +1,4 @@
-import { Minus, Square, X, Copy, Bell, Activity, Star, BarChart3, Focus, Sparkles, Network, Users, HelpCircle, Power, Loader2 } from 'lucide-react';
+import { Minus, Square, X, Copy, Bell, Activity, Star, BarChart3, Focus, Sparkles, Network, Users, HelpCircle, Power, Loader2, ClipboardCopy } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../store';
@@ -7,6 +7,7 @@ import { TabBar } from './TabBar';
 import { PresenceIndicator } from './PresenceIndicator';
 import { ServerDashboard } from './ServerDashboard';
 import { RunnerBadge } from './RunnerBadge';
+import { ClipboardSummaryPanel } from './ClipboardSummaryPanel';
 
 const isMac = typeof window !== 'undefined' && window.electronAPI?.platform === 'darwin';
 
@@ -119,6 +120,9 @@ export function Titlebar() {
       {/* Runner badge — shows engine vs pi status (Cowork-on-core migration P3) */}
       <RunnerBadge />
 
+      {/* Clipboard summary (Lisa-derived) */}
+      <ClipboardButton />
+
       {/* Code Buddy HTTP server toggle — boots `src/server/index.ts` in-process */}
       <ServerToggle />
 
@@ -189,6 +193,55 @@ interface ServerStatusShape {
   host: string | null;
   websocket: boolean;
   error?: string | null;
+}
+
+/**
+ * Clipboard summariser button (Lisa-derived). Click opens the
+ * ClipboardSummaryPanel overlay. Shows a small indicator dot when
+ * auto-monitoring is on so Patrice knows the watcher is running.
+ */
+function ClipboardButton() {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const monitoringEnabled = useAppStore((s) => s.clipboardMonitoringEnabled);
+  const summarising = useAppStore((s) => s.clipboardSummarising);
+
+  // "Send as prompt" routes the summary into the system clipboard so
+  // the user just pastes it into the composer. Avoids tight coupling
+  // with ChatView's local prompt state.
+  const handleSendToChat = (prompt: string) => {
+    try {
+      void navigator.clipboard.writeText(prompt);
+    } catch {
+      /* clipboard might be locked — silent fail */
+    }
+  };
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="relative w-10 h-full flex items-center justify-center titlebar-no-drag hover:bg-surface transition-colors"
+        title={t('clipboardSummary.button', 'Clipboard summariser')}
+        aria-label="Clipboard summariser"
+        data-testid="clipboard-summary-button"
+      >
+        {summarising ? (
+          <Loader2 className="w-4 h-4 text-text-secondary animate-spin" />
+        ) : (
+          <ClipboardCopy className="w-4 h-4 text-text-secondary" />
+        )}
+        {monitoringEnabled && !summarising && (
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-success animate-pulse" />
+        )}
+      </button>
+      <ClipboardSummaryPanel
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        onSendToChat={handleSendToChat}
+      />
+    </>
+  );
 }
 
 /**

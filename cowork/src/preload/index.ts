@@ -695,6 +695,32 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }> => ipcRenderer.invoke('runner.status'),
   },
 
+  /**
+   * Clipboard summariser (Lisa-derived). The renderer subscribes to
+   * `clipboard.summary` ServerEvents pushed via the regular
+   * server-event channel — these IPC methods are for explicit
+   * actions only.
+   */
+  clipboard: {
+    summarizeNow: (): Promise<{
+      ok: boolean;
+      payload?: {
+        hash: string;
+        sourceLength: number;
+        sourcePreview: string;
+        summary: string | null;
+        at: string;
+      };
+      error?: string;
+    }> => ipcRenderer.invoke('clipboard.summarizeNow'),
+    setMonitoring: (
+      enabled: boolean,
+    ): Promise<{ ok: boolean; running?: boolean }> =>
+      ipcRenderer.invoke('clipboard.setMonitoring', enabled),
+    status: (): Promise<{ running: boolean; monitoringEnabled: boolean }> =>
+      ipcRenderer.invoke('clipboard.status'),
+  },
+
   // Phase 8 — voice input. The renderer captures audio via MediaRecorder
   // and ships the resulting Blob (as ArrayBuffer) to the main process for
   // transcription via faster-whisper.
@@ -2317,6 +2343,23 @@ declare global {
           engineReady: boolean;
           bootError: string | null;
         }>;
+      };
+      clipboard: {
+        summarizeNow: () => Promise<{
+          ok: boolean;
+          payload?: {
+            hash: string;
+            sourceLength: number;
+            sourcePreview: string;
+            summary: string | null;
+            at: string;
+          };
+          error?: string;
+        }>;
+        setMonitoring: (
+          enabled: boolean,
+        ) => Promise<{ ok: boolean; running?: boolean }>;
+        status: () => Promise<{ running: boolean; monitoringEnabled: boolean }>;
       };
       voice: {
         transcribe: (

@@ -56,6 +56,7 @@ import { TemplateService } from './project/template-service';
 import { WorkflowBridge } from './workflows/workflow-bridge';
 import { VoiceBridge } from './voice/voice-bridge';
 import { TTSBridge } from './voice/tts-bridge';
+import { ClipboardWatcher } from './clipboard/clipboard-watcher';
 import { SessionExportService } from './session/session-export-service';
 import { SessionInsightsBridge } from './session/session-insights-bridge';
 import { ActivityFeed } from './activity/activity-feed';
@@ -187,6 +188,7 @@ let templateService: TemplateService | null = null;
 let workflowBridge: WorkflowBridge | null = null;
 let voiceBridge: VoiceBridge | null = null;
 let ttsBridge: TTSBridge | null = null;
+let clipboardWatcher: ClipboardWatcher | null = null;
 let sessionExportService: SessionExportService | null = null;
 let sessionInsightsBridge: SessionInsightsBridge | null = null;
 let activityFeed: ActivityFeed | null = null;
@@ -1196,6 +1198,13 @@ app
     // until first synthesize), so always-on is fine. Override paths
     // via COWORK_PIPER_BIN / COWORK_PIPER_VOICE env vars.
     ttsBridge = new TTSBridge();
+    // Clipboard summariser (Lisa-derived). Created always; only
+    // starts polling when user enables it via Settings.
+    clipboardWatcher = new ClipboardWatcher();
+    clipboardWatcher.setSendToRenderer(sendToRenderer);
+    if (configStore.getAll().clipboard?.monitoringEnabled) {
+      clipboardWatcher.start();
+    }
 
     // Session export — enhanced formats (markdown/json/html) with redaction
     const sessionInsightsSource = sessionManager;
@@ -1528,6 +1537,12 @@ async function cleanupSandboxResources(): Promise<void> {
     voiceBridge?.shutdown();
   } catch (error) {
     logError('[App] Error shutting down voice bridge:', error);
+  }
+
+  try {
+    clipboardWatcher?.stop();
+  } catch (error) {
+    logError('[App] Error stopping clipboard watcher:', error);
   }
 
   try {
@@ -2898,6 +2913,47 @@ ipcMain.handle('voice.ttsStatus', async () => {
   return {
     available: ttsBridge.isReady(),
     bootError: ttsBridge.getBootError(),
+  };
+});
+
+/**
+ * Clipboard summariser (Lisa-derived). One-shot summarise of the
+ * current clipboard text, regardless of length, for the "Summarize
+ * Now" button.
+ */
+ipcMain.handle('clipboard.summarizeNow', async () => {
+  if (!clipboardWatcher) {
+    return { ok: false, error: 'watcher not initialized' };
+  }
+  try {
+    const payload = await clipboardWatcher.summariseNow();
+    if (!payload) return { ok: false, error: 'clipboard empty or too short' };
+    return { ok: true, payload };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: message };
+  }
+});
+
+ipcMain.handle('clipboard.setMonitoring', async (_event, enabled: boolean) => {
+  if (!clipboardWatcher) return { ok: false };
+  // Persist + apply.
+  const previousConfig = configStore.getAll();
+  configStore.update({
+    clipboard: { ...(previousConfig.clipboard ?? {}), monitoringEnabled: enabled },
+  });
+  if (enabled) {
+    clipboardWatcher.start();
+  } else {
+    clipboardWatcher.stop();
+  }
+  return { ok: true, running: clipboardWatcher.isRunning() };
+});
+
+ipcMain.handle('clipboard.status', async () => {
+  return {
+    running: clipboardWatcher?.isRunning() ?? false,
+    monitoringEnabled: configStore.getAll().clipboard?.monitoringEnabled ?? false,
   };
 });
 

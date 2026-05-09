@@ -235,6 +235,24 @@ interface AppState {
     /** Unread message counter — increments when a message lands on a non-active session. */
     unread?: number;
   }>;
+  /**
+   * Latest clipboard summary pushed by the main-side `ClipboardWatcher`
+   * (Lisa-derived feature). `null` when no summary has arrived in this
+   * session yet. Replaced every time a new summary is generated.
+   */
+  clipboardSummary: {
+    hash: string;
+    sourceLength: number;
+    sourcePreview: string;
+    summary: string | null;
+    at: string;
+  } | null;
+  /** Mirror of `configStore.clipboard.monitoringEnabled` — written by the panel. */
+  clipboardMonitoringEnabled: boolean;
+  /** Flips true while the main process is generating a summary. */
+  clipboardSummarising: boolean;
+  /** Whether the user has the panel expanded in the UI. Persists in localStorage via the panel. */
+  showClipboardPanel: boolean;
   showMemoryEditor: boolean;
   showActivityFeed: boolean;
   showSessionInsights: boolean;
@@ -466,6 +484,18 @@ interface AppState {
   incrementTabUnread: (sessionId: string) => void;
   /** Clear the unread counter for a tab — called when the user views it. */
   clearTabUnread: (sessionId: string) => void;
+  setClipboardSummary: (
+    payload: {
+      hash: string;
+      sourceLength: number;
+      sourcePreview: string;
+      summary: string | null;
+      at: string;
+    } | null,
+  ) => void;
+  setClipboardMonitoringEnabled: (enabled: boolean) => void;
+  setClipboardSummarising: (busy: boolean) => void;
+  setShowClipboardPanel: (show: boolean) => void;
   setShowMemoryEditor: (show: boolean) => void;
   setShowActivityFeed: (show: boolean) => void;
   setShowSessionInsights: (show: boolean) => void;
@@ -621,6 +651,10 @@ export const useAppStore = create<AppState>((set) => ({
   workflowExecutions: {},
   pendingApprovals: [],
   openTabs: [],
+  clipboardSummary: null,
+  clipboardMonitoringEnabled: false,
+  clipboardSummarising: false,
+  showClipboardPanel: false,
   showMemoryEditor: false,
   showActivityFeed: false,
   showSessionInsights: false,
@@ -1385,6 +1419,11 @@ export const useAppStore = create<AppState>((set) => ({
         t.sessionId === sessionId && t.unread ? { ...t, unread: 0 } : t
       ),
     })),
+  setClipboardSummary: (payload) => set({ clipboardSummary: payload }),
+  setClipboardMonitoringEnabled: (enabled) =>
+    set({ clipboardMonitoringEnabled: enabled }),
+  setClipboardSummarising: (busy) => set({ clipboardSummarising: busy }),
+  setShowClipboardPanel: (show) => set({ showClipboardPanel: show }),
   setShowMemoryEditor: (show) => set({ showMemoryEditor: show }),
   setShowActivityFeed: (show) => set({ showActivityFeed: show }),
   setShowSessionInsights: (show) => set({ showSessionInsights: show }),

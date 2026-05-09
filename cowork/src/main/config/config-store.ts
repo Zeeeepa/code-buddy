@@ -192,6 +192,18 @@ export interface AppConfig {
         live `openTabs` at renderer mount; missing IDs are dropped. */
     pinnedSessionIds?: string[];
   };
+
+  /**
+   * Clipboard summariser (Lisa-derived feature). When monitoring is
+   * on, the main process polls the system clipboard every 2 s and
+   * fires a `clipboard.summary` ServerEvent on substantial new copy
+   * with an LLM-produced 2-3 sentence summary. The user can also
+   * trigger a summary manually from the panel.
+   */
+  clipboard?: {
+    /** Whether the watcher polls automatically. Default false. */
+    monitoringEnabled?: boolean;
+  };
 }
 
 const DEFAULT_CONFIG_SET_ID = 'default';

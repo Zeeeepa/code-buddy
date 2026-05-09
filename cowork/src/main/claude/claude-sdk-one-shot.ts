@@ -402,3 +402,40 @@ export async function dryRunPromptHook(
     config
   );
 }
+
+/**
+ * Clipboard summariser — produces a 2-3 sentence French summary of
+ * the supplied text using the user's configured LLM. Used by the
+ * `ClipboardWatcher` (Lisa-derived feature) so the user sees a
+ * digest after copying long content (error stack, paper, etc.)
+ * without having to spin up a chat session.
+ *
+ * Returns null on LLM failure rather than throwing — clipboard
+ * summarisation is a polish feature and shouldn't break the host
+ * if the configured model is offline.
+ */
+export async function summarizeForClipboard(
+  text: string,
+  config: AppConfig
+): Promise<string | null> {
+  const trimmed = text.length > 8000 ? text.slice(0, 8000) + '…' : text;
+  try {
+    const result = await runPiAiOneShot(
+      trimmed,
+      'Tu es un assistant. Résume le texte de l\'utilisateur en 2 ou 3 '
+        + 'phrases courtes en français. Conserve les informations clés '
+        + '(nombres, noms propres, dates). Réponds uniquement par le '
+        + 'résumé, sans préambule ni mise en forme.',
+      config
+    );
+    const text = result.text?.trim();
+    if (!text) {
+      logWarn('[ClipboardSummary] LLM returned empty text');
+      return null;
+    }
+    return text;
+  } catch (err) {
+    logWarn('[ClipboardSummary] LLM call failed:', err);
+    return null;
+  }
+}
