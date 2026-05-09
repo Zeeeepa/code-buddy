@@ -46,6 +46,15 @@ export function setMainWindow(win: BrowserWindow | null): void {
   mainWindow = win;
 }
 
+/**
+ * Counterpart of `setMainWindow` for the tray. Same pattern: each
+ * module that creates a Tray must register it here so `getTray()`
+ * reflects reality.
+ */
+export function setTray(t: Tray | null): void {
+  tray = t;
+}
+
 export function getTray(): Tray | null {
   return tray;
 }

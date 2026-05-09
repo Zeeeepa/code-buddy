@@ -22,7 +22,7 @@ import { registerProjectIpcHandlers } from './ipc/project-ipc';
 import { registerSubAgentIpcHandlers } from './ipc/subagent-ipc';
 import { registerOrchestratorIpcHandlers } from './ipc/orchestrator-ipc';
 import { registerFleetIpcHandlers } from './ipc/fleet-ipc';
-import { setMainWindow } from './window-management';
+import { setMainWindow, setTray } from './window-management';
 import { registerTeamIpcHandlers } from './ipc/team-ipc';
 import { registerMentionIpcHandlers } from './ipc/mention-ipc';
 import { registerCommandIpcHandlers } from './ipc/command-ipc';
@@ -389,6 +389,7 @@ function setupTray() {
   }
 
   tray = new Tray(resolvedIconPath);
+  setTray(tray); // Same pattern as setMainWindow — keeps getTray() in sync.
   tray.setToolTip('Open Cowork');
 
   const contextMenu = Menu.buildFromTemplate([
