@@ -68,6 +68,10 @@ export class CodeBuddyEngineAdapter implements EngineAdapter {
       model: config.model,
       baseURL: config.baseURL,
       embedded: config.embedded,
+      // Surface the optional capabilities so a host (Cowork) log line
+      // makes it easy to grep `ag,setMcpServers,reloadSkills,hot-swap,LRU=50`
+      // and confirm we're on a recent bundle.
+      capabilities: 'setMcpServers,reloadSkills,hot-swap,LRU=' + CodeBuddyEngineAdapter.MAX_CACHED_SESSIONS,
     });
   }
 
