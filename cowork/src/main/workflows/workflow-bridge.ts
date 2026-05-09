@@ -92,6 +92,7 @@ interface CoreOrchestrator {
 
 interface CoreToolRegistryModule {
   getFormalToolRegistry(): FormalToolRegistryLike;
+  registerBuiltinTools?(registry: FormalToolRegistryLike): number;
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -355,6 +356,24 @@ export class WorkflowBridge {
           logLevel: 'warn',
         });
         const registry = registryModule.getFormalToolRegistry();
+
+        // Populate the registry with built-in tools — without this the
+        // FormalToolRegistry singleton stays empty (the core only fills
+        // it lazily when a CodeBuddyAgent boots a session, and the
+        // Cowork bridge is independent of that path).
+        try {
+          if (typeof registryModule.registerBuiltinTools === 'function') {
+            const n = registryModule.registerBuiltinTools(registry);
+            log(`[WorkflowBridge] registered ${n} built-in tools`);
+          } else {
+            logWarn(
+              '[WorkflowBridge] core registerBuiltinTools() not available — '
+                + 'tool nodes will fail with "not found" until a session boots'
+            );
+          }
+        } catch (err) {
+          logWarn('[WorkflowBridge] registerBuiltinTools failed:', err);
+        }
 
         const toolAgent = new CoworkToolAgent({
           registry,

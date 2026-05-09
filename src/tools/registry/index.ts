@@ -419,3 +419,110 @@ export async function createAllToolsAsync(): Promise<ITool[]> {
 
 // Import ITool type for return type
 import type { ITool } from './types.js';
+
+/**
+ * Register all built-in synchronous tools (text-editor, bash, search,
+ * web, todo, docker, k8s, git, misc, browser, process, vision, script,
+ * plan, knowledge, memory, parallel, attention, lessons, multimodal,
+ * advanced, canvas, control, firecrawl, lsp, bug-finder, merge-conflict,
+ * vuln-scanner, codebase-replace, advisor, fleet, ask-user-question,
+ * exit-plan-mode, gui, session) plus their canonical-prefix aliases
+ * (`shell_exec`, `file_read`, `browser_search`, …).
+ *
+ * Counterpart of `createAllToolsAsync()` that does NOT initialize MCP —
+ * for callers (e.g. Cowork's WorkflowBridge) that want a usable registry
+ * without paying the MCP boot cost.
+ *
+ * @returns the number of tools newly registered (skipped duplicates).
+ */
+export function registerBuiltinTools(registry: FormalToolRegistry): number {
+  const allTools: ITool[] = [
+    ...createTextEditorTools(),
+    ...createBashTools(),
+    ...createLsTools(),
+    ...createSearchTools(),
+    ...createWebTools(),
+    ...createTodoTools(),
+    ...createDockerTools(),
+    ...createKubernetesTools(),
+    ...createGitTools(),
+    ...createMiscTools(),
+    ...createBrowserTools(),
+    ...createProcessTools(),
+    ...createVisionTools(),
+    ...createScriptTools(),
+    ...createPlanTools(),
+    ...createKnowledgeTools(),
+    ...createMemoryTools(),
+    ...createParallelTools(),
+    ...createAttentionTools(),
+    ...createLessonsTools(),
+    ...createMultimodalTools(),
+    ...createAdvancedTools(),
+    ...createCanvasTools(),
+    ...createControlTools(),
+    ...createFirecrawlTools(),
+    ...createLspTools(),
+    ...createBugFinderTools(),
+    ...createMergeConflictTools(),
+    ...createVulnScannerTools(),
+    ...createCodebaseReplaceTools(),
+    ...createAdvisorTools(),
+    ...createFleetTools(),
+    ...createAskUserQuestionTools(),
+    ...createExitPlanModeTools(),
+    ...createGuiTools(),
+    ...createSessionTools(),
+  ];
+  // Append canonical-prefix aliases (shell_exec → bash_run, etc.).
+  allTools.push(...createAliasTools(allTools));
+
+  let registered = 0;
+  for (const tool of allTools) {
+    if (!registry.has(tool.name)) {
+      registry.register(tool);
+      registered++;
+    }
+  }
+  return registered;
+}
+
+// Re-import the factories used by registerBuiltinTools so the function above resolves.
+import { FormalToolRegistry } from './tool-registry.js';
+import { createTextEditorTools } from './text-editor-tools.js';
+import { createBashTools } from './bash-tools.js';
+import { createLsTools } from './ls-tools.js';
+import { createSearchTools } from './search-tools.js';
+import { createWebTools } from './web-tools.js';
+import { createTodoTools } from './todo-tools.js';
+import { createDockerTools } from './docker-tools.js';
+import { createKubernetesTools } from './kubernetes-tools.js';
+import { createGitTools } from './git-tools.js';
+import { createMiscTools } from './misc-tools.js';
+import { createBrowserTools } from './browser-tools.js';
+import { createProcessTools } from './process-tools.js';
+import { createVisionTools } from './vision-tools.js';
+import { createScriptTools } from './script-tools.js';
+import { createPlanTools } from './plan-tools.js';
+import { createKnowledgeTools } from './knowledge-tools.js';
+import { createMemoryTools } from './memory-tools.js';
+import { createParallelTools } from './parallel-tools.js';
+import { createAttentionTools } from './attention-tools.js';
+import { createLessonsTools } from './lessons-tools.js';
+import { createMultimodalTools } from './multimodal-tools.js';
+import { createAdvancedTools } from './advanced-tools.js';
+import { createCanvasTools } from './canvas-tools.js';
+import { createControlTools } from './control-tools.js';
+import { createFirecrawlTools } from './firecrawl-tools.js';
+import { createLspTools } from './lsp-tools.js';
+import { createBugFinderTools } from './bug-finder-tools.js';
+import { createMergeConflictTools } from './merge-conflict-tools.js';
+import { createVulnScannerTools } from './vuln-scanner-tools.js';
+import { createCodebaseReplaceTools } from './codebase-replace-tools.js';
+import { createAdvisorTools } from './advisor-tools.js';
+import { createFleetTools } from './fleet-tools.js';
+import { createAskUserQuestionTools } from './ask-user-question-tools.js';
+import { createExitPlanModeTools } from './exit-plan-mode-tools.js';
+import { createGuiTools } from './gui-tools.js';
+import { createSessionTools } from './session-tools.js';
+import { createAliasTools } from './tool-aliases.js';
