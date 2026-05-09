@@ -1,0 +1,222 @@
+/**
+ * Fleet — cost tracker (Fleet P8).
+ *
+ * Aggregates LLM cost across the fleet by peer × provider × day.
+ * Provides hard budget caps that the dispatcher consults before
+ * firing a saga.
+ *
+ * Storage: `~/.codebuddy/fleet-cost-ledger.json` — flat JSON file
+ * (one entry per saga step charge) so it's easy to inspect and back
+ * up. The ledger is append-only; aggregations are computed on read.
+ *
+ * @module fleet/cost-tracker
+ */
+
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import { logger } from '../utils/logger.js';
+
+export interface CostEntry {
+  /** ISO timestamp. */
+  at: string;
+  /** Peer that ran the call. */
+  peerId: string;
+  /** Provider family — for aggregation by family. */
+  provider: string;
+  /** Model id. */
+  model: string;
+  /** USD cost — pre-computed by the caller from token usage × rates. */
+  usd: number;
+  /** Optional saga id this entry belongs to. */
+  sagaId?: string;
+  /** Optional dispatch / run id within the saga. */
+  runId?: string;
+  /** Token usage snapshot. Optional — kept for replay/debug. */
+  tokensIn?: number;
+  tokensOut?: number;
+}
+
+export interface CostBudget {
+  /** Cap for total fleet spend per day. Default $5. */
+  maxDailyUsd: number;
+  /** Cap per-saga. Default $1. */
+  maxSagaUsd: number;
+}
+
+export const DEFAULT_BUDGET: CostBudget = {
+  maxDailyUsd: 5,
+  maxSagaUsd: 1,
+};
+
+export interface CostSummary {
+  /** Total spend today (UTC day boundary). */
+  todayUsd: number;
+  /** Spend grouped by provider for today. */
+  todayByProvider: Record<string, number>;
+  /** Spend grouped by peer for today. */
+  todayByPeer: Record<string, number>;
+  /** Last 7 days total. */
+  weekUsd: number;
+}
+
+export interface BudgetCheck {
+  ok: boolean;
+  reason?: string;
+  /** Remaining headroom in USD if ok=true. */
+  remainingUsd?: number;
+}
+
+export class CostTracker {
+  private readonly file: string;
+  private cached: CostEntry[] | null = null;
+
+  constructor(options: { file?: string } = {}) {
+    this.file = options.file ?? this.defaultFile();
+    this.ensureDir();
+  }
+
+  /** Append a new charge to the ledger and refresh the cache. */
+  async charge(entry: CostEntry): Promise<void> {
+    const ledger = await this.load();
+    ledger.push(entry);
+    this.cached = ledger;
+    await this.persist(ledger);
+  }
+
+  /** Read full ledger (cached after first call). */
+  async load(): Promise<CostEntry[]> {
+    if (this.cached) return this.cached;
+    if (!fs.existsSync(this.file)) {
+      this.cached = [];
+      return [];
+    }
+    try {
+      const raw = await fs.promises.readFile(this.file, 'utf-8');
+      const parsed = JSON.parse(raw) as CostEntry[];
+      this.cached = Array.isArray(parsed) ? parsed : [];
+      return this.cached;
+    } catch (err) {
+      logger.warn?.('[cost-tracker] failed to read ledger', {
+        err: err instanceof Error ? err.message : String(err),
+      });
+      this.cached = [];
+      return [];
+    }
+  }
+
+  /** Aggregate today's spend + 7-day total + per-provider/peer. */
+  async summary(): Promise<CostSummary> {
+    const ledger = await this.load();
+    const now = Date.now();
+    const startOfToday = new Date();
+    startOfToday.setUTCHours(0, 0, 0, 0);
+    const todayCutoff = startOfToday.getTime();
+    const weekCutoff = now - 7 * 24 * 60 * 60 * 1000;
+
+    const today = ledger.filter((e) => Date.parse(e.at) >= todayCutoff);
+    const week = ledger.filter((e) => Date.parse(e.at) >= weekCutoff);
+
+    const todayByProvider: Record<string, number> = {};
+    const todayByPeer: Record<string, number> = {};
+    for (const entry of today) {
+      todayByProvider[entry.provider] =
+        (todayByProvider[entry.provider] ?? 0) + entry.usd;
+      todayByPeer[entry.peerId] = (todayByPeer[entry.peerId] ?? 0) + entry.usd;
+    }
+    const todayUsd = today.reduce((sum, e) => sum + e.usd, 0);
+    const weekUsd = week.reduce((sum, e) => sum + e.usd, 0);
+
+    return { todayUsd, todayByProvider, todayByPeer, weekUsd };
+  }
+
+  /**
+   * Check whether a new dispatch costing `estimatedUsd` would breach
+   * either cap. Pure function — does NOT charge.
+   */
+  async canSpend(
+    estimatedUsd: number,
+    sagaId: string | undefined,
+    budget: CostBudget = DEFAULT_BUDGET,
+  ): Promise<BudgetCheck> {
+    const summary = await this.summary();
+    if (summary.todayUsd + estimatedUsd > budget.maxDailyUsd) {
+      return {
+        ok: false,
+        reason: `Daily cap reached: today ${summary.todayUsd.toFixed(2)}$ + ${estimatedUsd.toFixed(
+          2,
+        )}$ > cap ${budget.maxDailyUsd}$`,
+      };
+    }
+    if (sagaId) {
+      const ledger = await this.load();
+      const sagaSpend = ledger
+        .filter((e) => e.sagaId === sagaId)
+        .reduce((s, e) => s + e.usd, 0);
+      if (sagaSpend + estimatedUsd > budget.maxSagaUsd) {
+        return {
+          ok: false,
+          reason: `Per-saga cap reached: saga ${sagaSpend.toFixed(
+            2,
+          )}$ + ${estimatedUsd.toFixed(2)}$ > cap ${budget.maxSagaUsd}$`,
+        };
+      }
+    }
+    return {
+      ok: true,
+      remainingUsd: Math.max(0, budget.maxDailyUsd - summary.todayUsd - estimatedUsd),
+    };
+  }
+
+  /** Drop entries older than `retentionDays`. Defaults to 30 days. */
+  async vacuum(retentionDays = 30): Promise<number> {
+    const ledger = await this.load();
+    const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
+    const kept = ledger.filter((e) => Date.parse(e.at) >= cutoff);
+    const dropped = ledger.length - kept.length;
+    if (dropped > 0) {
+      this.cached = kept;
+      await this.persist(kept);
+    }
+    return dropped;
+  }
+
+  /** Test-only — resets cached + on-disk ledger. */
+  async _resetForTests(): Promise<void> {
+    this.cached = [];
+    if (fs.existsSync(this.file)) {
+      await fs.promises.unlink(this.file);
+    }
+  }
+
+  // ─────── internals ───────
+
+  private defaultFile(): string {
+    const home = process.env.HOME || process.env.USERPROFILE || os.homedir();
+    return path.join(home, '.codebuddy', 'fleet-cost-ledger.json');
+  }
+
+  private ensureDir(): void {
+    const dir = path.dirname(this.file);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  }
+
+  private async persist(ledger: CostEntry[]): Promise<void> {
+    const tmp = `${this.file}.tmp.${process.pid}`;
+    await fs.promises.writeFile(tmp, JSON.stringify(ledger, null, 2));
+    await fs.promises.rename(tmp, this.file);
+  }
+}
+
+let cachedTracker: CostTracker | null = null;
+
+export function getCostTracker(): CostTracker {
+  if (!cachedTracker) cachedTracker = new CostTracker();
+  return cachedTracker;
+}
+
+export function resetCostTracker(): void {
+  cachedTracker = null;
+}
