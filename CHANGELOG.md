@@ -15,6 +15,31 @@ Heading toward `1.0.0` final. Open audit blockers tracked in
 [`docs/fleet-guide.md`](docs/fleet-guide.md). Backlog notes also under
 `## [0.5.1-fleet]`.
 
+### Added — Fleet V1.2 (Phase d.21)
+
+- **`peer.chat-session.start/.continue/.end`** — multi-turn
+  conversations between fleet peers, with state held in-memory on the
+  peer that hosts the LLM client. Where `peer.chat` (d.15) is a
+  stateless one-shot, this trio lets a caller open a session, append
+  turns that build on prior context, and close it explicitly.
+  - Idle TTL 30 min (override via `CODEBUDDY_PEER_SESSION_IDLE_MS`),
+    reset on each `continue`. Opportunistic GC — no setInterval timer.
+  - Concurrent `continue` calls on the same sessionId serialise FIFO
+    via per-session promise chains so assistant messages can't
+    interleave on shared history.
+  - Failed turns roll back the user message they appended, so a
+    retry stays consistent with what the model has actually seen.
+  - Error codes: `SESSION_NOT_FOUND`, `SESSION_EXPIRED`,
+    `CLIENT_UNAVAILABLE`. `traceId` echoed in every response.
+  - New module `src/fleet/peer-session-bridge.ts` (~250 LOC),
+    17 unit tests in `tests/fleet/peer-session-bridge.test.ts`.
+  - Wired alongside `peer-chat-bridge` in `src/server/index.ts`.
+  - Docs: [`docs/fleet-guide.md`](docs/fleet-guide.md) — section
+    "`peer.chat-session.*` V1.2 (Phase d.21)".
+  - Limitations carried into V1.3: no tools (separate
+    `peer.tool.invoke` design), no cross-restart durability
+    (saga-store backing is a possible follow-up).
+
 ---
 
 ## [1.0.0-rc.8] — 2026-05-09 (afternoon)

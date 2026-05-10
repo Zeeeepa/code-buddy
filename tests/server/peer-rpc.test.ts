@@ -64,8 +64,8 @@ describe('peer-rpc — Phase (d).13', () => {
       expect(payload.hostname.length).toBeGreaterThan(0);
       expect(payload.pid).toBe(process.pid);
       expect(payload.methods).toContain('peer.describe');
-      // Phase (d).16a — apiVersion bumped d.13 → d.14 → d.15 → d.16.
-      expect(payload.apiVersion).toBe('d.16');
+      // apiVersion bumped d.13 → d.14 → d.15 → d.16 → d.17 (capabilities) → d.21 (chat-session).
+      expect(payload.apiVersion).toBe('d.21');
     });
 
     it('peer.describe honors CODEBUDDY_FLEET_HOSTNAME env override', async () => {
@@ -182,11 +182,11 @@ describe('peer-rpc — Phase (d).13', () => {
   // Phase (d).14 — role taxonomy + depth cap + trace propagation
   // ========================================================================
   describe('Phase (d).14 — depth cap + trace propagation', () => {
-    it('peer.describe (Phase (d).14 → d.16) exposes role + maxDepth + apiVersion=d.16', async () => {
+    it('peer.describe (Phase (d).14 → d.21) exposes role + maxDepth + apiVersion=d.21', async () => {
       const r = await dispatchPeerRequest({ id: 'd', method: 'peer.describe' }, ctx);
       expect(r.ok).toBe(true);
       const payload = r.payload as { apiVersion: string; role: string; maxDepth: number };
-      expect(payload.apiVersion).toBe('d.16');
+      expect(payload.apiVersion).toBe('d.21');
       expect(['main', 'orchestrator', 'leaf']).toContain(payload.role);
       expect(typeof payload.maxDepth).toBe('number');
     });

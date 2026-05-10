@@ -222,7 +222,7 @@ function registerBuiltInMethods(): void {
       hostname: process.env.CODEBUDDY_FLEET_HOSTNAME || os.hostname(),
       pid: process.pid,
       methods: listPeerMethods(),
-      apiVersion: 'd.17', // bumped: now exposes capabilities
+      apiVersion: 'd.21', // bumped: peer.chat-session.* trio landed
       role: getPeerRole(),
       maxDepth: getMaxDepth(),
       peerChatProvider,

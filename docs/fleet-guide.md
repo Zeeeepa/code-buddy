@@ -550,6 +550,73 @@ Useful for long generations where the caller wants visibility into
 in-flight progress. `peer_delegate` (Phase d.17) currently aggregates
 locally — the streaming path is for power users via `/fleet send`.
 
+### `peer.chat-session.*` V1.2 (Phase d.21)
+
+Multi-turn conversations between peers. Where `peer.chat` is a
+stateless one-shot (every call rebuilds context from scratch), this
+trio holds conversation state **in-memory on the peer that hosts the
+LLM client**. The caller manages the lifecycle: open with `start`,
+append turns with `continue`, close with `end`.
+
+#### Methods
+
+- `peer.chat-session.start({ systemPrompt?, model? })`
+  → `{ sessionId, expiresAt, traceId }`
+- `peer.chat-session.continue({ sessionId, prompt })`
+  → `{ text, finishReason, usage, traceId }`
+- `peer.chat-session.end({ sessionId })`
+  → `{ closed: boolean, traceId }`
+
+#### Idle TTL
+
+Default 30 min, reset to "now" on every `continue`. Override via
+`CODEBUDDY_PEER_SESSION_IDLE_MS`. Sessions self-purge opportunistically
+at the top of each `start`/`continue` — no setInterval timer.
+
+#### Concurrency
+
+Concurrent `continue` calls on the same sessionId are serialised FIFO
+(promise-chained per session) so assistant messages can't interleave
+on shared `messages` history. Different sessions run independently.
+
+#### Limitations (V1.2)
+
+- **In-memory only** — sessions are lost on peer restart. V1.2-saga
+  (optional follow-up) would back state with the saga store.
+- **No tools** — call surface mirrors `peer.chat` / `/btw`. Exposing
+  remote tools is V1.3 (`peer.tool.invoke`), gated behind a serious
+  permission design.
+- **Caller-owned cleanup** — peers won't close sessions for you
+  unless they idle out. Always `end` what you `start`.
+
+#### Errors
+
+- `SESSION_NOT_FOUND` — sessionId unknown (typo, wrong peer, or already ended)
+- `SESSION_EXPIRED` — idled past the TTL between turns (rare; usually
+  surfaces as `SESSION_NOT_FOUND` because GC runs first)
+- `CLIENT_UNAVAILABLE` — peer has no LLM client wired (peer.chat would
+  return the same)
+
+#### Example
+
+```bash
+> /fleet send ministar-linux peer.chat-session.start \
+    {"systemPrompt":"Tu es un expert Rust","model":"qwen2.5-coder:7b"}
+# → { sessionId: "sess_lpz4xy_h2k1", expiresAt: 1715380000000, ... }
+
+> /fleet send ministar-linux peer.chat-session.continue \
+    {"sessionId":"sess_lpz4xy_h2k1","prompt":"Donne-moi un exemple de borrow checker"}
+# → { text: "Voici un exemple..." }
+
+> /fleet send ministar-linux peer.chat-session.continue \
+    {"sessionId":"sess_lpz4xy_h2k1","prompt":"Maintenant montre comment le fixer avec des lifetimes"}
+# → { text: "Tu peux écrire..." }    # ← le peer se souvient du précédent
+
+> /fleet send ministar-linux peer.chat-session.end \
+    {"sessionId":"sess_lpz4xy_h2k1"}
+# → { closed: true }
+```
+
 ### Autonomous v0.2 — Ollama spokes (Phase d.20)
 
 Per-task or per-host LLM routing for the autonomous protocol:
@@ -704,8 +771,10 @@ La fleet Code Buddy reste le brain ; OpenClaw apporte les canaux.
 
 ## Roadmap (post-V1)
 
-- **V1.2** — `peer.chat-session.start/.continue/.end` (multi-tour
-  conversations between peers, with state held server-side).
+- ~~**V1.2** — `peer.chat-session.start/.continue/.end` (multi-tour
+  conversations between peers, with state held server-side).~~
+  **✅ Shipped Phase d.21** — see section above. Idle TTL 30 min,
+  in-memory state, FIFO-serialised concurrent continues.
 - **V1.3** — `peer.tool.invoke` (more powerful, more risky — exposing
   the peer's local tools to remote callers requires a serious
   permission design).

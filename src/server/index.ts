@@ -36,6 +36,7 @@ import { startFleetHeartbeat, stopFleetHeartbeat } from '../fleet/heartbeat-broa
 import { startApiHeartbeatMonitor, stopApiHeartbeatMonitor } from './heartbeat-monitor.js';
 import { wireCompactionBridge, unwireCompactionBridge } from '../fleet/compaction-bridge.js';
 import { wirePeerChatBridge, unwirePeerChatBridge } from '../fleet/peer-chat-bridge.js';
+import { wirePeerSessionBridge, unwirePeerSessionBridge } from '../fleet/peer-session-bridge.js';
 import { logger } from '../utils/logger.js';
 import { initMetrics, getMetrics as _getMetrics } from '../metrics/index.js';
 import { CSRFProtection } from '../security/csrf-protection.js';
@@ -833,11 +834,13 @@ export async function startServer(userConfig: Partial<ServerConfig> = {}): Promi
         const factory = createPeerChatClientFromEnv();
         if (factory) {
           wirePeerChatBridge(() => factory.client, factory.info);
+          wirePeerSessionBridge(() => factory.client);
           logger.info(
             `[fleet] peer.chat wired: ${factory.info.provider} (${factory.info.model}${factory.info.isLocal ? ', local' : ''})`,
           );
         } else {
           wirePeerChatBridge(() => null);
+          wirePeerSessionBridge(() => null);
           logger.info('[fleet] peer.chat wired without provider — set GOOGLE_API_KEY / GROK_API_KEY / ... or OLLAMA_HOST to activate');
         }
       } catch (err) {
@@ -845,6 +848,7 @@ export async function startServer(userConfig: Partial<ServerConfig> = {}): Promi
           error: err instanceof Error ? err.message : String(err),
         });
         wirePeerChatBridge(() => null);
+        wirePeerSessionBridge(() => null);
       }
     })().catch(() => { /* unhandled-rejection guard */ });
 
@@ -944,6 +948,8 @@ export async function stopServer(server: HttpServer): Promise<void> {
     unwireCompactionBridge();
     // Phase (d).15 — un-register peer.chat method.
     unwirePeerChatBridge();
+    // Phase (d).20 — un-register peer.chat-session.* methods.
+    unwirePeerSessionBridge();
 
     // Detach the channel-A2A bridge handler + shut down the
     // ChannelManager so polling loops (Telegram, Discord, ...) stop.
