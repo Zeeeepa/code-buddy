@@ -57,6 +57,25 @@ Heading toward `1.0.0` final. Open audit blockers tracked in
     LOC for the new sub-action + state). 18 unit tests in
     `tests/fleet/fleet-chat-helper.test.ts`.
 
+### Added — Fleet peer.chat-session.continue-stream
+
+- **Streaming variant of `peer.chat-session.continue`** — mirrors the
+  Phase d.19 `peer.chat-stream` pattern but reuses the session's
+  multi-turn history. Each assistant delta is pushed via
+  `ctx.emitChunk`; the final response carries the aggregated text +
+  usage so transports without streaming support still get a usable
+  answer. Same FIFO serialisation per session and same persistence /
+  observability hooks as the non-streaming `continue`.
+- Error handling: if the stream throws before producing any delta the
+  user message is rolled back (consistent with `continue`); if some
+  text was emitted before the error, it's persisted as the assistant
+  message so the next turn sees what the model already said.
+- 9 new bridge tests in `tests/fleet/peer-session-bridge.test.ts`
+  covering delta forwarding, no-transport aggregation, multi-turn
+  history accumulation across streaming + non-streaming, missing
+  params, server errors with zero / partial deltas, and the
+  `fleet:chat-session:turn` event.
+
 ### Added — Fleet privacy-lint PII patterns
 
 - **SSN, IBAN, phone, credit-card detection** added to

@@ -564,6 +564,14 @@ append turns with `continue`, close with `end`.
   → `{ sessionId, expiresAt, traceId }`
 - `peer.chat-session.continue({ sessionId, prompt })`
   → `{ text, finishReason, usage, traceId }`
+- `peer.chat-session.continue-stream({ sessionId, prompt })`
+  → `{ text, finishReason, usage, traceId }` plus `peer:chunk` frames
+  emitted live for each assistant delta. Same FIFO serialisation and
+  persistence as `continue` ; useful when a turn is expected to be
+  long and the caller wants visibility into in-flight output. If
+  the stream errors before any delta arrives, the user message is
+  rolled back ; if some text was already produced, that partial
+  answer is persisted so the next turn sees it.
 - `peer.chat-session.end({ sessionId })`
   → `{ closed: boolean, traceId }`
 

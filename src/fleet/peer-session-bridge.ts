@@ -330,6 +330,136 @@ export async function wirePeerSessionBridge(getClient: PeerChatClientGetter): Pr
     return next;
   });
 
+  // Streaming variant of `continue` — mirrors `peer.chat-stream`
+  // (Phase d.19). Same FIFO serialisation, same history accumulation,
+  // same persistence + events as `continue`, but the assistant deltas
+  // are pushed via `ctx.emitChunk` as they're produced. The final
+  // response still carries the aggregated text + usage so callers
+  // without streaming transport support get a usable answer either way.
+  registerPeerMethod('peer.chat-session.continue-stream', async (params, ctx) => {
+    const sessionId = typeof params.sessionId === 'string' ? params.sessionId : '';
+    const prompt = typeof params.prompt === 'string' ? params.prompt : '';
+    if (!sessionId) {
+      throw new Error('peer.chat-session.continue-stream: sessionId is required (string)');
+    }
+    if (!prompt) {
+      throw new Error('peer.chat-session.continue-stream: prompt is required (string)');
+    }
+
+    const idleMs = getIdleMs();
+    const now = Date.now();
+    await purgeExpired(now, idleMs);
+
+    const session = sessions.get(sessionId);
+    if (!session) {
+      throw new Error(`SESSION_NOT_FOUND: no session with id "${sessionId}"`);
+    }
+    if (now - session.lastUsedAt > idleMs) {
+      sessions.delete(sessionId);
+      try {
+        await getPeerSessionStore().delete(sessionId);
+      } catch {
+        /* best-effort */
+      }
+      broadcastChatSessionEnd({ sessionId, reason: 'expired' });
+      throw new Error(`SESSION_EXPIRED: session "${sessionId}" idled past ${idleMs}ms`);
+    }
+
+    const run = async (): Promise<{
+      text: string;
+      finishReason: string | null | undefined;
+      usage: unknown;
+      traceId: string;
+    }> => {
+      const client = cachedGetter?.() ?? null;
+      if (!client) {
+        throw new Error(
+          'CLIENT_UNAVAILABLE: no LLM client wired on this peer (peer.chat-session.continue-stream cannot answer)',
+        );
+      }
+
+      session.messages.push({ role: 'user', content: prompt });
+      const requestMessages = [
+        { role: 'system' as const, content: session.systemPrompt },
+        ...session.messages,
+      ];
+      const chatOptions: ChatOptions | undefined = session.model
+        ? { model: session.model }
+        : undefined;
+
+      const turnStartedAt = Date.now();
+      let aggregate = '';
+      let finishReason: string | null | undefined;
+      let usage: unknown;
+      try {
+        const stream = client.chatStream(requestMessages, undefined, chatOptions);
+        for await (const chunk of stream as AsyncIterable<{
+          choices?: Array<{ delta?: { content?: string }; finish_reason?: string | null }>;
+          usage?: unknown;
+        }>) {
+          const delta = chunk?.choices?.[0]?.delta?.content ?? '';
+          if (delta) {
+            aggregate += delta;
+            ctx.emitChunk?.(delta);
+          }
+          const fr = chunk?.choices?.[0]?.finish_reason;
+          if (fr) finishReason = fr;
+          if (chunk?.usage) usage = chunk.usage;
+        }
+      } catch (err) {
+        // Mirror the non-streaming `continue` rollback: if the model
+        // bailed before producing any answer we drop the user turn
+        // entirely. If we did get partial text, persist it as the
+        // assistant message so the conversation stays coherent on
+        // retry — the next `continue` will see what the model said
+        // before the error.
+        if (aggregate.length === 0) {
+          session.messages.pop();
+        } else {
+          session.messages.push({ role: 'assistant', content: aggregate });
+          session.lastUsedAt = Date.now();
+          try {
+            await getPeerSessionStore().save(snapshot(session));
+          } catch {
+            /* best-effort */
+          }
+        }
+        throw err;
+      }
+
+      session.messages.push({ role: 'assistant', content: aggregate });
+      session.lastUsedAt = Date.now();
+
+      try {
+        await getPeerSessionStore().save(snapshot(session));
+      } catch (err) {
+        logger.warn('[peer-session-bridge] save on continue-stream failed', {
+          sessionId: session.sessionId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+
+      const turnCount = Math.floor(session.messages.length / 2);
+      broadcastChatSessionTurn({
+        sessionId: session.sessionId,
+        turnCount,
+        elapsedMs: Date.now() - turnStartedAt,
+        usage,
+      });
+
+      return {
+        text: aggregate,
+        finishReason,
+        usage,
+        traceId: ctx.traceId,
+      };
+    };
+
+    const next = session.pending.then(run, run);
+    session.pending = next.catch(() => undefined);
+    return next;
+  });
+
   registerPeerMethod('peer.chat-session.end', async (params, ctx) => {
     const sessionId = typeof params.sessionId === 'string' ? params.sessionId : '';
     if (!sessionId) {
@@ -359,6 +489,7 @@ export function unwirePeerSessionBridge(): void {
   if (!wired) return;
   unregisterPeerMethod('peer.chat-session.start');
   unregisterPeerMethod('peer.chat-session.continue');
+  unregisterPeerMethod('peer.chat-session.continue-stream');
   unregisterPeerMethod('peer.chat-session.end');
   cachedGetter = null;
   wired = false;
@@ -379,6 +510,7 @@ export function _unwireForTests(): void {
   try {
     unregisterPeerMethod('peer.chat-session.start');
     unregisterPeerMethod('peer.chat-session.continue');
+    unregisterPeerMethod('peer.chat-session.continue-stream');
     unregisterPeerMethod('peer.chat-session.end');
   } catch {
     /* peer-rpc may not be initialised in some test setups */

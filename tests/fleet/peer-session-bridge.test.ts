@@ -129,13 +129,14 @@ describe('peer-session-bridge — wiring', () => {
     _unwireForTests();
   });
 
-  it('registers all 3 peer.chat-session.* methods when wired', async () => {
+  it('registers all 4 peer.chat-session.* methods when wired', async () => {
     expect(isPeerSessionBridgeWired()).toBe(false);
     await wirePeerSessionBridge(() => null);
     expect(isPeerSessionBridgeWired()).toBe(true);
     const methods = listPeerMethods();
     expect(methods).toContain('peer.chat-session.start');
     expect(methods).toContain('peer.chat-session.continue');
+    expect(methods).toContain('peer.chat-session.continue-stream');
     expect(methods).toContain('peer.chat-session.end');
   });
 
@@ -622,5 +623,245 @@ describe('V1.2-saga — observability events', () => {
     expect(blob).not.toMatch(/\bprompt\b/);
     expect(blob).not.toMatch(/\bmessages\b/);
     expect(blob).not.toMatch(/\bcontent\b/);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────
+// peer.chat-session.continue-stream (variant streaming, mirror d.19)
+// ──────────────────────────────────────────────────────────────────
+
+interface StreamChunk {
+  choices?: Array<{
+    delta?: { content?: string };
+    finish_reason?: string | null;
+  }>;
+  usage?: unknown;
+}
+
+/** Streaming client mock — yields the configured chunks then ends. */
+function makeStreamingClient(chunks: string[], usage?: unknown, finishReason = 'stop') {
+  const captured: Array<{ messages: unknown; opts: unknown }> = [];
+  return {
+    captured,
+    client: {
+      chat: vi.fn(),
+      async *chatStream(messages: unknown, _tools: unknown, opts?: unknown): AsyncGenerator<StreamChunk> {
+        captured.push({ messages, opts });
+        for (const c of chunks) {
+          yield { choices: [{ delta: { content: c } }] };
+        }
+        yield { choices: [{ delta: {}, finish_reason: finishReason }], usage };
+      },
+    },
+  };
+}
+
+describe('peer.chat-session.continue-stream', () => {
+  beforeEach(() => _unwireForTests());
+  afterEach(() => _unwireForTests());
+
+  it('emits per-chunk deltas and returns aggregated text', async () => {
+    const { client } = makeStreamingClient(['Hel', 'lo, ', 'world!'], {
+      total_tokens: 9,
+      prompt_tokens: 2,
+      completion_tokens: 7,
+    });
+    await wirePeerSessionBridge(() => client as never);
+
+    const startRes = await dispatch('peer.chat-session.start', {});
+    const sessionId = (startRes.payload as { sessionId: string }).sessionId;
+
+    const emitted: string[] = [];
+    const r = await dispatchPeerRequest(
+      {
+        id: 'r1',
+        method: 'peer.chat-session.continue-stream',
+        params: { sessionId, prompt: 'say hi' },
+      },
+      baseCtx({ emitChunk: (delta) => emitted.push(delta) }),
+    );
+    expect(r.ok).toBe(true);
+    expect(emitted).toEqual(['Hel', 'lo, ', 'world!']);
+    const payload = r.payload as { text: string; usage?: { total_tokens?: number }; finishReason?: string };
+    expect(payload.text).toBe('Hello, world!');
+    expect(payload.finishReason).toBe('stop');
+    expect(payload.usage?.total_tokens).toBe(9);
+  });
+
+  it('works without an emitChunk transport (aggregates locally)', async () => {
+    const { client } = makeStreamingClient(['part', '1', 'part2']);
+    await wirePeerSessionBridge(() => client as never);
+    const startRes = await dispatch('peer.chat-session.start', {});
+    const sessionId = (startRes.payload as { sessionId: string }).sessionId;
+
+    const r = await dispatchPeerRequest(
+      {
+        id: 'r2',
+        method: 'peer.chat-session.continue-stream',
+        params: { sessionId, prompt: 'q' },
+      },
+      baseCtx(),
+    );
+    expect(r.ok).toBe(true);
+    expect((r.payload as { text: string }).text).toBe('part1part2');
+  });
+
+  it('accumulates assistant text in the session for next turn', async () => {
+    const { client, captured } = makeStreamingClient(['stream', ' answer']);
+    await wirePeerSessionBridge(() => client as never);
+    const startRes = await dispatch('peer.chat-session.start', {});
+    const sessionId = (startRes.payload as { sessionId: string }).sessionId;
+
+    await dispatchPeerRequest(
+      {
+        id: 'r3',
+        method: 'peer.chat-session.continue-stream',
+        params: { sessionId, prompt: 'first' },
+      },
+      baseCtx({ emitChunk: () => undefined }),
+    );
+
+    // Second turn — the LLM sees system + user1 + assistant1 + user2.
+    await dispatchPeerRequest(
+      {
+        id: 'r4',
+        method: 'peer.chat-session.continue-stream',
+        params: { sessionId, prompt: 'second' },
+      },
+      baseCtx({ emitChunk: () => undefined }),
+    );
+
+    expect(captured).toHaveLength(2);
+    const second = captured[1].messages as Array<{ role: string; content: string }>;
+    expect(second.map((m) => m.role)).toEqual(['system', 'user', 'assistant', 'user']);
+    expect(second[2].content).toBe('stream answer');
+    expect(second[3].content).toBe('second');
+  });
+
+  it('rejects unknown sessionId with SESSION_NOT_FOUND', async () => {
+    await wirePeerSessionBridge(() => makeStreamingClient(['x']).client as never);
+    const r = await dispatchPeerRequest(
+      {
+        id: 'r5',
+        method: 'peer.chat-session.continue-stream',
+        params: { sessionId: 'sess_nope', prompt: 'hi' },
+      },
+      baseCtx(),
+    );
+    expect(r.ok).toBe(false);
+    expect(r.error?.message).toContain('SESSION_NOT_FOUND');
+  });
+
+  it('returns CLIENT_UNAVAILABLE when no client is wired', async () => {
+    await wirePeerSessionBridge(() => null);
+    const startRes = await dispatch('peer.chat-session.start', {});
+    const sessionId = (startRes.payload as { sessionId: string }).sessionId;
+    const r = await dispatchPeerRequest(
+      {
+        id: 'r6',
+        method: 'peer.chat-session.continue-stream',
+        params: { sessionId, prompt: 'hi' },
+      },
+      baseCtx(),
+    );
+    expect(r.ok).toBe(false);
+    expect(r.error?.message).toContain('CLIENT_UNAVAILABLE');
+  });
+
+  it('rejects empty prompt / missing sessionId', async () => {
+    await wirePeerSessionBridge(() => makeStreamingClient(['x']).client as never);
+    const r1 = await dispatchPeerRequest(
+      { id: 'r7', method: 'peer.chat-session.continue-stream', params: {} },
+      baseCtx(),
+    );
+    expect(r1.ok).toBe(false);
+    expect(r1.error?.message).toContain('sessionId is required');
+
+    const startRes = await dispatch('peer.chat-session.start', {});
+    const sessionId = (startRes.payload as { sessionId: string }).sessionId;
+    const r2 = await dispatchPeerRequest(
+      {
+        id: 'r8',
+        method: 'peer.chat-session.continue-stream',
+        params: { sessionId },
+      },
+      baseCtx(),
+    );
+    expect(r2.ok).toBe(false);
+    expect(r2.error?.message).toContain('prompt is required');
+  });
+
+  it('emits fleet:chat-session:turn after a successful stream', async () => {
+    await wirePeerSessionBridge(() => makeStreamingClient(['ok']).client as never);
+    const startRes = await dispatch('peer.chat-session.start', {});
+    const sessionId = (startRes.payload as { sessionId: string }).sessionId;
+
+    await dispatchPeerRequest(
+      {
+        id: 'r9',
+        method: 'peer.chat-session.continue-stream',
+        params: { sessionId, prompt: 'hi' },
+      },
+      baseCtx({ emitChunk: () => undefined }),
+    );
+    expect(broadcastChatSessionTurn).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId, turnCount: 1 }),
+    );
+  });
+
+  it('rolls back the user message when chatStream throws with zero deltas', async () => {
+    const flakyClient = {
+      chat: vi.fn(),
+      async *chatStream() {
+        throw new Error('upstream gateway 502');
+      },
+    };
+    await wirePeerSessionBridge(() => flakyClient as never);
+    const startRes = await dispatch('peer.chat-session.start', {});
+    const sessionId = (startRes.payload as { sessionId: string }).sessionId;
+
+    const r = await dispatchPeerRequest(
+      {
+        id: 'r10',
+        method: 'peer.chat-session.continue-stream',
+        params: { sessionId, prompt: 'q1' },
+      },
+      baseCtx({ emitChunk: () => undefined }),
+    );
+    expect(r.ok).toBe(false);
+    expect(r.error?.message).toContain('upstream gateway 502');
+
+    // No partial state — next turn starts fresh.
+    const live = _listSessionsForTests().find((s) => s.sessionId === sessionId);
+    expect(live?.messageCount).toBe(0);
+  });
+
+  it('persists partial answer when the stream errors after some deltas', async () => {
+    const partialClient = {
+      chat: vi.fn(),
+      async *chatStream(): AsyncGenerator<StreamChunk> {
+        yield { choices: [{ delta: { content: 'half ' } }] };
+        yield { choices: [{ delta: { content: 'an answer' } }] };
+        throw new Error('connection lost mid-stream');
+      },
+    };
+    await wirePeerSessionBridge(() => partialClient as never);
+    const startRes = await dispatch('peer.chat-session.start', {});
+    const sessionId = (startRes.payload as { sessionId: string }).sessionId;
+
+    const r = await dispatchPeerRequest(
+      {
+        id: 'r11',
+        method: 'peer.chat-session.continue-stream',
+        params: { sessionId, prompt: 'tell me' },
+      },
+      baseCtx({ emitChunk: () => undefined }),
+    );
+    expect(r.ok).toBe(false);
+
+    // The partial assistant text is saved so the next turn sees what
+    // the model already said before the failure.
+    const live = _listSessionsForTests().find((s) => s.sessionId === sessionId);
+    expect(live?.messageCount).toBe(2);
   });
 });
