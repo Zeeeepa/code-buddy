@@ -784,6 +784,53 @@ export class FleetListener extends EventEmitter {
   }
 
   /**
+   * Phase (d).23 / V1.3 — invoke a read-only tool on the connected peer
+   * via `peer.tool.invoke`. Convenience wrapper around `request()` with
+   * the params shape the bridge expects (`{ tool, args }`).
+   *
+   * Returns the executor's structured payload `{ tool, output,
+   * durationMs, truncated? }`. Errors carry the same `code` taxonomy as
+   * `request()` plus the bridge codes propagated in `error.message`:
+   * `TOOL_NOT_ALLOWED_FOR_PEER_INVOKE`, `TOOL_NOT_FLEET_SAFE`,
+   * `PEER_WORKSPACE_NOT_CONFIGURED`, `PATH_OUTSIDE_PEER_WORKSPACE`,
+   * `UNKNOWN_PEER_TOOL`, `SEARCH_TIMEOUT`, `SEARCH_FAILED`.
+   */
+  async invokeTool(
+    toolName: string,
+    args: Record<string, unknown> = {},
+    options: { timeoutMs?: number; traceId?: string; depth?: number } = {},
+  ): Promise<{ tool: string; output: string; durationMs: number; truncated?: boolean }> {
+    const payload = await this.request(
+      'peer.tool.invoke',
+      { tool: toolName, args },
+      options,
+    );
+    return payload as { tool: string; output: string; durationMs: number; truncated?: boolean };
+  }
+
+  /**
+   * Phase (d).23 / V1.3 — streaming variant. Same semantics as
+   * `invokeTool()` plus an `onChunk` callback invoked for each
+   * `peer:chunk` frame. The promise resolves with the final aggregated
+   * payload (the bridge accumulates locally too, so callers get the
+   * complete `output` either way).
+   */
+  async invokeToolStream(
+    toolName: string,
+    args: Record<string, unknown>,
+    onChunk: (delta: string) => void,
+    options: { timeoutMs?: number; traceId?: string; depth?: number } = {},
+  ): Promise<{ tool: string; output: string; durationMs: number; truncated?: boolean }> {
+    const payload = await this.requestStream(
+      'peer.tool.invoke.stream',
+      { tool: toolName, args },
+      onChunk,
+      options,
+    );
+    return payload as { tool: string; output: string; durationMs: number; truncated?: boolean };
+  }
+
+  /**
    * Phase (d).13 — generate a unique request id. Combines a per-listener
    * monotonic counter with the current timestamp to keep ids unique
    * even across listener restarts within the same ms.

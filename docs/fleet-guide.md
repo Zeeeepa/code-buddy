@@ -288,6 +288,97 @@ Errors as Error with `code`:
 - `peer.invoke ROLE_LEAF: this peer is configured as leaf` →
   `CODEBUDDY_PEER_ROLE=leaf` on this peer refuses outgoing invokes
 
+#### `peer.tool.invoke` + `peer.tool.invoke.stream` — Phase (d).23 / V1.3
+
+Read-only remote tool invocation. Lets a peer execute a tightly-scoped
+set of read tools on THIS peer's filesystem — like a logged, gated
+"ssh remote read" baked into the mesh. **V1 is intentionally narrow**
+(read-only, allowlist of 3 tools, mandatory workspace root). Future
+phases extend to mutating tools with explicit per-call approval.
+
+Request:
+```json
+{
+  "tool": "view_file",                                  // required, must be in allowlist
+  "args": { "file_path": "world-model/README.md" }      // tool-specific args
+}
+```
+
+Response:
+```json
+{
+  "tool": "view_file",
+  "output": "# World Model JEPA\n...",
+  "durationMs": 18,
+  "truncated": false
+}
+```
+
+Streaming variant `peer.tool.invoke.stream` accepts the same params
+and pushes `peer:chunk` frames as the output is produced (16 KB chunks
+for `view_file`, line-by-line for `search`). Use
+`FleetListener.invokeToolStream(toolName, args, onChunk)` on the caller.
+
+**V1 allowlist** (read-only):
+- `view_file` — `fs.readFile` of a file under the workspace root, 10 MB
+  cap. Args: `{ file_path: string }` (relative to root or absolute
+  inside it). Streamed chunks of 16 KB when via `.stream`.
+- `list_directory` — `fs.readdir` listing with type tags (`DIR`,
+  `FILE`, `LINK`). Args: `{ path: string }`.
+- `search` — ripgrep (`@vscode/ripgrep`) text search, capped at 200
+  matches and 30 s. Args: `{ query: string, path: string }`. Streamed
+  match-by-match when via `.stream`.
+
+**Three security gates** run on every invocation, in this order:
+
+1. **Allowlist** — `tool ∈ {view_file, list_directory, search}`,
+   override via `CODEBUDDY_PEER_TOOL_ALLOWLIST=tool1,tool2,...`.
+2. **`fleetSafe` registry flag** — `getToolRegistry().isFleetSafe(name)`
+   must return `true`. The same flag the A2A executor consults; opt-in
+   per `src/tools/metadata.ts`.
+3. **Workspace root** — every path argument is resolved + symlink-realpath'd
+   and checked against `CODEBUDDY_PEER_TOOL_WORKSPACE_ROOT`. **If the
+   env is unset, every invocation fails with `PEER_WORKSPACE_NOT_CONFIGURED`**
+   (fail-closed). A misconfigured peer cannot accidentally expose `/`.
+
+Depth cap (`CODEBUDDY_PEER_MAX_DEPTH`) and role-leaf are inherited from
+the dispatcher — no extra config needed.
+
+Errors as Error with `code` `METHOD_ERROR` and the bridge code in
+`message`:
+- `TOOL_NOT_ALLOWED_FOR_PEER_INVOKE: tool "<name>" is not in the peer-invoke allowlist`
+- `TOOL_NOT_FLEET_SAFE: tool "<name>" lacks fleetSafe metadata`
+- `PEER_WORKSPACE_NOT_CONFIGURED: set CODEBUDDY_PEER_TOOL_WORKSPACE_ROOT...`
+- `PATH_OUTSIDE_PEER_WORKSPACE: <p> resolves to <abs>, outside <root>`
+- `UNKNOWN_PEER_TOOL: no executor registered for "<name>"`
+- `SEARCH_TIMEOUT: ripgrep did not finish within 30000ms`
+- `SEARCH_FAILED: ripgrep exited with code <n>: <stderr>`
+- `peer.tool.invoke.stream: this transport does not support streaming`
+  (only `.stream` requires `ctx.emitChunk`)
+
+Audit log: every invocation produces a structured `logger.info` entry
+with shape `{ event, from, traceId, depth, tool, stream, ok, error?, durationMs }`
+under message `[fleet] peer.tool.invoke`.
+
+Concrete cross-host call from Cowork or `buddy` CLI:
+```bash
+> /fleet send darkstar peer.tool.invoke {"tool":"view_file","args":{"file_path":"world-model/README.md"}}
+```
+
+Or programmatically from a peer agent:
+```ts
+const { output } = await listener.invokeTool('view_file', {
+  file_path: 'world-model/README.md',
+});
+```
+
+Required peer config (env on the EXPOSING side):
+```bash
+CODEBUDDY_PEER_TOOL_WORKSPACE_ROOT=/path/to/projects   # mandatory, fail-closed
+CODEBUDDY_PEER_TOOL_ALLOWLIST=view_file,list_directory,search   # default, optional
+CODEBUDDY_PEER_ROLE=leaf                               # recommended on pure-spoke peers
+```
+
 ---
 
 ## Configuration via env vars

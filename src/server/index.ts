@@ -37,6 +37,7 @@ import { startApiHeartbeatMonitor, stopApiHeartbeatMonitor } from './heartbeat-m
 import { wireCompactionBridge, unwireCompactionBridge } from '../fleet/compaction-bridge.js';
 import { wirePeerChatBridge, unwirePeerChatBridge } from '../fleet/peer-chat-bridge.js';
 import { wirePeerSessionBridge, unwirePeerSessionBridge } from '../fleet/peer-session-bridge.js';
+import { wirePeerToolBridge, unwirePeerToolBridge } from '../fleet/peer-tool-bridge.js';
 import { logger } from '../utils/logger.js';
 import { initMetrics, getMetrics as _getMetrics } from '../metrics/index.js';
 import { CSRFProtection } from '../security/csrf-protection.js';
@@ -823,6 +824,10 @@ export async function startServer(userConfig: Partial<ServerConfig> = {}): Promi
     // fleet:peer:compacting:* so remote Claudes know when this peer is
     // briefly indisposed by a summarization pass.
     wireCompactionBridge();
+    // Phase (d).23 — peer.tool.invoke read-only bridge. No factory
+    // needed: the bridge wraps standalone executors and runs gates
+    // (allowlist + fleetSafe + workspace root) per invocation.
+    wirePeerToolBridge();
     // Phase (d).16a — auto-detect the peer.chat client from env
     // (priority order: ollama > grok > anthropic > gemini > openai).
     // When no key is detected, peer.chat still wires but answers
@@ -950,6 +955,8 @@ export async function stopServer(server: HttpServer): Promise<void> {
     unwirePeerChatBridge();
     // Phase (d).20 — un-register peer.chat-session.* methods.
     unwirePeerSessionBridge();
+    // Phase (d).23 — un-register peer.tool.invoke + .stream.
+    unwirePeerToolBridge();
 
     // Detach the channel-A2A bridge handler + shut down the
     // ChannelManager so polling loops (Telegram, Discord, ...) stop.

@@ -15,6 +15,53 @@ Heading toward `1.0.0` final. Open audit blockers tracked in
 [`docs/fleet-guide.md`](docs/fleet-guide.md). Backlog notes also under
 `## [0.5.1-fleet]`.
 
+### Added — Fleet V1.3 partial (Phase d.23) — `peer.tool.invoke`
+
+- **`peer.tool.invoke` + `peer.tool.invoke.stream`** — read-only remote
+  tool invocation via the fleet WebSocket. A peer Code Buddy can ask
+  another peer to execute a tightly-scoped read tool against THIS
+  peer's filesystem and stream the result back. Pattern is OpenClaw
+  `node.invoke` extended to tools.
+  - V1 allowlist (hardcoded, override via env `CODEBUDDY_PEER_TOOL_ALLOWLIST`):
+    `view_file`, `list_directory`, `search` (ripgrep). All three already
+    carry `fleetSafe: true` in `src/tools/metadata.ts`.
+  - **Three security gates**, in order: allowlist → registry `fleetSafe`
+    flag → workspace root (every path arg is `realpath`'d and checked
+    against `CODEBUDDY_PEER_TOOL_WORKSPACE_ROOT`). **Fail-closed when
+    the workspace env is unset** so a misconfigured peer cannot
+    accidentally expose `/`.
+  - Streaming variant uses `ctx.emitChunk` → `peer:chunk` frames
+    (16 KB chunks for `view_file`, line-by-line for `search`).
+  - Anti-loop guards (`CODEBUDDY_PEER_MAX_DEPTH`, `CODEBUDDY_PEER_ROLE=leaf`)
+    inherited from the dispatcher — no new wiring.
+  - Audit log via `logger.info('[fleet] peer.tool.invoke', meta)` on
+    every invocation (success and failure), with shape
+    `{ event, from, traceId, depth, tool, stream, ok, error?, durationMs }`.
+  - New module `src/fleet/peer-tool-bridge.ts` (~280 LOC,
+    standalone executors using `fs/promises` + `@vscode/ripgrep`).
+    18 unit tests in `tests/server/peer-tool-bridge.test.ts`.
+  - Client convenience: `FleetListener.invokeTool(name, args, opts)` +
+    `invokeToolStream(name, args, onChunk, opts)`.
+  - Wired alongside `peer-chat-bridge` in `src/server/index.ts`.
+  - Docs: [`docs/fleet-guide.md`](docs/fleet-guide.md) — section
+    "`peer.tool.invoke` + `peer.tool.invoke.stream` — Phase (d).23 / V1.3".
+  - Out of scope for V1 (kept for future phases): mutating tools
+    (Edit/Write/Bash) — require explicit per-call approval; permission
+    modes on the peer side; multi-workspace; cancellation cross-WS;
+    JWT scope `peer:tool:invoke`; MCP-tool exposure.
+  - **Behavior note** — the bridge is wired unconditionally on every
+    `buddy server` start (no env feature flag). Safe by fail-closed
+    default: with no `CODEBUDDY_PEER_TOOL_WORKSPACE_ROOT` set, every
+    invocation rejects with `PEER_WORKSPACE_NOT_CONFIGURED` and
+    nothing else changes. Existing deployments need no migration.
+  - **Test coverage scope** — the 19 unit tests dispatch directly via
+    `dispatchPeerRequest`, bypassing the WebSocket transport. The
+    `ctx.emitChunk → peer:chunk` wiring in `handler.ts` is exercised
+    indirectly by the symmetrical `peer-chat-stream` tests but not
+    directly here. **Cross-host E2E with a real DARKSTAR fleet
+    gateway is the intended Phase 2-3 follow-up**; do not push this
+    commit upstream until that validation is green.
+
 ### Added — Fleet V1.2 (Phase d.21)
 
 - **`peer.chat-session.start/.continue/.end`** — multi-turn
