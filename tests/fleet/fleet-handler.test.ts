@@ -45,6 +45,27 @@ const fleetListenerMock = vi.hoisted(() => {
   const requestMock = vi.fn<
     (method: string, params?: Record<string, unknown>, options?: { timeoutMs?: number }) => Promise<unknown>
   >(async () => ({ ok: true }));
+  // Phase (d).23 / V1.3 — peer.tool.invoke wrappers. Default: resolves
+  // to a deterministic payload so /fleet tool tests have a baseline.
+  const invokeToolMock = vi.fn<
+    (
+      toolName: string,
+      args?: Record<string, unknown>,
+      options?: { timeoutMs?: number },
+    ) => Promise<{ tool: string; output: string; durationMs: number; truncated?: boolean }>
+  >(async (toolName) => ({ tool: toolName, output: 'mocked-output', durationMs: 5 }));
+  const invokeToolStreamMock = vi.fn<
+    (
+      toolName: string,
+      args: Record<string, unknown>,
+      onChunk: (delta: string) => void,
+      options?: { timeoutMs?: number },
+    ) => Promise<{ tool: string; output: string; durationMs: number; truncated?: boolean }>
+  >(async (toolName, _args, onChunk) => {
+    onChunk('chunk-A');
+    onChunk('chunk-B');
+    return { tool: toolName, output: 'chunk-Achunk-B', durationMs: 8 };
+  });
 
   class FleetListenerStub {
     constructor(opts: { url: string; apiKey?: string; jwt?: string }) {
@@ -62,6 +83,8 @@ const fleetListenerMock = vi.hoisted(() => {
     getPeerCompactionState = getPeerCompactionStateMock;
     getEventHistory = getEventHistoryMock;
     request = requestMock;
+    invokeTool = invokeToolMock;
+    invokeToolStream = invokeToolStreamMock;
   }
 
   return {
@@ -75,6 +98,8 @@ const fleetListenerMock = vi.hoisted(() => {
     getPeerCompactionStateMock,
     getEventHistoryMock,
     requestMock,
+    invokeToolMock,
+    invokeToolStreamMock,
   };
 });
 
@@ -105,6 +130,20 @@ describe('/fleet slash handler — Phase (d).5 V0.4.1', () => {
     });
     fleetListenerMock.getEventHistoryMock.mockReset().mockReturnValue([]);
     fleetListenerMock.requestMock.mockReset().mockResolvedValue({ ok: true });
+    fleetListenerMock.invokeToolMock
+      .mockReset()
+      .mockImplementation(async (toolName) => ({
+        tool: toolName,
+        output: 'mocked-output',
+        durationMs: 5,
+      }));
+    fleetListenerMock.invokeToolStreamMock
+      .mockReset()
+      .mockImplementation(async (toolName, _args, onChunk) => {
+        onChunk('chunk-A');
+        onChunk('chunk-B');
+        return { tool: toolName, output: 'chunk-Achunk-B', durationMs: 8 };
+      });
     _resetFleetHandlerForTests();
     delete process.env.CODEBUDDY_FLEET_API_KEY;
   });
@@ -623,6 +662,112 @@ describe('/fleet slash handler — Phase (d).5 V0.4.1', () => {
       const r = await handleFleet(['send', 'peer:3000', 'peer.boom']);
       expect(r.entry?.content).toContain('Peer "peer:3000" → peer.boom FAILED');
       expect(r.entry?.content).toContain('METHOD_ERROR');
+    });
+  });
+
+  describe('tool action (Phase (d).23 / V1.3)', () => {
+    it('reports no listeners when none active', async () => {
+      const r = await handleFleet(['tool', 'peer:3000', 'view_file']);
+      expect(r.entry?.content).toContain('No fleet listeners active');
+    });
+
+    it('rejects when peer + tool name are missing', async () => {
+      await handleFleet(['listen', 'ws://peer:3000/ws', '--api-key', 'k']);
+      const r = await handleFleet(['tool']);
+      expect(r.entry?.content).toContain('Usage:');
+    });
+
+    it('rejects when peer name is unknown', async () => {
+      await handleFleet(['listen', 'ws://peer:3000/ws', '--api-key', 'k', '--name', 'a']);
+      const r = await handleFleet(['tool', 'nonexistent', 'view_file']);
+      expect(r.entry?.content).toContain('No fleet peer named "nonexistent"');
+      expect(r.entry?.content).toContain('Active peers: a');
+    });
+
+    it('successful invoke renders OK + duration + output body (non-stream)', async () => {
+      await handleFleet(['listen', 'ws://peer:3000/ws', '--api-key', 'k']);
+      fleetListenerMock.invokeToolMock.mockResolvedValueOnce({
+        tool: 'view_file',
+        output: '# README\nhello\n',
+        durationMs: 12,
+      });
+      const r = await handleFleet([
+        'tool', 'peer:3000', 'view_file', '{"file_path":"README.md"}',
+      ]);
+      expect(r.entry?.content).toContain('Peer "peer:3000" → view_file OK');
+      expect(r.entry?.content).toContain('# README');
+      expect(fleetListenerMock.invokeToolMock).toHaveBeenCalledWith(
+        'view_file',
+        { file_path: 'README.md' },
+        { timeoutMs: 30_000 },
+      );
+    });
+
+    it('handles tool invocation with no JSON args (defaults to {})', async () => {
+      await handleFleet(['listen', 'ws://peer:3000/ws', '--api-key', 'k']);
+      await handleFleet(['tool', 'peer:3000', 'list_directory']);
+      expect(fleetListenerMock.invokeToolMock).toHaveBeenCalledWith(
+        'list_directory',
+        {},
+        { timeoutMs: 30_000 },
+      );
+    });
+
+    it('rejects malformed JSON args', async () => {
+      await handleFleet(['listen', 'ws://peer:3000/ws', '--api-key', 'k']);
+      const r = await handleFleet(['tool', 'peer:3000', 'view_file', '{bad json']);
+      expect(r.entry?.content).toContain('invalid JSON args');
+      expect(fleetListenerMock.invokeToolMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects JSON args that are not an object', async () => {
+      await handleFleet(['listen', 'ws://peer:3000/ws', '--api-key', 'k']);
+      const r = await handleFleet(['tool', 'peer:3000', 'view_file', '[1,2,3]']);
+      expect(r.entry?.content).toContain('args must be a JSON object');
+    });
+
+    it('honors --timeout override', async () => {
+      await handleFleet(['listen', 'ws://peer:3000/ws', '--api-key', 'k']);
+      await handleFleet(['tool', 'peer:3000', 'view_file', '--timeout', '500']);
+      expect(fleetListenerMock.invokeToolMock).toHaveBeenCalledWith(
+        'view_file',
+        {},
+        { timeoutMs: 500 },
+      );
+    });
+
+    it('--stream uses invokeToolStream and renders summary line with byte count', async () => {
+      await handleFleet(['listen', 'ws://peer:3000/ws', '--api-key', 'k']);
+      const r = await handleFleet([
+        'tool', 'peer:3000', 'view_file', '{"file_path":"big.txt"}', '--stream',
+      ]);
+      expect(fleetListenerMock.invokeToolStreamMock).toHaveBeenCalled();
+      // Default mock streams 'chunk-A' + 'chunk-B' = 14 bytes total.
+      expect(r.entry?.content).toContain('view_file (stream) OK');
+      expect(r.entry?.content).toContain('14 bytes');
+    });
+
+    it('renders [truncated] tag when payload signals truncation', async () => {
+      await handleFleet(['listen', 'ws://peer:3000/ws', '--api-key', 'k']);
+      fleetListenerMock.invokeToolMock.mockResolvedValueOnce({
+        tool: 'view_file',
+        output: 'partial content',
+        durationMs: 9,
+        truncated: true,
+      });
+      const r = await handleFleet(['tool', 'peer:3000', 'view_file']);
+      expect(r.entry?.content).toContain('[truncated]');
+    });
+
+    it('renders FAILED message when invokeTool rejects (preserves the bridge code)', async () => {
+      await handleFleet(['listen', 'ws://peer:3000/ws', '--api-key', 'k']);
+      const err = new Error('peer.invoke METHOD_ERROR: PATH_OUTSIDE_PEER_WORKSPACE: ...');
+      fleetListenerMock.invokeToolMock.mockRejectedValueOnce(err);
+      const r = await handleFleet([
+        'tool', 'peer:3000', 'view_file', '{"file_path":"/etc/hosts"}',
+      ]);
+      expect(r.entry?.content).toContain('Peer "peer:3000" → view_file FAILED');
+      expect(r.entry?.content).toContain('PATH_OUTSIDE_PEER_WORKSPACE');
     });
   });
 });

@@ -320,6 +320,93 @@ describe('peer-tool-bridge — Phase (d).23 V1.3', () => {
       expect(payload.output).toMatch(/hello\.txt/);
       expect(payload.output).toMatch(/nested\.md/);
     });
+
+    it('returns success with empty output when ripgrep finds zero matches (exit 1)', async () => {
+      wirePeerToolBridge();
+      const r = await dispatchPeerRequest(
+        {
+          id: 'p9b',
+          method: 'peer.tool.invoke',
+          params: { tool: 'search', args: { query: 'unlikely_pattern_xyzzy_no_match', path: '.' } },
+        },
+        baseCtx,
+      );
+      // ripgrep exits 1 on no matches — bridge maps that to ok=true,
+      // empty output (NOT to SEARCH_FAILED).
+      expect(r.ok).toBe(true);
+      const payload = r.payload as { output: string; truncated: boolean };
+      expect(payload.output).toBe('');
+      expect(payload.truncated).toBe(false);
+    });
+  });
+
+  describe('view_file — 10 MB truncation cap', () => {
+    it('returns truncated=true when file exceeds READ_TRUNCATE_BYTES', async () => {
+      // Write a 10 MB + 1 byte file. Smaller than the cap by one byte
+      // would round to truncated=false; we deliberately cross.
+      const cap = 10 * 1024 * 1024;
+      const big = Buffer.alloc(cap + 1024, 'a'); // 10 MB + 1 KB ASCII 'a'
+      await fs.writeFile(path.join(tmpRoot, 'huge.txt'), big);
+
+      wirePeerToolBridge();
+      const r = await dispatchPeerRequest(
+        {
+          id: 'p_trunc',
+          method: 'peer.tool.invoke',
+          params: { tool: 'view_file', args: { file_path: 'huge.txt' } },
+        },
+        baseCtx,
+      );
+      expect(r.ok).toBe(true);
+      const payload = r.payload as { output: string; truncated: boolean };
+      expect(payload.truncated).toBe(true);
+      expect(payload.output.length).toBe(cap);
+    });
+  });
+
+  describe('env override — CODEBUDDY_PEER_TOOL_ALLOWLIST', () => {
+    it('restricts allowlist to the env value when set', async () => {
+      // Lock allowlist to view_file only — list_directory + search reject.
+      process.env.CODEBUDDY_PEER_TOOL_ALLOWLIST = 'view_file';
+      wirePeerToolBridge();
+
+      const r1 = await dispatchPeerRequest(
+        {
+          id: 'p_env_1',
+          method: 'peer.tool.invoke',
+          params: { tool: 'list_directory', args: { path: '.' } },
+        },
+        baseCtx,
+      );
+      expect(r1.ok).toBe(false);
+      expect(r1.error?.message).toContain('TOOL_NOT_ALLOWED_FOR_PEER_INVOKE');
+
+      const r2 = await dispatchPeerRequest(
+        {
+          id: 'p_env_2',
+          method: 'peer.tool.invoke',
+          params: { tool: 'view_file', args: { file_path: 'hello.txt' } },
+        },
+        baseCtx,
+      );
+      expect(r2.ok).toBe(true);
+    });
+
+    it('falls back to V1 default when env is empty/whitespace', async () => {
+      process.env.CODEBUDDY_PEER_TOOL_ALLOWLIST = '   ';
+      wirePeerToolBridge();
+      // Empty/whitespace-only env should NOT lock everything out — falls
+      // back to V1 default {view_file, list_directory, search}.
+      const r = await dispatchPeerRequest(
+        {
+          id: 'p_env_3',
+          method: 'peer.tool.invoke',
+          params: { tool: 'list_directory', args: { path: '.' } },
+        },
+        baseCtx,
+      );
+      expect(r.ok).toBe(true);
+    });
   });
 
   describe('streaming', () => {

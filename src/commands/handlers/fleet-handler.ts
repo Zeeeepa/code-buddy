@@ -77,6 +77,14 @@ Actions:
                                       "peer.echo". The peer's apiKey must
                                       have peer:invoke scope. Default
                                       timeout is 30000ms.
+  tool <peer> <name> [json-args]      (Phase (d).23 / V1.3) UX wrapper
+            [--timeout <ms>]          around peer.tool.invoke for the
+            [--stream]                read-only allowlist {view_file,
+                                      list_directory, search}. With
+                                      --stream, prints peer:chunk frames
+                                      live (uses peer.tool.invoke.stream).
+                                      Example: /fleet tool darkstar
+                                      view_file {"file_path":"README.md"}
   chat start <peer>                   (V1.2.1) UX wrapper around
        [--system "<prompt>"]          peer.chat-session.* — opens a
        [--model <id>]                 multi-turn session with stable alias
@@ -1065,11 +1073,137 @@ export async function handleFleet(args: string[]): Promise<CommandHandlerResult>
     return await handleChat(rest);
   }
 
+  if (action === 'tool') {
+    return await handleTool(rest);
+  }
+
   if (action === 'autonomous') {
     return await handleAutonomous(rest);
   }
 
   return textResult(`Unknown fleet action: ${args[0]}\n\n${HELP}`);
+}
+
+/**
+ * Phase (d).23 / V1.3 — `/fleet tool <peer> <name> [json-args]`
+ * [--timeout <ms>] [--stream]
+ *
+ * UX wrapper around peer.tool.invoke. Same JSON-blob parser as
+ * `/fleet send` (joins tokens until --timeout/--stream so users can
+ * paste un-quoted JSON). With --stream, uses
+ * peer.tool.invoke.stream and prints peer:chunk deltas via
+ * `process.stdout.write` (the user sees output flow while the call
+ * is in flight, then a final OK summary line).
+ */
+async function handleTool(rest: string[]): Promise<CommandHandlerResult> {
+  if (getFleetRegistry().size() === 0) {
+    return textResult('No fleet listeners active. Connect with /fleet listen first.');
+  }
+
+  let peerName: string | null = null;
+  let toolName: string | null = null;
+  let jsonArgs: string | null = null;
+  let timeoutMs = 30_000;
+  let stream = false;
+
+  for (let i = 0; i < rest.length; i++) {
+    const arg = rest[i];
+    if (arg === '--timeout' && i + 1 < rest.length) {
+      const n = parseInt(rest[i + 1], 10);
+      if (Number.isFinite(n) && n > 0) timeoutMs = n;
+      i++;
+    } else if (arg === '--stream') {
+      stream = true;
+    } else if (!peerName) {
+      peerName = arg;
+    } else if (!toolName) {
+      toolName = arg;
+    } else if (!jsonArgs) {
+      // Consume tokens until we hit a flag, mirroring /fleet send.
+      const remaining = rest.slice(i);
+      const flagIdx = remaining.findIndex((r) => r === '--timeout' || r === '--stream');
+      const blobEnd = flagIdx === -1 ? remaining.length : flagIdx;
+      jsonArgs = remaining.slice(0, blobEnd).join(' ');
+      i += blobEnd - 1;
+    }
+  }
+
+  if (!peerName || !toolName) {
+    return textResult(
+      'Usage: /fleet tool <peer> <name> [json-args] [--timeout <ms>] [--stream]\n\n' + HELP,
+    );
+  }
+
+  const target = getFleetRegistry().get(peerName);
+  if (!target) {
+    return textResult(
+      `No fleet peer named "${peerName}". Active peers: ${getFleetRegistry().ids().join(', ')}`,
+    );
+  }
+
+  let parsedArgs: Record<string, unknown> = {};
+  if (jsonArgs && jsonArgs.trim().length > 0) {
+    try {
+      const parsed = JSON.parse(jsonArgs);
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        return textResult('Error: tool args must be a JSON object (e.g. {"file_path":"README.md"}).');
+      }
+      parsedArgs = parsed as Record<string, unknown>;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return textResult(`Error: invalid JSON args: ${msg}`);
+    }
+  }
+
+  // The optional shape on FleetListenerPublicAPI lets test mocks omit
+  // these — guard so we fail clean instead of TypeError'ing in JS.
+  const invokeTool = target.listener.invokeTool?.bind(target.listener);
+  const invokeToolStream = target.listener.invokeToolStream?.bind(target.listener);
+  if (!invokeTool || !invokeToolStream) {
+    return textResult(
+      `Peer "${peerName}" listener does not expose invokeTool/invokeToolStream — likely an older Code Buddy build (pre-Phase d.23).`,
+    );
+  }
+
+  try {
+    const t0 = Date.now();
+    let payload: { tool: string; output: string; durationMs: number; truncated?: boolean };
+    if (stream) {
+      let streamedAny = false;
+      payload = await invokeToolStream(
+        toolName,
+        parsedArgs,
+        (delta: string) => {
+          streamedAny = true;
+          // Best-effort live print. In a TUI session this gives the
+          // operator immediate feedback without waiting for the final
+          // peer:response. Errors writing to stdout are non-fatal.
+          try { process.stdout.write(delta); } catch { /* ignore */ }
+        },
+        { timeoutMs },
+      );
+      if (streamedAny) {
+        try { process.stdout.write('\n'); } catch { /* ignore */ }
+      }
+    } else {
+      payload = await invokeTool(toolName, parsedArgs, { timeoutMs });
+    }
+    const elapsed = Date.now() - t0;
+    const tag = stream ? `${toolName} (stream)` : toolName;
+    const trunc = payload.truncated ? ' [truncated]' : '';
+    if (stream) {
+      // The body has already been streamed live — keep the summary terse.
+      return textResult(
+        `Peer "${peerName}" → ${tag} OK (${elapsed}ms)${trunc}: ${payload.output.length} bytes`,
+      );
+    }
+    return textResult(
+      `Peer "${peerName}" → ${tag} OK (${elapsed}ms)${trunc}:\n${payload.output}`,
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return textResult(`Peer "${peerName}" → ${toolName} FAILED:\n  ${message}`);
+  }
 }
 
 /**

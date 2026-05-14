@@ -36,6 +36,19 @@ export interface FleetListenerPublicAPI {
     onChunk: (delta: string) => void,
     options?: { timeoutMs?: number; traceId?: string; depth?: number },
   ) => Promise<unknown>;
+  /** Phase (d).23 / V1.3 — convenience wrapper around peer.tool.invoke. */
+  invokeTool?: (
+    toolName: string,
+    args?: Record<string, unknown>,
+    options?: { timeoutMs?: number; traceId?: string; depth?: number },
+  ) => Promise<{ tool: string; output: string; durationMs: number; truncated?: boolean }>;
+  /** Phase (d).23 / V1.3 — streaming variant; onChunk fires for every peer:chunk frame. */
+  invokeToolStream?: (
+    toolName: string,
+    args: Record<string, unknown>,
+    onChunk: (delta: string) => void,
+    options?: { timeoutMs?: number; traceId?: string; depth?: number },
+  ) => Promise<{ tool: string; output: string; durationMs: number; truncated?: boolean }>;
   getLastSeen: () => { at: number | null; reason: string | null; ageMs: number | null };
   isStale: (thresholdMs?: number) => boolean;
   getPeerCompactionState: () => {
